@@ -1,0 +1,193 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_text_styles.dart';
+import '../../core/widgets/custom_button.dart';
+import '../../core/widgets/custom_text_field.dart';
+import '../../core/widgets/glass_card.dart';
+import '../../core/providers/auth_provider.dart';
+
+class EditProfileScreen extends ConsumerStatefulWidget {
+  const EditProfileScreen({super.key});
+
+  @override
+  ConsumerState<EditProfileScreen> createState() => _EditProfileScreenState();
+}
+
+class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
+  final _formKey = GlobalKey<FormState>();
+  late TextEditingController _nameController;
+  late TextEditingController _emailController;
+
+  @override
+  void initState() {
+    super.initState();
+    final user = ref.read(authProvider).user;
+    _nameController = TextEditingController(text: user?.name ?? '');
+    _emailController = TextEditingController(text: user?.email ?? '');
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    super.dispose();
+  }
+
+  void _handleSave() {
+    if (_formKey.currentState!.validate()) {
+      ref.read(authProvider.notifier).updateProfile(
+            _nameController.text,
+            _emailController.text,
+          );
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Profile updated successfully!'),
+          backgroundColor: AppColors.success,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+      context.pop();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.bgDark,
+      body: Container(
+        decoration: const BoxDecoration(gradient: AppColors.bgGradientDark),
+        child: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Back + Title Row
+                  Row(
+                    children: [
+                      GestureDetector(
+                        onTap: () => context.pop(),
+                        child: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: AppColors.cardDark,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: AppColors.borderDark),
+                          ),
+                          child: const Icon(Icons.arrow_back_rounded,
+                              color: Colors.white, size: 20),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Text(
+                        'Edit Profile',
+                        style: AppTextStyles.title(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ).animate().fadeIn().slideX(begin: -0.1),
+
+                  const SizedBox(height: 36),
+
+                  // Avatar Edit Circle
+                  Center(
+                    child: Stack(
+                      children: [
+                        Container(
+                          width: 100,
+                          height: 100,
+                          decoration: BoxDecoration(
+                            gradient: AppColors.purpleCyanGradient,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 3),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.primary.withValues(alpha: 0.4),
+                                blurRadius: 16,
+                                offset: const Offset(0, 6),
+                              ),
+                            ],
+                          ),
+                          child: Center(
+                            child: Text(
+                              _nameController.text.isNotEmpty
+                                  ? _nameController.text[0].toUpperCase()
+                                  : 'U',
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 38,
+                                  fontWeight: FontWeight.w900),
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          bottom: 0,
+                          right: 0,
+                          child: Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: const BoxDecoration(
+                              color: AppColors.primary,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.camera_alt_rounded,
+                              color: Colors.white,
+                              size: 16,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ).animate().scale(curve: Curves.elasticOut, duration: 600.ms),
+
+                  const SizedBox(height: 40),
+
+                  // Fields inside GlassCard
+                  GlassCard(
+                    padding: const EdgeInsets.all(24),
+                    borderRadius: BorderRadius.circular(24),
+                    child: Column(
+                      children: [
+                        CustomTextField(
+                          labelText: 'Full Name',
+                          hintText: 'John Doe',
+                          prefixIcon: Icons.person_outline_rounded,
+                          controller: _nameController,
+                          validator: (val) => val == null || val.isEmpty ? 'Enter name' : null,
+                        ),
+                        const SizedBox(height: 20),
+                        CustomTextField(
+                          labelText: 'Email Address',
+                          hintText: 'yourname@uclm.edu',
+                          prefixIcon: Icons.email_outlined,
+                          controller: _emailController,
+                          keyboardType: TextInputType.emailAddress,
+                          validator: (val) => val == null || val.isEmpty ? 'Enter email' : null,
+                        ),
+                        const SizedBox(height: 32),
+                        CustomButton(
+                          text: 'Save Changes',
+                          onPressed: _handleSave,
+                          icon: Icons.check_circle_outline_rounded,
+                        ),
+                      ],
+                    ),
+                  ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.08),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

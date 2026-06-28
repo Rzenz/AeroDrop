@@ -1,6 +1,5 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -229,7 +228,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                               height: 32,
                                               child: CustomPaint(
                                                 size: const Size(32, 32),
-                                                painter: _DroneSvgPainter(
+                                                painter: DroneSvgPainter(
                                                   animationValue:
                                                       _bgRotateController.value,
                                                   lineColor: AppColors.bgDark,
@@ -354,7 +353,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Text(
-                                  "New to the fleet?",
+                                  "Don't have an Account?",
                                   style: AppTextStyles.body(
                                     fontSize: 14,
                                     color: AppColors.textSecondaryDark,
@@ -374,68 +373,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                               ],
                             ).animate().fadeIn(delay: 300.ms),
 
-                            const SizedBox(height: 24),
-
-                            // Quick Access Sessions
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                Center(
-                                  child: Text(
-                                    'QUICK ACCESS SESSIONS',
-                                    style: AppTextStyles.label(
-                                      fontSize: 11,
-                                      color: AppColors.textSecondaryDark,
-                                    ),
-                                  ),
-                                ).animate().fadeIn(delay: 350.ms),
-                                const SizedBox(height: 16),
-                                Row(
-                                      children: [
-                                        Expanded(
-                                          child: _QuickAccessButton(
-                                            title: 'User Portal',
-                                            subtitle: 'john.doe',
-                                            icon: Icons.person_outline_rounded,
-                                            accentColor: AppColors.primaryLight,
-                                            onTap: () {
-                                              _emailController.text =
-                                                  'john.doe@uclm.edu';
-                                              _passwordController.text =
-                                                  'password123';
-                                              _handleLogin();
-                                            },
-                                          ),
-                                        ),
-                                        const SizedBox(width: 12),
-                                        Expanded(
-                                          child: _QuickAccessButton(
-                                            title: 'Command Deck',
-                                            subtitle: 'admin.portal',
-                                            icon: Icons
-                                                .admin_panel_settings_outlined,
-                                            accentColor: AppColors.accent,
-                                            onTap: () {
-                                              _emailController.text =
-                                                  'admin.portal@uclm.edu';
-                                              _passwordController.text =
-                                                  'admin123';
-                                              _handleLogin();
-                                            },
-                                          ),
-                                        ),
-                                      ],
-                                    )
-                                    .animate()
-                                    .fadeIn(delay: 400.ms)
-                                    .slideY(
-                                      begin: 0.08,
-                                      end: 0,
-                                      curve: Curves.easeOutCubic,
-                                    ),
-                                const SizedBox(height: 32),
-                              ],
-                            ),
+                            const SizedBox(height: 16),
                           ],
                         ),
                       ),
@@ -451,124 +389,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   }
 }
 
-class _QuickAccessButton extends StatefulWidget {
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final Color accentColor;
-  final VoidCallback onTap;
-
-  const _QuickAccessButton({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.accentColor,
-    required this.onTap,
-  });
-
-  @override
-  State<_QuickAccessButton> createState() => _QuickAccessButtonState();
-}
-
-class _QuickAccessButtonState extends State<_QuickAccessButton>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _ctrl;
-  late Animation<double> _scale;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 90),
-    );
-    _scale = Tween<double>(
-      begin: 1.0,
-      end: 0.95,
-    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapDown: (_) {
-        HapticFeedback.lightImpact();
-        _ctrl.forward();
-      },
-      onTapUp: (_) {
-        _ctrl.reverse();
-        widget.onTap();
-      },
-      onTapCancel: () => _ctrl.reverse(),
-      child: ScaleTransition(
-        scale: _scale,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-          decoration: BoxDecoration(
-            color: AppColors.cardDark,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: widget.accentColor.withValues(alpha: 0.25),
-              width: 1.5,
-            ),
-          ),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: widget.accentColor.withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(widget.icon, color: widget.accentColor, size: 18),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      widget.title,
-                      style: AppTextStyles.title(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      widget.subtitle,
-                      style: AppTextStyles.body(
-                        fontSize: 11,
-                        color: AppColors.textSecondaryDark,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _DroneSvgPainter extends CustomPainter {
+class DroneSvgPainter extends CustomPainter {
   final double animationValue;
   final Color lineColor;
   final Color accentColor;
 
-  _DroneSvgPainter({
+  DroneSvgPainter({
     required this.animationValue,
     this.lineColor = Colors.white,
     this.accentColor = const Color(0xFF4F46E5),
@@ -838,7 +664,7 @@ class _DroneSvgPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _DroneSvgPainter oldDelegate) {
+  bool shouldRepaint(covariant DroneSvgPainter oldDelegate) {
     return oldDelegate.animationValue != animationValue ||
         oldDelegate.lineColor != lineColor ||
         oldDelegate.accentColor != accentColor;

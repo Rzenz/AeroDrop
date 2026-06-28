@@ -12,7 +12,7 @@ import '../../features/auth/onboarding_screen.dart';
 import '../../features/auth/login_screen.dart';
 import '../../features/auth/register_screen.dart';
 import '../../features/auth/forgot_password_screen.dart';
-import '../../features/auth/presentation/pages/email_verification_page.dart';
+import '../../features/auth/verification_page.dart';
 import '../../features/auth/presentation/pages/account_pending_page.dart';
 
 import '../../features/dashboard/user_shell.dart';
@@ -123,8 +123,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         pageBuilder: (context, state) => _slide(state, const ForgotPasswordScreen()),
       ),
       GoRoute(
-        path: '/email-verification',
-        pageBuilder: (context, state) => _fade(state, const EmailVerificationPage()),
+        path: '/verification',
+        pageBuilder: (context, state) => _fade(state, const VerificationPage()),
       ),
       GoRoute(
         path: '/account-pending',

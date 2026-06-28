@@ -289,7 +289,7 @@ class AdminDashboardScreen extends ConsumerWidget {
                 delivery: e.value,
                 onTap: () => context.go('/admin/deliveries/details?id=${e.value.id}'),
               )
-                  .animate(delay: Duration(milliseconds: 460 + e.key * 80))
+                  .animate(delay: Duration(milliseconds: (460 + e.key * 80).toInt()))
                   .fadeIn()
                   .slideX(begin: 0.04);
             }),

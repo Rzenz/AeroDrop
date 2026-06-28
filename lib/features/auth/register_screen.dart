@@ -52,11 +52,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         await Future.delayed(const Duration(milliseconds: 150));
         if (!mounted) return;
 
-        if (_selectedRole == UserRole.admin) {
-          context.go('/admin');
-        } else {
-          context.go('/user');
-        }
+        context.go('/verification');
       }
     }
   }

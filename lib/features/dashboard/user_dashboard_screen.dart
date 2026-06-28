@@ -11,10 +11,8 @@ import '../../core/widgets/section_header.dart';
 import '../../core/widgets/staggered_list.dart';
 import '../../core/widgets/status_chip.dart';
 import '../../core/providers/delivery_provider.dart';
-import '../../core/providers/drone_provider.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/models/delivery_model.dart';
-import '../../core/models/drone_model.dart';
 
 class UserDashboardScreen extends ConsumerWidget {
   const UserDashboardScreen({super.key});
@@ -23,11 +21,8 @@ class UserDashboardScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authProvider).user;
     final deliveries = ref.watch(deliveryProvider);
-    final drones = ref.watch(droneProvider);
 
     final active = deliveries.where((d) => d.status == DeliveryStatus.inTransit).toList();
-    final completed = deliveries.where((d) => d.status == DeliveryStatus.delivered).toList();
-    final availDrones = drones.where((d) => d.status == DroneStatus.available).length;
 
     final hour = DateTime.now().hour;
     final greeting = hour < 12
@@ -138,34 +133,6 @@ class UserDashboardScreen extends ConsumerWidget {
                   children: [
                     // Quick Actions Grid (Moved to top)
                     _QuickActions(),
-
-                    const SizedBox(height: 24),
-
-                    // Quick Stats Row
-                    Row(
-                      children: [
-                        _StatPill(
-                          label: 'Active',
-                          value: '${active.length}',
-                          color: AppColors.primaryLight,
-                          icon: Icons.flight_takeoff_rounded,
-                        ),
-                        const SizedBox(width: 12),
-                        _StatPill(
-                          label: 'Completed',
-                          value: '${completed.length}',
-                          color: AppColors.success,
-                          icon: Icons.check_circle_rounded,
-                        ),
-                        const SizedBox(width: 12),
-                        _StatPill(
-                          label: 'Available',
-                          value: '$availDrones',
-                          color: AppColors.accent,
-                          icon: Icons.precision_manufacturing_rounded,
-                        ),
-                      ],
-                    ),
 
                     const SizedBox(height: 28),
 
@@ -320,58 +287,7 @@ class UserDashboardScreen extends ConsumerWidget {
   }
 }
 
-class _StatPill extends StatelessWidget {
-  final String label;
-  final String value;
-  final Color color;
-  final IconData icon;
 
-  const _StatPill({
-    required this.label,
-    required this.value,
-    required this.color,
-    required this.icon,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: color.withValues(alpha: 0.25),
-            width: 1.5,
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, color: color, size: 20),
-            const SizedBox(height: 8),
-            Text(
-              value,
-              style: AppTextStyles.display(
-                fontSize: 22,
-                color: color,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: AppTextStyles.label(
-                fontSize: 10,
-                color: AppColors.textSecondaryDark,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 class _QuickActions extends StatelessWidget {
   Widget _buildActionCard(_QuickActionData a, {double margin = 0}) {

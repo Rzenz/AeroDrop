@@ -63,116 +63,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> with TickerProvider
         gradientEnd: Alignment.bottomRight,
         colors: [const Color(0xFF0D1B2A), const Color(0xFF1565C0)],
         illustrationBuilder: (context, animController) {
-          final size = isSmallScreen ? 180.0 : 250.0;
           return Center(
-            child: AnimatedBuilder(
-              animation: animController,
-              builder: (context, child) {
-                // Subtle floating up-and-down effect
-                final floatOffset = Offset(0, -10 * math.sin(animController.value * 2 * math.pi));
-                return Transform.translate(
-                  offset: floatOffset,
-                  child: child,
-                );
-              },
-              child: SizedBox(
-                width: size,
-                height: size,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    // Drone Body Glow Shadow
-                    Container(
-                      width: size * 0.4,
-                      height: size * 0.4,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.primary.withValues(alpha: 0.15),
-                            blurRadius: 28,
-                            spreadRadius: 4,
-                          ),
-                        ],
-                      ),
-                    ),
-                    // Drone Arms (X-Shape) - Ultra Minimalist Thin Lines
-                    Transform.rotate(
-                      angle: math.pi / 4,
-                      child: Container(
-                        width: size * 0.72,
-                        height: 3,
-                        decoration: BoxDecoration(
-                          color: Colors.white10,
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                    ),
-                    Transform.rotate(
-                      angle: -math.pi / 4,
-                      child: Container(
-                        width: size * 0.72,
-                        height: 3,
-                        decoration: BoxDecoration(
-                          color: Colors.white10,
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                    ),
-                    // Drone Propeller Motors (4 corners)
-                    ...List.generate(4, (index) {
-                      final angle = (index * 90 + 45) * math.pi / 180;
-                      final dist = size * 0.36;
-                      final x = dist * math.cos(angle);
-                      final y = dist * math.sin(angle);
-                      return Positioned(
-                        left: (size / 2) + x - (size * 0.125),
-                        top: (size / 2) + y - (size * 0.125),
-                        child: _PropellerWidget(
-                          size: size * 0.25,
-                        ),
-                      );
-                    }),
-                    // Central Drone Body - Minimalist Glassmorphic Circle
-                    Container(
-                      width: size * 0.35,
-                      height: size * 0.35,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF101926),
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.12),
-                          width: 1.5,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.5),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.radar_rounded,
-                        color: Colors.white70,
-                        size: 32,
-                      ),
-                    ),
-                    // Camera Lens Accent (Gold Dot)
-                    Positioned(
-                      bottom: size * 0.36,
-                      child: Container(
-                        width: 6,
-                        height: 6,
-                        decoration: const BoxDecoration(
-                          color: AppColors.accent,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+            child: _DroneAndTruckIllustration(
+              animController: animController,
+              size: isSmallScreen ? 180.0 : 240.0,
             ),
           );
         },
@@ -698,6 +592,303 @@ class _PropellerWidgetState extends State<_PropellerWidget>
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DroneAndTruckIllustration extends StatelessWidget {
+  final AnimationController animController;
+  final double size;
+
+  const _DroneAndTruckIllustration({
+    required this.animController,
+    required this.size,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // 1. Sleek Minimalist Delivery Truck at the bottom
+          Positioned(
+            bottom: size * 0.05,
+            child: _MinimalistTruckWidget(
+              animController: animController,
+              size: size * 0.8,
+            ),
+          ),
+          // 2. Minimalist FontAwesome-style Drone hovering at the top
+          Positioned(
+            top: size * 0.05,
+            child: AnimatedBuilder(
+              animation: animController,
+              builder: (context, child) {
+                final floatOffset = Offset(0, -10 * math.sin(animController.value * 2 * math.pi));
+                return Transform.translate(
+                  offset: floatOffset,
+                  child: child,
+                );
+              },
+              child: _FontAwesomeDroneWidget(
+                size: size * 0.45,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FontAwesomeDroneWidget extends StatelessWidget {
+  final double size;
+
+  const _FontAwesomeDroneWidget({required this.size});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // 4 Diagonal Arms (X-Shape)
+          ...List.generate(4, (index) {
+            final angle = (index * 90 + 45) * math.pi / 180;
+            return Transform.rotate(
+              angle: angle,
+              child: Container(
+                width: size * 0.8,
+                height: 3,
+                decoration: BoxDecoration(
+                  color: Colors.white12,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            );
+          }),
+          // 4 Propellers and Motors on the corners
+          ...List.generate(4, (index) {
+            final angle = (index * 90 + 45) * math.pi / 180;
+            final dist = size * 0.38;
+            final x = dist * math.cos(angle);
+            final y = dist * math.sin(angle);
+            return Positioned(
+              left: (size / 2) + x - (size * 0.125),
+              top: (size / 2) + y - (size * 0.125),
+              child: _PropellerWidget(size: size * 0.25),
+            );
+          }),
+          // Center Body (FontAwesome-style circular core)
+          Container(
+            width: size * 0.35,
+            height: size * 0.35,
+            decoration: BoxDecoration(
+              color: const Color(0xFF101926),
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: Colors.white24,
+                width: 1.5,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.accent.withValues(alpha: 0.1),
+                  blurRadius: 16,
+                  spreadRadius: 2,
+                ),
+              ],
+            ),
+            child: const Icon(
+              Icons.radar_rounded,
+              color: Colors.white70,
+              size: 20,
+            ),
+          ),
+          // Small Camera Lens on the front of the body
+          Positioned(
+            top: size * 0.36,
+            child: Container(
+              width: 5,
+              height: 5,
+              decoration: const BoxDecoration(
+                color: AppColors.accent,
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MinimalistTruckWidget extends StatelessWidget {
+  final AnimationController animController;
+  final double size;
+
+  const _MinimalistTruckWidget({
+    required this.animController,
+    required this.size,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final truckHeight = size * 0.42;
+    final cabinWidth = size * 0.24;
+    final cargoWidth = size * 0.72;
+
+    return SizedBox(
+      width: size,
+      height: truckHeight + 20,
+      child: Stack(
+        alignment: Alignment.bottomLeft,
+        children: [
+          // Cargo Box (Left side of the truck)
+          Positioned(
+            left: 0,
+            bottom: 12,
+            child: Container(
+              width: cargoWidth,
+              height: truckHeight,
+              decoration: BoxDecoration(
+                color: const Color(0xFF101926),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.08),
+                  width: 1.5,
+                ),
+              ),
+              child: const Center(
+                child: Icon(
+                  Icons.local_shipping_rounded,
+                  color: Colors.white10,
+                  size: 32,
+                ),
+              ),
+            ),
+          ),
+          // Cabin (Right side of the truck - front)
+          Positioned(
+            left: cargoWidth - 4,
+            bottom: 12,
+            child: Container(
+              width: cabinWidth,
+              height: truckHeight * 0.8,
+              decoration: BoxDecoration(
+                color: const Color(0xFF1A2638),
+                borderRadius: const BorderRadius.only(
+                  topRight: Radius.circular(12),
+                  bottomRight: Radius.circular(12),
+                ),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.08),
+                  width: 1.5,
+                ),
+              ),
+              child: Align(
+                alignment: Alignment.topRight,
+                child: Padding(
+                  padding: const EdgeInsets.all(6.0),
+                  child: Container(
+                    width: cabinWidth * 0.5,
+                    height: truckHeight * 0.3,
+                    decoration: BoxDecoration(
+                      color: AppColors.accent.withValues(alpha: 0.1),
+                      borderRadius: const BorderRadius.only(
+                        topRight: Radius.circular(6),
+                      ),
+                      border: Border.all(
+                        color: AppColors.accent.withValues(alpha: 0.2),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          // Back Wheel
+          Positioned(
+            left: cargoWidth * 0.25 - 10,
+            bottom: 2,
+            child: _WheelWidget(animController: animController),
+          ),
+          // Middle Wheel
+          Positioned(
+            left: cargoWidth * 0.75 - 10,
+            bottom: 2,
+            child: _WheelWidget(animController: animController),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WheelWidget extends StatefulWidget {
+  final AnimationController animController;
+
+  const _WheelWidget({required this.animController});
+
+  @override
+  State<_WheelWidget> createState() => _WheelWidgetState();
+}
+
+class _WheelWidgetState extends State<_WheelWidget>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _rollController;
+
+  @override
+  void initState() {
+    super.initState();
+    _rollController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _rollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _rollController,
+      builder: (context, child) {
+        return Transform.rotate(
+          angle: _rollController.value * 2 * math.pi,
+          child: child,
+        );
+      },
+      child: Container(
+        width: 20,
+        height: 20,
+        decoration: BoxDecoration(
+          color: const Color(0xFF0D1B2A),
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: Colors.white24,
+            width: 2,
+          ),
+        ),
+        child: Center(
+          child: Container(
+            width: 5,
+            height: 5,
+            decoration: const BoxDecoration(
+              color: AppColors.accent,
+              shape: BoxShape.circle,
+            ),
+          ),
         ),
       ),
     );

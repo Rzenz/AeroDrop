@@ -11,7 +11,6 @@ import '../../core/widgets/gradient_button.dart';
 import '../../core/widgets/custom_text_field.dart';
 import '../../core/widgets/glass_card.dart';
 import '../../core/providers/auth_provider.dart';
-import '../../core/models/user_model.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -60,12 +59,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         await Future.delayed(const Duration(milliseconds: 150));
         if (!mounted) return;
 
-        final user = ref.read(authProvider).user;
-        if (user?.role == UserRole.admin) {
-          context.go('/admin');
-        } else {
-          context.go('/user');
-        }
+        context.go('/verification');
       }
     }
   }

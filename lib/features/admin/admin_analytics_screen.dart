@@ -124,7 +124,6 @@ class AdminAnalyticsScreen extends StatelessWidget {
                         barTouchData: BarTouchData(
                           touchTooltipData: BarTouchTooltipData(
                             getTooltipColor: (_) => AppColors.cardDark2,
-                            tooltipRoundedRadius: 8,
                             getTooltipItem: (group, groupIndex, rod, rodIndex) => BarTooltipItem(
                               '${rod.toY.toInt()} pkgs',
                               const TextStyle(color: Colors.white, fontSize: 12),

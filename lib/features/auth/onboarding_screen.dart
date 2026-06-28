@@ -612,285 +612,200 @@ class _DroneAndTruckIllustration extends StatelessWidget {
     return SizedBox(
       width: size,
       height: size,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          // 1. Sleek Minimalist Delivery Truck at the bottom
-          Positioned(
-            bottom: size * 0.05,
-            child: _MinimalistTruckWidget(
-              animController: animController,
-              size: size * 0.8,
+      child: AnimatedBuilder(
+        animation: animController,
+        builder: (context, child) {
+          // Floating hovering animation
+          final floatOffset = Offset(0, -12 * math.sin(animController.value * 2 * math.pi));
+          return Transform.translate(
+            offset: floatOffset,
+            child: CustomPaint(
+              size: Size(size, size),
+              painter: _DroneSvgPainter(animationValue: animController.value),
             ),
-          ),
-          // 2. Minimalist FontAwesome-style Drone hovering at the top
-          Positioned(
-            top: size * 0.05,
-            child: AnimatedBuilder(
-              animation: animController,
-              builder: (context, child) {
-                final floatOffset = Offset(0, -10 * math.sin(animController.value * 2 * math.pi));
-                return Transform.translate(
-                  offset: floatOffset,
-                  child: child,
-                );
-              },
-              child: _FontAwesomeDroneWidget(
-                size: size * 0.45,
-              ),
-            ),
-          ),
-        ],
+          );
+        },
       ),
     );
   }
 }
 
-class _FontAwesomeDroneWidget extends StatelessWidget {
-  final double size;
+class _DroneSvgPainter extends CustomPainter {
+  final double animationValue;
 
-  const _FontAwesomeDroneWidget({required this.size});
+  _DroneSvgPainter({required this.animationValue});
 
   @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: size,
-      height: size,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          // 4 Diagonal Arms (X-Shape)
-          ...List.generate(4, (index) {
-            final angle = (index * 90 + 45) * math.pi / 180;
-            return Transform.rotate(
-              angle: angle,
-              child: Container(
-                width: size * 0.8,
-                height: 3,
-                decoration: BoxDecoration(
-                  color: Colors.white12,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            );
-          }),
-          // 4 Propellers and Motors on the corners
-          ...List.generate(4, (index) {
-            final angle = (index * 90 + 45) * math.pi / 180;
-            final dist = size * 0.38;
-            final x = dist * math.cos(angle);
-            final y = dist * math.sin(angle);
-            return Positioned(
-              left: (size / 2) + x - (size * 0.125),
-              top: (size / 2) + y - (size * 0.125),
-              child: _PropellerWidget(size: size * 0.25),
-            );
-          }),
-          // Center Body (FontAwesome-style circular core)
-          Container(
-            width: size * 0.35,
-            height: size * 0.35,
-            decoration: BoxDecoration(
-              color: const Color(0xFF101926),
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: Colors.white24,
-                width: 1.5,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.accent.withValues(alpha: 0.1),
-                  blurRadius: 16,
-                  spreadRadius: 2,
-                ),
-              ],
-            ),
-            child: const Icon(
-              Icons.radar_rounded,
-              color: Colors.white70,
-              size: 20,
-            ),
-          ),
-          // Small Camera Lens on the front of the body
-          Positioned(
-            top: size * 0.36,
-            child: Container(
-              width: 5,
-              height: 5,
-              decoration: const BoxDecoration(
-                color: AppColors.accent,
-                shape: BoxShape.circle,
-              ),
-            ),
-          ),
-        ],
+  void paint(Canvas canvas, Size size) {
+    final double w = size.width;
+    
+    // Scale factor to map 0..400 coordinate space to the actual size
+    double s(double val) => val * w / 400.0;
+
+    // Paints
+    final linePaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.9)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = s(12.0)
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    final accentPaint = Paint()
+      ..color = const Color(0xFF4F46E5) // Indigo from SVG
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = s(12.0)
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    final propellerPaint = Paint()
+      ..color = const Color(0xFF4F46E5) // Indigo from SVG
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = s(12.0)
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    // 1. Left Motor Mount
+    // <path d="M94.65,91.35v17.77c-8.24,3.98-17.76,7.46-29.74,9.89v-27.66c0-8.21,6.66-14.87,14.87-14.87,4.1,0,7.82,1.66,10.51,4.36,2.69,2.69,4.36,6.4,4.36,10.51Z"/>
+    final path1 = Path()
+      ..moveTo(s(94.65), s(91.35))
+      ..lineTo(s(94.65), s(109.12))
+      ..cubicTo(s(86.41), s(113.1), s(76.89), s(116.58), s(64.91), s(119.01))
+      ..lineTo(s(64.91), s(91.35))
+      ..cubicTo(s(64.91), s(83.14), s(71.57), s(76.48), s(79.78), s(76.48))
+      ..cubicTo(s(83.88), s(76.48), s(87.6), s(78.14), s(90.29), s(80.83))
+      ..cubicTo(s(92.98), s(83.52), s(94.65), s(87.23), s(94.65), s(91.35))
+      ..close();
+    canvas.drawPath(path1, linePaint);
+
+    // 2. Left Motor Shaft
+    // <line x1="79.783" y1="76.478" x2="79.783" y2="50"/>
+    canvas.drawLine(Offset(s(79.783), s(76.478)), Offset(s(79.783), s(50.0)), linePaint);
+
+    // 3. Right Motor Mount
+    // <path d="M322.99,91.35v24.59c-12.03-3.64-21.31-8.42-29.74-13.5v-11.09c0-8.21,6.66-14.87,14.87-14.87,4.1,0,7.82,1.66,10.51,4.36,2.69,2.69,4.36,6.4,4.36,10.51Z"/>
+    final path2 = Path()
+      ..moveTo(s(322.99), s(91.35))
+      ..lineTo(s(322.99), s(115.94))
+      ..cubicTo(s(310.96), s(112.3), s(301.68), s(107.52), s(293.25), s(102.44))
+      ..lineTo(s(293.25), s(91.35))
+      ..cubicTo(s(293.25), s(83.14), s(299.91), s(76.48), s(308.12), s(76.48))
+      ..cubicTo(s(312.22), s(76.48), s(315.94), s(78.14), s(318.63), s(80.83))
+      ..cubicTo(s(321.32), s(83.52), s(323.0), s(87.23), s(323.0), s(91.35))
+      ..close();
+    canvas.drawPath(path2, linePaint);
+
+    // 4. Right Motor Shaft
+    // <line x1="308.12" y1="76.478" x2="308.12" y2="50"/>
+    canvas.drawLine(Offset(s(308.12), s(76.478)), Offset(s(308.12), s(50.0)), linePaint);
+
+    // 5. Lower body structure
+    // <path d="M271.217,155.102v11.181c0,8.945-7.251,16.196-16.196,16.196h-110.043c-8.945,0-16.196-7.251-16.196-16.196v-11.181"/>
+    final path3 = Path()
+      ..moveTo(s(271.217), s(155.102))
+      ..lineTo(s(271.217), s(166.283))
+      ..cubicTo(s(271.217), s(175.228), s(263.966), s(182.479), s(255.021), s(182.479))
+      ..lineTo(s(144.979), s(182.479))
+      ..cubicTo(s(136.034), s(182.479), s(128.783), s(175.228), s(128.783), s(166.283))
+      ..lineTo(s(128.783), s(155.102));
+    canvas.drawPath(path3, linePaint);
+
+    // 6. Drone Main Aerodynamic Body
+    // <path d="M335.381,119.043c-57.801-11.688-58.25-47.577-135.231-47.622h0c-.024-.001-.048,0-.072,0s-.048,0-.072,0h0c-76.981.047-77.43,35.935-135.231,47.623-8.527,1.724-14.696,9.158-14.696,17.858h0c0,10.052,8.149,18.201,18.2,18.201h263.599c10.052,0,18.201-8.149,18.201-18.201h0c0-8.7-6.169-16.134-14.696-17.858Z"/>
+    final path4 = Path()
+      ..moveTo(s(335.381), s(119.043))
+      ..cubicTo(s(277.58), s(107.355), s(277.13), s(71.466), s(200.149), s(71.421))
+      ..cubicTo(s(123.168), s(71.466), s(122.719), s(107.355), s(64.919), s(119.043))
+      ..cubicTo(s(56.392), s(120.767), s(50.222), s(128.201), s(50.222), s(136.901))
+      ..cubicTo(s(50.222), s(146.953), s(58.371), s(155.102), s(68.423), s(155.102))
+      ..lineTo(s(332.022), s(155.102))
+      ..cubicTo(s(342.074), s(155.102), s(350.223), s(146.953), s(350.223), s(136.901))
+      ..cubicTo(s(350.223), s(128.201), s(344.053), s(120.767), s(335.381), s(119.043))
+      ..close();
+    canvas.drawPath(path4, linePaint);
+
+    // 7. Center eye/camera
+    // <circle cx="200" cy="113.261" r="20.935"/>
+    canvas.drawCircle(Offset(s(200.0), s(113.261)), s(20.935), linePaint);
+
+    // 8. Left Leg
+    // <path d="M94.297,155.102l-19.181,43.472c-6.409,14.525-3.569,31.469,7.225,43.111l28.39,30.619"/>
+    final path5 = Path()
+      ..moveTo(s(94.297), s(155.102))
+      ..lineTo(s(75.116), s(198.574))
+      ..cubicTo(s(68.707), s(213.099), s(71.547), s(230.043), s(82.341), s(241.685))
+      ..lineTo(s(110.731), s(272.304));
+    canvas.drawPath(path5, linePaint);
+
+    // 9. Right Leg
+    // <path d="M305.703,155.102l19.181,43.472c6.409,14.525,3.569,31.469-7.225,43.111l-28.39,30.619"/>
+    final path6 = Path()
+      ..moveTo(s(305.703), s(155.102))
+      ..lineTo(s(324.884), s(198.574))
+      ..cubicTo(s(331.293), s(213.099), s(328.453), s(230.043), s(317.659), s(241.685))
+      ..lineTo(s(289.269), s(272.304));
+    canvas.drawPath(path6, linePaint);
+
+    // 10. Secondary/Back Box Part
+    // <path d="M174.735,220.319h98.66c8.566,0,15.51,6.944,15.51,15.51v98.66c0,8.566-6.944,15.51-15.51,15.51h-98.66"
+    final path7 = Path()
+      ..moveTo(s(174.735), s(220.319))
+      ..lineTo(s(273.395), s(220.319))
+      ..cubicTo(s(281.961), s(220.319), s(288.905), s(227.263), s(288.905), s(235.829))
+      ..lineTo(s(288.905), s(334.489))
+      ..cubicTo(s(288.905), s(343.055), s(281.961), s(350.0), s(273.395), s(350.0))
+      ..lineTo(s(174.735), s(350.0));
+    canvas.drawPath(path7, linePaint);
+
+    // 11. Main Cargo Box
+    // <rect x="111.225" y="220.319" width="129.681" height="129.681" rx="15.51" ry="15.51"/>
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(s(111.225), s(220.319), s(129.681), s(129.681)),
+        Radius.circular(s(15.51)),
       ),
+      linePaint,
     );
-  }
-}
 
-class _MinimalistTruckWidget extends StatelessWidget {
-  final AnimationController animController;
-  final double size;
+    // 12. Box Latch/Ribbon (Indigo in SVG)
+    // <path d="M159.289,220.319h33.552v39.787c0,4.881-3.963,8.843-8.843,8.843h-15.865c-4.881,0-8.843-3.963-8.843-8.843v-39.787h0Z"/>
+    final path8 = Path()
+      ..moveTo(s(159.289), s(220.319))
+      ..lineTo(s(192.841), s(220.319))
+      ..lineTo(s(192.841), s(260.106))
+      ..cubicTo(s(192.841), s(264.987), s(188.878), s(268.95), s(183.997), s(268.95))
+      ..lineTo(s(168.132), s(268.95))
+      ..cubicTo(s(163.251), s(268.95), s(159.289), s(264.987), s(159.289), s(260.106))
+      ..close();
+    canvas.drawPath(path8, accentPaint);
 
-  const _MinimalistTruckWidget({
-    required this.animController,
-    required this.size,
-  });
+    // 13. Spinning Propellers (Indigo in SVG)
+    final double propellerRotation = animationValue * 8 * math.pi; // Fast spin
 
-  @override
-  Widget build(BuildContext context) {
-    final truckHeight = size * 0.42;
-    final cabinWidth = size * 0.24;
-    final cargoWidth = size * 0.72;
-
-    return SizedBox(
-      width: size,
-      height: truckHeight + 20,
-      child: Stack(
-        alignment: Alignment.bottomLeft,
-        children: [
-          // Cargo Box (Left side of the truck)
-          Positioned(
-            left: 0,
-            bottom: 12,
-            child: Container(
-              width: cargoWidth,
-              height: truckHeight,
-              decoration: BoxDecoration(
-                color: const Color(0xFF101926),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.08),
-                  width: 1.5,
-                ),
-              ),
-              child: const Center(
-                child: Icon(
-                  Icons.local_shipping_rounded,
-                  color: Colors.white10,
-                  size: 32,
-                ),
-              ),
-            ),
-          ),
-          // Cabin (Right side of the truck - front)
-          Positioned(
-            left: cargoWidth - 4,
-            bottom: 12,
-            child: Container(
-              width: cabinWidth,
-              height: truckHeight * 0.8,
-              decoration: BoxDecoration(
-                color: const Color(0xFF1A2638),
-                borderRadius: const BorderRadius.only(
-                  topRight: Radius.circular(12),
-                  bottomRight: Radius.circular(12),
-                ),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.08),
-                  width: 1.5,
-                ),
-              ),
-              child: Align(
-                alignment: Alignment.topRight,
-                child: Padding(
-                  padding: const EdgeInsets.all(6.0),
-                  child: Container(
-                    width: cabinWidth * 0.5,
-                    height: truckHeight * 0.3,
-                    decoration: BoxDecoration(
-                      color: AppColors.accent.withValues(alpha: 0.1),
-                      borderRadius: const BorderRadius.only(
-                        topRight: Radius.circular(6),
-                      ),
-                      border: Border.all(
-                        color: AppColors.accent.withValues(alpha: 0.2),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-          // Back Wheel
-          Positioned(
-            left: cargoWidth * 0.25 - 10,
-            bottom: 2,
-            child: _WheelWidget(animController: animController),
-          ),
-          // Middle Wheel
-          Positioned(
-            left: cargoWidth * 0.75 - 10,
-            bottom: 2,
-            child: _WheelWidget(animController: animController),
-          ),
-        ],
-      ),
+    // Left Propeller
+    canvas.save();
+    canvas.translate(s(79.783), s(50.0));
+    canvas.rotate(propellerRotation);
+    canvas.drawLine(
+      Offset(-s(41.957), 0),
+      Offset(s(41.957), 0),
+      propellerPaint,
     );
-  }
-}
+    canvas.restore();
 
-class _WheelWidget extends StatefulWidget {
-  final AnimationController animController;
-
-  const _WheelWidget({required this.animController});
-
-  @override
-  State<_WheelWidget> createState() => _WheelWidgetState();
-}
-
-class _WheelWidgetState extends State<_WheelWidget>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _rollController;
-
-  @override
-  void initState() {
-    super.initState();
-    _rollController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 2),
-    )..repeat();
-  }
-
-  @override
-  void dispose() {
-    _rollController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _rollController,
-      builder: (context, child) {
-        return Transform.rotate(
-          angle: _rollController.value * 2 * math.pi,
-          child: child,
-        );
-      },
-      child: Container(
-        width: 20,
-        height: 20,
-        decoration: BoxDecoration(
-          color: const Color(0xFF0D1B2A),
-          shape: BoxShape.circle,
-          border: Border.all(
-            color: Colors.white24,
-            width: 2,
-          ),
-        ),
-        child: Center(
-          child: Container(
-            width: 5,
-            height: 5,
-            decoration: const BoxDecoration(
-              color: AppColors.accent,
-              shape: BoxShape.circle,
-            ),
-          ),
-        ),
-      ),
+    // Right Propeller
+    canvas.save();
+    canvas.translate(s(308.12), s(50.0));
+    canvas.rotate(propellerRotation);
+    canvas.drawLine(
+      Offset(-s(41.957), 0),
+      Offset(s(41.957), 0),
+      propellerPaint,
     );
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant _DroneSvgPainter oldDelegate) {
+    return oldDelegate.animationValue != animationValue;
   }
 }

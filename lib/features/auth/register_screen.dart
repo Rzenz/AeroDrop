@@ -233,7 +233,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                               children: [
                                 Expanded(
                                   child: _RoleTab(
-                                    label: 'User Portal',
+                                    label: 'Student',
                                     selected: _selectedRole == UserRole.user,
                                     onTap: () => setState(() =>
                                         _selectedRole = UserRole.user),
@@ -241,7 +241,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                 ),
                                 Expanded(
                                   child: _RoleTab(
-                                    label: 'Command Deck',
+                                    label: 'Faculty/Staff',
                                     selected: _selectedRole == UserRole.admin,
                                     onTap: () => setState(() =>
                                         _selectedRole = UserRole.admin),

@@ -20,7 +20,7 @@ class _EditUserPageState extends ConsumerState<EditUserPage> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _nameController;
   late final TextEditingController _deptController;
-  String _selectedRole = 'User (Student)';
+  String _selectedRole = 'Student';
   String _selectedStatus = 'Active';
 
   @override
@@ -35,7 +35,7 @@ class _EditUserPageState extends ConsumerState<EditUserPage> {
     _deptController = TextEditingController(
       text: isFaculty ? 'Engineering & Technology' : 'Computer Studies Council',
     );
-    _selectedRole = isFaculty ? 'User (Faculty)' : 'User (Student)';
+    _selectedRole = isFaculty ? 'Faculty/Staff' : 'Student';
   }
 
   @override
@@ -124,7 +124,7 @@ class _EditUserPageState extends ConsumerState<EditUserPage> {
                             _buildDropdownField(
                               labelText: 'System Access Role',
                               value: _selectedRole,
-                              items: const ['User (Student)', 'User (Faculty)', 'Admin (Fleet Commander)'],
+                              items: const ['Student', 'Faculty/Staff', 'Admin (Fleet Commander)'],
                               onChanged: (val) => setState(() => _selectedRole = val!),
                             ),
                             const SizedBox(height: 20),

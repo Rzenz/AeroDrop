@@ -180,65 +180,71 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     required ValueChanged<bool> onChanged,
     required Color activeColor,
   }) {
-    return ListTile(
-      leading: Container(
-        padding: const EdgeInsets.all(6),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.05),
-          borderRadius: BorderRadius.circular(8),
+    return Material(
+      color: Colors.transparent,
+      child: ListTile(
+        leading: Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, color: Colors.white, size: 18),
         ),
-        child: Icon(icon, color: Colors.white, size: 18),
-      ),
-      title: Text(
-        title,
-        style: AppTextStyles.title(fontSize: 14.5, fontWeight: FontWeight.bold, color: Colors.white),
-      ),
-      subtitle: Text(
-        subtitle,
-        style: AppTextStyles.body(fontSize: 11.5, color: AppColors.textSecondaryDark),
-      ),
-      trailing: SpringSwitch(
-        value: value,
-        onChanged: onChanged,
-        activeColor: activeColor,
+        title: Text(
+          title,
+          style: AppTextStyles.title(fontSize: 14.5, fontWeight: FontWeight.bold, color: Colors.white),
+        ),
+        subtitle: Text(
+          subtitle,
+          style: AppTextStyles.body(fontSize: 11.5, color: AppColors.textSecondaryDark),
+        ),
+        trailing: SpringSwitch(
+          value: value,
+          onChanged: onChanged,
+          activeColor: activeColor,
+        ),
       ),
     );
   }
 
   Widget _buildLanguageTile() {
-    return ListTile(
-      leading: Container(
-        padding: const EdgeInsets.all(6),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.05),
-          borderRadius: BorderRadius.circular(8),
+    return Material(
+      color: Colors.transparent,
+      child: ListTile(
+        leading: Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: const Icon(Icons.language_rounded, color: Colors.white, size: 18),
         ),
-        child: const Icon(Icons.language_rounded, color: Colors.white, size: 18),
-      ),
-      title: Text(
-        'Language',
-        style: AppTextStyles.title(fontSize: 14.5, fontWeight: FontWeight.bold, color: Colors.white),
-      ),
-      subtitle: Text(
-        'Change app localization settings',
-        style: AppTextStyles.body(fontSize: 11.5, color: AppColors.textSecondaryDark),
-      ),
-      trailing: DropdownButton<String>(
-        value: _selectedLanguage,
-        dropdownColor: AppColors.cardDark,
-        underline: const SizedBox(),
-        icon: const Icon(Icons.arrow_drop_down_rounded, color: AppColors.accent),
-        items: const [
-          DropdownMenuItem(value: 'English', child: Text('English', style: TextStyle(color: Colors.white, fontSize: 13))),
-          DropdownMenuItem(value: 'Spanish', child: Text('Español', style: TextStyle(color: Colors.white, fontSize: 13))),
-          DropdownMenuItem(value: 'Filipino', child: Text('Filipino', style: TextStyle(color: Colors.white, fontSize: 13))),
-        ],
-        onChanged: (val) {
-          if (val != null) {
-            HapticFeedback.lightImpact();
-            setState(() => _selectedLanguage = val);
-          }
-        },
+        title: Text(
+          'Language',
+          style: AppTextStyles.title(fontSize: 14.5, fontWeight: FontWeight.bold, color: Colors.white),
+        ),
+        subtitle: Text(
+          'Change app localization settings',
+          style: AppTextStyles.body(fontSize: 11.5, color: AppColors.textSecondaryDark),
+        ),
+        trailing: DropdownButton<String>(
+          value: _selectedLanguage,
+          dropdownColor: AppColors.cardDark,
+          underline: const SizedBox(),
+          icon: const Icon(Icons.arrow_drop_down_rounded, color: AppColors.accent),
+          items: const [
+            DropdownMenuItem(value: 'English', child: Text('English', style: TextStyle(color: Colors.white, fontSize: 13))),
+            DropdownMenuItem(value: 'Spanish', child: Text('Español', style: TextStyle(color: Colors.white, fontSize: 13))),
+            DropdownMenuItem(value: 'Filipino', child: Text('Filipino', style: TextStyle(color: Colors.white, fontSize: 13))),
+          ],
+          onChanged: (val) {
+            if (val != null) {
+              HapticFeedback.lightImpact();
+              setState(() => _selectedLanguage = val);
+            }
+          },
+        ),
       ),
     );
   }
@@ -249,24 +255,27 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     required Color color,
     required VoidCallback onTap,
   }) {
-    return ListTile(
-      leading: Container(
-        padding: const EdgeInsets.all(6),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(8),
+    return Material(
+      color: Colors.transparent,
+      child: ListTile(
+        leading: Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, color: color, size: 18),
         ),
-        child: Icon(icon, color: color, size: 18),
+        title: Text(
+          title,
+          style: AppTextStyles.title(fontSize: 14.5, fontWeight: FontWeight.bold, color: Colors.white),
+        ),
+        trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.textSecondaryDark, size: 20),
+        onTap: () {
+          HapticFeedback.lightImpact();
+          onTap();
+        },
       ),
-      title: Text(
-        title,
-        style: AppTextStyles.title(fontSize: 14.5, fontWeight: FontWeight.bold, color: Colors.white),
-      ),
-      trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.textSecondaryDark, size: 20),
-      onTap: () {
-        HapticFeedback.lightImpact();
-        onTap();
-      },
     );
   }
 
@@ -275,49 +284,52 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final user = authState.user;
     final isAdmin = user?.role == UserRole.admin;
 
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: Icon(
-        isAdmin ? Icons.admin_panel_settings_outlined : Icons.person_outline_rounded,
-        color: AppColors.accent,
-        size: 24,
-      ),
-      title: Text(
-        'Switch Developer Role',
-        style: AppTextStyles.title(
-          fontSize: 14.5,
-          fontWeight: FontWeight.bold,
-          color: Colors.white,
+    return Material(
+      color: Colors.transparent,
+      child: ListTile(
+        contentPadding: EdgeInsets.zero,
+        leading: Icon(
+          isAdmin ? Icons.admin_panel_settings_outlined : Icons.person_outline_rounded,
+          color: AppColors.accent,
+          size: 24,
         ),
-      ),
-      subtitle: Text(
-        'Current Role: ${user?.role == UserRole.admin ? "Admin" : "User"}',
-        style: AppTextStyles.body(
-          fontSize: 11.5,
-          color: AppColors.textSecondaryDark,
-        ),
-      ),
-      trailing: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: AppColors.primary.withValues(alpha: 0.25),
-          borderRadius: BorderRadius.circular(32),
-          border: Border.all(color: AppColors.borderDark, width: 1.5),
-        ),
-        child: Text(
-          isAdmin ? 'Switch to User' : 'Switch to Admin',
-          style: AppTextStyles.label(
-            fontSize: 10,
+        title: Text(
+          'Switch Developer Role',
+          style: AppTextStyles.title(
+            fontSize: 14.5,
+            fontWeight: FontWeight.bold,
             color: Colors.white,
           ),
         ),
+        subtitle: Text(
+          'Current Role: ${user?.role == UserRole.admin ? "Admin" : "User"}',
+          style: AppTextStyles.body(
+            fontSize: 11.5,
+            color: AppColors.textSecondaryDark,
+          ),
+        ),
+        trailing: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: AppColors.primary.withValues(alpha: 0.25),
+            borderRadius: BorderRadius.circular(32),
+            border: Border.all(color: AppColors.borderDark, width: 1.5),
+          ),
+          child: Text(
+            isAdmin ? 'Switch to User' : 'Switch to Admin',
+            style: AppTextStyles.label(
+              fontSize: 10,
+              color: Colors.white,
+            ),
+          ),
+        ),
+        onTap: () {
+          HapticFeedback.mediumImpact();
+          final targetRole = isAdmin ? UserRole.user : UserRole.admin;
+          ref.read(authProvider.notifier).switchRole(targetRole);
+          context.go(targetRole == UserRole.admin ? '/admin' : '/user');
+        },
       ),
-      onTap: () {
-        HapticFeedback.mediumImpact();
-        final targetRole = isAdmin ? UserRole.user : UserRole.admin;
-        ref.read(authProvider.notifier).switchRole(targetRole);
-        context.go(targetRole == UserRole.admin ? '/admin' : '/user');
-      },
     );
   }
 }

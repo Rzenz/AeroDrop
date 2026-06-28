@@ -7,8 +7,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/glass_card.dart';
 import '../../core/providers/auth_provider.dart';
-import '../../core/providers/delivery_provider.dart';
-import '../../core/models/delivery_model.dart';
+import '../../core/models/user_model.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -22,7 +21,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(authProvider).user;
-    final deliveries = ref.watch(deliveryProvider);
     final name = user?.name ?? 'User';
     final email = user?.email ?? '';
 
@@ -99,42 +97,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                             color: AppColors.textSecondaryDark,
                           ),
                         ).animate().fadeIn(delay: 250.ms),
+                        const SizedBox(height: 10),
+                        _buildRoleTag(user?.role),
                       ],
                     ),
                   ),
                 ],
               ),
-            ),
-          ),
-
-          // Stats Horizontal Row
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-              child: Row(
-                children: [
-                  _StatItem(
-                    val: '${deliveries.length}',
-                    lbl: 'Dispatches',
-                    color: AppColors.primaryLight,
-                    icon: Icons.local_shipping_rounded,
-                  ),
-                  const SizedBox(width: 12),
-                  _StatItem(
-                    val: '${deliveries.where((d) => d.status == DeliveryStatus.delivered).length}',
-                    lbl: 'Completed',
-                    color: AppColors.success,
-                    icon: Icons.check_circle_rounded,
-                  ),
-                  const SizedBox(width: 12),
-                  const _StatItem(
-                    val: '4.9 ★',
-                    lbl: 'Rating',
-                    color: AppColors.accent,
-                    icon: Icons.star_rounded,
-                  ),
-                ],
-              ).animate().fadeIn(delay: 350.ms).slideY(begin: 0.1, end: 0),
             ),
           ),
 
@@ -249,57 +218,45 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       ),
     );
   }
-}
 
-class _StatItem extends StatelessWidget {
-  final String val;
-  final String lbl;
-  final Color color;
-  final IconData icon;
+  Widget _buildRoleTag(UserRole? role) {
+    if (role == null) return const SizedBox.shrink();
 
-  const _StatItem({
-    required this.val,
-    required this.lbl,
-    required this.color,
-    required this.icon,
-  });
+    final isFaculty = role == UserRole.admin;
+    final label = isFaculty ? 'FACULTY/STAFF' : 'STUDENT';
+    final color = isFaculty ? AppColors.accent : AppColors.primaryLight;
+    final icon = isFaculty ? Icons.badge_rounded : Icons.school_rounded;
 
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        decoration: BoxDecoration(
-          color: AppColors.cardDark,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: color.withValues(alpha: 0.2),
-            width: 1.5,
-          ),
-        ),
-        child: Column(
-          children: [
-            Icon(icon, color: color, size: 18),
-            const SizedBox(height: 6),
-            Text(
-              val,
-              style: AppTextStyles.display(
-                fontSize: 18,
-                color: color,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              lbl,
-              style: AppTextStyles.label(
-                fontSize: 9,
-                color: AppColors.textSecondaryDark,
-              ),
-            ),
-          ],
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(30),
+        border: Border.all(
+          color: color.withValues(alpha: 0.25),
+          width: 1.5,
         ),
       ),
-    );
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            color: color,
+            size: 14,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: AppTextStyles.label(
+              fontSize: 10,
+              color: color,
+              letterSpacing: 0.8,
+            ),
+          ),
+        ],
+      ),
+    ).animate().fadeIn(delay: 300.ms).scale(begin: const Offset(0.9, 0.9));
   }
 }
 

@@ -18,7 +18,7 @@ class UserDetailsPage extends ConsumerWidget {
     final name = email.split('@').first.replaceAll('.', ' ');
     final displayName = name.split(' ').map((s) => s.isNotEmpty ? '${s[0].toUpperCase()}${s.substring(1)}' : '').join(' ');
     final isFaculty = email.contains('.edu') && !email.contains('student');
-    final role = isFaculty ? 'Faculty Member' : 'Student Client';
+    final role = isFaculty ? 'Faculty/Staff' : 'Student';
     final dept = isFaculty ? 'Engineering & Technology' : 'Computer Studies Council';
     final initials = displayName.isNotEmpty 
         ? displayName.split(' ').map((e) => e[0]).take(2).join().toUpperCase()

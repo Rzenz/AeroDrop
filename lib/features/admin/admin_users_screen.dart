@@ -18,10 +18,10 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
   String _searchQuery = '';
 
   final List<Map<String, String>> _allUsers = [
-    {'name': 'Professor Green', 'email': 'p.green@uclm.edu', 'role': 'User (Faculty)', 'dept': 'Science Department'},
-    {'name': 'Dean Harrison', 'email': 'd.harrison@uclm.edu', 'role': 'User (Faculty)', 'dept': 'Engineering Department'},
+    {'name': 'Professor Green', 'email': 'p.green@uclm.edu', 'role': 'Faculty/Staff', 'dept': 'Science Department'},
+    {'name': 'Dean Harrison', 'email': 'd.harrison@uclm.edu', 'role': 'Faculty/Staff', 'dept': 'Engineering Department'},
     {'name': 'Sarah Jenkins', 'email': 's.jenkins@uclm.edu', 'role': 'Admin (Fleet Commander)', 'dept': 'Logistics & Fleet control'},
-    {'name': 'John Doe', 'email': 'john.doe@uclm.edu', 'role': 'User (Student)', 'dept': 'Computer Studies Council'},
+    {'name': 'John Doe', 'email': 'john.doe@uclm.edu', 'role': 'Student', 'dept': 'Computer Studies Council'},
   ];
 
   @override
@@ -157,23 +157,37 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
                                   color: AppColors.textSecondaryDark,
                                 ),
                               ),
-                              trailing: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                decoration: BoxDecoration(
-                                  color: (isAdmin ? AppColors.success : AppColors.primary).withValues(alpha: 0.12),
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(
-                                    color: (isAdmin ? AppColors.success : AppColors.primary).withValues(alpha: 0.25),
-                                  ),
-                                ),
-                                child: Text(
-                                  isAdmin ? 'ADMIN' : 'MEMBER',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                    color: isAdmin ? AppColors.success : AppColors.primary,
-                                  ),
-                                ),
+                              trailing: Builder(
+                                builder: (context) {
+                                  final role = user['role']!;
+                                  final isAdmin = role.contains('Admin');
+                                  final isFaculty = role == 'Faculty/Staff';
+                                  final chipColor = isAdmin 
+                                      ? AppColors.success 
+                                      : (isFaculty ? AppColors.accent : AppColors.primaryLight);
+                                  final label = isAdmin 
+                                      ? 'ADMIN' 
+                                      : (isFaculty ? 'FACULTY' : 'STUDENT');
+
+                                  return Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                    decoration: BoxDecoration(
+                                      color: chipColor.withValues(alpha: 0.12),
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(
+                                        color: chipColor.withValues(alpha: 0.25),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      label,
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        color: chipColor,
+                                      ),
+                                    ),
+                                  );
+                                },
                               ),
                               children: [
                                 Padding(

@@ -240,34 +240,37 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppColors.borderDark),
       ),
-      child: SwitchListTile(
-        secondary: Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: iconColor.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(10),
+      child: Material(
+        color: Colors.transparent,
+        child: SwitchListTile(
+          secondary: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: iconColor.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: iconColor, size: 18),
           ),
-          child: Icon(icon, color: iconColor, size: 18),
-        ),
-        title: Text(
-          title,
-          style: AppTextStyles.title(
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
+          title: Text(
+            title,
+            style: AppTextStyles.title(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
           ),
+          subtitle: Text(
+            subtitle,
+            style: AppTextStyles.body(fontSize: 12, color: AppColors.textSecondaryDark),
+          ),
+          value: value,
+          onChanged: onChanged,
+          activeThumbColor: AppColors.primary,
+          activeTrackColor: AppColors.primary.withValues(alpha: 0.3),
+          inactiveThumbColor: AppColors.textSecondaryDark,
+          inactiveTrackColor: AppColors.borderDark,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         ),
-        subtitle: Text(
-          subtitle,
-          style: AppTextStyles.body(fontSize: 12, color: AppColors.textSecondaryDark),
-        ),
-        value: value,
-        onChanged: onChanged,
-        activeThumbColor: AppColors.primary,
-        activeTrackColor: AppColors.primary.withValues(alpha: 0.3),
-        inactiveThumbColor: AppColors.textSecondaryDark,
-        inactiveTrackColor: AppColors.borderDark,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
     );
   }
@@ -286,29 +289,32 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppColors.borderDark),
       ),
-      child: ListTile(
-        leading: Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(10),
+      child: Material(
+        color: Colors.transparent,
+        child: ListTile(
+          leading: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: color, size: 18),
           ),
-          child: Icon(icon, color: color, size: 18),
-        ),
-        title: Text(
-          title,
-          style: AppTextStyles.title(
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
+          title: Text(
+            title,
+            style: AppTextStyles.title(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
           ),
+          subtitle: Text(
+            subtitle,
+            style: AppTextStyles.body(fontSize: 12, color: AppColors.textSecondaryDark),
+          ),
+          onTap: onTap,
+          trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.textSecondaryDark),
         ),
-        subtitle: Text(
-          subtitle,
-          style: AppTextStyles.body(fontSize: 12, color: AppColors.textSecondaryDark),
-        ),
-        onTap: onTap,
-        trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.textSecondaryDark),
       ),
     );
   }

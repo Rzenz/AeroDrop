@@ -1,4 +1,4 @@
-# aerodrop
+# Aerodrop
 
 A new Flutter project.
 

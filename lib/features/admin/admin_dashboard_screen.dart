@@ -42,6 +42,71 @@ class AdminDashboardScreen extends ConsumerWidget {
 
             const SizedBox(height: 24),
 
+            // Hero Banner Card: Accent Gradient Highlight (Moved from User Dashboard)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(22),
+              margin: const EdgeInsets.only(bottom: 24),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF42A5F5), AppColors.accent],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.accent.withValues(alpha: 0.25),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: AppColors.bgDark.withValues(alpha: 0.25),
+                          borderRadius: BorderRadius.circular(100),
+                        ),
+                        child: const Text(
+                          'AUTONOMOUS NETWORK',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: AppColors.bgDark,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      const Icon(Icons.wifi_tethering_rounded, color: AppColors.bgDark, size: 20),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Campus Fleet Active',
+                    style: AppTextStyles.display(
+                      fontSize: 28,
+                      color: AppColors.bgDark,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    '$availDrones drones ready for immediate dispatch.',
+                    style: AppTextStyles.body(
+                      fontSize: 13.5,
+                      color: AppColors.bgDark.withValues(alpha: 0.8),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ).animate().fadeIn(delay: 150.ms).slideY(begin: 0.05, end: 0),
+
             // KPI grid
             GridView.count(
               shrinkWrap: true,
@@ -49,7 +114,7 @@ class AdminDashboardScreen extends ConsumerWidget {
               crossAxisCount: 2,
               crossAxisSpacing: 12,
               mainAxisSpacing: 12,
-              childAspectRatio: 1.1,
+              childAspectRatio: 1.25,
               children: [
                 AnalyticsCard(
                   title: 'Active Flights',
@@ -84,7 +149,7 @@ class AdminDashboardScreen extends ConsumerWidget {
                   change: '+0.2%',
                   isPositive: true,
                   icon: Icons.verified_rounded,
-                  iconColor: AppColors.secondary,
+                  iconColor: AppColors.accent,
                   animDelay: 240,
                 ),
               ],
@@ -138,14 +203,18 @@ class AdminDashboardScreen extends ConsumerWidget {
                               showTitles: true,
                               getTitlesWidget: (v, _) {
                                 const days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-                                return Padding(
-                                  padding: const EdgeInsets.only(top: 8),
-                                  child: Text(
-                                    days[v.toInt()],
-                                    style: const TextStyle(
-                                        color: AppColors.textSecondaryDark, fontSize: 11),
-                                  ),
-                                );
+                                final index = v.toInt();
+                                if (index >= 0 && index < days.length) {
+                                  return Padding(
+                                    padding: const EdgeInsets.only(top: 8),
+                                    child: Text(
+                                      days[index],
+                                      style: const TextStyle(
+                                          color: AppColors.textSecondaryDark, fontSize: 11),
+                                    ),
+                                  );
+                                }
+                                return const SizedBox.shrink();
                               },
                               reservedSize: 28,
                             ),
@@ -164,14 +233,14 @@ class AdminDashboardScreen extends ConsumerWidget {
                             ],
                             isCurved: true,
                             gradient: const LinearGradient(
-                              colors: [AppColors.primary, AppColors.secondary],
+                              colors: [AppColors.primary, AppColors.accent],
                             ),
                             barWidth: 3,
                             dotData: FlDotData(
                               show: true,
                               getDotPainter: (s, x, bar, i) => FlDotCirclePainter(
                                 radius: 4,
-                                color: AppColors.secondary,
+                                color: AppColors.accent,
                                 strokeWidth: 2,
                                 strokeColor: AppColors.bgDark,
                               ),
@@ -209,7 +278,7 @@ class AdminDashboardScreen extends ConsumerWidget {
                   onPressed: () => context.go('/admin/deliveries'),
                   child: Text('View all',
                       style: AppTextStyles.body(
-                          fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.secondary)),
+                          fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.accent)),
                 ),
               ],
             ).animate(delay: 400.ms).fadeIn(),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/custom_text_field.dart';
@@ -177,16 +178,42 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
                               children: [
                                 Padding(
                                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-                                  child: Row(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.stretch,
                                     children: [
-                                      const Icon(Icons.business_center_outlined, size: 16, color: AppColors.secondary),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Text(
-                                          'Department: ${user['dept']!}',
-                                          style: TextStyle(
-                                            fontSize: 13,
-                                            color: AppColors.textSecondaryDark,
+                                      Row(
+                                        children: [
+                                          const Icon(Icons.business_center_outlined, size: 16, color: AppColors.secondary),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              'Department: ${user['dept']!}',
+                                              style: TextStyle(
+                                                fontSize: 13,
+                                                color: AppColors.textSecondaryDark,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 12),
+                                      GestureDetector(
+                                        onTap: () => GoRouter.of(context).push('/admin/users/details?email=${user['email']!}'),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(vertical: 8),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.primary.withValues(alpha: 0.1),
+                                            borderRadius: BorderRadius.circular(10),
+                                            border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
+                                          ),
+                                          alignment: Alignment.center,
+                                          child: const Text(
+                                            'Manage Account Details',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                              color: AppColors.primary,
+                                            ),
                                           ),
                                         ),
                                       ),

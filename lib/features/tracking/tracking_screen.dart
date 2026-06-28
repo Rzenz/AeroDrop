@@ -1,200 +1,389 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/glass_card.dart';
+import '../../core/widgets/gradient_button.dart';
 import '../../core/providers/delivery_provider.dart';
-import '../../core/providers/drone_provider.dart';
 import '../../core/models/delivery_model.dart';
 
-class TrackingScreen extends ConsumerWidget {
+class TrackingScreen extends ConsumerStatefulWidget {
   const TrackingScreen({super.key});
+
+  @override
+  ConsumerState<TrackingScreen> createState() => _TrackingScreenState();
+}
+
+class _TrackingScreenState extends ConsumerState<TrackingScreen>
+    with TickerProviderStateMixin {
+  late AnimationController _radarController;
+  late AnimationController _flightProgressController;
+
+  // UCLM campus bounds for coordinate mapping
+  static const double latMin = 10.3250;
+  static const double latMax = 10.3310;
+  static const double lngMin = 123.9480;
+  static const double lngMax = 123.9540;
+
+  // Hub coordinates (start)
+  static const double hubLat = 10.3276;
+  static const double hubLng = 123.9507;
+
+  @override
+  void initState() {
+    super.initState();
+    _radarController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 4),
+    )..repeat();
+
+    _flightProgressController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 15),
+    )..repeat();
+    // ponytail: removed _simulationTimer that called setState((){}) every 1s
+    // for no data change. The two AnimationControllers already drive repaints.
+  }
+
+  @override
+  void dispose() {
+    _radarController.dispose();
+    _flightProgressController.dispose();
+    super.dispose();
+  }
 
   ({double lat, double lng}) _parseCoordinates(String coords) {
     try {
       final parts = coords.split(',');
-      if (parts.length != 2) return (lat: 10.3157, lng: 123.8854);
+      if (parts.length != 2) return (lat: hubLat, lng: hubLng);
       final latPart = parts[0].replaceAll(RegExp(r'[^0-9.-]'), '').trim();
       final lngPart = parts[1].replaceAll(RegExp(r'[^0-9.-]'), '').trim();
-      double lat = double.tryParse(latPart) ?? 10.3157;
-      double lng = double.tryParse(lngPart) ?? 123.8854;
+      double lat = double.tryParse(latPart) ?? hubLat;
+      double lng = double.tryParse(lngPart) ?? hubLng;
       if (parts[0].contains('S')) lat = -lat;
       if (parts[1].contains('W')) lng = -lng;
       return (lat: lat, lng: lng);
     } catch (_) {
-      return (lat: 10.3157, lng: 123.8854);
+      return (lat: hubLat, lng: hubLng);
     }
   }
 
+  Offset _mapCoordsToOffset(double lat, double lng, Size size) {
+    final pctX = (lng - lngMin) / (lngMax - lngMin);
+    final pctY = (latMax - lat) / (latMax - latMin);
+    return Offset(
+      pctX.clamp(0.1, 0.9) * size.width,
+      pctY.clamp(0.2, 0.8) * size.height,
+    );
+  }
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final deliveries = ref.watch(deliveryProvider);
-    final drones = ref.watch(droneProvider);
-    final active = deliveries.where((d) => d.status == DeliveryStatus.inTransit).toList();
+    final activeDeliveries = deliveries
+        .where((d) => d.status == DeliveryStatus.inTransit)
+        .toList();
 
     return Scaffold(
       backgroundColor: AppColors.bgDark,
-      body: Stack(
-        children: [
-          // Map area
-          Positioned.fill(
-            child: CustomPaint(
-              painter: _DarkMapPainter(),
-            ),
-          ),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final size = Size(constraints.maxWidth, constraints.maxHeight);
 
-          // Drone positions
-          ...drones.map((drone) {
-            final parsed = _parseCoordinates(drone.currentCoordinates);
-            final w = MediaQuery.of(context).size.width;
-            final h = MediaQuery.of(context).size.height;
+          double targetLat = 10.3265;
+          double targetLng = 123.9515;
 
-            // Map UCLM area lat [10.28, 10.35] and lng [123.85, 123.92]
-            const latMin = 10.28;
-            const latMax = 10.35;
-            const lngMin = 123.85;
-            const lngMax = 123.92;
+          if (activeDeliveries.isNotEmpty) {
+            final activeDel = activeDeliveries.first;
+            final parsedTarget = _parseCoordinates(activeDel.deliveryAddress);
+            targetLat = parsedTarget.lat;
+            targetLng = parsedTarget.lng;
+            if (targetLat == hubLat && targetLng == hubLng) {
+              if (activeDel.deliveryAddress.toLowerCase().contains('library')) {
+                targetLat = 10.3288;
+                targetLng = 123.9525;
+              } else if (activeDel.deliveryAddress.toLowerCase().contains('gate')) {
+                targetLat = 10.3258;
+                targetLng = 123.9495;
+              } else {
+                targetLat = 10.3265;
+                targetLng = 123.9515;
+              }
+            }
+          }
 
-            final pctX = (parsed.lng - lngMin) / (lngMax - lngMin);
-            final pctY = (latMax - parsed.lat) / (latMax - latMin);
+          final double progress = _flightProgressController.value;
+          final double currentLat = hubLat + (targetLat - hubLat) * progress;
+          final double currentLng = hubLng + (targetLng - hubLng) * progress;
 
-            final x = pctX.clamp(0.1, 0.9) * w;
-            final y = pctY.clamp(0.2, 0.8) * h;
+          final startOffset = _mapCoordsToOffset(hubLat, hubLng, size);
+          final endOffset = _mapCoordsToOffset(targetLat, targetLng, size);
+          final droneOffset = _mapCoordsToOffset(currentLat, currentLng, size);
 
-            return Positioned(
-              left: x - 20,
-              top: y - 20,
-              child: _DroneMarker(drone.batteryLevel).animate(
-                onPlay: (c) => c.repeat(),
-              ).scale(
-                duration: 1200.ms,
-                begin: const Offset(1.0, 1.0),
-                end: const Offset(1.1, 1.1),
-                curve: Curves.easeInOut,
-              ).then().scale(
-                duration: 1200.ms,
-                begin: const Offset(1.1, 1.1),
-                end: const Offset(1.0, 1.0),
-                curve: Curves.easeInOut,
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              // Real Map Background centered on UCLM Campus
+              Positioned.fill(
+                child: Opacity(
+                  opacity: 0.85, // Slightly dimmed to keep the overlay HUD highly readable
+                  child: Image.asset(
+                    'assets/images/uclm_map.png',
+                    fit: BoxFit.cover,
+                  ),
+                ),
               ),
-            );
-          }),
 
-          // Top header
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: GlassCard(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                borderRadius: BorderRadius.circular(16),
-                child: Row(
-                  children: [
-                    ShaderMask(
-                      shaderCallback: (b) => AppColors.primaryGradient.createShader(b),
-                      child: const Icon(Icons.my_location_rounded,
-                          color: Colors.white, size: 20),
-                    ),
-                    const SizedBox(width: 10),
-                    Text('Live Fleet Tracker',
-                        style: AppTextStyles.title(
-                            fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
-                    const Spacer(),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: AppColors.success.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(8),
+              // Vector Map Painter (Now paints overlay path and radar on top of the real map)
+              Positioned.fill(
+                child: CustomPaint(
+                  painter: _VectorMapPainter(
+                    startPoint: startOffset,
+                    endPoint: endOffset,
+                    dronePoint: droneOffset,
+                    flightProgress: progress,
+                    radarAngle: _radarController.value * 2 * math.pi,
+                  ),
+                ),
+              ),
+
+              // Drone Marker
+              Positioned(
+                left: droneOffset.dx - 28,
+                top: droneOffset.dy - 28,
+                child: _DroneMarkerWidget(
+                  radarValue: _radarController.value,
+                ),
+              ),
+
+              // Start/End Landmarks
+              Positioned(
+                left: startOffset.dx - 12,
+                top: startOffset.dy - 12,
+                child: const _LandmarkPin(
+                  icon: Icons.business_rounded,
+                  color: AppColors.primaryLight,
+                ),
+              ),
+
+              Positioned(
+                left: endOffset.dx - 12,
+                top: endOffset.dy - 12,
+                child: _LandmarkPin(
+                  icon: Icons.flag_rounded,
+                  color: AppColors.accent,
+                ),
+              ),
+
+              // Top Telemetry HUD Overlay
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: GlassCard(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                      borderRadius: BorderRadius.circular(24),
+                      borderGradient: const LinearGradient(
+                        colors: [AppColors.accent, AppColors.primary, Colors.transparent],
+                        stops: [0.0, 0.5, 1.0],
                       ),
                       child: Row(
-                        mainAxisSize: MainAxisSize.min,
                         children: [
                           Container(
-                            width: 6, height: 6,
-                            decoration: const BoxDecoration(
-                                color: AppColors.success, shape: BoxShape.circle),
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: AppColors.accent.withValues(alpha: 0.15),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.radar_rounded,
+                              color: AppColors.accent,
+                              size: 22,
+                            ),
+                          ).animate(onPlay: (c) => c.repeat()).shimmer(
+                                duration: 2000.ms,
+                                color: Colors.white24,
+                              ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  'Telemetry Link Active',
+                                  style: AppTextStyles.title(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Lat: ${currentLat.toStringAsFixed(5)} • Lng: ${currentLng.toStringAsFixed(5)}',
+                                  style: AppTextStyles.body(
+                                    fontSize: 11,
+                                    color: AppColors.textSecondaryDark,
+                                    height: 1.0,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                          const SizedBox(width: 6),
-                          Text('${drones.length} active',
-                              style: const TextStyle(
-                                  color: AppColors.success, fontSize: 11,
-                                  fontWeight: FontWeight.bold)),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: AppColors.success.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: AppColors.success.withValues(alpha: 0.3),
+                              ),
+                            ),
+                            child: Text(
+                              'ONLINE',
+                              style: AppTextStyles.label(
+                                fontSize: 10,
+                                color: AppColors.success,
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ),
-                  ],
+                  ),
                 ),
-              ).animate().fadeIn().slideY(begin: -0.1),
-            ),
-          ),
+              ).animate().fadeIn().slideY(begin: -0.1, end: 0),
 
-          // Bottom info sheet
-          Positioned(
-            bottom: 0, left: 0, right: 0,
-            child: Container(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Colors.transparent, AppColors.bgDark, AppColors.bgDark],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
+              // Bottom Detail Panel
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: Container(
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.transparent,
+                        AppColors.bgDark,
+                        AppColors.bgDark,
+                      ],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      stops: [0.0, 0.25, 1.0],
+                    ),
+                  ),
+                  padding: const EdgeInsets.fromLTRB(24, 40, 24, 110),
+                  child: activeDeliveries.isEmpty
+                      ? GlassCard(
+                          padding: const EdgeInsets.all(22),
+                          borderRadius: BorderRadius.circular(24),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.05),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.flight_land_rounded,
+                                  color: AppColors.textSecondaryDark,
+                                  size: 24,
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      'No Deliveries in Progress',
+                                      style: AppTextStyles.title(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'Fleet is currently docked at UCLM Hub',
+                                      style: AppTextStyles.body(
+                                        fontSize: 12,
+                                        color: AppColors.textSecondaryDark,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : _ActiveTrackingCard(
+                          delivery: activeDeliveries.first,
+                          progress: progress,
+                        ),
                 ),
-              ),
-              padding: const EdgeInsets.fromLTRB(20, 40, 20, 120),
-              child: active.isEmpty
-                  ? GlassCard(
-                      padding: const EdgeInsets.all(20),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.flight_land_rounded,
-                              color: AppColors.textSecondaryDark),
-                          const SizedBox(width: 12),
-                          Text('No active deliveries',
-                              style: AppTextStyles.body(
-                                  fontSize: 14, color: AppColors.textSecondaryDark)),
-                        ],
-                      ),
-                    )
-                  : _ActiveDeliveryCard(delivery: active.first),
-            ).animate().slideY(begin: 0.15, delay: 200.ms).fadeIn(delay: 200.ms),
-          ),
-        ],
+              ).animate().fadeIn(delay: 150.ms).slideY(begin: 0.1, end: 0),
+            ],
+          );
+        },
       ),
     );
   }
 }
 
-class _DroneMarker extends StatelessWidget {
-  final double battery;
-  const _DroneMarker(this.battery);
+class _DroneMarkerWidget extends StatelessWidget {
+  final double radarValue;
+
+  const _DroneMarkerWidget({required this.radarValue});
 
   @override
   Widget build(BuildContext context) {
-    final color = battery > 50
-        ? AppColors.success
-        : battery > 20
-            ? AppColors.warning
-            : AppColors.danger;
     return SizedBox(
-      width: 40,
-      height: 40,
+      width: 56,
+      height: 56,
       child: Stack(
         alignment: Alignment.center,
         children: [
+          // Outer pulsing radar ring
           Container(
-            width: 40, height: 40,
+            width: 56 * radarValue,
+            height: 56 * radarValue,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: color.withValues(alpha: 0.15),
+              border: Border.all(
+                color: AppColors.accent.withValues(alpha: 1 - radarValue),
+                width: 1.5,
+              ),
             ),
           ),
+          // Inner core glow
           Container(
-            width: 20, height: 20,
+            width: 32,
+            height: 32,
             decoration: BoxDecoration(
-              gradient: LinearGradient(colors: [color, AppColors.primary]),
               shape: BoxShape.circle,
-              boxShadow: [BoxShadow(color: color.withValues(alpha: 0.5), blurRadius: 8)],
+              gradient: AppColors.accentGradient,
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.accent.withValues(alpha: 0.4),
+                  blurRadius: 16,
+                  spreadRadius: 2,
+                ),
+              ],
             ),
-            child: const Icon(Icons.flight_rounded, color: Colors.white, size: 10),
+            child: const Icon(
+              Icons.navigation_rounded,
+              color: AppColors.bgDark,
+              size: 16,
+            ),
           ),
         ],
       ),
@@ -202,106 +391,147 @@ class _DroneMarker extends StatelessWidget {
   }
 }
 
-class _ActiveDeliveryCard extends StatelessWidget {
-  final DeliveryModel delivery;
-  const _ActiveDeliveryCard({required this.delivery});
-
-  @override
-  Widget build(BuildContext context) {
-    final address = delivery.deliveryAddress;
-    String pickup = 'Main Gate';
-    String dropoff = address;
-    if (address.startsWith('From ') && address.contains(' to ')) {
-      pickup = address.substring(5, address.indexOf(' to '));
-      dropoff = address.substring(address.indexOf(' to ') + 4);
-    }
-
-    return GlassCard(
-      padding: const EdgeInsets.all(20),
-      borderRadius: BorderRadius.circular(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  gradient: AppColors.primaryGradient,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(Icons.flight_takeoff_rounded, color: Colors.white, size: 16),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Package In Transit',
-                        style: AppTextStyles.title(
-                            fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
-                    Text(delivery.id.substring(0, 8).toUpperCase(),
-                        style: AppTextStyles.body(
-                            fontSize: 11, color: AppColors.textSecondaryDark)),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Text('LIVE',
-                    style: TextStyle(
-                        color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.bold)),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(child: _InfoChip(Icons.location_on_rounded, pickup,
-                  AppColors.warning)),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 8),
-                child: Icon(Icons.arrow_forward_rounded,
-                    color: AppColors.textSecondaryDark, size: 16),
-              ),
-              Expanded(child: _InfoChip(Icons.flag_rounded, dropoff,
-                  AppColors.success)),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _InfoChip extends StatelessWidget {
+class _LandmarkPin extends StatelessWidget {
   final IconData icon;
-  final String text;
   final Color color;
-  const _InfoChip(this.icon, this.text, this.color);
+
+  const _LandmarkPin({
+    required this.icon,
+    required this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      padding: const EdgeInsets.all(6),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
+        color: AppColors.bgDark,
+        shape: BoxShape.circle,
+        border: Border.all(color: color, width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.3),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
-      child: Row(
+      child: Icon(
+        icon,
+        color: color,
+        size: 14,
+      ),
+    );
+  }
+}
+
+class _ActiveTrackingCard extends StatelessWidget {
+  final DeliveryModel delivery;
+  final double progress;
+
+  const _ActiveTrackingCard({
+    required this.delivery,
+    required this.progress,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final percentage = (progress * 100).toInt();
+
+    return GlassCard(
+      padding: const EdgeInsets.all(22),
+      borderRadius: BorderRadius.circular(26),
+      borderGradient: const LinearGradient(
+        colors: [AppColors.accent, AppColors.primary, Colors.transparent],
+        stops: [0.0, 0.5, 1.0],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: color, size: 12),
-          const SizedBox(width: 6),
-          Flexible(
-            child: Text(text,
-                style: const TextStyle(fontSize: 10, color: Colors.white70),
-                overflow: TextOverflow.ellipsis),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  gradient: AppColors.accentGradient,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'FLIGHT # ${delivery.id.substring(0, 5).toUpperCase()}',
+                  style: AppTextStyles.label(
+                    fontSize: 10,
+                    color: AppColors.bgDark,
+                  ),
+                ),
+              ),
+              const Spacer(),
+              Text(
+                'ETA: ${delivery.eta}',
+                style: AppTextStyles.title(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.accent,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            delivery.packageName,
+            style: AppTextStyles.title(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Destination: ${delivery.deliveryAddress}',
+            style: AppTextStyles.body(
+              fontSize: 13,
+              color: AppColors.textSecondaryDark,
+            ),
+          ),
+          const SizedBox(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Transit Progress',
+                style: AppTextStyles.body(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white70,
+                ),
+              ),
+              Text(
+                '$percentage%',
+                style: AppTextStyles.title(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.accent,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: LinearProgressIndicator(
+              value: progress,
+              backgroundColor: AppColors.borderDark,
+              valueColor: const AlwaysStoppedAnimation<Color>(AppColors.accent),
+              minHeight: 6,
+            ),
+          ),
+          const SizedBox(height: 16),
+          // Gradient Button for Full Telemetry Details
+          GradientButton(
+            text: 'View Telemetry Logs',
+            height: 44,
+            onPressed: () => context.push('/user/track/details?id=${delivery.id}'),
+            icon: Icons.analytics_outlined,
           ),
         ],
       ),
@@ -309,54 +539,75 @@ class _InfoChip extends StatelessWidget {
   }
 }
 
-class _DarkMapPainter extends CustomPainter {
+class _VectorMapPainter extends CustomPainter {
+  final Offset startPoint;
+  final Offset endPoint;
+  final Offset dronePoint;
+  final double flightProgress;
+  final double radarAngle;
+
+  const _VectorMapPainter({
+    required this.startPoint,
+    required this.endPoint,
+    required this.dronePoint,
+    required this.flightProgress,
+    required this.radarAngle,
+  });
+
   @override
   void paint(Canvas canvas, Size size) {
-    // Base — deep dark map background
-    canvas.drawRect(Offset.zero & size,
-        Paint()..color = const Color(0xFF0A0F1E));
+    // Only paint the path and radar sweep. The background map is now rendered by the Image.network underneath.
 
-    final gridPaint = Paint()
-      ..color = const Color(0xFF1A2240)
-      ..strokeWidth = 1;
+    final pathPaint = Paint()
+      ..color = AppColors.primary.withValues(alpha: 0.15)
+      ..strokeWidth = 3.0
+      ..style = PaintingStyle.stroke;
 
-    // Vertical grid lines
-    for (double x = 0; x < size.width; x += 40) {
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), gridPaint);
-    }
-    // Horizontal grid lines
-    for (double y = 0; y < size.height; y += 40) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
-    }
+    canvas.drawLine(startPoint, endPoint, pathPaint);
 
-    // Road-like lines
-    final roadPaint = Paint()
-      ..color = const Color(0xFF1E2C50)
-      ..strokeWidth = 6
+    final activePathPaint = Paint()
+      ..color = AppColors.accent
+      ..strokeWidth = 3.0
+      ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
 
-    canvas.drawLine(
-        Offset(0, size.height * 0.35),
-        Offset(size.width, size.height * 0.45),
-        roadPaint);
-    canvas.drawLine(
-        Offset(size.width * 0.3, 0),
-        Offset(size.width * 0.45, size.height),
-        roadPaint);
-    canvas.drawLine(
-        Offset(0, size.height * 0.65),
-        Offset(size.width, size.height * 0.6),
-        roadPaint);
+    final double dashWidth = 6.0;
+    final double dashSpace = 6.0;
+    double distance = 0.0;
+    final double totalDistance = (endPoint - startPoint).distance;
+    final double activeDistance = totalDistance * flightProgress;
 
-    // Glowing waypoints
-    final glowPaint = Paint()
-      ..color = const Color(0xFF6C63FF).withValues(alpha: 0.15)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 20);
+    final Offset vector = (endPoint - startPoint) / totalDistance;
 
-    canvas.drawCircle(Offset(size.width * 0.3, size.height * 0.4), 40, glowPaint);
-    canvas.drawCircle(Offset(size.width * 0.7, size.height * 0.6), 40, glowPaint);
+    while (distance < activeDistance) {
+      final Offset startDash = startPoint + vector * distance;
+      distance += dashWidth;
+      final Offset endDash = startPoint + vector * math.min(distance, activeDistance);
+      canvas.drawLine(startDash, endDash, activePathPaint);
+      distance += dashSpace;
+    }
+
+    final radarPaint = Paint()
+      ..shader = SweepGradient(
+        center: Alignment.center,
+        colors: [
+          Colors.transparent,
+          AppColors.accent.withValues(alpha: 0.15),
+          Colors.transparent,
+        ],
+        stops: const [0.0, 0.5, 1.0],
+        transform: GradientRotation(radarAngle),
+      ).createShader(
+        Rect.fromCircle(center: dronePoint, radius: 140),
+      );
+
+    canvas.drawCircle(dronePoint, 140, radarPaint);
   }
 
   @override
-  bool shouldRepaint(covariant _DarkMapPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _VectorMapPainter oldDelegate) {
+    return oldDelegate.flightProgress != flightProgress ||
+        oldDelegate.radarAngle != radarAngle ||
+        oldDelegate.dronePoint != dronePoint;
+  }
 }

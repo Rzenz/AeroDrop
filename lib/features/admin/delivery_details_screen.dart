@@ -59,7 +59,7 @@ class DeliveryDetailsScreen extends ConsumerWidget {
                     GestureDetector(
                       onTap: () => context.pop(),
                       child: Container(
-                        padding: const EdgeInsets.all(10),
+                        padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
                           color: AppColors.cardDark,
                           borderRadius: BorderRadius.circular(12),

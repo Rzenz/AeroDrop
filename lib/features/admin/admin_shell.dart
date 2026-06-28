@@ -16,15 +16,15 @@ class AdminShell extends ConsumerWidget {
     return Scaffold(
       backgroundColor: AppColors.bgDark,
       drawer: _AdminDrawer(user: user, ref: ref),
-      appBar: _AdminAppBar(context: context),
+      appBar: const _AdminAppBar(),
       body: child,
     );
   }
 }
 
+// ponytail: removed stale BuildContext field — use the build()'s own context.
 class _AdminAppBar extends StatelessWidget implements PreferredSizeWidget {
-  final BuildContext context;
-  const _AdminAppBar({required this.context});
+  const _AdminAppBar();
 
   String _titleForRoute(String loc) {
     if (loc.startsWith('/admin/users')) return 'Users';
@@ -37,7 +37,7 @@ class _AdminAppBar extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext ctx) {
-    final loc = GoRouterState.of(context).uri.toString();
+    final loc = GoRouterState.of(ctx).uri.toString();
     return AppBar(
       backgroundColor: AppColors.bgDark,
       elevation: 0,
@@ -46,7 +46,7 @@ class _AdminAppBar extends StatelessWidget implements PreferredSizeWidget {
         builder: (c) => GestureDetector(
           onTap: () => Scaffold.of(c).openDrawer(),
           child: Container(
-            margin: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               color: AppColors.cardDark,
               borderRadius: BorderRadius.circular(12),
@@ -66,18 +66,18 @@ class _AdminAppBar extends StatelessWidget implements PreferredSizeWidget {
           margin: const EdgeInsets.only(right: 16),
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
           decoration: BoxDecoration(
-            color: AppColors.danger.withValues(alpha: 0.12),
+            color: AppColors.accent.withValues(alpha: 0.15),
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: AppColors.danger.withValues(alpha: 0.3)),
+            border: Border.all(color: AppColors.accent.withValues(alpha: 0.4)),
           ),
           child: const Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.shield_rounded, color: AppColors.danger, size: 14),
+              Icon(Icons.shield_rounded, color: AppColors.accent, size: 14),
               SizedBox(width: 4),
               Text('ADMIN',
                   style: TextStyle(
-                      color: AppColors.danger, fontSize: 10, fontWeight: FontWeight.bold)),
+                      color: AppColors.accent, fontSize: 10, fontWeight: FontWeight.bold)),
             ],
           ),
         ),
@@ -120,21 +120,21 @@ class _AdminDrawer extends StatelessWidget {
                     Container(
                       width: 60, height: 60,
                       decoration: BoxDecoration(
-                        gradient: AppColors.purpleCyanGradient,
+                        gradient: AppColors.accentGradient,
                         shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 2),
+                        border: Border.all(color: AppColors.bgDark.withValues(alpha: 0.3), width: 2),
                         boxShadow: [
                           BoxShadow(
-                              color: AppColors.primary.withValues(alpha: 0.4),
+                              color: AppColors.accent.withValues(alpha: 0.4),
                               blurRadius: 16)
                         ],
                       ),
                       child: Center(
                         child: Text(name[0].toUpperCase(),
-                            style: const TextStyle(
-                                color: Colors.white,
+                            style: AppTextStyles.title(
                                 fontSize: 24,
-                                fontWeight: FontWeight.w900)),
+                                fontWeight: FontWeight.w900,
+                                color: AppColors.bgDark)),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -170,12 +170,18 @@ class _AdminDrawer extends StatelessWidget {
                         route: '/admin/users', current: loc, onTap: () => context.go('/admin/users')),
                     _NavItem(icon: Icons.flight_takeoff_rounded, label: 'Drone Fleet',
                         route: '/admin/drones', current: loc, onTap: () => context.go('/admin/drones')),
+                    _NavItem(icon: Icons.hub_rounded, label: 'Mission Control',
+                        route: '/admin/missions', current: loc, onTap: () => context.push('/admin/missions')),
+                    _NavItem(icon: Icons.map_rounded, label: 'Route Planner',
+                        route: '/admin/routes/planner', current: loc, onTap: () => context.push('/admin/routes/planner')),
                     _NavItem(icon: Icons.local_shipping_rounded, label: 'Deliveries',
                         route: '/admin/deliveries', current: loc,
                         onTap: () => context.go('/admin/deliveries')),
                     _NavItem(icon: Icons.bar_chart_rounded, label: 'Analytics',
                         route: '/admin/analytics', current: loc,
                         onTap: () => context.go('/admin/analytics')),
+                    _NavItem(icon: Icons.analytics_outlined, label: 'Analytical Reports',
+                        route: '/admin/reports', current: loc, onTap: () => context.push('/admin/reports')),
                     _NavItem(icon: Icons.settings_rounded, label: 'Settings',
                         route: '/admin/settings', current: loc,
                         onTap: () => context.go('/admin/settings')),
@@ -245,7 +251,7 @@ class _NavItem extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         margin: const EdgeInsets.only(bottom: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
         decoration: BoxDecoration(
           gradient: isActive ? AppColors.primaryGradient : null,
           color: isActive ? null : Colors.transparent,
@@ -257,16 +263,16 @@ class _NavItem extends StatelessWidget {
                 color: isActive ? Colors.white : AppColors.textSecondaryDark, size: 20),
             const SizedBox(width: 14),
             Text(label,
-                style: TextStyle(
-                    color: isActive ? Colors.white : AppColors.textSecondaryDark,
-                    fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-                    fontSize: 15)),
+                style: AppTextStyles.body(
+                    fontSize: 15,
+                    fontWeight: isActive ? FontWeight.w700 : FontWeight.normal,
+                    color: isActive ? Colors.white : AppColors.textSecondaryDark)),
             if (isActive) ...[
               const Spacer(),
               Container(
-                width: 6, height: 6,
+                width: 8, height: 8,
                 decoration: const BoxDecoration(
-                    color: Colors.white, shape: BoxShape.circle),
+                    color: AppColors.accent, shape: BoxShape.circle),
               ),
             ],
           ],

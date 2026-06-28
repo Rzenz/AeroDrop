@@ -1,4 +1,29 @@
 {
     "java.compile.nullAnalysis.mode": "automatic",
-    "java.jdt.ls.vmargs": "-XX:+UseParallelGC -XX:GCTimeRatio=4 -XX:AdaptiveSizePolicyWeight=90 -Dsun.zip.disableMemoryMapping=true -Xmx4G -Xms100m -Xlog:disable"
+    "java.jdt.ls.vmargs": "-XX:+UseParallelGC -XX:GCTimeRatio=4 -XX:AdaptiveSizePolicyWeight=90 -Dsun.zip.disableMemoryMapping=true -Xmx4G -Xms100m -Xlog:disable",
+    "cSpell.words": [
+        "AERODROP",
+        "Cupertino",
+        "Densification",
+        "Español",
+        "Glassmorphism",
+        "LTWH",
+        "Nunito",
+        "RSSI",
+        "Schyler",
+        "Sparkline",
+        "UCLM",
+        "WCAG",
+        "Wordmark",
+        "aerodrop",
+        "dela",
+        "dropoff",
+        "jank",
+        "nunito",
+        "pkgs",
+        "riverpod",
+        "smcp",
+        "swipeable",
+        "wireframes"
+    ]
 }

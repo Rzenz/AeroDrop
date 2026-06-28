@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/user_model.dart';
+import '../config/simulation_config.dart';
+import '../../providers/mock/auth_mock_provider.dart';
 
 class AuthState {
   final UserModel? user;
@@ -26,9 +28,20 @@ class AuthState {
 }
 
 class AuthNotifier extends StateNotifier<AuthState> {
-  AuthNotifier() : super(AuthState());
+  final Ref? ref;
+
+  AuthNotifier([this.ref]) : super(AuthState()) {
+    if (kSimulationMode && ref != null) {
+      ref!.listen<AuthState>(authMockProvider, (previous, next) {
+        state = next;
+      }, fireImmediately: true);
+    }
+  }
 
   Future<bool> login(String email, String password) async {
+    if (kSimulationMode && ref != null) {
+      return ref!.read(authMockProvider.notifier).login(email, password);
+    }
     state = state.copyWith(isLoading: true, errorMessage: null);
     await Future.delayed(const Duration(milliseconds: 800));
 
@@ -56,6 +69,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<bool> register(String name, String email, String password, UserRole role) async {
+    if (kSimulationMode && ref != null) {
+      return ref!.read(authMockProvider.notifier).login(email, password);
+    }
     state = state.copyWith(isLoading: true, errorMessage: null);
     await Future.delayed(const Duration(milliseconds: 800));
 
@@ -72,6 +88,19 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   void updateProfile(String name, String email) {
+    if (kSimulationMode && ref != null) {
+      if (state.user != null) {
+        final updated = UserModel(
+          id: state.user!.id,
+          name: name,
+          email: email,
+          role: state.user!.role,
+          avatarUrl: state.user!.avatarUrl,
+        );
+        state = state.copyWith(user: updated);
+      }
+      return;
+    }
     if (state.user != null) {
       final updated = UserModel(
         id: state.user!.id,
@@ -84,11 +113,23 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  void switchRole(UserRole role) {
+    if (kSimulationMode && ref != null) {
+      ref!.read(authMockProvider.notifier).switchRole(role);
+      return;
+    }
+  }
+
   void logout() {
+    if (kSimulationMode && ref != null) {
+      ref!.read(authMockProvider.notifier).logout();
+      return;
+    }
     state = AuthState();
   }
 }
 
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
-  return AuthNotifier();
+  return AuthNotifier(ref);
 });
+

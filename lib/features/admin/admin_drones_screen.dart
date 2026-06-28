@@ -104,7 +104,7 @@ class AdminDronesScreen extends ConsumerWidget {
                         final drone = drones[index];
                         return DroneCard(
                           drone: drone,
-                          onTap: () => context.push('/admin/drones/edit?id=${drone.id}'),
+                          onTap: () => context.push('/admin/drones/details?id=${drone.id}'),
                         ).animate(delay: Duration(milliseconds: 100 + index * 60))
                          .fadeIn()
                          .slideY(begin: 0.08, end: 0);

@@ -1,42 +1,75 @@
 import 'package:flutter/material.dart';
 
 class AppColors {
-  // Brand
-  static const Color primary = Color(0xFF6C63FF);
-  static const Color primaryDark = Color(0xFF3D5BF5);
-  static const Color secondary = Color(0xFF00E5FF);
-  static const Color secondaryDark = Color(0xFF00B4CC);
+  // === Brand — Electric Blue ===
+  static const Color primary = Color(0xFF1976D2);
+  static const Color primaryLight = Color(0xFF42A5F5);
+  static const Color primaryDark = Color(0xFF1565C0);
 
-  // Semantic
+  // === Accent — Vivid Yellow ===
+  static const Color accent = Color(0xFFFFD600);
+  static const Color accentLight = Color(0xFFFFF176);
+  static const Color accentDark = Color(0xFFFFCA28);
+
+  // === Semantic ===
   static const Color success = Color(0xFF00C896);
   static const Color warning = Color(0xFFFFB547);
   static const Color danger = Color(0xFFFF4D6A);
-  static const Color info = Color(0xFF4DA8FF);
+  static const Color info = Color(0xFF29B6F6);
+  static const Color secondary = accent;
 
-  // Dark Theme
-  static const Color bgDark = Color(0xFF080B14);
-  static const Color bgDark2 = Color(0xFF0C1220);
-  static const Color cardDark = Color(0xFF0E1525);
-  static const Color cardDark2 = Color(0xFF141C35);
-  static const Color textPrimaryDark = Color(0xFFFFFFFF);
-  static const Color textSecondaryDark = Color(0xFF8892B0);
-  static const Color borderDark = Color(0xFF1E2A45);
+  // === Dark Theme Surfaces ===
+  static const Color bgDark = Color(0xFF0D1B2A);
+  static const Color bgDark2 = Color(0xFF122336);
+  static const Color cardDark = Color(0xFF1A2332);
+  static const Color cardDark2 = Color(0xFF222E41);
+  static const Color borderDark = Color(0xFF2C3B52);
 
-  // Light Theme
-  static const Color bgLight = Color(0xFFF0F4FF);
+  // === Dark Theme Text ===
+  static const Color textPrimaryDark = Color(0xFFF8FAFF);
+  static const Color textSecondaryDark = Color(0xFF7B8FA1);
+
+  // === Light Theme ===
+  static const Color bgLight = Color(0xFFF0F6FF);
   static const Color cardLight = Color(0xFFFFFFFF);
-  static const Color textPrimaryLight = Color(0xFF0A0E1A);
-  static const Color textSecondaryLight = Color(0xFF5A6480);
-  static const Color borderLight = Color(0xFFDDE3F8);
+  static const Color textPrimaryLight = Color(0xFF0A1628);
+  static const Color textSecondaryLight = Color(0xFF4A6B8A);
+  static const Color borderLight = Color(0xFFCCDEF5);
 
-  // Gradients
+  // === Gradients ===
   static const LinearGradient primaryGradient = LinearGradient(
-    colors: [Color(0xFF6C63FF), Color(0xFF3D5BF5)],
+    colors: [Color(0xFF1565C0), Color(0xFF1976D2)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
+  static const LinearGradient accentGradient = LinearGradient(
+    colors: [Color(0xFFFFD600), Color(0xFFFFCA28)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+  static const LinearGradient heroGradient = LinearGradient(
+    colors: [Color(0xFF1565C0), Color(0xFF0D1B2A)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+  static const LinearGradient bgGradientDark = LinearGradient(
+    colors: [Color(0xFF0D1B2A), Color(0xFF122336)],
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+  );
+  static const LinearGradient cardGradientDark = LinearGradient(
+    colors: [Color(0xFF1A2332), Color(0xFF122336)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+  static const LinearGradient blueYellowGradient = LinearGradient(
+    colors: [Color(0xFF1976D2), Color(0xFFFFD600)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+  static const LinearGradient purpleCyanGradient = primaryGradient;
   static const LinearGradient cyanGradient = LinearGradient(
-    colors: [Color(0xFF00E5FF), Color(0xFF00B4CC)],
+    colors: [Color(0xFF29B6F6), Color(0xFF0288D1)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
@@ -45,28 +78,8 @@ class AppColors {
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
-  static const LinearGradient warningGradient = LinearGradient(
-    colors: [Color(0xFFFFB547), Color(0xFFFF8C00)],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-  );
   static const LinearGradient dangerGradient = LinearGradient(
-    colors: [Color(0xFFFF4D6A), Color(0xFFCC0033)],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-  );
-  static const LinearGradient bgGradientDark = LinearGradient(
-    colors: [Color(0xFF080B14), Color(0xFF0E1525)],
-    begin: Alignment.topCenter,
-    end: Alignment.bottomCenter,
-  );
-  static const LinearGradient cardGradientDark = LinearGradient(
-    colors: [Color(0xFF141C35), Color(0xFF0E1525)],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-  );
-  static const LinearGradient purpleCyanGradient = LinearGradient(
-    colors: [Color(0xFF6C63FF), Color(0xFF00E5FF)],
+    colors: [Color(0xFFFF4D6A), Color(0xFFD32F2F)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );

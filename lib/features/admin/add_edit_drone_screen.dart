@@ -27,6 +27,7 @@ class _AddEditDroneScreenState extends ConsumerState<AddEditDroneScreen> {
   late TextEditingController _coordsController;
   late TextEditingController _batteryController;
   DroneStatus _status = DroneStatus.available;
+  bool _saving = false;
 
   bool get _isEdit => widget.droneId.isNotEmpty;
 
@@ -60,8 +61,14 @@ class _AddEditDroneScreenState extends ConsumerState<AddEditDroneScreen> {
     super.dispose();
   }
 
-  void _saveDrone() {
+  void _saveDrone() async {
+    if (_saving) return;
     if (_formKey.currentState!.validate()) {
+      setState(() => _saving = true);
+      // Simulate network delay for smooth visual feedback
+      await Future.delayed(const Duration(milliseconds: 600));
+      if (!mounted) return;
+
       final payload = double.tryParse(_payloadController.text) ?? 5.0;
       final battery = double.tryParse(_batteryController.text) ?? 100.0;
       
@@ -113,7 +120,7 @@ class _AddEditDroneScreenState extends ConsumerState<AddEditDroneScreen> {
                       GestureDetector(
                         onTap: () => context.pop(),
                         child: Container(
-                          padding: const EdgeInsets.all(10),
+                          padding: const EdgeInsets.all(14),
                           decoration: BoxDecoration(
                             color: AppColors.cardDark,
                             borderRadius: BorderRadius.circular(12),
@@ -152,21 +159,26 @@ class _AddEditDroneScreenState extends ConsumerState<AddEditDroneScreen> {
                       ],
                     ),
                     child: Center(
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.flight_takeoff_rounded, color: Colors.white, size: 32),
-                          const SizedBox(width: 14),
-                          Text(
-                            _isEdit ? 'Update Hardware Configuration' : 'Deploy New Aerial Hardware',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.5,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.flight_takeoff_rounded, color: Colors.white, size: 32),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Text(
+                                _isEdit ? 'Update Hardware Configuration' : 'Deploy New Aerial Hardware',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ).animate(delay: 100.ms).scale(duration: 400.ms, curve: Curves.easeOutBack),
@@ -224,7 +236,7 @@ class _AddEditDroneScreenState extends ConsumerState<AddEditDroneScreen> {
                         const SizedBox(height: 20),
                         CustomTextField(
                           labelText: 'Current Coordinates',
-                          hintText: 'e.g. 10.3157° N, 123.8854° E',
+                          hintText: 'e.g. 10.3276° N, 123.9507° E',
                           prefixIcon: Icons.location_on_outlined,
                           controller: _coordsController,
                         ),
@@ -256,18 +268,20 @@ class _AddEditDroneScreenState extends ConsumerState<AddEditDroneScreen> {
                             return Expanded(
                               child: GestureDetector(
                                 onTap: () => setState(() => _status = status),
-                                child: AnimatedContainer(
-                                  duration: const Duration(milliseconds: 200),
-                                  margin: const EdgeInsets.symmetric(horizontal: 4),
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
-                                  decoration: BoxDecoration(
-                                    color: isSel ? statusColor.withValues(alpha: 0.15) : AppColors.cardDark2,
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                      color: isSel ? statusColor : AppColors.borderDark,
-                                      width: 1.5,
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 200),
+                                    margin: const EdgeInsets.symmetric(horizontal: 4),
+                                    constraints: const BoxConstraints(minHeight: 48),
+                                    alignment: Alignment.center,
+                                    padding: const EdgeInsets.symmetric(vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: isSel ? statusColor.withValues(alpha: 0.15) : AppColors.cardDark2,
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: isSel ? statusColor : AppColors.borderDark,
+                                        width: 1.5,
+                                      ),
                                     ),
-                                  ),
                                   child: Column(
                                     children: [
                                       Icon(
@@ -300,6 +314,7 @@ class _AddEditDroneScreenState extends ConsumerState<AddEditDroneScreen> {
                         const SizedBox(height: 36),
                         CustomButton(
                           text: _isEdit ? 'Save Settings' : 'Deploy Drone',
+                          isLoading: _saving,
                           onPressed: _saveDrone,
                           icon: _isEdit ? Icons.save_rounded : Icons.flight_takeoff_rounded,
                         ),

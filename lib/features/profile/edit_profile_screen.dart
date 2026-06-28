@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
-import '../../core/widgets/custom_button.dart';
+import '../../core/widgets/gradient_button.dart';
 import '../../core/widgets/custom_text_field.dart';
 import '../../core/widgets/glass_card.dart';
+import '../../core/widgets/custom_app_bar.dart';
 import '../../core/providers/auth_provider.dart';
 
 class EditProfileScreen extends ConsumerStatefulWidget {
@@ -58,45 +60,25 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.bgDark,
+      appBar: const CustomAppBar(title: 'Edit Profile'),
       body: Container(
-        decoration: const BoxDecoration(gradient: AppColors.bgGradientDark),
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF0F243A), AppColors.bgDark],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
         child: SafeArea(
           child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
             child: Form(
               key: _formKey,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Back + Title Row
-                  Row(
-                    children: [
-                      GestureDetector(
-                        onTap: () => context.pop(),
-                        child: Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: AppColors.cardDark,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: AppColors.borderDark),
-                          ),
-                          child: const Icon(Icons.arrow_back_rounded,
-                              color: Colors.white, size: 20),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Text(
-                        'Edit Profile',
-                        style: AppTextStyles.title(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ],
-                  ).animate().fadeIn().slideX(begin: -0.1),
-
-                  const SizedBox(height: 36),
+                  const SizedBox(height: 20),
 
                   // Avatar Edit Circle
                   Center(
@@ -106,12 +88,12 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                           width: 100,
                           height: 100,
                           decoration: BoxDecoration(
-                            gradient: AppColors.purpleCyanGradient,
+                            gradient: AppColors.primaryGradient,
                             shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 3),
+                            border: Border.all(color: Colors.white.withValues(alpha: 0.15), width: 3),
                             boxShadow: [
                               BoxShadow(
-                                color: AppColors.primary.withValues(alpha: 0.4),
+                                color: AppColors.primary.withValues(alpha: 0.3),
                                 blurRadius: 16,
                                 offset: const Offset(0, 6),
                               ),
@@ -122,26 +104,26 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                               _nameController.text.isNotEmpty
                                   ? _nameController.text[0].toUpperCase()
                                   : 'U',
-                              style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 38,
-                                  fontWeight: FontWeight.w900),
+                              style: AppTextStyles.display(fontSize: 36),
                             ),
                           ),
                         ),
                         Positioned(
                           bottom: 0,
                           right: 0,
-                          child: Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: const BoxDecoration(
-                              color: AppColors.primary,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.camera_alt_rounded,
-                              color: Colors.white,
-                              size: 16,
+                          child: GestureDetector(
+                            onTap: () => HapticFeedback.lightImpact(),
+                            child: Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: const BoxDecoration(
+                                color: AppColors.accent,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.camera_alt_rounded,
+                                color: AppColors.bgDark,
+                                size: 16,
+                              ),
                             ),
                           ),
                         ),
@@ -155,6 +137,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                   GlassCard(
                     padding: const EdgeInsets.all(24),
                     borderRadius: BorderRadius.circular(24),
+                    borderGradient: const LinearGradient(
+                      colors: [AppColors.accent, AppColors.primary, Colors.transparent],
+                      stops: [0.0, 0.5, 1.0],
+                    ),
                     child: Column(
                       children: [
                         CustomTextField(
@@ -174,7 +160,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                           validator: (val) => val == null || val.isEmpty ? 'Enter email' : null,
                         ),
                         const SizedBox(height: 32),
-                        CustomButton(
+                        GradientButton(
                           text: 'Save Changes',
                           onPressed: _handleSave,
                           icon: Icons.check_circle_outline_rounded,

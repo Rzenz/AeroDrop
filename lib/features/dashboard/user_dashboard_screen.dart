@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:flutter_animate/flutter_animate.dart';
-import 'package:fl_chart/fl_chart.dart';
+import 'dart:math' as math;
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/glass_card.dart';
 import '../../core/widgets/delivery_card.dart';
+import '../../core/widgets/section_header.dart';
+import '../../core/widgets/staggered_list.dart';
+import '../../core/widgets/status_chip.dart';
 import '../../core/providers/delivery_provider.dart';
 import '../../core/providers/drone_provider.dart';
 import '../../core/providers/auth_provider.dart';
@@ -27,221 +30,290 @@ class UserDashboardScreen extends ConsumerWidget {
     final availDrones = drones.where((d) => d.status == DroneStatus.available).length;
 
     final hour = DateTime.now().hour;
-    final greeting = hour < 12 ? 'Good Morning' : hour < 17 ? 'Good Afternoon' : 'Good Evening';
-    final firstName = user?.name.split(' ').first ?? 'User';
+    final greeting = hour < 12
+        ? 'Good Morning ☀️'
+        : hour < 17
+            ? 'Good Afternoon 🌤'
+            : 'Good Evening 🌙';
+    final firstName = user?.name.split(' ').first ?? 'Pilot';
 
     return Scaffold(
       backgroundColor: AppColors.bgDark,
       body: CustomScrollView(
+        physics: const BouncingScrollPhysics(),
         slivers: [
-          // Hero header
-          SliverToBoxAdapter(
-            child: _HeroHeader(
-              greeting: greeting,
-              name: firstName,
-              active: active.length,
-              availDrones: availDrones,
-            ),
-          ),
-
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                const SizedBox(height: 24),
-
-                // Stats row
-                Row(
-                  children: [
-                    _StatPill(label: 'Active', value: '${active.length}', color: AppColors.primary),
-                    const SizedBox(width: 10),
-                    _StatPill(label: 'Completed', value: '${completed.length}', color: AppColors.success),
-                    const SizedBox(width: 10),
-                    _StatPill(label: 'Fleet', value: '$availDrones Online', color: AppColors.secondary),
-                  ],
-                ).animate().fadeIn(delay: 200.ms),
-
-                const SizedBox(height: 24),
-
-                // Delivery trend sparkline
-                _DeliverySparkline(deliveries: deliveries).animate().fadeIn(delay: 300.ms),
-
-                const SizedBox(height: 24),
-
-                // Active delivery
-                if (active.isNotEmpty) ...[
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          // Sticky SliverAppBar
+          SliverAppBar(
+            expandedHeight: 110,
+            floating: false,
+            pinned: true,
+            stretch: true,
+            backgroundColor: AppColors.bgDark,
+            elevation: 0,
+            flexibleSpace: FlexibleSpaceBar(
+              collapseMode: CollapseMode.parallax,
+              background: Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Color(0xFF1565C0), AppColors.bgDark],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                  ),
+                ),
+              ),
+              titlePadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              title: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text('Active Delivery',
-                          style: AppTextStyles.title(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white)),
-                      GestureDetector(
-                        onTap: () => context.go('/user/track'),
-                        child: Text('Track →',
-                            style: AppTextStyles.body(
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.secondary)),
+                      Text(
+                        greeting,
+                        style: AppTextStyles.label(
+                          fontSize: 10,
+                          color: Colors.white70,
+                        ),
+                      ),
+                      Text(
+                        firstName,
+                        style: AppTextStyles.title(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                        ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  DeliveryCard(
-                    delivery: active.first,
-                    onTap: () => context.go('/user/track'),
-                  ).animate().fadeIn(delay: 400.ms).slideX(begin: -0.05),
-                  const SizedBox(height: 24),
-                ],
-
-                // Recent deliveries
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('Recent Deliveries',
-                        style: AppTextStyles.title(
-                            fontSize: 18,
+                  Row(
+                    children: [
+                      IconButton(
+                        onPressed: () => context.push('/user/notifications'),
+                        icon: Stack(
+                          children: [
+                            const Icon(Icons.notifications_none_rounded, color: Colors.white, size: 24),
+                            Positioned(
+                              right: 2,
+                              top: 2,
+                              child: Container(
+                                width: 8,
+                                height: 8,
+                                decoration: const BoxDecoration(
+                                  color: AppColors.accent,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      CircleAvatar(
+                        radius: 16,
+                        backgroundColor: AppColors.accent,
+                        child: Text(
+                          firstName.isNotEmpty ? firstName[0] : 'P',
+                          style: AppTextStyles.title(
+                            fontSize: 12,
+                            color: AppColors.bgDark,
                             fontWeight: FontWeight.bold,
-                            color: Colors.white)),
-                    GestureDetector(
-                      onTap: () => context.go('/user/history'),
-                      child: Text('View all →',
-                          style: AppTextStyles.body(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.secondary)),
-                    ),
-                  ],
-                ).animate().fadeIn(delay: 450.ms),
-                const SizedBox(height: 12),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
 
-                if (deliveries.isEmpty)
-                  GlassCard(
-                    padding: const EdgeInsets.all(28),
-                    child: Column(
+          // Scrollable Body
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 120),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
+                StaggeredColumn(
+                  delayMs: 50,
+                  children: [
+                    // Quick Actions Grid (Moved to top)
+                    _QuickActions(),
+
+                    const SizedBox(height: 24),
+
+                    // Quick Stats Row
+                    Row(
                       children: [
-                        const Icon(Icons.local_shipping_outlined,
-                            color: AppColors.textSecondaryDark, size: 40),
-                        const SizedBox(height: 12),
-                        Text('No deliveries yet',
-                            style: AppTextStyles.body(
-                                fontSize: 14,
-                                color: AppColors.textSecondaryDark)),
+                        _StatPill(
+                          label: 'Active',
+                          value: '${active.length}',
+                          color: AppColors.primaryLight,
+                          icon: Icons.flight_takeoff_rounded,
+                        ),
+                        const SizedBox(width: 12),
+                        _StatPill(
+                          label: 'Completed',
+                          value: '${completed.length}',
+                          color: AppColors.success,
+                          icon: Icons.check_circle_rounded,
+                        ),
+                        const SizedBox(width: 12),
+                        _StatPill(
+                          label: 'Available',
+                          value: '$availDrones',
+                          color: AppColors.accent,
+                          icon: Icons.precision_manufacturing_rounded,
+                        ),
                       ],
                     ),
-                  )
-                else
-                  ...deliveries.take(3).toList().asMap().entries.map((e) {
-                    return DeliveryCard(
-                      delivery: e.value,
-                      onTap: () {},
-                    ).animate(delay: Duration(milliseconds: 500 + e.key * 80))
-                        .fadeIn()
-                        .slideX(begin: 0.04);
-                  }),
+
+                    const SizedBox(height: 28),
+
+                    // Weekly Trend Sparkline (Glass Card)
+                    // UCLM Flight Weather Advisories (Glass Card)
+                    const AeroDropWeatherWidget(),
+
+                    const SizedBox(height: 28),
+
+                    // Active Delivery Section
+                    if (active.isNotEmpty) ...[
+                      SectionHeader(
+                        title: 'Active Delivery',
+                        actionLabel: 'Track Live →',
+                        onAction: () => context.go('/user/track'),
+                      ),
+                      const SizedBox(height: 12),
+                      DeliveryCard(
+                        delivery: active.first,
+                        onTap: () => context.go('/user/track'),
+                      ),
+                      const SizedBox(height: 24),
+                    ],
+
+
+
+                    // Recent Deliveries Section with Alternating Cards
+                    SectionHeader(
+                      title: 'Recent Deliveries',
+                      actionLabel: 'View All →',
+                      onAction: () => context.go('/user/history'),
+                    ),
+                    const SizedBox(height: 12),
+
+                    if (deliveries.isEmpty)
+                      GlassCard(
+                        padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 24),
+                        child: Column(
+                          children: [
+                            const Icon(
+                              Icons.inventory_2_outlined,
+                              color: AppColors.textSecondaryDark,
+                              size: 48,
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'No deliveries yet',
+                              style: AppTextStyles.subHead(
+                                fontSize: 16,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Tap the + button to dispatch a drone.',
+                              style: AppTextStyles.body(
+                                fontSize: 13,
+                                color: AppColors.textSecondaryDark,
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    else
+                      Column(
+                        children: List.generate(
+                          deliveries.take(4).length,
+                          (index) {
+                            final delivery = deliveries[index];
+
+                            // Alternate between gradient-rimmed AnimatedCard (via DeliveryCard)
+                            // and a frosted GlassCard containing the delivery details.
+                            if (index % 2 == 0) {
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: DeliveryCard(
+                                  delivery: delivery,
+                                  onTap: () => context.push('/user/track/details?id=${delivery.id}'),
+                                ),
+                              );
+                            } else {
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: GlassCard(
+                                  onTap: () => context.push('/user/track/details?id=${delivery.id}'),
+                                  padding: const EdgeInsets.all(18),
+                                  borderGradient: const LinearGradient(
+                                    colors: [Colors.white24, Colors.white12],
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Text(
+                                            delivery.id,
+                                            style: AppTextStyles.label(
+                                              fontSize: 11,
+                                              color: AppColors.accentLight,
+                                            ),
+                                          ),
+                                          StatusChip.delivery(delivery.status.name),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 12),
+                                      Text(
+                                        delivery.packageName,
+                                        style: AppTextStyles.title(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Text(
+                                            delivery.packageType,
+                                            style: AppTextStyles.body(
+                                              fontSize: 12.5,
+                                              color: AppColors.textSecondaryDark,
+                                            ),
+                                          ),
+                                          Text(
+                                            '${delivery.packageWeight} kg',
+                                            style: AppTextStyles.body(
+                                              fontSize: 12.5,
+                                              fontWeight: FontWeight.bold,
+                                              color: AppColors.textSecondaryDark,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            }
+                          },
+                        ),
+                      ),
+                  ],
+                ),
               ]),
             ),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _HeroHeader extends StatelessWidget {
-  final String greeting;
-  final String name;
-  final int active;
-  final int availDrones;
-
-  const _HeroHeader({
-    required this.greeting,
-    required this.name,
-    required this.active,
-    required this.availDrones,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.fromLTRB(
-          20, MediaQuery.of(context).padding.top + 16, 20, 28),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            AppColors.primary.withValues(alpha: 0.8),
-            AppColors.bgDark,
-          ],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(greeting,
-                      style: AppTextStyles.body(
-                          fontSize: 14,
-                          color: Colors.white.withValues(alpha: 0.7))),
-                  Text(name,
-                      style: AppTextStyles.title(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w900,
-                          color: Colors.white)),
-                ],
-              ),
-              Container(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 2),
-                ),
-                child: CircleAvatar(
-                  radius: 22,
-                  backgroundColor: AppColors.primary.withValues(alpha: 0.3),
-                  child: Text(
-                    name[0].toUpperCase(),
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18),
-                  ),
-                ),
-              ),
-            ],
-          ).animate().fadeIn().slideY(begin: -0.1),
-          const SizedBox(height: 16),
-          // Live status pill
-          if (active > 0)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 8, height: 8,
-                    decoration: const BoxDecoration(
-                      color: AppColors.success, shape: BoxShape.circle),
-                  ),
-                  const SizedBox(width: 8),
-                  Text('$active delivery in flight',
-                      style: const TextStyle(
-                          color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
-                ],
-              ),
-            ).animate().fadeIn(delay: 200.ms).slideX(begin: -0.05),
         ],
       ),
     );
@@ -252,28 +324,48 @@ class _StatPill extends StatelessWidget {
   final String label;
   final String value;
   final Color color;
+  final IconData icon;
 
-  const _StatPill({required this.label, required this.value, required this.color});
+  const _StatPill({
+    required this.label,
+    required this.value,
+    required this.color,
+    required this.icon,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: color.withValues(alpha: 0.2)),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: color.withValues(alpha: 0.25),
+            width: 1.5,
+          ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(value,
-                style: AppTextStyles.title(
-                    fontSize: 16, fontWeight: FontWeight.w900, color: color)),
-            Text(label,
-                style: AppTextStyles.body(
-                    fontSize: 11, color: AppColors.textSecondaryDark)),
+            Icon(icon, color: color, size: 20),
+            const SizedBox(height: 8),
+            Text(
+              value,
+              style: AppTextStyles.display(
+                fontSize: 22,
+                color: color,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: AppTextStyles.label(
+                fontSize: 10,
+                color: AppColors.textSecondaryDark,
+              ),
+            ),
           ],
         ),
       ),
@@ -281,88 +373,446 @@ class _StatPill extends StatelessWidget {
   }
 }
 
-class _DeliverySparkline extends StatelessWidget {
-  final List deliveries;
-  const _DeliverySparkline({required this.deliveries});
-
-  @override
-  Widget build(BuildContext context) {
-    // ponytail: static sparkline data — wire to real timeseries if backend added
-    final spots = [
-      const FlSpot(0, 3),
-      const FlSpot(1, 5),
-      const FlSpot(2, 4),
-      const FlSpot(3, 7),
-      const FlSpot(4, 6),
-      const FlSpot(5, 8),
-      FlSpot(6, deliveries.length.toDouble().clamp(1, 12)),
-    ];
-
-    return GlassCard(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+class _QuickActions extends StatelessWidget {
+  Widget _buildActionCard(_QuickActionData a, {double margin = 0}) {
+    return Expanded(
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: margin),
+        child: GlassCard(
+          onTap: a.onTap,
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 6),
+          borderGradient: LinearGradient(
+            colors: [a.color.withValues(alpha: 0.3), Colors.transparent],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Text('Weekly Trend',
-                  style: AppTextStyles.title(
-                      fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white)),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.success.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(8),
+              Icon(a.icon, color: a.color, size: 22),
+              const SizedBox(height: 6),
+              Text(
+                a.label,
+                style: AppTextStyles.label(
+                  fontSize: 9.5,
+                  color: AppColors.textSecondaryDark,
                 ),
-                child: const Text('↑ 23%',
-                    style: TextStyle(
-                        color: AppColors.success,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold)),
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          SizedBox(
-            height: 100,
-            child: LineChart(
-              LineChartData(
-                gridData: const FlGridData(show: false),
-                titlesData: const FlTitlesData(show: false),
-                borderData: FlBorderData(show: false),
-                minX: 0,
-                maxX: 6,
-                minY: 0,
-                maxY: 12,
-                lineBarsData: [
-                  LineChartBarData(
-                    spots: spots,
-                    isCurved: true,
-                    gradient: const LinearGradient(
-                      colors: [AppColors.primary, AppColors.secondary],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final actions = [
+      _QuickActionData(
+        Icons.local_shipping_rounded,
+        'New Request',
+        AppColors.accent,
+        () => context.push('/user/request'),
+      ),
+      _QuickActionData(
+        Icons.radar_rounded,
+        'Radar Track',
+        AppColors.primaryLight,
+        () => context.go('/user/track'),
+      ),
+      _QuickActionData(
+        Icons.history_rounded,
+        'History Log',
+        AppColors.success,
+        () => context.go('/user/history'),
+      ),
+      _QuickActionData(
+        Icons.help_outline_rounded,
+        'Support Help',
+        AppColors.textSecondaryDark,
+        () => context.push('/shared/help'),
+      ),
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SectionHeader(title: 'Quick Actions', showAccentBar: true),
+        const SizedBox(height: 12),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final double cardWidth = (constraints.maxWidth - 24) / 4;
+            final bool useTwoRows = cardWidth < 75; // if less than 75px, 4 in a row is too cramped
+            
+            if (useTwoRows) {
+              return Column(
+                children: [
+                  Row(
+                    children: [
+                      _buildActionCard(actions[0]),
+                      const SizedBox(width: 8),
+                      _buildActionCard(actions[1]),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      _buildActionCard(actions[2]),
+                      const SizedBox(width: 8),
+                      _buildActionCard(actions[3]),
+                    ],
+                  ),
+                ],
+              );
+            }
+            
+            return Row(
+              children: actions.map((a) => _buildActionCard(a, margin: 4)).toList(),
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+class _QuickActionData {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  _QuickActionData(this.icon, this.label, this.color, this.onTap);
+}
+
+class AeroDropWeatherWidget extends StatefulWidget {
+  const AeroDropWeatherWidget({super.key});
+
+  @override
+  State<AeroDropWeatherWidget> createState() => _AeroDropWeatherWidgetState();
+}
+
+class _AeroDropWeatherWidgetState extends State<AeroDropWeatherWidget>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _refreshController;
+  bool _isLoading = false;
+
+  // Initial Weather States
+  String _condition = 'Clear Skies';
+  double _temp = 30.2;
+  double _windSpeed = 11.4;
+  double _humidity = 62.0;
+  String _status = 'EXCELLENT';
+  Color _statusColor = AppColors.success;
+  IconData _weatherIcon = Icons.wb_sunny_rounded;
+  Color _iconColor = AppColors.accent;
+
+  final List<Map<String, dynamic>> _conditions = [
+    {
+      'condition': 'Clear Skies',
+      'tempRange': [29.0, 34.0],
+      'windRange': [5.0, 12.0],
+      'humidityRange': [45.0, 60.0],
+      'status': 'EXCELLENT',
+      'statusColor': AppColors.success,
+      'icon': Icons.wb_sunny_rounded,
+      'iconColor': AppColors.accent,
+    },
+    {
+      'condition': 'Partly Cloudy',
+      'tempRange': [26.0, 29.5],
+      'windRange': [9.0, 16.0],
+      'humidityRange': [60.0, 72.0],
+      'status': 'SAFE',
+      'statusColor': AppColors.success,
+      'icon': Icons.cloud_rounded,
+      'iconColor': AppColors.primaryLight,
+    },
+    {
+      'condition': 'High Winds',
+      'tempRange': [25.0, 27.8],
+      'windRange': [25.0, 36.0],
+      'humidityRange': [55.0, 68.0],
+      'status': 'CAUTION',
+      'statusColor': AppColors.warning,
+      'icon': Icons.air_rounded,
+      'iconColor': Colors.cyanAccent,
+    },
+    {
+      'condition': 'Heavy Rain',
+      'tempRange': [22.5, 25.0],
+      'windRange': [18.0, 28.0],
+      'humidityRange': [85.0, 96.0],
+      'status': 'GROUNDED',
+      'statusColor': AppColors.danger,
+      'icon': Icons.thunderstorm_rounded,
+      'iconColor': AppColors.primaryLight,
+    }
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+  }
+
+  @override
+  void dispose() {
+    _refreshController.dispose();
+    super.dispose();
+  }
+
+  void _refreshWeather() async {
+    if (_isLoading) return;
+    setState(() => _isLoading = true);
+    _refreshController.repeat();
+
+    // Simulate network/telemetry fetch delay
+    await Future.delayed(const Duration(milliseconds: 700));
+
+    final random = math.Random();
+    // Ensure we pick a different condition than the current one
+    final currentIdx = _conditions.indexWhere((c) => c['condition'] == _condition);
+    int nextIdx;
+    do {
+      nextIdx = random.nextInt(_conditions.length);
+    } while (nextIdx == currentIdx && _conditions.length > 1);
+
+    final selected = _conditions[nextIdx];
+
+    final double minTemp = selected['tempRange'][0];
+    final double maxTemp = selected['tempRange'][1];
+    final double minWind = selected['windRange'][0];
+    final double maxWind = selected['windRange'][1];
+    final double minHum = selected['humidityRange'][0];
+    final double maxHum = selected['humidityRange'][1];
+
+    if (mounted) {
+      setState(() {
+        _condition = selected['condition'];
+        _temp = minTemp + random.nextDouble() * (maxTemp - minTemp);
+        _windSpeed = minWind + random.nextDouble() * (maxWind - minWind);
+        _humidity = minHum + random.nextDouble() * (maxHum - minHum);
+        _status = selected['status'];
+        _statusColor = selected['statusColor'];
+        _weatherIcon = selected['icon'];
+        _iconColor = selected['iconColor'];
+        _isLoading = false;
+      });
+      _refreshController.stop();
+      _refreshController.reset();
+      HapticFeedback.lightImpact();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassCard(
+      padding: const EdgeInsets.all(20),
+      borderGradient: const LinearGradient(
+        colors: [AppColors.primary, Colors.transparent],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header Row (Wrap left Column in Expanded to prevent right overflow)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'UCLM Campus Weather',
+                      style: AppTextStyles.subHead(fontSize: 15, color: Colors.white),
                     ),
-                    barWidth: 3,
-                    dotData: const FlDotData(show: false),
-                    belowBarData: BarAreaData(
-                      show: true,
-                      gradient: LinearGradient(
-                        colors: [
-                          AppColors.primary.withValues(alpha: 0.25),
-                          AppColors.primary.withValues(alpha: 0.0),
-                        ],
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
+                    const SizedBox(height: 2),
+                    Text(
+                      'Drone dispatch environment conditions',
+                      style: AppTextStyles.label(
+                        fontSize: 10,
+                        color: AppColors.textSecondaryDark,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Status Chip
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: _statusColor.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: _statusColor.withValues(alpha: 0.3),
+                        width: 1,
+                      ),
+                    ),
+                    child: Text(
+                      _status,
+                      style: AppTextStyles.body(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: _statusColor,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  // Refresh Button
+                  RotationTransition(
+                    turns: _refreshController,
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: _refreshWeather,
+                        customBorder: const CircleBorder(),
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.05),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.refresh_rounded,
+                            color: Colors.white,
+                            size: 16,
+                          ),
+                        ),
                       ),
                     ),
                   ),
                 ],
-                lineTouchData: const LineTouchData(enabled: false),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          // Weather Info Row
+          Row(
+            children: [
+              // Weather Icon + Temp (Wrapped in Expanded/Flexible to prevent overflow)
+              Expanded(
+                child: Row(
+                  children: [
+                    Icon(
+                      _weatherIcon,
+                      color: _iconColor,
+                      size: 38,
+                    ),
+                    const SizedBox(width: 12),
+                    Flexible(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            '${_temp.toStringAsFixed(1)}°C',
+                            style: AppTextStyles.display(
+                              fontSize: 24,
+                              color: Colors.white,
+                            ),
+                          ),
+                          Text(
+                            _condition,
+                            style: AppTextStyles.body(
+                              fontSize: 12,
+                              color: AppColors.textSecondaryDark,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              // Telemetry stats vertical divider
+              Container(
+                height: 40,
+                width: 1.5,
+                color: AppColors.borderDark,
+              ),
+              const SizedBox(width: 16),
+              // Right block: Metrics stacked vertically to prevent horizontal overflow
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _WeatherMetric(
+                    icon: Icons.air_rounded,
+                    value: '${_windSpeed.toStringAsFixed(1)} km/h',
+                    label: 'Wind Speed',
+                    iconColor: Colors.cyanAccent,
+                  ),
+                  const SizedBox(height: 8),
+                  _WeatherMetric(
+                    icon: Icons.water_drop_rounded,
+                    value: '${_humidity.toStringAsFixed(0)}%',
+                    label: 'Humidity',
+                    iconColor: AppColors.info,
+                  ),
+                ],
+              ),
+            ],
+          ),        ],
+      ),
+    );
+  }
+}
+
+class _WeatherMetric extends StatelessWidget {
+  final IconData icon;
+  final String value;
+  final String label;
+  final Color iconColor;
+
+  const _WeatherMetric({
+    required this.icon,
+    required this.value,
+    required this.label,
+    required this.iconColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, color: iconColor, size: 14),
+            const SizedBox(width: 4),
+            Text(
+              value,
+              style: AppTextStyles.title(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
               ),
             ),
+          ],
+        ),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          style: AppTextStyles.label(
+            fontSize: 9,
+            color: AppColors.textSecondaryDark,
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

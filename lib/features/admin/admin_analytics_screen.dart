@@ -34,7 +34,7 @@ class AdminAnalyticsScreen extends StatelessWidget {
               crossAxisCount: 2,
               crossAxisSpacing: 12,
               mainAxisSpacing: 12,
-              childAspectRatio: 1.1,
+              childAspectRatio: 1.25,
               children: const [
                 AnalyticsCard(
                   title: 'Total Deliveries', value: '405',
@@ -89,12 +89,16 @@ class AdminAnalyticsScreen extends StatelessWidget {
                               showTitles: true,
                               getTitlesWidget: (v, _) {
                                 const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-                                return Padding(
-                                  padding: const EdgeInsets.only(top: 6),
-                                  child: Text(days[v.toInt()],
-                                      style: const TextStyle(
-                                          color: AppColors.textSecondaryDark, fontSize: 10)),
-                                );
+                                final index = v.toInt();
+                                if (index >= 0 && index < days.length) {
+                                  return Padding(
+                                    padding: const EdgeInsets.only(top: 6),
+                                    child: Text(days[index],
+                                        style: const TextStyle(
+                                            color: AppColors.textSecondaryDark, fontSize: 10)),
+                                  );
+                                }
+                                return const SizedBox.shrink();
                               },
                               reservedSize: 28,
                             ),

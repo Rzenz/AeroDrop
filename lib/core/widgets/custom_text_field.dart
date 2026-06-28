@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 
-class CustomTextField extends StatelessWidget {
+class CustomTextField extends StatefulWidget {
   final String labelText;
   final String hintText;
   final IconData? prefixIcon;
@@ -11,9 +11,10 @@ class CustomTextField extends StatelessWidget {
   final TextEditingController? controller;
   final String? Function(String?)? validator;
   final TextInputType keyboardType;
-
   final int maxLines;
   final ValueChanged<String>? onChanged;
+  final TextInputAction? textInputAction;
+  final FocusNode? focusNode;
 
   const CustomTextField({
     super.key,
@@ -27,74 +28,117 @@ class CustomTextField extends StatelessWidget {
     this.keyboardType = TextInputType.text,
     this.maxLines = 1,
     this.onChanged,
+    this.textInputAction,
+    this.focusNode,
   });
 
   @override
+  State<CustomTextField> createState() => _CustomTextFieldState();
+}
+
+class _CustomTextFieldState extends State<CustomTextField> {
+  late FocusNode _focusNode;
+  bool _isFocused = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode = widget.focusNode ?? FocusNode();
+    _focusNode.addListener(_onFocusChange);
+  }
+
+  void _onFocusChange() {
+    setState(() {
+      _isFocused = _focusNode.hasFocus;
+    });
+  }
+
+  @override
+  void dispose() {
+    // Only dispose if it was created locally
+    if (widget.focusNode == null) {
+      _focusNode.dispose();
+    } else {
+      _focusNode.removeListener(_onFocusChange);
+    }
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (labelText.isNotEmpty) ...[
+        if (widget.labelText.isNotEmpty) ...[
           Text(
-            labelText,
-            style: AppTextStyles.body(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+            widget.labelText,
+            style: AppTextStyles.label(
+              fontSize: 12,
+              color: _isFocused ? AppColors.primaryLight : AppColors.textSecondaryDark,
             ),
           ),
           const SizedBox(height: 8),
         ],
-        TextFormField(
-          controller: controller,
-          obscureText: obscureText,
-          validator: validator,
-          keyboardType: keyboardType,
-          maxLines: maxLines,
-          onChanged: onChanged,
-          style: AppTextStyles.body(
-            fontSize: 16,
-            color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOut,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: _isFocused
+                    ? AppColors.primary.withValues(alpha: 0.25)
+                    : Colors.transparent,
+                blurRadius: 12,
+                spreadRadius: 2,
+              ),
+            ],
           ),
-          decoration: InputDecoration(
-            hintText: hintText,
-            hintStyle: AppTextStyles.body(
-              fontSize: 14,
-              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+          child: TextFormField(
+            controller: widget.controller,
+            obscureText: widget.obscureText,
+            validator: widget.validator,
+            keyboardType: widget.keyboardType,
+            maxLines: widget.maxLines,
+            onChanged: widget.onChanged,
+            textInputAction: widget.textInputAction,
+            focusNode: _focusNode,
+            style: AppTextStyles.body(
+              fontSize: 15,
+              color: AppColors.textPrimaryDark,
             ),
-            prefixIcon: prefixIcon != null ? Icon(prefixIcon, color: AppColors.secondary) : null,
-            suffixIcon: suffixIcon,
-            filled: true,
-            fillColor: isDark ? AppColors.cardDark : Colors.white,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide(
-                color: isDark ? AppColors.borderDark : AppColors.borderLight,
-                width: 1,
+            decoration: InputDecoration(
+              hintText: widget.hintText,
+              hintStyle: AppTextStyles.body(
+                fontSize: 14,
+                color: AppColors.textSecondaryDark.withValues(alpha: 0.5),
               ),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: const BorderSide(
-                color: AppColors.primary,
-                width: 2,
+              prefixIcon: widget.prefixIcon != null
+                  ? Icon(
+                      widget.prefixIcon,
+                      color: _isFocused ? AppColors.primaryLight : AppColors.textSecondaryDark,
+                      size: 20,
+                    )
+                  : null,
+              suffixIcon: widget.suffixIcon,
+              filled: true,
+              fillColor: AppColors.cardDark2,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: const BorderSide(color: AppColors.borderDark, width: 1.5),
               ),
-            ),
-            errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: const BorderSide(
-                color: AppColors.danger,
-                width: 1.5,
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: const BorderSide(color: AppColors.primaryLight, width: 2),
               ),
-            ),
-            focusedErrorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: const BorderSide(
-                color: AppColors.danger,
-                width: 2,
+              errorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: const BorderSide(color: AppColors.danger, width: 1.5),
+              ),
+              focusedErrorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: const BorderSide(color: AppColors.danger, width: 2),
               ),
             ),
           ),

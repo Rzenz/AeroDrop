@@ -27,37 +27,34 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         child: NavigationToolbar(
           leading: canPop
-              ? Center(
-                  child: GestureDetector(
-                    onTap: onBackPressed ?? () {
-                      HapticFeedback.lightImpact();
-                      if (context.canPop()) {
-                        context.pop();
-                      } else {
-                        // fallback if popped out of go_router stack
-                        Navigator.maybePop(context);
-                      }
-                    },
-                    child: Container(
-                      width: 38,
-                      height: 38,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: AppColors.cardDark.withValues(alpha: 0.6),
-                        border: Border.all(
-                          color: AppColors.borderDark,
-                          width: 1.5,
-                        ),
-                      ),
-                      child: const Icon(
-                        Icons.arrow_back_ios_new_rounded,
-                        color: Colors.white,
-                        size: 16,
-                      ),
-                    ),
-                  ),
-                )
-              : const SizedBox.shrink(),
+    ? GestureDetector(
+        onTap: onBackPressed ?? () {
+          HapticFeedback.lightImpact();
+          if (context.canPop()) {
+            context.pop();
+          } else {
+            Navigator.maybePop(context);
+          }
+        },
+        child: Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: AppColors.cardDark.withValues(alpha: 0.6),
+            border: Border.all(
+              color: AppColors.borderDark,
+              width: 1.5,
+            ),
+          ),
+          child: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: Colors.white,
+            size: 16,
+          ),
+        ),
+      )
+    : const SizedBox.shrink(),
           middle: Text(
             title,
             style: AppTextStyles.heading(fontSize: 22),

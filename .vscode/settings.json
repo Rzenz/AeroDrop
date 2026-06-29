@@ -25,5 +25,6 @@
         "smcp",
         "swipeable",
         "wireframes"
-    ]
+    ],
+    "CodeGPT.apiKey": "Google AI Studio"
 }

@@ -94,9 +94,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       if (isAdminPath && user.role != UserRole.admin) {
         return '/user';
       }
-      if (isUserPath && user.role != UserRole.user) {
-        return '/admin';
-      }
+     if (isUserPath && user.role == UserRole.admin) {
+  return '/admin';
+}
 
       return null;
     },

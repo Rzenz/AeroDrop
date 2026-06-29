@@ -15,6 +15,7 @@ class CustomTextField extends StatefulWidget {
   final ValueChanged<String>? onChanged;
   final TextInputAction? textInputAction;
   final FocusNode? focusNode;
+  final bool readOnly;
 
   const CustomTextField({
     super.key,
@@ -30,6 +31,7 @@ class CustomTextField extends StatefulWidget {
     this.onChanged,
     this.textInputAction,
     this.focusNode,
+    this.readOnly = false,
   });
 
   @override
@@ -74,7 +76,9 @@ class _CustomTextFieldState extends State<CustomTextField> {
             widget.labelText,
             style: AppTextStyles.label(
               fontSize: 12,
-              color: _isFocused ? AppColors.primaryLight : AppColors.textSecondaryDark,
+              color: _isFocused
+                  ? AppColors.primaryLight
+                  : AppColors.textSecondaryDark,
             ),
           ),
           const SizedBox(height: 8),
@@ -103,6 +107,7 @@ class _CustomTextFieldState extends State<CustomTextField> {
             onChanged: widget.onChanged,
             textInputAction: widget.textInputAction,
             focusNode: _focusNode,
+            readOnly: widget.readOnly,
             style: AppTextStyles.body(
               fontSize: 15,
               color: AppColors.textPrimaryDark,
@@ -116,25 +121,39 @@ class _CustomTextFieldState extends State<CustomTextField> {
               prefixIcon: widget.prefixIcon != null
                   ? Icon(
                       widget.prefixIcon,
-                      color: _isFocused ? AppColors.primaryLight : AppColors.textSecondaryDark,
+                      color: _isFocused
+                          ? AppColors.primaryLight
+                          : AppColors.textSecondaryDark,
                       size: 20,
                     )
                   : null,
               suffixIcon: widget.suffixIcon,
               filled: true,
               fillColor: AppColors.cardDark2,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 20,
+                vertical: 18,
+              ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),
-                borderSide: const BorderSide(color: AppColors.borderDark, width: 1.5),
+                borderSide: const BorderSide(
+                  color: AppColors.borderDark,
+                  width: 1.5,
+                ),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),
-                borderSide: const BorderSide(color: AppColors.primaryLight, width: 2),
+                borderSide: const BorderSide(
+                  color: AppColors.primaryLight,
+                  width: 2,
+                ),
               ),
               errorBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),
-                borderSide: const BorderSide(color: AppColors.danger, width: 1.5),
+                borderSide: const BorderSide(
+                  color: AppColors.danger,
+                  width: 1.5,
+                ),
               ),
               focusedErrorBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),

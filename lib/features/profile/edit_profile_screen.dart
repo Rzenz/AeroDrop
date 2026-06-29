@@ -153,7 +153,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                         const SizedBox(height: 20),
                         CustomTextField(
                           labelText: 'Email Address',
-                          hintText: 'yourname@uclm.edu',
+                          hintText: 'yourname@email.com',
                           prefixIcon: Icons.email_outlined,
                           controller: _emailController,
                           keyboardType: TextInputType.emailAddress,

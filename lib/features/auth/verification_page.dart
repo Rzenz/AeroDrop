@@ -184,7 +184,7 @@ class _VerificationPageState extends ConsumerState<VerificationPage> {
                     duration: const Duration(milliseconds: 300),
                     child: Text(
                       _method == VerificationMethod.email
-                          ? 'We sent a 6-digit verification code to your university email:\n$userEmail'
+                          ? 'We sent a 6-digit verification code to your email:\n$userEmail'
                           : 'We sent a 6-digit verification code to your registered mobile number:\n$userPhone',
                       key: ValueKey(_method),
                       style: AppTextStyles.body(

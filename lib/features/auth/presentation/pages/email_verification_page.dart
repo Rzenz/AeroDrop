@@ -73,7 +73,7 @@ class _EmailVerificationPageState extends State<EmailVerificationPage> {
                 ).animate().fadeIn(delay: 100.ms),
                 const SizedBox(height: 12),
                 Text(
-                  'We have sent a verification link to your university email. Please click the link to verify your account.',
+                  'We have sent a verification link to your email. Please click the link to verify your account.',
                   style: AppTextStyles.body(fontSize: 14, color: AppColors.textSecondaryDark),
                   textAlign: TextAlign.center,
                 ).animate().fadeIn(delay: 200.ms),

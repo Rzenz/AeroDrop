@@ -21,7 +21,7 @@ class LoginScreen extends ConsumerStatefulWidget {
 class _LoginScreenState extends ConsumerState<LoginScreen>
     with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController(text: 'john.doe@uclm.edu');
+  final _emailController = TextEditingController(text: 'john.doe@gmail.com');
   final _passwordController = TextEditingController(text: 'password123');
   bool _obscurePassword = true;
   late AnimationController _bgRotateController;
@@ -279,8 +279,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                       ),
                                       const SizedBox(height: 24),
                                       CustomTextField(
-                                        labelText: 'University Email',
-                                        hintText: 'yourname@uclm.edu',
+                                        labelText: 'Email',
+                                        hintText: 'yourname@email.com',
                                         prefixIcon: Icons.email_outlined,
                                         controller: _emailController,
                                         keyboardType:

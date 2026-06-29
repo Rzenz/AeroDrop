@@ -21,7 +21,7 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
     {'name': 'Professor Green', 'email': 'p.green@uclm.edu', 'role': 'Faculty/Staff', 'dept': 'Science Department'},
     {'name': 'Dean Harrison', 'email': 'd.harrison@uclm.edu', 'role': 'Faculty/Staff', 'dept': 'Engineering Department'},
     {'name': 'Sarah Jenkins', 'email': 's.jenkins@uclm.edu', 'role': 'Admin (Fleet Commander)', 'dept': 'Logistics & Fleet control'},
-    {'name': 'John Doe', 'email': 'john.doe@uclm.edu', 'role': 'Student', 'dept': 'Computer Studies Council'},
+    {'name': 'John Doe', 'email': 'john.doe@gmail.com', 'role': 'Student', 'dept': 'Computer Studies Council'},
   ];
 
   @override

@@ -46,7 +46,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     await Future.delayed(const Duration(milliseconds: 800));
 
     UserModel? loggedInUser;
-    if (email.toLowerCase().contains('admin')) {
+    if (email.toLowerCase().endsWith('@uclm.edu')) {
       loggedInUser = UserModel(
         id: 'admin_1',
         name: 'Admin Commander',

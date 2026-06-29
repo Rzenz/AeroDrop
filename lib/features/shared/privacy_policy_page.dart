@@ -54,7 +54,7 @@ class PrivacyPolicyPage extends StatelessWidget {
                         children: [
                           _buildSectionTitle('1. Information Collection'),
                           _buildSectionText(
-                            'AeroDrop collects basic user account profile details (Name, University Email, and Department) and location specifications during flight dispatch requests. Live telemetry and flight coordinate parameters are audited solely for campus airspace coordination.'
+                            'AeroDrop collects basic user account profile details (Name, Email, and Department) and location specifications during flight dispatch requests. Live telemetry and flight coordinate parameters are audited solely for campus airspace coordination.'
                           ),
                           const SizedBox(height: 20),
                           _buildSectionTitle('2. Use of Information'),

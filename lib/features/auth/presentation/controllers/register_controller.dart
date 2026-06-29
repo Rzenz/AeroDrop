@@ -1,3 +1,5 @@
+import '../../../../core/models/user_model.dart';
+
 class RegisterController {
   static String? validateName(String? value) {
     if (value == null || value.isEmpty) {
@@ -9,16 +11,22 @@ class RegisterController {
     return null;
   }
 
-  static String? validateEmail(String? value) {
+  static String? validateEmail(String? value, UserRole role) {
     if (value == null || value.isEmpty) {
-      return 'University email is required';
+      return 'Email is required';
     }
-    final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+edu$');
+    final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[a-zA-Z]{2,4}$');
     if (!emailRegex.hasMatch(value)) {
-      return 'Enter a valid university email address';
+      return 'Enter a valid email address';
     }
-    if (!value.endsWith('@uclm.edu')) {
-      return 'Must be an official @uclm.edu address';
+    if (role == UserRole.user) {
+      if (!value.endsWith('@gmail.com')) {
+        return 'Students must use a @gmail.com address';
+      }
+    } else {
+      if (!value.endsWith('@uclm.edu')) {
+        return 'Faculty/Staff must use a @uclm.edu address';
+      }
     }
     return null;
   }

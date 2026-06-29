@@ -252,8 +252,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                         child: Column(
                           children: [
                             CustomTextField(
-                              labelText: 'University Email',
-                              hintText: 'yourname@uclm.edu',
+                              labelText: 'Email',
+                              hintText: 'yourname@email.com',
                               prefixIcon: Icons.email_outlined,
                               controller: _emailController,
                               keyboardType: TextInputType.emailAddress,

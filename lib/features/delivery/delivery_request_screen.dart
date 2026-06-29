@@ -114,9 +114,7 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
 
       final locations = (response as List)
           .map(
-            (item) => CampusLocation.fromMap(
-              Map<String, dynamic>.from(item),
-            ),
+            (item) => CampusLocation.fromMap(Map<String, dynamic>.from(item)),
           )
           .toList();
 
@@ -130,8 +128,7 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
       final dropoffs = locations
           .where(
             (location) =>
-                location.type == 'dropoff_platform' ||
-                location.type == 'both',
+                location.type == 'dropoff_platform' || location.type == 'both',
           )
           .toList();
 
@@ -181,8 +178,8 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
     final hour = value.hour > 12
         ? value.hour - 12
         : value.hour == 0
-            ? 12
-            : value.hour;
+        ? 12
+        : value.hour;
 
     final minute = value.minute.toString().padLeft(2, '0');
     final amPm = value.hour >= 12 ? 'PM' : 'AM';
@@ -199,10 +196,7 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
       firstDate: now,
       lastDate: now.add(const Duration(days: 30)),
       builder: (context, child) {
-        return Theme(
-          data: ThemeData.dark(),
-          child: child!,
-        );
+        return Theme(data: ThemeData.dark(), child: child!);
       },
     );
 
@@ -212,10 +206,7 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
       context: context,
       initialTime: TimeOfDay.now(),
       builder: (context, child) {
-        return Theme(
-          data: ThemeData.dark(),
-          child: child!,
-        );
+        return Theme(data: ThemeData.dark(), child: child!);
       },
     );
 
@@ -353,11 +344,14 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
     final weight = double.tryParse(_weightController.text.trim()) ?? 1.0;
 
     final pickupName = _selectedPickup?.name ?? _pickupController.text.trim();
-    final dropoffName = _selectedDropoff?.name ?? _dropoffController.text.trim();
+    final dropoffName =
+        _selectedDropoff?.name ?? _dropoffController.text.trim();
 
     setState(() => _loading = true);
 
-    final error = await ref.read(deliveryProvider.notifier).createDelivery(
+    final error = await ref
+        .read(deliveryProvider.notifier)
+        .createDelivery(
           senderName: user.name,
           recipientName: _recipientController.text.trim(),
           recipientPhone: '+63 900 000 0000',
@@ -392,15 +386,13 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
   @override
   Widget build(BuildContext context) {
     final pickupText = _selectedPickup?.name ?? _pickupController.text.trim();
-    final dropoffText = _selectedDropoff?.name ?? _dropoffController.text.trim();
+    final dropoffText =
+        _selectedDropoff?.name ?? _dropoffController.text.trim();
     final paymentAmount = _calculatePaymentAmount();
 
     return Scaffold(
       backgroundColor: AppColors.bgDark,
-      appBar: CustomAppBar(
-        title: 'Make a Delivery',
-        onBackPressed: _back,
-      ),
+      appBar: CustomAppBar(title: 'Make a Delivery', onBackPressed: _back),
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -431,8 +423,9 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
                               height: 34,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                gradient:
-                                    isActive ? AppColors.accentGradient : null,
+                                gradient: isActive
+                                    ? AppColors.accentGradient
+                                    : null,
                                 color: isActive ? null : AppColors.cardDark,
                                 border: Border.all(
                                   color: isActive
@@ -541,8 +534,9 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
                       },
                     ),
                     _ConfirmPage(
-                      pickup:
-                          pickupText.isEmpty ? 'No pickup selected' : pickupText,
+                      pickup: pickupText.isEmpty
+                          ? 'No pickup selected'
+                          : pickupText,
                       dropoff: dropoffText.isEmpty
                           ? 'No drop-off selected'
                           : dropoffText,
@@ -614,10 +608,7 @@ class _PackagePage extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             'Package Details',
-            style: AppTextStyles.subHead(
-              fontSize: 18,
-              color: Colors.white,
-            ),
+            style: AppTextStyles.subHead(fontSize: 18, color: Colors.white),
           ).animate().fadeIn().slideY(begin: 0.1),
           const SizedBox(height: 16),
           DarkCard(
@@ -648,10 +639,7 @@ class _PackagePage extends StatelessWidget {
                         HapticFeedback.lightImpact();
                         onTypeChanged(type);
                       },
-                      child: _ChoiceChip(
-                        label: type,
-                        selected: selected,
-                      ),
+                      child: _ChoiceChip(label: type, selected: selected),
                     );
                   }).toList(),
                 ),
@@ -683,10 +671,7 @@ class _PackagePage extends StatelessWidget {
                         HapticFeedback.lightImpact();
                         onPriorityChanged(priority);
                       },
-                      child: _ChoiceChip(
-                        label: priority,
-                        selected: selected,
-                      ),
+                      child: _ChoiceChip(label: priority, selected: selected),
                     );
                   }).toList(),
                 ),
@@ -783,10 +768,7 @@ class _LocationPage extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             'Delivery Locations',
-            style: AppTextStyles.subHead(
-              fontSize: 18,
-              color: Colors.white,
-            ),
+            style: AppTextStyles.subHead(fontSize: 18, color: Colors.white),
           ).animate().fadeIn().slideY(begin: 0.1),
           const SizedBox(height: 16),
           DarkCard(
@@ -935,19 +917,19 @@ class _PaymentPage extends StatelessWidget {
         name: 'GCash',
         icon: Icons.account_balance_wallet_rounded,
         subtitle: 'Simulated e-wallet payment',
-        color: AppColors.primaryLight
+        color: AppColors.primaryLight,
       ),
       (
         name: 'Cash',
         icon: Icons.payments_rounded,
         subtitle: 'Pending until package arrival',
-        color: AppColors.success
+        color: AppColors.success,
       ),
       (
         name: 'Credit / Debit Card',
         icon: Icons.credit_card_rounded,
         subtitle: 'Simulated card payment',
-        color: AppColors.accent
+        color: AppColors.accent,
       ),
     ];
 
@@ -959,10 +941,7 @@ class _PaymentPage extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             'Payment Method',
-            style: AppTextStyles.subHead(
-              fontSize: 18,
-              color: Colors.white,
-            ),
+            style: AppTextStyles.subHead(fontSize: 18, color: Colors.white),
           ).animate().fadeIn().slideY(begin: 0.1),
           const SizedBox(height: 16),
           Container(
@@ -1031,11 +1010,7 @@ class _PaymentPage extends StatelessWidget {
                         color: option.color.withValues(alpha: 0.15),
                         shape: BoxShape.circle,
                       ),
-                      child: Icon(
-                        option.icon,
-                        color: option.color,
-                        size: 24,
-                      ),
+                      child: Icon(option.icon, color: option.color, size: 24),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
@@ -1103,8 +1078,9 @@ class _ConfirmPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final paymentStatus =
-        paymentMethod == 'Cash' ? 'Pending on delivery' : 'Simulated paid';
+    final paymentStatus = paymentMethod == 'Cash'
+        ? 'Pending on delivery'
+        : 'Simulated paid';
 
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -1114,10 +1090,7 @@ class _ConfirmPage extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             'Confirm Details',
-            style: AppTextStyles.subHead(
-              fontSize: 18,
-              color: Colors.white,
-            ),
+            style: AppTextStyles.subHead(fontSize: 18, color: Colors.white),
           ).animate().fadeIn(),
           const SizedBox(height: 16),
           GlassCard(
@@ -1227,11 +1200,7 @@ class _ConfirmPage extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            icon,
-            size: 18,
-            color: AppColors.textSecondaryDark,
-          ),
+          Icon(icon, size: 18, color: AppColors.textSecondaryDark),
           const SizedBox(width: 12),
           Text(
             label,
@@ -1263,10 +1232,7 @@ class _ChoiceChip extends StatelessWidget {
   final String label;
   final bool selected;
 
-  const _ChoiceChip({
-    required this.label,
-    required this.selected,
-  });
+  const _ChoiceChip({required this.label, required this.selected});
 
   @override
   Widget build(BuildContext context) {
@@ -1314,7 +1280,7 @@ class _LocationDropdown extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DropdownButtonFormField<CampusLocation>(
-      value: value,
+      initialValue: value,
       isExpanded: true,
       dropdownColor: AppColors.cardDark,
       iconEnabledColor: AppColors.textSecondaryDark,
@@ -1324,11 +1290,7 @@ class _LocationDropdown extends StatelessWidget {
           fontSize: 12,
           color: AppColors.textSecondaryDark,
         ),
-        prefixIcon: Icon(
-          icon,
-          color: AppColors.textSecondaryDark,
-          size: 20,
-        ),
+        prefixIcon: Icon(icon, color: AppColors.textSecondaryDark, size: 20),
         filled: true,
         fillColor: AppColors.bgDark,
         enabledBorder: OutlineInputBorder(
@@ -1339,9 +1301,7 @@ class _LocationDropdown extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           borderSide: const BorderSide(color: AppColors.accent),
         ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
       ),
       hint: Text(
         hint,
@@ -1357,10 +1317,7 @@ class _LocationDropdown extends StatelessWidget {
             location.building == null || location.building!.isEmpty
                 ? location.name
                 : '${location.name} • ${location.building}',
-            style: AppTextStyles.body(
-              fontSize: 13.5,
-              color: Colors.white,
-            ),
+            style: AppTextStyles.body(fontSize: 13.5, color: Colors.white),
             overflow: TextOverflow.ellipsis,
           ),
         );

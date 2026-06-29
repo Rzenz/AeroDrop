@@ -14,13 +14,9 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
 
   DeliveryNotifier(this.ref) : super([]) {
     if (kSimulationMode) {
-      ref.listen<List<DeliveryModel>>(
-        deliveryMockProvider,
-        (previous, next) {
-          state = next;
-        },
-        fireImmediately: true,
-      );
+      ref.listen<List<DeliveryModel>>(deliveryMockProvider, (previous, next) {
+        state = next;
+      }, fireImmediately: true);
     } else {
       Future.microtask(loadDeliveriesFromSupabase);
       _startSimulation();
@@ -161,7 +157,8 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
       final temp = _toDouble(weather['temperature_c']);
       final maxWind = _toDouble(weather['max_safe_wind_kph'], 35);
       final maxTemp = _toDouble(weather['max_safe_temperature_c'], 38);
-      final advisory = weather['advisory_message']?.toString() ??
+      final advisory =
+          weather['advisory_message']?.toString() ??
           'Weather conditions are unsafe for dispatch.';
 
       if (!dispatchEnabled) {
@@ -183,7 +180,9 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
     }
   }
 
-  Future<Map<String, dynamic>?> _findAvailableDrone(double packageWeight) async {
+  Future<Map<String, dynamic>?> _findAvailableDrone(
+    double packageWeight,
+  ) async {
     if (!SupabaseService.isConfigured) return null;
 
     final drones = await SupabaseService.client
@@ -195,7 +194,7 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
         .order('battery_level', ascending: false)
         .limit(1);
 
-    if (drones is List && drones.isNotEmpty) {
+    if (drones.isNotEmpty) {
       return Map<String, dynamic>.from(drones.first);
     }
 
@@ -291,23 +290,18 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
 
           if (nextProgress >= 1.0) {
             if (delivery.droneId != null) {
-              ref.read(droneProvider.notifier).updateStatus(
-                    delivery.droneId!,
-                    DroneStatus.available,
-                  );
+              ref
+                  .read(droneProvider.notifier)
+                  .updateStatus(delivery.droneId!, DroneStatus.available);
 
-              ref.read(droneProvider.notifier).updateBattery(
-                    delivery.droneId!,
-                    85.0,
-                  );
+              ref
+                  .read(droneProvider.notifier)
+                  .updateBattery(delivery.droneId!, 85.0);
 
               if (SupabaseService.isConfigured) {
                 SupabaseService.client
                     .from('drones')
-                    .update({
-                      'status': 'available',
-                      'battery_level': 85.0,
-                    })
+                    .update({'status': 'available', 'battery_level': 85.0})
                     .eq('id', delivery.droneId!)
                     .then((_) {})
                     .catchError((error) {
@@ -344,12 +338,12 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
           } else {
             if (delivery.droneId != null) {
               final drones = ref.read(droneProvider);
-              final index = drones.indexWhere(
-                (d) => d.id == delivery.droneId,
-              );
+              final index = drones.indexWhere((d) => d.id == delivery.droneId);
 
               if (index != -1) {
-                ref.read(droneProvider.notifier).updateBattery(
+                ref
+                    .read(droneProvider.notifier)
+                    .updateBattery(
                       delivery.droneId!,
                       (drones[index].batteryLevel - 1.5).clamp(0.0, 100.0),
                     );
@@ -389,7 +383,9 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
     double? dropoffLongitude,
   }) async {
     if (kSimulationMode) {
-      ref.read(deliveryMockProvider.notifier).createDelivery(
+      ref
+          .read(deliveryMockProvider.notifier)
+          .createDelivery(
             senderName: senderName,
             recipientName: recipientName,
             recipientPhone: recipientPhone,
@@ -467,8 +463,7 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
         'dropoff_latitude': dropoffLatitude,
         'dropoff_longitude': dropoffLongitude,
         'safety_status': 'Safe',
-        'safety_message':
-            'Payload, drone capacity, and weather checks passed.',
+        'safety_message': 'Payload, drone capacity, and weather checks passed.',
         'payment_method': paymentMethod,
         'payment_status': paymentStatus,
         'payment_amount': paymentAmount,
@@ -483,10 +478,10 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
           .select()
           .single();
 
-      await SupabaseService.client.from('drones').update({
-        'status': 'busy',
-        'battery_level': assignedDroneBattery,
-      }).eq('id', assignedDroneId);
+      await SupabaseService.client
+          .from('drones')
+          .update({'status': 'busy', 'battery_level': assignedDroneBattery})
+          .eq('id', assignedDroneId);
 
       await _insertFirstTelemetry(
         droneId: assignedDroneId,
@@ -508,10 +503,9 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
         referenceNumber: paymentReference,
       );
 
-      ref.read(droneProvider.notifier).updateStatus(
-            assignedDroneId,
-            DroneStatus.busy,
-          );
+      ref
+          .read(droneProvider.notifier)
+          .updateStatus(assignedDroneId, DroneStatus.busy);
 
       final createdDelivery = DeliveryModel(
         id: response['id'].toString(),
@@ -520,10 +514,7 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
         recipientPhone: response['recipient_phone'] ?? recipientPhone,
         deliveryAddress: response['delivery_address'] ?? deliveryAddress,
         packageName: response['package_name'] ?? packageName,
-        packageWeight: _toDouble(
-          response['package_weight'],
-          packageWeight,
-        ),
+        packageWeight: _toDouble(response['package_weight'], packageWeight),
         packageType: response['package_type'] ?? packageType,
         status: _parseDeliveryStatus(response['status']),
         droneId: response['drone_id']?.toString(),
@@ -547,11 +538,9 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
     String? droneId,
   }) {
     if (kSimulationMode) {
-      ref.read(deliveryMockProvider.notifier).updateDeliveryStatus(
-            id,
-            status,
-            droneId: droneId,
-          );
+      ref
+          .read(deliveryMockProvider.notifier)
+          .updateDeliveryStatus(id, status, droneId: droneId);
       return;
     }
 
@@ -575,10 +564,7 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
     if (SupabaseService.isConfigured) {
       SupabaseService.client
           .from('deliveries')
-          .update({
-            'status': status.name,
-            if (droneId != null) 'drone_id': droneId,
-          })
+          .update({'status': status.name, 'drone_id': ?droneId})
           .eq('id', id)
           .then((_) async {
             await _insertStatusLog(
@@ -602,5 +588,5 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
 
 final deliveryProvider =
     StateNotifierProvider<DeliveryNotifier, List<DeliveryModel>>((ref) {
-  return DeliveryNotifier(ref);
-});
+      return DeliveryNotifier(ref);
+    });

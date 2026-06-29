@@ -23,6 +23,7 @@ import '../../features/delivery/delivery_history_screen.dart';
 import '../../features/delivery/delivery_request_screen.dart';
 import '../../features/delivery/presentation/pages/delivery_summary_page.dart';
 import '../../features/delivery/presentation/pages/delivery_success_page.dart';
+import '../../features/delivery/presentation/pages/delivery_completed_page.dart';
 import '../../features/notifications/notifications_screen.dart';
 import '../../features/notifications/notification_details_page.dart';
 import '../../features/profile/profile_screen.dart';
@@ -182,6 +183,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/user/delivery/success',
         pageBuilder: (context, state) => _slide(state, const DeliverySuccessPage()),
+      ),
+      GoRoute(
+        path: '/user/delivery/completed',
+        pageBuilder: (context, state) => _slide(state, const DeliveryCompletedPage()),
       ),
       GoRoute(
         path: '/user/track/details',

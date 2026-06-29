@@ -82,6 +82,18 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<List<DeliveryModel>>(deliveryProvider, (previous, next) {
+      if (previous != null) {
+        for (final nextDel in next) {
+          final prevDel = previous.firstWhere((d) => d.id == nextDel.id, orElse: () => nextDel);
+          if (prevDel.status == DeliveryStatus.inTransit && nextDel.status == DeliveryStatus.delivered) {
+            context.go('/user/delivery/completed');
+            break;
+          }
+        }
+      }
+    });
+
     final deliveries = ref.watch(deliveryProvider);
     final activeDeliveries = deliveries
         .where((d) => d.status == DeliveryStatus.inTransit)

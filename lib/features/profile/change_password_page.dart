@@ -83,7 +83,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
       _showMessage('Password updated successfully!', true);
       context.pop();
     } on AuthException catch (error) {
-      print('Supabase password update failed: ${error.message}');
+      debugPrint('Supabase password update failed: ${error.message}');
 
       if (!mounted) return;
 
@@ -97,7 +97,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
 
       _showMessage(message, false);
     } catch (error) {
-      print('Supabase password update failed: $error');
+      debugPrint('Supabase password update failed: $error');
 
       if (!mounted) return;
 

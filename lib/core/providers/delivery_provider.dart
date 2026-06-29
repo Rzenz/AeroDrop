@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/delivery_model.dart';
@@ -106,7 +107,7 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
     final currentUser = SupabaseService.client.auth.currentUser;
 
     if (currentUser == null) {
-      print('Load deliveries skipped: no logged in user.');
+      debugPrint('Load deliveries skipped: no logged in user.');
       return;
     }
 
@@ -140,7 +141,7 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
 
       state = deliveries;
     } catch (error) {
-      print('Load deliveries failed: $error');
+      debugPrint('Load deliveries failed: $error');
     }
   }
 
@@ -161,12 +162,7 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
       final temp = _toDouble(weather['temperature_c']);
       final maxWind = _toDouble(weather['max_safe_wind_kph'], 35);
       final maxTemp = _toDouble(weather['max_safe_temperature_c'], 38);
-<<<<<<< HEAD
-      final advisory =
-          weather['advisory_message']?.toString() ??
-=======
       final advisory = weather['advisory_message']?.toString() ??
->>>>>>> 5b6b7b1e3cbcc6cfb4e7ffb4cce8b6e56b3d0c51
           'Weather conditions are unsafe for dispatch.';
 
       if (!dispatchEnabled) {
@@ -183,18 +179,12 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
 
       return null;
     } catch (error) {
-      print('Weather safety check failed: $error');
+      debugPrint('Weather safety check failed: $error');
       return null;
     }
   }
 
-<<<<<<< HEAD
-  Future<Map<String, dynamic>?> _findAvailableDrone(
-    double packageWeight,
-  ) async {
-=======
   Future<Map<String, dynamic>?> _findAvailableDrone(double packageWeight) async {
->>>>>>> 5b6b7b1e3cbcc6cfb4e7ffb4cce8b6e56b3d0c51
     if (!SupabaseService.isConfigured) return null;
 
     final drones = await SupabaseService.client
@@ -206,11 +196,7 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
         .order('battery_level', ascending: false)
         .limit(1);
 
-<<<<<<< HEAD
     if (drones.isNotEmpty) {
-=======
-    if (drones is List && drones.isNotEmpty) {
->>>>>>> 5b6b7b1e3cbcc6cfb4e7ffb4cce8b6e56b3d0c51
       return Map<String, dynamic>.from(drones.first);
     }
 
@@ -235,7 +221,7 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
         'heading': 0,
       });
     } catch (error) {
-      print('Telemetry placeholder insert failed: $error');
+      debugPrint('Telemetry placeholder insert failed: $error');
     }
   }
 
@@ -253,7 +239,7 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
         'message': message,
       });
     } catch (error) {
-      print('Delivery status log insert failed: $error');
+      debugPrint('Delivery status log insert failed: $error');
     }
   }
 
@@ -292,7 +278,7 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
             : 'Payment is pending using $paymentMethod.',
       });
     } catch (error) {
-      print('Payment insert failed: $error');
+      debugPrint('Payment insert failed: $error');
     }
   }
 
@@ -306,15 +292,6 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
 
           if (nextProgress >= 1.0) {
             if (delivery.droneId != null) {
-<<<<<<< HEAD
-              ref
-                  .read(droneProvider.notifier)
-                  .updateStatus(delivery.droneId!, DroneStatus.available);
-
-              ref
-                  .read(droneProvider.notifier)
-                  .updateBattery(delivery.droneId!, 85.0);
-=======
               ref.read(droneProvider.notifier).updateStatus(
                     delivery.droneId!,
                     DroneStatus.available,
@@ -324,23 +301,18 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
                     delivery.droneId!,
                     85.0,
                   );
->>>>>>> 5b6b7b1e3cbcc6cfb4e7ffb4cce8b6e56b3d0c51
 
               if (SupabaseService.isConfigured) {
                 SupabaseService.client
                     .from('drones')
-<<<<<<< HEAD
-                    .update({'status': 'available', 'battery_level': 85.0})
-=======
                     .update({
                       'status': 'available',
                       'battery_level': 85.0,
                     })
->>>>>>> 5b6b7b1e3cbcc6cfb4e7ffb4cce8b6e56b3d0c51
                     .eq('id', delivery.droneId!)
                     .then((_) {})
                     .catchError((error) {
-                      print('Drone release failed: $error');
+                      debugPrint('Drone release failed: $error');
                     });
               }
             }
@@ -361,7 +333,7 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
                     );
                   })
                   .catchError((error) {
-                    print('Delivery completion update failed: $error');
+                    debugPrint('Delivery completion update failed: $error');
                   });
             }
 
@@ -373,21 +345,12 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
           } else {
             if (delivery.droneId != null) {
               final drones = ref.read(droneProvider);
-<<<<<<< HEAD
-              final index = drones.indexWhere((d) => d.id == delivery.droneId);
-
-              if (index != -1) {
-                ref
-                    .read(droneProvider.notifier)
-                    .updateBattery(
-=======
               final index = drones.indexWhere(
                 (d) => d.id == delivery.droneId,
               );
 
               if (index != -1) {
                 ref.read(droneProvider.notifier).updateBattery(
->>>>>>> 5b6b7b1e3cbcc6cfb4e7ffb4cce8b6e56b3d0c51
                       delivery.droneId!,
                       (drones[index].batteryLevel - 1.5).clamp(0.0, 100.0),
                     );
@@ -427,9 +390,7 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
     double? dropoffLongitude,
   }) async {
     if (kSimulationMode) {
-      ref
-          .read(deliveryMockProvider.notifier)
-          .createDelivery(
+      ref.read(deliveryMockProvider.notifier).createDelivery(
             senderName: senderName,
             recipientName: recipientName,
             recipientPhone: recipientPhone,
@@ -507,12 +468,8 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
         'dropoff_latitude': dropoffLatitude,
         'dropoff_longitude': dropoffLongitude,
         'safety_status': 'Safe',
-<<<<<<< HEAD
-        'safety_message': 'Payload, drone capacity, and weather checks passed.',
-=======
         'safety_message':
             'Payload, drone capacity, and weather checks passed.',
->>>>>>> 5b6b7b1e3cbcc6cfb4e7ffb4cce8b6e56b3d0c51
         'payment_method': paymentMethod,
         'payment_status': paymentStatus,
         'payment_amount': paymentAmount,
@@ -527,17 +484,10 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
           .select()
           .single();
 
-<<<<<<< HEAD
-      await SupabaseService.client
-          .from('drones')
-          .update({'status': 'busy', 'battery_level': assignedDroneBattery})
-          .eq('id', assignedDroneId);
-=======
       await SupabaseService.client.from('drones').update({
         'status': 'busy',
         'battery_level': assignedDroneBattery,
       }).eq('id', assignedDroneId);
->>>>>>> 5b6b7b1e3cbcc6cfb4e7ffb4cce8b6e56b3d0c51
 
       await _insertFirstTelemetry(
         droneId: assignedDroneId,
@@ -559,16 +509,10 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
         referenceNumber: paymentReference,
       );
 
-<<<<<<< HEAD
-      ref
-          .read(droneProvider.notifier)
-          .updateStatus(assignedDroneId, DroneStatus.busy);
-=======
       ref.read(droneProvider.notifier).updateStatus(
             assignedDroneId,
             DroneStatus.busy,
           );
->>>>>>> 5b6b7b1e3cbcc6cfb4e7ffb4cce8b6e56b3d0c51
 
       final createdDelivery = DeliveryModel(
         id: response['id'].toString(),
@@ -577,14 +521,10 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
         recipientPhone: response['recipient_phone'] ?? recipientPhone,
         deliveryAddress: response['delivery_address'] ?? deliveryAddress,
         packageName: response['package_name'] ?? packageName,
-<<<<<<< HEAD
-        packageWeight: _toDouble(response['package_weight'], packageWeight),
-=======
         packageWeight: _toDouble(
           response['package_weight'],
           packageWeight,
         ),
->>>>>>> 5b6b7b1e3cbcc6cfb4e7ffb4cce8b6e56b3d0c51
         packageType: response['package_type'] ?? packageType,
         status: _parseDeliveryStatus(response['status']),
         droneId: response['drone_id']?.toString(),
@@ -597,7 +537,7 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
 
       return null;
     } catch (error) {
-      print('Create delivery failed: $error');
+      debugPrint('Create delivery failed: $error');
       return 'Delivery request failed. Please check Supabase or terminal logs.';
     }
   }
@@ -608,17 +548,11 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
     String? droneId,
   }) {
     if (kSimulationMode) {
-<<<<<<< HEAD
-      ref
-          .read(deliveryMockProvider.notifier)
-          .updateDeliveryStatus(id, status, droneId: droneId);
-=======
       ref.read(deliveryMockProvider.notifier).updateDeliveryStatus(
             id,
             status,
             droneId: droneId,
           );
->>>>>>> 5b6b7b1e3cbcc6cfb4e7ffb4cce8b6e56b3d0c51
       return;
     }
 
@@ -642,14 +576,10 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
     if (SupabaseService.isConfigured) {
       SupabaseService.client
           .from('deliveries')
-<<<<<<< HEAD
-          .update({'status': status.name, 'drone_id': ?droneId})
-=======
           .update({
             'status': status.name,
-            if (droneId != null) 'drone_id': droneId,
+            'drone_id':? droneId,
           })
->>>>>>> 5b6b7b1e3cbcc6cfb4e7ffb4cce8b6e56b3d0c51
           .eq('id', id)
           .then((_) async {
             await _insertStatusLog(
@@ -659,7 +589,7 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
             );
           })
           .catchError((error) {
-            print('Delivery status update failed: $error');
+            debugPrint('Delivery status update failed: $error');
           });
     }
   }
@@ -673,10 +603,5 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
 
 final deliveryProvider =
     StateNotifierProvider<DeliveryNotifier, List<DeliveryModel>>((ref) {
-<<<<<<< HEAD
-      return DeliveryNotifier(ref);
-    });
-=======
   return DeliveryNotifier(ref);
 });
->>>>>>> 5b6b7b1e3cbcc6cfb4e7ffb4cce8b6e56b3d0c51

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -146,7 +147,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         onConflict: 'id',
       );
     } catch (error) {
-      print('Supabase user sync failed: $error');
+      debugPrint('Supabase user sync failed: $error');
     }
   }
 
@@ -217,7 +218,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
       return true;
     } catch (error) {
-      print('Supabase login failed: $error');
+      debugPrint('Supabase login failed: $error');
 
       state = state.copyWith(
         isLoading: false,
@@ -298,7 +299,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
       return true;
     } catch (error) {
-      print('Supabase register failed: $error');
+      debugPrint('Supabase register failed: $error');
 
       state = state.copyWith(
         isLoading: false,
@@ -374,7 +375,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
       return true;
     } catch (error) {
-      print('Supabase profile update failed: $error');
+      debugPrint('Supabase profile update failed: $error');
 
       state = state.copyWith(
         isLoading: false,

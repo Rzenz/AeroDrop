@@ -14,7 +14,11 @@ class SupabaseService {
 
     await Supabase.initialize(
       url: url,
+<<<<<<< HEAD
       publishableKey: anonKey,
+=======
+      anonKey: anonKey,
+>>>>>>> 5b6b7b1e3cbcc6cfb4e7ffb4cce8b6e56b3d0c51
     );
 
     _initialized = true;

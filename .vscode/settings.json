@@ -26,6 +26,10 @@
         "swipeable",
         "wireframes"
     ],
+<<<<<<< HEAD
     "CodeGPT.apiKey": "Google AI Studio",
     "java.configuration.updateBuildConfiguration": "interactive"
+=======
+    "CodeGPT.apiKey": "Google AI Studio"
+>>>>>>> 5b6b7b1e3cbcc6cfb4e7ffb4cce8b6e56b3d0c51
 }

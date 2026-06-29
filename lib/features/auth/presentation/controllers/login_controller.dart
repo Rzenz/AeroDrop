@@ -7,9 +7,6 @@ class LoginController {
     if (!emailRegex.hasMatch(value)) {
       return 'Enter a valid email address';
     }
-    if (!value.endsWith('@gmail.com') && !value.endsWith('@uclm.edu')) {
-      return 'Must be a @gmail.com or @uclm.edu address';
-    }
     return null;
   }
 

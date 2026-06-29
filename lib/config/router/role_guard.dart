@@ -6,6 +6,6 @@ class RoleGuard {
   }
 
   static bool isUser(UserModel? user) {
-    return user != null && user.role == UserRole.user;
+    return user != null && user.role != UserRole.admin;
   }
 }

@@ -38,21 +38,34 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     super.dispose();
   }
 
-  void _handleSave() {
+  Future<void> _handleSave() async {
     if (_formKey.currentState!.validate()) {
-      ref.read(authProvider.notifier).updateProfile(
-            _nameController.text,
-            _emailController.text,
-          );
+      final success = await ref
+          .read(authProvider.notifier)
+          .updateProfile(_nameController.text, _emailController.text);
+
+      if (!mounted) return;
+
+      final errorMessage = ref.read(authProvider).errorMessage;
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Profile updated successfully!'),
-          backgroundColor: AppColors.success,
+          content: Text(
+            success
+                ? 'Profile updated successfully!'
+                : errorMessage ?? 'Profile update failed.',
+          ),
+          backgroundColor: success ? AppColors.success : AppColors.danger,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
         ),
       );
-      context.pop();
+
+      if (success) {
+        context.pop();
+      }
     }
   }
 
@@ -90,7 +103,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                           decoration: BoxDecoration(
                             gradient: AppColors.primaryGradient,
                             shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white.withValues(alpha: 0.15), width: 3),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.15),
+                              width: 3,
+                            ),
                             boxShadow: [
                               BoxShadow(
                                 color: AppColors.primary.withValues(alpha: 0.3),
@@ -138,7 +154,11 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                     padding: const EdgeInsets.all(24),
                     borderRadius: BorderRadius.circular(24),
                     borderGradient: const LinearGradient(
-                      colors: [AppColors.accent, AppColors.primary, Colors.transparent],
+                      colors: [
+                        AppColors.accent,
+                        AppColors.primary,
+                        Colors.transparent,
+                      ],
                       stops: [0.0, 0.5, 1.0],
                     ),
                     child: Column(
@@ -148,7 +168,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                           hintText: 'John Doe',
                           prefixIcon: Icons.person_outline_rounded,
                           controller: _nameController,
-                          validator: (val) => val == null || val.isEmpty ? 'Enter name' : null,
+                          validator: (val) =>
+                              val == null || val.isEmpty ? 'Enter name' : null,
                         ),
                         const SizedBox(height: 20),
                         CustomTextField(
@@ -157,7 +178,13 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                           prefixIcon: Icons.email_outlined,
                           controller: _emailController,
                           keyboardType: TextInputType.emailAddress,
-                          validator: (val) => val == null || val.isEmpty ? 'Enter email' : null,
+                          readOnly: true,
+                          suffixIcon: const Icon(
+                            Icons.lock_outline_rounded,
+                            color: AppColors.textSecondaryDark,
+                          ),
+                          validator: (val) =>
+                              val == null || val.isEmpty ? 'Enter email' : null,
                         ),
                         const SizedBox(height: 32),
                         GradientButton(

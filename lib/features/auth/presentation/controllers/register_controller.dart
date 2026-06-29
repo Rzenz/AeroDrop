@@ -19,15 +19,9 @@ class RegisterController {
     if (!emailRegex.hasMatch(value)) {
       return 'Enter a valid email address';
     }
-    if (role == UserRole.user) {
-      if (!value.endsWith('@gmail.com')) {
-        return 'Students must use a @gmail.com address';
-      }
-    } else {
-      if (!value.endsWith('@uclm.edu')) {
-        return 'Faculty/Staff must use a @uclm.edu address';
-      }
-    }
+  if (role == UserRole.facultyStaff && !value.toLowerCase().endsWith('@uclm.edu')) {
+  return 'Faculty/Staff must use a @uclm.edu address';
+}
     return null;
   }
 

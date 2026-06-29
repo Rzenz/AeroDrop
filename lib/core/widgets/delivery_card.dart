@@ -15,6 +15,11 @@ class DeliveryCard extends StatelessWidget {
     this.onTap,
   });
 
+  String get _displayId {
+    if (delivery.id.length <= 12) return delivery.id;
+    return 'DEL-${delivery.id.substring(0, 8).toUpperCase()}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final isInTransit = delivery.status == DeliveryStatus.inTransit;
@@ -24,13 +29,15 @@ class DeliveryCard extends StatelessWidget {
       borderGradient: LinearGradient(
         colors: isInTransit
             ? [AppColors.accent, AppColors.primary]
-            : [AppColors.borderDark, AppColors.borderDark.withValues(alpha: 0.4)],
+            : [
+                AppColors.borderDark,
+                AppColors.borderDark.withValues(alpha: 0.4),
+              ],
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
       ),
       child: Stack(
         children: [
-          // Subtle background decoration for active items
           if (isInTransit)
             Positioned(
               right: -20,
@@ -44,20 +51,23 @@ class DeliveryCard extends StatelessWidget {
                 ),
               ),
             ),
-
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    delivery.id,
-                    style: AppTextStyles.label(
-                      fontSize: 11,
-                      color: AppColors.primaryLight,
+                  Expanded(
+                    child: Text(
+                      _displayId,
+                      style: AppTextStyles.label(
+                        fontSize: 11,
+                        color: AppColors.primaryLight,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
+                  const SizedBox(width: 8),
                   StatusChip.delivery(delivery.status.name),
                 ],
               ),
@@ -97,16 +107,20 @@ class DeliveryCard extends StatelessWidget {
               const SizedBox(height: 14),
               if (isInTransit) ...[
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      'ETA: ${delivery.eta}',
-                      style: AppTextStyles.body(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.accent,
+                    Expanded(
+                      child: Text(
+                        'ETA: ${delivery.eta}',
+                        style: AppTextStyles.body(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.accent,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
+                    const SizedBox(width: 8),
                     Text(
                       '${(delivery.progress * 100).toInt()}%',
                       style: AppTextStyles.body(
@@ -121,23 +135,29 @@ class DeliveryCard extends StatelessWidget {
                 ClipRRect(
                   borderRadius: BorderRadius.circular(4),
                   child: LinearProgressIndicator(
-                    value: delivery.progress,
+                    value: delivery.progress.clamp(0.0, 1.0),
                     backgroundColor: AppColors.borderDark,
-                    valueColor: const AlwaysStoppedAnimation<Color>(AppColors.accent),
+                    valueColor: const AlwaysStoppedAnimation<Color>(
+                      AppColors.accent,
+                    ),
                     minHeight: 5,
                   ),
                 ),
               ] else ...[
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      delivery.packageType,
-                      style: AppTextStyles.body(
-                        fontSize: 12,
-                        color: AppColors.textSecondaryDark,
+                    Expanded(
+                      child: Text(
+                        delivery.packageType,
+                        style: AppTextStyles.body(
+                          fontSize: 12,
+                          color: AppColors.textSecondaryDark,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
+                    const SizedBox(width: 8),
                     Text(
                       '${delivery.packageWeight} kg',
                       style: AppTextStyles.body(

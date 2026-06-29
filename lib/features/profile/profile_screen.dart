@@ -222,10 +222,26 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Widget _buildRoleTag(UserRole? role) {
     if (role == null) return const SizedBox.shrink();
 
-    final isFaculty = role == UserRole.admin;
-    final label = isFaculty ? 'FACULTY/STAFF' : 'STUDENT';
-    final color = isFaculty ? AppColors.accent : AppColors.primaryLight;
-    final icon = isFaculty ? Icons.badge_rounded : Icons.school_rounded;
+  final isFaculty = role == UserRole.facultyStaff;
+final isAdmin = role == UserRole.admin;
+
+final label = isAdmin
+    ? 'ADMIN'
+    : isFaculty
+        ? 'FACULTY/STAFF'
+        : 'STUDENT';
+
+final color = isAdmin
+    ? AppColors.danger
+    : isFaculty
+        ? AppColors.accent
+        : AppColors.primaryLight;
+
+final icon = isAdmin
+    ? Icons.admin_panel_settings_rounded
+    : isFaculty
+        ? Icons.badge_rounded
+        : Icons.school_rounded;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),

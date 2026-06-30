@@ -58,6 +58,16 @@ final _passwordController = TextEditingController();
         if (!mounted) return;
 
         context.go('/verification');
+      } else if (!success && mounted) {
+        final errorMsg = ref.read(authProvider).errorMessage ?? 'Login failed. Please try again.';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMsg),
+            backgroundColor: AppColors.danger,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
       }
     }
   }

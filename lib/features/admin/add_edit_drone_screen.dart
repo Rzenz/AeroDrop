@@ -65,15 +65,12 @@ class _AddEditDroneScreenState extends ConsumerState<AddEditDroneScreen> {
     if (_saving) return;
     if (_formKey.currentState!.validate()) {
       setState(() => _saving = true);
-      // Simulate network delay for smooth visual feedback
-      await Future.delayed(const Duration(milliseconds: 600));
-      if (!mounted) return;
 
       final payload = double.tryParse(_payloadController.text) ?? 5.0;
       final battery = double.tryParse(_batteryController.text) ?? 100.0;
       
       final drone = DroneModel(
-        id: _isEdit ? widget.droneId : 'DRN-${100 + ref.read(droneProvider).length + 1}',
+        id: _isEdit ? widget.droneId : 'DRN-${DateTime.now().millisecondsSinceEpoch % 10000}',
         name: _nameController.text,
         batteryLevel: battery,
         status: _status,
@@ -82,21 +79,36 @@ class _AddEditDroneScreenState extends ConsumerState<AddEditDroneScreen> {
         currentCoordinates: _coordsController.text.isNotEmpty ? _coordsController.text : 'UCLM Control Room Hub',
       );
 
+      final String? error;
       if (_isEdit) {
-        ref.read(droneProvider.notifier).editDrone(drone);
+        error = await ref.read(droneProvider.notifier).editDroneInSupabase(drone);
       } else {
-        ref.read(droneProvider.notifier).addDrone(drone);
+        error = await ref.read(droneProvider.notifier).addDroneToSupabase(drone);
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(_isEdit ? 'Drone profile updated!' : 'New drone added to fleet!'),
-          backgroundColor: AppColors.success,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-      );
-      context.pop();
+      if (!mounted) return;
+      setState(() => _saving = false);
+
+      if (error != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Operation failed: $error'),
+            backgroundColor: AppColors.danger,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_isEdit ? 'Drone profile updated!' : 'New drone added to fleet!'),
+            backgroundColor: AppColors.success,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+        context.pop();
+      }
     }
   }
 

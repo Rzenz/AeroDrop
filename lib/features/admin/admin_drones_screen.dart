@@ -27,8 +27,15 @@ class AdminDronesScreen extends ConsumerWidget {
         tooltip: 'Add Drone',
         onPressed: () => context.push('/admin/drones/add'),
       ),
-      body: CustomScrollView(
-        slivers: [
+      body: RefreshIndicator(
+        color: AppColors.accent,
+        backgroundColor: AppColors.cardDark,
+        onRefresh: () async {
+          await ref.read(droneProvider.notifier).loadDronesFromSupabase();
+        },
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
           // Fleet Status Summary Header
           SliverToBoxAdapter(
             child: Padding(
@@ -115,6 +122,7 @@ class AdminDronesScreen extends ConsumerWidget {
           ),
         ],
       ),
+     ),
     );
   }
 }

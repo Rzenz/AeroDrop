@@ -47,8 +47,8 @@ class DeliveryMockNotifier extends StateNotifier<List<DeliveryModel>> {
           final nextProgress = delivery.progress + 0.05;
           if (nextProgress >= 1.0) {
             if (delivery.droneId != null) {
+              // Keep reduced battery — admin must recharge manually
               ref.read(droneProvider.notifier).updateStatus(delivery.droneId!, DroneStatus.available);
-              ref.read(droneProvider.notifier).updateBattery(delivery.droneId!, 85.0);
             }
             ref.read(analyticsMockProvider.notifier).incrementDeliveries();
             
@@ -113,7 +113,7 @@ class DeliveryMockNotifier extends StateNotifier<List<DeliveryModel>> {
     final uniqueNum = 10000 + rand.nextInt(90000);
     final newId = 'ADR-2026-$uniqueNum';
 
-    final availableDrones = ref.read(droneProvider).where((d) => d.status == DroneStatus.available && d.batteryLevel > 20.0).toList();
+    final availableDrones = ref.read(droneProvider).where((d) => d.status == DroneStatus.available && d.batteryLevel >= 10.0).toList();
     
     String? assignedDroneId;
     DeliveryStatus status = DeliveryStatus.pending;

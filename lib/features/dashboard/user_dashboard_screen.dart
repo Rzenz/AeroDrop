@@ -14,6 +14,8 @@ import '../../core/providers/delivery_provider.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/models/delivery_model.dart';
 
+import '../../core/providers/notification_provider.dart';
+
 class UserDashboardScreen extends ConsumerWidget {
   const UserDashboardScreen({super.key});
 
@@ -21,6 +23,8 @@ class UserDashboardScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authProvider).user;
     final deliveries = ref.watch(deliveryProvider);
+    final notifications = ref.watch(notificationProvider);
+    final unreadCount = notifications.where((n) => !n.isRead).length;
 
     final active = deliveries.where((d) => d.status == DeliveryStatus.inTransit).toList();
 
@@ -34,9 +38,16 @@ class UserDashboardScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppColors.bgDark,
-      body: CustomScrollView(
-        physics: const BouncingScrollPhysics(),
-        slivers: [
+      body: RefreshIndicator(
+        color: AppColors.accent,
+        backgroundColor: AppColors.cardDark,
+        onRefresh: () async {
+          await ref.read(deliveryProvider.notifier).loadDeliveriesFromSupabase();
+          await ref.read(notificationProvider.notifier).loadNotifications();
+        },
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
           // Sticky SliverAppBar
           SliverAppBar(
             expandedHeight: 110,
@@ -86,20 +97,34 @@ class UserDashboardScreen extends ConsumerWidget {
                       IconButton(
                         onPressed: () => context.push('/user/notifications'),
                         icon: Stack(
+                          clipBehavior: Clip.none,
                           children: [
                             const Icon(Icons.notifications_none_rounded, color: Colors.white, size: 24),
-                            Positioned(
-                              right: 2,
-                              top: 2,
-                              child: Container(
-                                width: 8,
-                                height: 8,
-                                decoration: const BoxDecoration(
-                                  color: AppColors.accent,
-                                  shape: BoxShape.circle,
+                            if (unreadCount > 0)
+                              Positioned(
+                                right: -4,
+                                top: -4,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.accent,
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  constraints: const BoxConstraints(
+                                    minWidth: 14,
+                                    minHeight: 14,
+                                  ),
+                                  child: Text(
+                                    unreadCount > 99 ? '99+' : '$unreadCount',
+                                    style: const TextStyle(
+                                      color: AppColors.bgDark,
+                                      fontSize: 8.5,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
                                 ),
                               ),
-                            ),
                           ],
                         ),
                       ),
@@ -283,6 +308,7 @@ class UserDashboardScreen extends ConsumerWidget {
           ),
         ],
       ),
+     ),
     );
   }
 }

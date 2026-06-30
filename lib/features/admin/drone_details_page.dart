@@ -108,6 +108,24 @@ class DroneDetailsPage extends ConsumerWidget {
                                 label: drone.status.name.toUpperCase(),
                                 color: statusColor,
                               ),
+                              const SizedBox(height: 12),
+                              // Battery delivery readiness label
+                              Text(
+                                drone.batteryLevel < 10.0
+                                    ? 'Battery too low for delivery'
+                                    : drone.status == DroneStatus.available
+                                        ? 'Ready for delivery'
+                                        : 'Drone not available',
+                                style: AppTextStyles.body(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: drone.batteryLevel < 10.0
+                                      ? AppColors.danger
+                                      : drone.status == DroneStatus.available
+                                          ? AppColors.success
+                                          : AppColors.warning,
+                                ),
+                              ),
                             ],
                           ),
                         ).animate().fadeIn(delay: 100.ms).slideY(begin: 0.05),
@@ -168,10 +186,105 @@ class DroneDetailsPage extends ConsumerWidget {
                     ),
                     const SizedBox(height: 12),
                     CustomButton(
+                      text: 'Recharge Drone',
+                      icon: Icons.battery_charging_full_rounded,
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF1A6B3C), Color(0xFF27AE60)],
+                      ),
+                      onPressed: () async {
+                        final confirm = await showDialog<bool>(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            backgroundColor: AppColors.cardDark,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                            title: const Text('Recharge Drone?', style: TextStyle(color: Colors.white)),
+                            content: const Text(
+                              'This will set AeroCarrier Alpha battery to 100% and mark it as available.',
+                              style: TextStyle(color: Colors.white70),
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.of(context).pop(false),
+                                child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+                              ),
+                              TextButton(
+                                onPressed: () => Navigator.of(context).pop(true),
+                                child: const Text('Recharge', style: TextStyle(color: AppColors.success)),
+                              ),
+                            ],
+                          ),
+                        );
+                        if (confirm == true && context.mounted) {
+                          final error = await ref.read(droneProvider.notifier).rechargeDrone(drone.id);
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(error ?? 'Drone recharged successfully.'),
+                              backgroundColor: error == null ? AppColors.success : AppColors.danger,
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                          );
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    CustomButton(
                       text: 'Edit Hardware Profile',
                       icon: Icons.edit_rounded,
                       gradient: const LinearGradient(colors: [AppColors.cardDark, AppColors.cardDark]),
                       onPressed: () => context.push('/admin/drones/edit?id=${drone.id}'),
+                    ),
+                    const SizedBox(height: 12),
+                    CustomButton(
+                      text: 'Decommission Drone',
+                      icon: Icons.delete_forever_rounded,
+                      gradient: AppColors.dangerGradient,
+                      onPressed: () async {
+                        final confirm = await showDialog<bool>(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            backgroundColor: AppColors.cardDark,
+                            title: const Text('Decommission Drone', style: TextStyle(color: Colors.white)),
+                            content: Text('Are you sure you want to decommission and delete ${drone.name} (${drone.id}) from the fleet registry?', style: const TextStyle(color: Colors.white70)),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.of(context).pop(false),
+                                child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+                              ),
+                              TextButton(
+                                onPressed: () => Navigator.of(context).pop(true),
+                                child: const Text('Decommission', style: TextStyle(color: AppColors.danger)),
+                              ),
+                            ],
+                          ),
+                        );
+
+                        if (confirm == true && context.mounted) {
+                          final error = await ref.read(droneProvider.notifier).deleteDroneFromSupabase(drone.id);
+                          if (!context.mounted) return;
+                          if (error != null) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Decommission failed: $error'),
+                                backgroundColor: AppColors.danger,
+                                behavior: SnackBarBehavior.floating,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                            );
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: const Text('Drone decommissioned successfully!'),
+                                backgroundColor: AppColors.success,
+                                behavior: SnackBarBehavior.floating,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                            );
+                            context.pop();
+                          }
+                        }
+                      },
                     ),
                   ],
                 ).animate().fadeIn(delay: 400.ms),

@@ -26,9 +26,17 @@ class AdminDashboardScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppColors.bgDark,
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
-        child: Column(
+      body: RefreshIndicator(
+        color: AppColors.accent,
+        backgroundColor: AppColors.cardDark,
+        onRefresh: () async {
+          await ref.read(deliveryProvider.notifier).loadAdminDeliveriesFromSupabase();
+          await ref.read(droneProvider.notifier).loadDronesFromSupabase();
+        },
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+          child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Title
@@ -296,6 +304,7 @@ class AdminDashboardScreen extends ConsumerWidget {
           ],
         ),
       ),
+     ),
     );
   }
 }

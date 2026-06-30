@@ -48,7 +48,15 @@ class DeliveryDetailsScreen extends ConsumerWidget {
       body: Container(
         decoration: const BoxDecoration(gradient: AppColors.bgGradientDark),
         child: SafeArea(
+        child: RefreshIndicator(
+          color: AppColors.accent,
+          backgroundColor: AppColors.cardDark,
+          onRefresh: () async {
+            await ref.read(deliveryProvider.notifier).loadAdminDeliveriesFromSupabase();
+            await ref.read(droneProvider.notifier).loadDronesFromSupabase();
+          },
           child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -144,6 +152,11 @@ class DeliveryDetailsScreen extends ConsumerWidget {
                       _buildDetailRow(Icons.inventory_2_outlined, 'Package Name', delivery.packageName),
                       _buildDetailRow(Icons.category_outlined, 'Category', delivery.packageType),
                       _buildDetailRow(Icons.scale_rounded, 'Weight Load', '${delivery.packageWeight} kg'),
+                      _buildDetailRow(Icons.scale_outlined, 'Max Payload Limit', '0.5 kg'),
+                      if (delivery.estimatedDistanceKm != null)
+                        _buildDetailRow(Icons.map_outlined, 'Estimated Distance', '${delivery.estimatedDistanceKm} km'),
+                      if (delivery.paymentAmount != null)
+                        _buildDetailRow(Icons.payments_outlined, 'Payment Amount', '₱${delivery.paymentAmount!.toStringAsFixed(2)}'),
                     ],
                   ),
                 ).animate(delay: 280.ms).fadeIn().slideY(begin: 0.05),
@@ -188,27 +201,79 @@ class DeliveryDetailsScreen extends ConsumerWidget {
 
                 // Action Buttons
                 if (delivery.status == DeliveryStatus.pending) ...[
-                  CustomButton(
-                    text: 'Cancel Dispatch',
-                    gradient: AppColors.dangerGradient,
-                    onPressed: () {
-                      ref.read(deliveryProvider.notifier).updateDeliveryStatus(delivery.id, DeliveryStatus.cancelled);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: const Text('Dispatch successfully cancelled'),
-                          backgroundColor: AppColors.danger,
-                          behavior: SnackBarBehavior.floating,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: CustomButton(
+                          text: 'Reject Request',
+                          gradient: AppColors.dangerGradient,
+                          onPressed: () async {
+                            final error = await ref.read(deliveryProvider.notifier).rejectDelivery(delivery.id);
+                            if (context.mounted) {
+                              if (error != null) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Failed to reject: $error'),
+                                    backgroundColor: AppColors.danger,
+                                    behavior: SnackBarBehavior.floating,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  ),
+                                );
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: const Text('Delivery request rejected.'),
+                                    backgroundColor: AppColors.success,
+                                    behavior: SnackBarBehavior.floating,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  ),
+                                );
+                                context.pop();
+                              }
+                            }
+                          },
+                          icon: Icons.close_rounded,
                         ),
-                      );
-                      context.pop();
-                    },
-                    icon: Icons.cancel_outlined,
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: CustomButton(
+                          text: 'Accept & Dispatch',
+                          onPressed: () async {
+                            final error = await ref.read(deliveryProvider.notifier).acceptDelivery(delivery.id);
+                            if (context.mounted) {
+                              if (error != null) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Failed to accept: $error'),
+                                    backgroundColor: AppColors.danger,
+                                    behavior: SnackBarBehavior.floating,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  ),
+                                );
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: const Text('Delivery accepted and drone assigned!'),
+                                    backgroundColor: AppColors.success,
+                                    behavior: SnackBarBehavior.floating,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  ),
+                                );
+                                context.pop();
+                              }
+                            }
+                          },
+                          icon: Icons.check_rounded,
+                        ),
+                      ),
+                    ],
                   ).animate(delay: 440.ms).fadeIn(),
                 ],
                 const SizedBox(height: 32),
               ],
             ),
+           ),
           ),
         ),
       ),

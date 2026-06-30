@@ -13,6 +13,7 @@ import '../../core/widgets/custom_app_bar.dart';
 import '../../core/providers/delivery_provider.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/services/supabase_service.dart';
+import '../../core/providers/drone_provider.dart';
 
 class CampusLocation {
   final String id;
@@ -64,7 +65,7 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
   final _pickupController = TextEditingController();
   final _dropoffController = TextEditingController();
   final _recipientController = TextEditingController();
-  final _weightController = TextEditingController(text: '1.0');
+  final _weightController = TextEditingController(text: '0.0');
   final _notesController = TextEditingController();
 
   String _packageType = 'Documents';
@@ -120,20 +121,8 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
           )
           .toList();
 
-      final pickups = locations
-          .where(
-            (location) =>
-                location.type == 'launch_pad' || location.type == 'both',
-          )
-          .toList();
-
-      final dropoffs = locations
-          .where(
-            (location) =>
-                location.type == 'dropoff_platform' ||
-                location.type == 'both',
-          )
-          .toList();
+      final pickups = locations;
+      final dropoffs = locations;
 
       if (!mounted) return;
 
@@ -143,6 +132,16 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
       });
     } catch (error) {
       debugPrint('Campus locations load failed: $error');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Campus locations failed to load. Please try again.'),
+            backgroundColor: AppColors.danger,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+      }
     } finally {
       if (mounted) {
         setState(() => _locationsLoading = false);
@@ -151,20 +150,124 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
   }
 
   double _calculatePaymentAmount() {
-    final weight = double.tryParse(_weightController.text.trim()) ?? 1.0;
+    if (_selectedPickup == null || _selectedDropoff == null) return 20.0;
 
-    const baseFee = 50.0;
-    final weightFee = weight * 10.0;
-
-    double priorityFee = 0.0;
-
-    if (_priority == 'Express') {
-      priorityFee = 25.0;
-    } else if (_priority == 'Scheduled') {
-      priorityFee = 10.0;
+    double distance = 0.0;
+    try {
+      distance = _getEstimatedDistanceKm(_selectedPickup!.id, _selectedDropoff!.id);
+    } catch (_) {
+      distance = 0.05;
     }
 
-    return baseFee + weightFee + priorityFee;
+    final weight = double.tryParse(_weightController.text.trim()) ?? 0.0;
+
+    final baseFee = 20.0;
+    final distanceFee = distance * 100.0;
+    final weightFee = weight * 20.0;
+
+    double itemFee = 5.0;
+    switch (_packageType) {
+      case 'Documents':
+        itemFee = 0.0;
+        break;
+      case 'Medicine':
+      case 'Food':
+      case 'Other':
+        itemFee = 5.0;
+        break;
+      case 'Electronics':
+        itemFee = 10.0;
+        break;
+    }
+
+    double priorityFee = 0.0;
+    switch (_priority) {
+      case 'Standard':
+        priorityFee = 0.0;
+        break;
+      case 'Express':
+        priorityFee = 10.0;
+        break;
+      case 'Scheduled':
+        priorityFee = 5.0;
+        break;
+    }
+
+    return baseFee + distanceFee + weightFee + itemFee + priorityFee;
+  }
+
+  double _getEstimatedDistanceKm(String pickupId, String dropoffId) {
+    final pId = pickupId.toUpperCase();
+    final dId = dropoffId.toUpperCase();
+
+    if (pId == dId) {
+      return 0.0;
+    }
+
+    final key = pId.compareTo(dId) < 0 ? '${pId}_$dId' : '${dId}_$pId';
+
+    switch (key) {
+      case 'OLD_MAIN_ANNEX_1':
+      case 'ANNEX_1_OLD_MAIN':
+        return 0.04;
+      case 'OLD_MAIN_ANNEX_2':
+      case 'ANNEX_2_OLD_MAIN':
+        return 0.075;
+      case 'OLD_MAIN_BASIC_ED':
+      case 'BASIC_ED_OLD_MAIN':
+        return 0.10;
+      case 'OLD_MAIN_MARITIME':
+      case 'MARITIME_OLD_MAIN':
+        return 0.125;
+      case 'ANNEX_1_ANNEX_2':
+      case 'ANNEX_2_ANNEX_1':
+        return 0.035;
+      case 'ANNEX_1_BASIC_ED':
+      case 'BASIC_ED_ANNEX_1':
+        return 0.08;
+      case 'ANNEX_1_MARITIME':
+      case 'MARITIME_ANNEX_1':
+        return 0.105;
+      case 'ANNEX_2_BASIC_ED':
+      case 'BASIC_ED_ANNEX_2':
+        return 0.06;
+      case 'ANNEX_2_MARITIME':
+      case 'MARITIME_ANNEX_2':
+        return 0.085;
+      case 'BASIC_ED_MARITIME':
+      case 'MARITIME_BASIC_ED':
+        return 0.07;
+      default:
+        final pNorm = _normalizeLocId(pId);
+        final dNorm = _normalizeLocId(dId);
+        if (pNorm == dNorm) {
+          return 0.0;
+        }
+        final normKey = pNorm.compareTo(dNorm) < 0 ? '${pNorm}_$dNorm' : '${dNorm}_$pNorm';
+        switch (normKey) {
+          case 'OLD_MAIN_ANNEX_1': return 0.04;
+          case 'OLD_MAIN_ANNEX_2': return 0.075;
+          case 'OLD_MAIN_BASIC_ED': return 0.10;
+          case 'OLD_MAIN_MARITIME': return 0.125;
+          case 'ANNEX_1_ANNEX_2': return 0.035;
+          case 'ANNEX_1_BASIC_ED': return 0.08;
+          case 'ANNEX_1_MARITIME': return 0.105;
+          case 'ANNEX_2_BASIC_ED': return 0.06;
+          case 'ANNEX_2_MARITIME': return 0.085;
+          case 'BASIC_ED_MARITIME': return 0.07;
+        }
+        return 0.05;
+    }
+  }
+
+  String _normalizeLocId(String id) {
+    final raw = id.toUpperCase();
+    if (raw.contains('OLD') || raw.contains('MAIN')) return 'OLD_MAIN';
+    if (raw.contains('ANNEX_1') || raw.contains('ANNEX1')) return 'ANNEX_1';
+    if (raw.contains('ANNEX_2') || raw.contains('ANNEX2')) return 'ANNEX_2';
+    if (raw.contains('BASIC') || raw.contains('ED')) return 'BASIC_ED';
+    if (raw.contains('MARITIME')) return 'MARITIME';
+    return raw;
   }
 
   String _formatPeso(double value) {
@@ -246,6 +349,11 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
         return false;
       }
 
+      if (weight > 0.5) {
+        _showValidationError('Package is too heavy. Maximum supported drone payload is 0.5 kg.');
+        return false;
+      }
+
       if (_priority == 'Scheduled' && _scheduledAt == null) {
         _showValidationError('Please select a scheduled date and time');
         return false;
@@ -256,29 +364,19 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
         return false;
       }
     } else if (_currentPage == 1) {
-      final hasDbLocations =
-          _pickupLocations.isNotEmpty && _dropoffLocations.isNotEmpty;
+      if (_selectedPickup == null) {
+        _showValidationError('Pickup launch pad is required');
+        return false;
+      }
 
-      if (hasDbLocations) {
-        if (_selectedPickup == null) {
-          _showValidationError('Pickup launch pad is required');
-          return false;
-        }
+      if (_selectedDropoff == null) {
+        _showValidationError('Drop-off platform is required');
+        return false;
+      }
 
-        if (_selectedDropoff == null) {
-          _showValidationError('Drop-off platform is required');
-          return false;
-        }
-      } else {
-        if (_pickupController.text.trim().isEmpty) {
-          _showValidationError('Pickup location is required');
-          return false;
-        }
-
-        if (_dropoffController.text.trim().isEmpty) {
-          _showValidationError('Drop-off location is required');
-          return false;
-        }
+      if (_selectedPickup!.id == _selectedDropoff!.id) {
+        _showValidationError('Pickup and drop-off location cannot be the same.');
+        return false;
       }
 
       if (_recipientController.text.trim().isEmpty) {
@@ -350,10 +448,36 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
       return;
     }
 
-    final weight = double.tryParse(_weightController.text.trim()) ?? 1.0;
+    final weight = double.tryParse(_weightController.text.trim()) ?? 0.0;
 
-    final pickupName = _selectedPickup?.name ?? _pickupController.text.trim();
-    final dropoffName = _selectedDropoff?.name ?? _dropoffController.text.trim();
+    if (weight <= 0) {
+      _showMessage('Please enter a valid weight.', false);
+      return;
+    }
+
+    if (weight > 0.5) {
+      _showMessage('Package is too heavy. Maximum supported drone payload is 0.5 kg.', false);
+      return;
+    }
+
+    if (_selectedPickup == null || _selectedDropoff == null) {
+      _showMessage('Pickup and drop-off locations are required.', false);
+      return;
+    }
+
+    if (_selectedPickup!.id == _selectedDropoff!.id) {
+      _showMessage('Pickup and drop-off location cannot be the same.', false);
+      return;
+    }
+
+    final pickupName = _selectedPickup!.name;
+    final dropoffName = _selectedDropoff!.name;
+    double distance = 0.0;
+    try {
+      distance = _getEstimatedDistanceKm(_selectedPickup!.id, _selectedDropoff!.id);
+    } catch (_) {
+      distance = 0.05;
+    }
 
     setState(() => _loading = true);
 
@@ -374,6 +498,7 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
           pickupLongitude: _selectedPickup?.longitude,
           dropoffLatitude: _selectedDropoff?.latitude,
           dropoffLongitude: _selectedDropoff?.longitude,
+          estimatedDistanceKm: distance,
         );
 
     if (!mounted) return;
@@ -394,6 +519,14 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
     final pickupText = _selectedPickup?.name ?? _pickupController.text.trim();
     final dropoffText = _selectedDropoff?.name ?? _dropoffController.text.trim();
     final paymentAmount = _calculatePaymentAmount();
+
+    final drones = ref.watch(droneProvider);
+    double maxFleetPayload = 0.0;
+    if (drones.isNotEmpty) {
+      maxFleetPayload = drones.map((d) => d.maxPayload).reduce((a, b) => a > b ? a : b);
+    } else {
+      maxFleetPayload = 15.0;
+    }
 
     return Scaffold(
       backgroundColor: AppColors.bgDark,
@@ -516,6 +649,7 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
                       onPickSchedule: _pickSchedule,
                       weightController: _weightController,
                       notesController: _notesController,
+                      maxFleetPayload: maxFleetPayload,
                     ),
                     _LocationPage(
                       pickupController: _pickupController,
@@ -557,6 +691,41 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
                       scheduledText: _priority == 'Scheduled'
                           ? _formatSchedule(_scheduledAt)
                           : 'Not scheduled',
+                      estimatedDistance: _selectedPickup != null && _selectedDropoff != null
+                          ? '${_getEstimatedDistanceKm(_selectedPickup!.id, _selectedDropoff!.id)} km'
+                          : 'TBD',
+                      onEditPackage: () {
+                        _pageController.animateToPage(
+                          0,
+                          duration: const Duration(milliseconds: 350),
+                          curve: Curves.easeInOutCubic,
+                        );
+                        setState(() => _currentPage = 0);
+                      },
+                      onEditLocation: () {
+                        _pageController.animateToPage(
+                          1,
+                          duration: const Duration(milliseconds: 350),
+                          curve: Curves.easeInOutCubic,
+                        );
+                        setState(() => _currentPage = 1);
+                      },
+                      onEditPayment: () {
+                        _pageController.animateToPage(
+                          2,
+                          duration: const Duration(milliseconds: 350),
+                          curve: Curves.easeInOutCubic,
+                        );
+                        setState(() => _currentPage = 2);
+                      },
+                      onEditPrioritySchedule: () {
+                        _pageController.animateToPage(
+                          0,
+                          duration: const Duration(milliseconds: 350),
+                          curve: Curves.easeInOutCubic,
+                        );
+                        setState(() => _currentPage = 0);
+                      },
                     ),
                   ],
                 ),
@@ -589,6 +758,7 @@ class _PackagePage extends StatelessWidget {
   final VoidCallback onPickSchedule;
   final TextEditingController weightController;
   final TextEditingController notesController;
+  final double maxFleetPayload;
 
   const _PackagePage({
     required this.typeValue,
@@ -599,6 +769,7 @@ class _PackagePage extends StatelessWidget {
     required this.onPickSchedule,
     required this.weightController,
     required this.notesController,
+    required this.maxFleetPayload,
   });
 
   @override
@@ -662,6 +833,18 @@ class _PackagePage extends StatelessWidget {
                   prefixIcon: Icons.scale_rounded,
                   controller: weightController,
                   keyboardType: TextInputType.number,
+                ),
+                const SizedBox(height: 6),
+                Padding(
+                  padding: const EdgeInsets.only(left: 4),
+                  child: Text(
+                    'Maximum supported fleet capacity: ${maxFleetPayload.toStringAsFixed(1)} kg',
+                    style: TextStyle(
+                      color: AppColors.accent.withValues(alpha: 0.7),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 24),
                 Text(
@@ -849,27 +1032,19 @@ class _LocationPage extends StatelessWidget {
                     onChanged: onDropoffChanged,
                   ),
                 ] else ...[
-                  CustomTextField(
-                    labelText: 'Pickup Location',
-                    hintText: 'e.g. UCLM Main Gate',
-                    prefixIcon: Icons.location_on_rounded,
-                    controller: pickupController,
-                  ),
-                  Row(
-                    children: [
-                      const SizedBox(width: 24),
-                      Container(
-                        width: 2,
-                        height: 28,
-                        color: AppColors.borderDark,
+                  const SizedBox(height: 20),
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: Text(
+                        'Campus locations failed to load. Please try again.',
+                        style: TextStyle(
+                          color: AppColors.danger,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
                       ),
-                    ],
-                  ),
-                  CustomTextField(
-                    labelText: 'Drop-off Location',
-                    hintText: 'e.g. Engineering Block A',
-                    prefixIcon: Icons.flag_rounded,
-                    controller: dropoffController,
+                    ),
                   ),
                 ],
                 const SizedBox(height: 20),
@@ -1088,6 +1263,11 @@ class _ConfirmPage extends StatelessWidget {
   final String paymentAmount;
   final String priority;
   final String scheduledText;
+  final String estimatedDistance;
+  final VoidCallback onEditPackage;
+  final VoidCallback onEditLocation;
+  final VoidCallback onEditPayment;
+  final VoidCallback onEditPrioritySchedule;
 
   const _ConfirmPage({
     required this.pickup,
@@ -1099,7 +1279,33 @@ class _ConfirmPage extends StatelessWidget {
     required this.paymentAmount,
     required this.priority,
     required this.scheduledText,
+    required this.estimatedDistance,
+    required this.onEditPackage,
+    required this.onEditLocation,
+    required this.onEditPayment,
+    required this.onEditPrioritySchedule,
   });
+
+  Widget _sectionHeader(String title, VoidCallback onEdit) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          title.toUpperCase(),
+          style: AppTextStyles.label(
+            fontSize: 11,
+            color: AppColors.accent,
+          ),
+        ),
+        IconButton(
+          icon: const Icon(Icons.edit_outlined, size: 16, color: AppColors.accent),
+          constraints: const BoxConstraints(),
+          padding: EdgeInsets.zero,
+          onPressed: onEdit,
+        ),
+      ],
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1130,6 +1336,8 @@ class _ConfirmPage extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                _sectionHeader('Package Details', onEditPackage),
+                const SizedBox(height: 8),
                 _confirmItem(
                   icon: Icons.inventory_2_outlined,
                   label: 'Package Type',
@@ -1140,6 +1348,9 @@ class _ConfirmPage extends StatelessWidget {
                   label: 'Weight',
                   value: '$weight kg',
                 ),
+                const Divider(color: AppColors.borderDark, height: 24),
+                _sectionHeader('Priority & Schedule', onEditPrioritySchedule),
+                const SizedBox(height: 8),
                 _confirmItem(
                   icon: Icons.speed_rounded,
                   label: 'Priority',
@@ -1153,6 +1364,9 @@ class _ConfirmPage extends StatelessWidget {
                     value: scheduledText,
                     color: AppColors.accent,
                   ),
+                const Divider(color: AppColors.borderDark, height: 24),
+                _sectionHeader('Location Details', onEditLocation),
+                const SizedBox(height: 8),
                 _confirmItem(
                   icon: Icons.my_location_outlined,
                   label: 'Pickup',
@@ -1164,14 +1378,19 @@ class _ConfirmPage extends StatelessWidget {
                   value: dropoff,
                 ),
                 _confirmItem(
+                  icon: Icons.map_outlined,
+                  label: 'Estimated Distance',
+                  value: estimatedDistance,
+                  color: AppColors.accent,
+                ),
+                _confirmItem(
                   icon: Icons.person_outline_rounded,
                   label: 'Recipient',
                   value: recipient,
                 ),
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 12),
-                  child: Divider(color: AppColors.borderDark, height: 1),
-                ),
+                const Divider(color: AppColors.borderDark, height: 24),
+                _sectionHeader('Payment Details', onEditPayment),
+                const SizedBox(height: 8),
                 _confirmItem(
                   icon: Icons.payment_outlined,
                   label: 'Payment Method',
@@ -1223,7 +1442,7 @@ class _ConfirmPage extends StatelessWidget {
     Color color = Colors.white,
   }) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1233,15 +1452,19 @@ class _ConfirmPage extends StatelessWidget {
             color: AppColors.textSecondaryDark,
           ),
           const SizedBox(width: 12),
-          Text(
-            label,
-            style: AppTextStyles.body(
-              fontSize: 13.5,
-              color: AppColors.textSecondaryDark,
+          Expanded(
+            flex: 4,
+            child: Text(
+              label,
+              style: AppTextStyles.body(
+                fontSize: 13.5,
+                color: AppColors.textSecondaryDark,
+              ),
             ),
           ),
-          const Spacer(),
-          Flexible(
+          const SizedBox(width: 8),
+          Expanded(
+            flex: 6,
             child: Text(
               value,
               style: AppTextStyles.title(
@@ -1250,6 +1473,7 @@ class _ConfirmPage extends StatelessWidget {
                 color: color,
               ),
               textAlign: TextAlign.right,
+              maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
           ),

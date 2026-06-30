@@ -1,44 +1,112 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/notification_model.dart';
 import '../config/simulation_config.dart';
 import '../../providers/mock/notification_mock_provider.dart';
+import '../services/supabase_service.dart';
 
 class NotificationNotifier extends StateNotifier<List<NotificationModel>> {
   final Ref? ref;
 
-  NotificationNotifier([this.ref])
-      : super(kSimulationMode
-            ? []
-            : [
-                NotificationModel(
-                  id: 'ntf-1',
-                  title: 'Drone DRN-001 Dispatched',
-                  body: 'Your delivery request DEL-892 has been dispatched via AeroCarrier Falcon.',
-                  timestamp: DateTime.now().subtract(const Duration(minutes: 5)),
-                  isRead: false,
-                ),
-                NotificationModel(
-                  id: 'ntf-2',
-                  title: 'Delivery DEL-541 Delivered',
-                  body: 'SkyLifter Titan has successfully delivered package "Confidential Document Envelopes" to Main Library Lobby.',
-                  timestamp: DateTime.now().subtract(const Duration(hours: 2)),
-                  isRead: true,
-                ),
-                NotificationModel(
-                  id: 'ntf-3',
-                  title: 'System Alert: Maintenance',
-                  body: 'Drone DRN-003 is flagged for battery calibration and scheduled maintenance.',
-                  timestamp: DateTime.now().subtract(const Duration(days: 1)),
-                  isRead: true,
-                ),
-              ]) {
+  NotificationNotifier([this.ref]) : super([]) {
     if (kSimulationMode && ref != null) {
       ref!.listen<List<NotificationModel>>(notificationMockProvider, (previous, next) {
         state = next;
       }, fireImmediately: true);
+    } else {
+      if (SupabaseService.isConfigured) {
+        Future.microtask(loadNotifications);
+      }
     }
   }
 
+  Future<void> loadNotifications() async {
+    if (kSimulationMode) return;
+    if (!SupabaseService.isConfigured) return;
+
+    final currentUser = SupabaseService.client.auth.currentUser;
+    if (currentUser == null) {
+      state = [];
+      return;
+    }
+
+    try {
+      final response = await SupabaseService.client
+          .from('notifications')
+          .select()
+          .eq('user_id', currentUser.id)
+          .order('created_at', ascending: false);
+
+      final list = (response as List)
+          .map((item) => NotificationModel.fromMap(Map<String, dynamic>.from(item)))
+          .toList();
+
+      state = list;
+    } catch (e) {
+      debugPrint('Error loading notifications: $e');
+    }
+  }
+
+  Future<void> markAllAsRead() async {
+    if (kSimulationMode && ref != null) {
+      ref!.read(notificationMockProvider.notifier).markAllAsRead();
+      return;
+    }
+
+    if (!SupabaseService.isConfigured) return;
+    final currentUser = SupabaseService.client.auth.currentUser;
+    if (currentUser == null) return;
+
+    try {
+      final nowStr = DateTime.now().toUtc().toIso8601String();
+
+      // Update in local state immediately for instant UI feedback
+      state = state.map((n) => n.copyWith(isRead: true, readAt: DateTime.now())).toList();
+
+      await SupabaseService.client
+          .from('notifications')
+          .update({
+            'is_read': true,
+            'read_at': nowStr,
+          })
+          .eq('user_id', currentUser.id)
+          .eq('is_read', false);
+    } catch (e) {
+      debugPrint('Error marking all notifications as read: $e');
+    }
+  }
+
+  Future<void> markOneAsRead(String notificationId) async {
+    if (kSimulationMode && ref != null) {
+      ref!.read(notificationMockProvider.notifier).markAsRead(notificationId);
+      return;
+    }
+
+    if (!SupabaseService.isConfigured) return;
+
+    try {
+      final nowStr = DateTime.now().toUtc().toIso8601String();
+
+      // Update local state immediately
+      state = state.map((n) => n.id == notificationId ? n.copyWith(isRead: true, readAt: DateTime.now()) : n).toList();
+
+      await SupabaseService.client
+          .from('notifications')
+          .update({
+            'is_read': true,
+            'read_at': nowStr,
+          })
+          .eq('id', notificationId);
+    } catch (e) {
+      debugPrint('Error marking notification $notificationId as read: $e');
+    }
+  }
+
+  void clearNotifications() {
+    state = [];
+  }
+
+  // Support legacy manual add for mock data
   void addNotification(String title, String body) {
     if (kSimulationMode && ref != null) {
       ref!.read(notificationMockProvider.notifier).addNotification(title, body);
@@ -46,40 +114,17 @@ class NotificationNotifier extends StateNotifier<List<NotificationModel>> {
     }
     final newNtf = NotificationModel(
       id: 'ntf-${DateTime.now().millisecondsSinceEpoch}',
+      userId: SupabaseService.client.auth.currentUser?.id ?? '',
       title: title,
-      body: body,
-      timestamp: DateTime.now(),
+      message: body,
+      type: 'info',
       isRead: false,
+      createdAt: DateTime.now(),
     );
     state = [newNtf, ...state];
-  }
-
-  void markAsRead(String id) {
-    if (kSimulationMode && ref != null) {
-      ref!.read(notificationMockProvider.notifier).markAsRead(id);
-      return;
-    }
-    state = state.map((n) => n.id == id ? n.copyWith(isRead: true) : n).toList();
-  }
-
-  void markAllAsRead() {
-    if (kSimulationMode && ref != null) {
-      ref!.read(notificationMockProvider.notifier).markAllAsRead();
-      return;
-    }
-    state = state.map((n) => n.copyWith(isRead: true)).toList();
-  }
-
-  void clearAll() {
-    if (kSimulationMode && ref != null) {
-      ref!.read(notificationMockProvider.notifier).clearAll();
-      return;
-    }
-    state = [];
   }
 }
 
 final notificationProvider = StateNotifierProvider<NotificationNotifier, List<NotificationModel>>((ref) {
   return NotificationNotifier(ref);
 });
-

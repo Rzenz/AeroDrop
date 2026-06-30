@@ -10,6 +10,7 @@ import '../../core/widgets/custom_app_bar.dart';
 import '../../core/widgets/glass_card.dart';
 import '../../core/widgets/status_chip.dart';
 import '../../core/providers/delivery_provider.dart';
+import '../../core/providers/notification_provider.dart';
 import '../../core/models/delivery_model.dart';
 
 class DeliveryHistoryScreen extends ConsumerStatefulWidget {
@@ -24,9 +25,17 @@ class _DeliveryHistoryScreenState extends ConsumerState<DeliveryHistoryScreen> {
   // ponytail: removed fake 750ms loading shimmer — data is already in memory.
   DeliveryStatus? _filter;
 
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(() {
+      ref.read(deliveryProvider.notifier).loadDeliveriesFromSupabase();
+    });
+  }
+
   Future<void> _handleRefresh() async {
-    // ponytail: no-op since data is local state. Kept for pull-to-refresh UX.
-    await Future.delayed(const Duration(milliseconds: 400));
+    await ref.read(deliveryProvider.notifier).loadDeliveriesFromSupabase();
+    await ref.read(notificationProvider.notifier).loadNotifications();
   }
 
   @override
@@ -73,15 +82,22 @@ class _DeliveryHistoryScreenState extends ConsumerState<DeliveryHistoryScreen> {
                     onTap: () => setState(() => _filter = null),
                   ),
                   const SizedBox(width: 10),
-                  ...DeliveryStatus.values.map((s) => Padding(
-                        padding: const EdgeInsets.only(right: 10),
-                        child: _HistoryFilterChip(
-                          label: s.name[0].toUpperCase() + s.name.substring(1),
-                          selected: _filter == s,
-                          onTap: () => setState(() => _filter = s),
-                          color: _statusColor(s),
-                        ),
-                      )),
+                  ...DeliveryStatus.values
+                      .where((s) => s != DeliveryStatus.assigning)
+                      .map((s) {
+                    final label = s == DeliveryStatus.inTransit
+                        ? 'In Transit'
+                        : s.name[0].toUpperCase() + s.name.substring(1);
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 10),
+                      child: _HistoryFilterChip(
+                        label: label,
+                        selected: _filter == s,
+                        onTap: () => setState(() => _filter = s),
+                        color: _statusColor(s),
+                      ),
+                    );
+                  }),
                 ],
               ),
             ).animate().fadeIn(delay: 100.ms),

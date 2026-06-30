@@ -175,12 +175,10 @@ class TrackingDetailsPage extends ConsumerWidget {
                   ),
 
                   // Cancel Button
-                  if (delivery.status == DeliveryStatus.pending ||
-                      delivery.status == DeliveryStatus.assigning ||
-                      delivery.status == DeliveryStatus.inTransit) ...[
+                  if (delivery.status == DeliveryStatus.pending) ...[
                     const SizedBox(height: 24),
                     _DestructiveButton(
-                      text: 'Cancel Delivery',
+                      text: 'Cancel Request',
                       icon: Icons.cancel_outlined,
                       onPressed: () => _showCancelConfirmation(context, ref),
                     ),
@@ -229,13 +227,13 @@ class TrackingDetailsPage extends ConsumerWidget {
             const Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 28),
             const SizedBox(width: 12),
             Text(
-              'Cancel Delivery?',
+              'Cancel Delivery Request?',
               style: AppTextStyles.title(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
             ),
           ],
         ),
         content: Text(
-          'Are you sure you want to cancel this delivery request? The drone will abort the mission and return to base.',
+          'This request will be marked as cancelled and kept in your history.',
           style: AppTextStyles.body(fontSize: 14, color: AppColors.textSecondaryDark),
         ),
         actionsPadding: const EdgeInsets.only(right: 16, bottom: 16),
@@ -243,7 +241,7 @@ class TrackingDetailsPage extends ConsumerWidget {
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: Text(
-              'No, Keep',
+              'No',
               style: AppTextStyles.body(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textSecondaryDark),
             ),
           ),
@@ -253,16 +251,30 @@ class TrackingDetailsPage extends ConsumerWidget {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             ),
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(context); // Close dialog
-              ref.read(deliveryProvider.notifier).updateDeliveryStatus(deliveryId, DeliveryStatus.cancelled);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Delivery cancelled. Drone returning to base.'),
-                  backgroundColor: Colors.redAccent,
-                ),
-              );
-              Navigator.pop(context); // Go back from tracking details
+              final error = await ref.read(deliveryProvider.notifier).cancelDeliveryRequest(deliveryId);
+              
+              if (!context.mounted) return;
+
+              if (error == null) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Delivery request cancelled.'),
+                    backgroundColor: AppColors.success,
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+                context.pop(); // Go back from tracking details
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(error),
+                    backgroundColor: AppColors.danger,
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              }
             },
             child: Text(
               'Yes, Cancel',

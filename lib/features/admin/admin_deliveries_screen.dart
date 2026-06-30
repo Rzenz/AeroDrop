@@ -25,8 +25,66 @@ class _AdminDeliveriesScreenState extends ConsumerState<AdminDeliveriesScreen> {
   @override
   void initState() {
     super.initState();
-    Future.delayed(const Duration(milliseconds: 600),
-        () { if (mounted) setState(() => _loading = false); });
+    _fetchDeliveries();
+  }
+
+  Future<void> _fetchDeliveries() async {
+    if (!mounted) return;
+    setState(() => _loading = true);
+    await ref.read(deliveryProvider.notifier).loadAdminDeliveriesFromSupabase();
+    if (mounted) {
+      setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _accept(String id) async {
+    final error = await ref.read(deliveryProvider.notifier).acceptDelivery(id);
+    if (!mounted) return;
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to accept: $error'),
+          backgroundColor: AppColors.danger,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Delivery accepted and drone assigned!'),
+          backgroundColor: AppColors.success,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+      _fetchDeliveries();
+    }
+  }
+
+  Future<void> _reject(String id) async {
+    final error = await ref.read(deliveryProvider.notifier).rejectDelivery(id);
+    if (!mounted) return;
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to reject: $error'),
+          backgroundColor: AppColors.danger,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Delivery request rejected.'),
+          backgroundColor: AppColors.success,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+      _fetchDeliveries();
+    }
   }
 
   Color _statusColor(DeliveryStatus s) => switch (s) {
@@ -55,96 +113,144 @@ class _AdminDeliveriesScreenState extends ConsumerState<AdminDeliveriesScreen> {
                 _filterChip('All', _filter == null,
                     () => setState(() => _filter = null), AppColors.primary),
                 const SizedBox(width: 8),
-                ...DeliveryStatus.values.map((s) => Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: _filterChip(
-                        s.name[0].toUpperCase() + s.name.substring(1),
-                        _filter == s,
-                        () => setState(() => _filter = s),
-                        _statusColor(s),
-                      ),
-                    )),
+                ...DeliveryStatus.values
+                    .where((s) => s != DeliveryStatus.assigning)
+                    .map((s) {
+                  final label = s == DeliveryStatus.inTransit
+                      ? 'In Transit'
+                      : s.name[0].toUpperCase() + s.name.substring(1);
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: _filterChip(
+                      label,
+                      _filter == s,
+                      () => setState(() => _filter = s),
+                      _statusColor(s),
+                    ),
+                  );
+                }),
               ],
             ),
           ).animate().fadeIn(delay: 100.ms),
 
           Expanded(
-            child: _loading
-                ? ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    itemCount: 6,
-                    itemBuilder: (_, _) => const SkeletonCard())
-                : items.isEmpty
-                    ? const EmptyStateWidget(
-                        title: 'No Deliveries',
-                        subtitle: 'Nothing matches this filter.')
-                    : ListView.builder(
-                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
-                        itemCount: items.length,
-                        itemBuilder: (context, i) {
-                          final d = items[i];
-                          final address = d.deliveryAddress;
-                          String pickup = 'Main Gate';
-                          String dropoff = address;
-                          if (address.startsWith('From ') && address.contains(' to ')) {
-                            pickup = address.substring(5, address.indexOf(' to '));
-                            dropoff = address.substring(address.indexOf(' to ') + 4);
-                          }
+            child: RefreshIndicator(
+              onRefresh: _fetchDeliveries,
+              color: AppColors.accent,
+              backgroundColor: AppColors.cardDark,
+              child: _loading
+                  ? ListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      itemCount: 6,
+                      itemBuilder: (_, _) => const SkeletonCard())
+                  : items.isEmpty
+                      ? const EmptyStateWidget(
+                          title: 'No Deliveries',
+                          subtitle: 'Nothing matches this filter.')
+                      : ListView.builder(
+                          padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
+                          itemCount: items.length,
+                          itemBuilder: (context, i) {
+                            final d = items[i];
+                            final address = d.deliveryAddress;
+                            String pickup = 'Main Gate';
+                            String dropoff = address;
+                            if (address.startsWith('From ') && address.contains(' to ')) {
+                              pickup = address.substring(5, address.indexOf(' to '));
+                              dropoff = address.substring(address.indexOf(' to ') + 4);
+                            }
 
-                          return GestureDetector(
-                            onTap: () => context
-                                .push('/admin/deliveries/details?id=${d.id}'),
-                            child: Container(
-                              margin: const EdgeInsets.only(bottom: 10),
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: AppColors.cardDark,
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: AppColors.borderDark),
-                              ),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(10),
-                                    decoration: BoxDecoration(
-                                      color: _statusColor(d.status)
-                                          .withValues(alpha: 0.12),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Icon(Icons.local_shipping_rounded,
-                                        color: _statusColor(d.status), size: 18),
-                                  ),
-                                  const SizedBox(width: 14),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
+                            return GestureDetector(
+                              onTap: () => context
+                                  .push('/admin/deliveries/details?id=${d.id}'),
+                              child: Container(
+                                margin: const EdgeInsets.only(bottom: 10),
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: AppColors.cardDark,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(color: AppColors.borderDark),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: [
+                                    Row(
                                       children: [
-                                        Text(d.senderName,
-                                            style: AppTextStyles.title(
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.bold,
-                                                color: Colors.white)),
-                                        Text(
-                                            '$pickup → $dropoff',
-                                            style: AppTextStyles.body(
-                                                fontSize: 12,
-                                                color: AppColors.textSecondaryDark),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis),
+                                        Container(
+                                          padding: const EdgeInsets.all(10),
+                                          decoration: BoxDecoration(
+                                            color: _statusColor(d.status)
+                                                .withValues(alpha: 0.12),
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                          child: Icon(Icons.local_shipping_rounded,
+                                              color: _statusColor(d.status), size: 18),
+                                        ),
+                                        const SizedBox(width: 14),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(d.senderName,
+                                                  style: AppTextStyles.title(
+                                                      fontSize: 14,
+                                                      fontWeight: FontWeight.bold,
+                                                      color: Colors.white)),
+                                              Text(
+                                                  '$pickup → $dropoff',
+                                                  style: AppTextStyles.body(
+                                                      fontSize: 12,
+                                                      color: AppColors.textSecondaryDark),
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis),
+                                            ],
+                                          ),
+                                        ),
+                                        StatusChip.delivery(d.status == DeliveryStatus.pending ? 'Pending Admin Approval' : d.status.name),
                                       ],
                                     ),
-                                  ),
-                                  StatusChip.delivery(d.status.name),
-                                ],
+                                    if (d.status == DeliveryStatus.pending) ...[
+                                      const SizedBox(height: 12),
+                                      const Divider(color: AppColors.borderDark, height: 1),
+                                      const SizedBox(height: 12),
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.end,
+                                        children: [
+                                          TextButton.icon(
+                                            onPressed: () => _reject(d.id),
+                                            icon: const Icon(Icons.close_rounded, size: 16, color: AppColors.danger),
+                                            label: const Text('Reject', style: TextStyle(color: AppColors.danger, fontSize: 13, fontWeight: FontWeight.bold)),
+                                            style: TextButton.styleFrom(
+                                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                              backgroundColor: AppColors.danger.withValues(alpha: 0.1),
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 10),
+                                          TextButton.icon(
+                                            onPressed: () => _accept(d.id),
+                                            icon: const Icon(Icons.check_rounded, size: 16, color: AppColors.success),
+                                            label: const Text('Accept', style: TextStyle(color: AppColors.success, fontSize: 13, fontWeight: FontWeight.bold)),
+                                            style: TextButton.styleFrom(
+                                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                              backgroundColor: AppColors.success.withValues(alpha: 0.1),
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ],
+                                ),
                               ),
                             )
                                 .animate(delay: Duration(milliseconds: i * 50))
                                 .fadeIn()
-                                .slideX(begin: 0.04),
-                          );
-                        },
+                                .slideX(begin: 0.04);
+                          },
                       ),
+            ),
           ),
         ],
       ),

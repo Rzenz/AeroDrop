@@ -1,4 +1,4 @@
-enum DeliveryStatus { pending, assigning, inTransit, delivered, cancelled }
+﻿enum DeliveryStatus { pending, assigning, inTransit, delivered, cancelled }
 
 class DeliveryModel {
   final String id;
@@ -8,12 +8,18 @@ class DeliveryModel {
   final String deliveryAddress;
   final String packageName;
   final double packageWeight; // in kg
-  final String packageType; // e.g. Document, Electronics, Food, Medicine
+  final String packageType;
   final DeliveryStatus status;
   final String? droneId;
   final String eta;
   final DateTime createdAt;
   final double progress; // 0.0 to 1.0
+  final double? estimatedDistanceKm;
+  final double? paymentAmount;
+  // Timestamp-based tracking - survives refresh, hot restart, logout
+  final DateTime? deliveryStartedAt;
+  final int estimatedDeliverySeconds;
+  final DateTime? deliveredAt;
 
   DeliveryModel({
     required this.id,
@@ -29,6 +35,11 @@ class DeliveryModel {
     required this.eta,
     required this.createdAt,
     required this.progress,
+    this.estimatedDistanceKm,
+    this.paymentAmount,
+    this.deliveryStartedAt,
+    this.estimatedDeliverySeconds = 60,
+    this.deliveredAt,
   });
 
   DeliveryModel copyWith({
@@ -45,6 +56,11 @@ class DeliveryModel {
     String? eta,
     DateTime? createdAt,
     double? progress,
+    double? estimatedDistanceKm,
+    double? paymentAmount,
+    DateTime? deliveryStartedAt,
+    int? estimatedDeliverySeconds,
+    DateTime? deliveredAt,
   }) {
     return DeliveryModel(
       id: id ?? this.id,
@@ -60,6 +76,11 @@ class DeliveryModel {
       eta: eta ?? this.eta,
       createdAt: createdAt ?? this.createdAt,
       progress: progress ?? this.progress,
+      estimatedDistanceKm: estimatedDistanceKm ?? this.estimatedDistanceKm,
+      paymentAmount: paymentAmount ?? this.paymentAmount,
+      deliveryStartedAt: deliveryStartedAt ?? this.deliveryStartedAt,
+      estimatedDeliverySeconds: estimatedDeliverySeconds ?? this.estimatedDeliverySeconds,
+      deliveredAt: deliveredAt ?? this.deliveredAt,
     );
   }
 }

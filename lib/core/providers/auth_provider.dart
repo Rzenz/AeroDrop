@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'delivery_provider.dart';
+import 'notification_provider.dart';
 
 import '../models/user_model.dart';
 import '../config/simulation_config.dart';
@@ -32,7 +34,10 @@ String formatAuthErrorMessage(Object error) {
     return 'Too many sign-up attempts. Please wait a few minutes and try again with a different email address.';
   }
 
-  if (message.contains('invalid_credentials')) {
+  if (message.contains('invalid_credentials') ||
+      message.contains('invalid login credentials') ||
+      message.contains('email not confirmed') ||
+      message.contains('user not found')) {
     return 'The email or password is incorrect.';
   }
 
@@ -216,6 +221,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
         errorMessage: null,
       );
 
+      if (ref != null) {
+        ref!.read(notificationProvider.notifier).loadNotifications();
+        ref!.read(deliveryProvider.notifier).loadDeliveriesFromSupabase();
+      }
+
       return true;
     } catch (error) {
       debugPrint('Supabase login failed: $error');
@@ -396,11 +406,17 @@ class AuthNotifier extends StateNotifier<AuthState> {
   void logout() {
     if (kSimulationMode && ref != null) {
       ref!.read(authMockProvider.notifier).logout();
+      ref!.read(deliveryProvider.notifier).clearDeliveries();
       return;
     }
 
     if (SupabaseService.isConfigured) {
       SupabaseService.client.auth.signOut();
+    }
+
+    if (ref != null) {
+      ref!.read(deliveryProvider.notifier).clearDeliveries();
+      ref!.read(notificationProvider.notifier).clearNotifications();
     }
 
     state = AuthState();

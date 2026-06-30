@@ -101,9 +101,19 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
 
     return Scaffold(
       backgroundColor: AppColors.bgDark,
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final size = Size(constraints.maxWidth, constraints.maxHeight);
+      body: RefreshIndicator(
+        color: AppColors.accent,
+        backgroundColor: AppColors.cardDark,
+        onRefresh: () async {
+          await ref.read(deliveryProvider.notifier).loadDeliveriesFromSupabase();
+        },
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: SizedBox(
+            height: MediaQuery.of(context).size.height,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final size = Size(constraints.maxWidth, constraints.maxHeight);
 
           double targetLat = 10.3265;
           double targetLng = 123.9515;
@@ -347,8 +357,11 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
           );
         },
       ),
-    );
-  }
+     ),
+    ),
+   ),
+  );
+}
 }
 
 class _DroneMarkerWidget extends StatelessWidget {

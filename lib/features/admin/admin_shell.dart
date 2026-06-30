@@ -5,6 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/providers/auth_provider.dart';
+import '../../core/providers/delivery_provider.dart';
+
+import '../../core/services/supabase_service.dart';
 
 class AdminShell extends ConsumerWidget {
   final Widget child;
@@ -13,6 +16,11 @@ class AdminShell extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authProvider).user;
+    if (SupabaseService.isConfigured) {
+      Future.microtask(() {
+        ref.read(deliveryProvider.notifier).loadAdminDeliveriesFromSupabase();
+      });
+    }
     return Scaffold(
       backgroundColor: AppColors.bgDark,
       drawer: _AdminDrawer(user: user, ref: ref),
@@ -99,6 +107,7 @@ class _AdminDrawer extends StatelessWidget {
     final name = user?.name ?? 'Admin';
     final email = user?.email ?? '';
     final loc = GoRouterState.of(context).uri.toString();
+    final pendingCount = ref.watch(pendingDeliveriesCountProvider);
 
     return ClipRRect(
       borderRadius: const BorderRadius.horizontal(right: Radius.circular(24)),
@@ -176,7 +185,24 @@ class _AdminDrawer extends StatelessWidget {
                         route: '/admin/routes/planner', current: loc, onTap: () => context.push('/admin/routes/planner')),
                     _NavItem(icon: Icons.local_shipping_rounded, label: 'Deliveries',
                         route: '/admin/deliveries', current: loc,
-                        onTap: () => context.go('/admin/deliveries')),
+                        onTap: () => context.go('/admin/deliveries'),
+                        trailing: pendingCount > 0
+                            ? Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: AppColors.accent,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Text(
+                                  '$pendingCount',
+                                  style: const TextStyle(
+                                    color: AppColors.bgDark,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              )
+                            : null),
                     _NavItem(icon: Icons.bar_chart_rounded, label: 'Analytics',
                         route: '/admin/analytics', current: loc,
                         onTap: () => context.go('/admin/analytics')),
@@ -231,6 +257,7 @@ class _NavItem extends StatelessWidget {
   final String route;
   final String current;
   final VoidCallback onTap;
+  final Widget? trailing;
 
   const _NavItem({
     required this.icon,
@@ -238,6 +265,7 @@ class _NavItem extends StatelessWidget {
     required this.route,
     required this.current,
     required this.onTap,
+    this.trailing,
   });
 
   @override
@@ -267,7 +295,10 @@ class _NavItem extends StatelessWidget {
                     fontSize: 15,
                     fontWeight: isActive ? FontWeight.w700 : FontWeight.normal,
                     color: isActive ? Colors.white : AppColors.textSecondaryDark)),
-            if (isActive) ...[
+            if (trailing != null) ...[
+              const Spacer(),
+              trailing!,
+            ] else if (isActive) ...[
               const Spacer(),
               Container(
                 width: 8, height: 8,

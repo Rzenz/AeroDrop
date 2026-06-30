@@ -23,7 +23,7 @@ class DroneCard extends StatelessWidget {
     Color batteryColor;
     if (drone.batteryLevel > 50) {
       batteryColor = AppColors.success;
-    } else if (drone.batteryLevel > 20) {
+    } else if (drone.batteryLevel >= 10) {
       batteryColor = AppColors.warning;
     } else {
       batteryColor = AppColors.danger;
@@ -209,6 +209,24 @@ class DroneCard extends StatelessWidget {
                               ),
                             ],
                           ),
+                           const SizedBox(height: 8),
+                          // Battery delivery readiness label
+                          Text(
+                            drone.batteryLevel < 10.0
+                                ? 'Battery too low for delivery'
+                                : drone.status == DroneStatus.available
+                                    ? 'Ready for delivery'
+                                    : 'Drone not available',
+                            style: AppTextStyles.body(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: drone.batteryLevel < 10.0
+                                  ? AppColors.danger
+                                  : drone.status == DroneStatus.available
+                                      ? AppColors.success
+                                      : AppColors.warning,
+                            ),
+                           ),
                         ],
                       ),
                     ),

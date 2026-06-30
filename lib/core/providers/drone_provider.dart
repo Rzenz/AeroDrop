@@ -1,81 +1,203 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/drone_model.dart';
 import '../config/simulation_config.dart';
 import '../../providers/mock/drone_mock_provider.dart';
+import '../services/supabase_service.dart';
 
 class DroneNotifier extends StateNotifier<List<DroneModel>> {
   final Ref? ref;
 
-  DroneNotifier([this.ref])
-      : super(kSimulationMode
-            ? []
-            : [
-                DroneModel(
-                  id: 'DRN-001',
-                  name: 'AeroCarrier Falcon',
-                  batteryLevel: 92.5,
-                  status: DroneStatus.available,
-                  maxPayload: 5.0,
-                  modelType: 'AeroCarrier-X',
-                  currentCoordinates: '10.3276° N, 123.9507° E',
-                ),
-                DroneModel(
-                  id: 'DRN-002',
-                  name: 'SkyLifter Titan',
-                  batteryLevel: 45.0,
-                  status: DroneStatus.busy,
-                  maxPayload: 15.0,
-                  modelType: 'SkyLifter-V2',
-                  currentCoordinates: '10.3286° N, 123.9512° E',
-                ),
-                DroneModel(
-                  id: 'DRN-003',
-                  name: 'AeroCarrier Hawk',
-                  batteryLevel: 15.0,
-                  status: DroneStatus.maintenance,
-                  maxPayload: 5.0,
-                  modelType: 'AeroCarrier-X',
-                  currentCoordinates: '10.3280° N, 123.9498° E',
-                ),
-                DroneModel(
-                  id: 'DRN-004',
-                  name: 'Shadow Swift',
-                  batteryLevel: 0.0,
-                  status: DroneStatus.offline,
-                  maxPayload: 2.5,
-                  modelType: 'Swift-Lite',
-                  currentCoordinates: '10.3272° N, 123.9518° E',
-                ),
-              ]) {
-    if (kSimulationMode && ref != null) {
-      ref!.listen<List<DroneModel>>(droneMockProvider, (previous, next) {
-        state = next;
-      }, fireImmediately: true);
+  DroneNotifier([this.ref]) : super([]) {
+    if (kSimulationMode) {
+      state = [
+        DroneModel(
+          id: 'DRN-001',
+          name: 'AeroCarrier Alpha',
+          batteryLevel: 100.0,
+          status: DroneStatus.available,
+          maxPayload: 0.5,
+          modelType: '001',
+          currentCoordinates: '10.3456,123.9478',
+        ),
+      ];
+    } else {
+      if (SupabaseService.isConfigured) {
+        Future.microtask(loadDronesFromSupabase);
+      } else {
+        // Fallback to local hardcoded list if Supabase is not configured
+        state = [
+          DroneModel(
+            id: 'DRN-001',
+            name: 'AeroCarrier Alpha',
+            batteryLevel: 100.0,
+            status: DroneStatus.available,
+            maxPayload: 0.5,
+            modelType: '001',
+            currentCoordinates: '10.3456,123.9478',
+          ),
+        ];
+      }
+    }
+  }
+
+  double _toDouble(dynamic value, [double fallback = 0.0]) {
+    if (value == null) return fallback;
+    if (value is num) return value.toDouble();
+    return double.tryParse(value.toString()) ?? fallback;
+  }
+
+  DroneStatus _parseDroneStatus(String? statusStr) {
+    switch (statusStr?.toLowerCase()) {
+      case 'available':
+        return DroneStatus.available;
+      case 'busy':
+        return DroneStatus.busy;
+      case 'maintenance':
+        return DroneStatus.maintenance;
+      case 'offline':
+        return DroneStatus.offline;
+      default:
+        return DroneStatus.available;
+    }
+  }
+
+  Future<void> loadDronesFromSupabase() async {
+    if (kSimulationMode) return;
+    if (!SupabaseService.isConfigured) return;
+
+    try {
+      // Ensure DRN-001 exists in the database
+      final checkResponse = await SupabaseService.client
+          .from('drones')
+          .select()
+          .eq('id', 'DRN-001')
+          .maybeSingle();
+
+      if (checkResponse == null) {
+        await SupabaseService.client.from('drones').insert({
+          'id': 'DRN-001',
+          'name': 'AeroCarrier Alpha',
+          'battery_level': 100.0,
+          'status': 'available',
+          'max_payload': 0.5,
+          'model_type': '001',
+          'current_coordinates': '10.3456,123.9478',
+        });
+      }
+
+      // Query DRN-001 only to restrict the fleet list
+      final response = await SupabaseService.client
+          .from('drones')
+          .select()
+          .eq('id', 'DRN-001');
+
+      final drones = (response as List).map((item) {
+        final data = Map<String, dynamic>.from(item);
+        return DroneModel(
+          id: data['id'].toString(),
+          name: data['name']?.toString() ?? 'AeroCarrier Alpha',
+          batteryLevel: _toDouble(data['battery_level'], 100.0),
+          status: _parseDroneStatus(data['status']?.toString()),
+          maxPayload: _toDouble(data['max_payload'], 0.5),
+          modelType: data['model_type']?.toString() ?? '001',
+          currentCoordinates: data['current_coordinates']?.toString() ?? '10.3456,123.9478',
+        );
+      }).toList();
+
+      state = drones;
+    } catch (error) {
+      debugPrint('Load drones from Supabase failed: $error');
+    }
+  }
+
+  Future<String?> addDroneToSupabase(DroneModel drone) async {
+    return 'Drone registration is locked. Only one drone (AeroCarrier Alpha) is permitted in this workspace.';
+  }
+
+  Future<String?> editDroneInSupabase(DroneModel drone) async {
+    if (drone.id != 'DRN-001') {
+      return 'Editing other drones is not permitted.';
+    }
+
+    if (kSimulationMode) {
+      state = [drone];
+      return null;
+    }
+
+    if (!SupabaseService.isConfigured) {
+      return 'Supabase is not configured.';
+    }
+
+    try {
+      await SupabaseService.client.from('drones').update({
+        'name': drone.name,
+        'battery_level': drone.batteryLevel,
+        'status': drone.status.name,
+        'max_payload': drone.maxPayload,
+        'model_type': drone.modelType,
+        'current_coordinates': drone.currentCoordinates,
+      }).eq('id', 'DRN-001');
+
+      state = [drone];
+      return null;
+    } catch (e) {
+      debugPrint('Edit drone in Supabase failed: $e');
+      return e.toString();
+    }
+  }
+
+  Future<String?> deleteDroneFromSupabase(String id) async {
+    if (id == 'DRN-001') {
+      return 'The primary drone AeroCarrier Alpha cannot be deleted.';
+    }
+    return 'Deleting other drones is not permitted.';
+  }
+
+  Future<String?> rechargeDrone(String droneId) async {
+    if (kSimulationMode) {
+      state = state.map((d) {
+        if (d.id == droneId) {
+          return d.copyWith(batteryLevel: 100.0, status: DroneStatus.available);
+        }
+        return d;
+      }).toList();
+      return null;
+    }
+
+    if (!SupabaseService.isConfigured) return 'Supabase is not configured.';
+
+    try {
+      await SupabaseService.client.from('drones').update({
+        'battery_level': 100.0,
+        'status': 'available',
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      }).eq('id', droneId);
+
+      state = state.map((d) {
+        if (d.id == droneId) {
+          return d.copyWith(batteryLevel: 100.0, status: DroneStatus.available);
+        }
+        return d;
+      }).toList();
+
+      return null;
+    } catch (e) {
+      debugPrint('Recharge drone failed: $e');
+      return 'Failed to recharge drone: ${e.toString()}';
     }
   }
 
   void addDrone(DroneModel drone) {
-    if (kSimulationMode && ref != null) {
-      ref!.read(droneMockProvider.notifier).addDrone(drone);
-      return;
-    }
-    state = [...state, drone];
+    addDroneToSupabase(drone);
   }
 
   void editDrone(DroneModel updatedDrone) {
-    if (kSimulationMode && ref != null) {
-      ref!.read(droneMockProvider.notifier).editDrone(updatedDrone);
-      return;
-    }
-    state = state.map((drone) => drone.id == updatedDrone.id ? updatedDrone : drone).toList();
+    editDroneInSupabase(updatedDrone);
   }
 
   void deleteDrone(String id) {
-    if (kSimulationMode && ref != null) {
-      ref!.read(droneMockProvider.notifier).deleteDrone(id);
-      return;
-    }
-    state = state.where((drone) => drone.id != id).toList();
+    deleteDroneFromSupabase(id);
   }
 
   void updateBattery(String id, double level) {

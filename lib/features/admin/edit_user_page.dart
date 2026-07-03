@@ -122,10 +122,10 @@ class _EditUserPageState extends ConsumerState<EditUserPage> {
                             ),
                             const SizedBox(height: 20),
                             _buildDropdownField(
-                              labelText: 'System Access Role',
+                              labelText: 'System Access Role (Editing Disabled)',
                               value: _selectedRole,
                               items: const ['Student', 'Faculty/Staff', 'Admin (Fleet Commander)'],
-                              onChanged: (val) => setState(() => _selectedRole = val!),
+                              onChanged: null,
                             ),
                             const SizedBox(height: 20),
                             _buildDropdownField(
@@ -159,7 +159,7 @@ class _EditUserPageState extends ConsumerState<EditUserPage> {
     required String labelText,
     required String value,
     required List<String> items,
-    required ValueChanged<String?> onChanged,
+    required ValueChanged<String?>? onChanged,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

@@ -130,7 +130,7 @@ class DeliveryDetailsScreen extends ConsumerWidget {
                       _buildDetailRow(Icons.pin_drop_outlined, 'Pickup Location', pickup),
                       _buildDetailRow(Icons.flag_outlined, 'Drop-off Location', dropoff),
                       _buildDetailRow(Icons.assignment_ind_outlined, 'Recipient', delivery.recipientName),
-                      _buildDetailRow(Icons.phone_iphone_rounded, 'Contact Phone', delivery.recipientPhone),
+                      _buildDetailRow(Icons.phone_iphone_rounded, 'Contact Phone', delivery.recipientPhone.trim().isEmpty ? 'No phone number provided' : delivery.recipientPhone),
                     ],
                   ),
                 ).animate(delay: 200.ms).fadeIn().slideY(begin: 0.05),

@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -25,6 +26,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   UserRole _selectedRole = UserRole.user;
   bool _obscurePassword = true;
@@ -60,6 +62,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
     _authSubscription?.close();
     _nameController.dispose();
     _emailController.dispose();
+    _phoneController.dispose();
     _passwordController.dispose();
     _bgRotateController.dispose();
     super.dispose();
@@ -78,6 +81,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
             _emailController.text,
             _passwordController.text,
             _selectedRole,
+            _phoneController.text,
           );
       if (success && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -96,6 +100,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
       }
     }
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -347,6 +352,20 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
                                               _selectedRole,
                                             ),
                                         textInputAction: TextInputAction.next,
+                                      ),
+                                      const SizedBox(height: 18),
+                                      CustomTextField(
+                                        labelText: 'Phone Number',
+                                        hintText: 'e.g. 09XXXXXXXXX',
+                                        prefixIcon: Icons.phone_android_rounded,
+                                        controller: _phoneController,
+                                        keyboardType: TextInputType.phone,
+                                        validator: RegisterController.validatePhone,
+                                        textInputAction: TextInputAction.next,
+                                        inputFormatters: [
+                                          FilteringTextInputFormatter.digitsOnly,
+                                          LengthLimitingTextInputFormatter(11),
+                                        ],
                                       ),
                                       const SizedBox(height: 18),
                                       CustomTextField(

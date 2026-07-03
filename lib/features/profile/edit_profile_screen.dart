@@ -10,6 +10,7 @@ import '../../core/widgets/custom_text_field.dart';
 import '../../core/widgets/glass_card.dart';
 import '../../core/widgets/custom_app_bar.dart';
 import '../../core/providers/auth_provider.dart';
+import '../auth/presentation/controllers/register_controller.dart';
 
 class EditProfileScreen extends ConsumerStatefulWidget {
   const EditProfileScreen({super.key});
@@ -22,6 +23,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _nameController;
   late TextEditingController _emailController;
+  late TextEditingController _phoneController;
 
   @override
   void initState() {
@@ -29,12 +31,14 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     final user = ref.read(authProvider).user;
     _nameController = TextEditingController(text: user?.name ?? '');
     _emailController = TextEditingController(text: user?.email ?? '');
+    _phoneController = TextEditingController(text: user?.phoneNumber ?? '');
   }
 
   @override
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
+    _phoneController.dispose();
     super.dispose();
   }
 
@@ -42,7 +46,12 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     if (_formKey.currentState!.validate()) {
       final success = await ref
           .read(authProvider.notifier)
-          .updateProfile(_nameController.text, _emailController.text);
+          .updateProfile(
+            _nameController.text,
+            _emailController.text,
+            phoneNumber: _phoneController.text,
+          );
+
 
       if (!mounted) return;
 
@@ -185,6 +194,19 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                           ),
                           validator: (val) =>
                               val == null || val.isEmpty ? 'Enter email' : null,
+                        ),
+                        const SizedBox(height: 20),
+                        CustomTextField(
+                          labelText: 'Phone Number',
+                          hintText: 'e.g. 09XXXXXXXXX',
+                          prefixIcon: Icons.phone_android_rounded,
+                          controller: _phoneController,
+                          keyboardType: TextInputType.phone,
+                          validator: RegisterController.validatePhone,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                            LengthLimitingTextInputFormatter(11),
+                          ],
                         ),
                         const SizedBox(height: 32),
                         GradientButton(

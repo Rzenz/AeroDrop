@@ -7,8 +7,9 @@ import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/drone_card.dart';
 import '../../core/widgets/animated_fab.dart';
 import '../../core/widgets/glass_card.dart';
-import '../../core/providers/drone_provider.dart';
 import '../../core/models/drone_model.dart';
+import '../../core/providers/drone_provider.dart';
+import '../../core/providers/settings_provider.dart';
 
 class AdminDronesScreen extends ConsumerWidget {
   const AdminDronesScreen({super.key});
@@ -19,6 +20,21 @@ class AdminDronesScreen extends ConsumerWidget {
     final available = drones.where((d) => d.status == DroneStatus.available).length;
     final active = drones.where((d) => d.status == DroneStatus.busy).length;
     final maintenance = drones.where((d) => d.status == DroneStatus.maintenance).length;
+    
+    final lowBatteryAlerts = ref.watch(lowBatteryAlertsProvider);
+    final drone001 = drones.firstWhere(
+      (d) => d.id == 'DRN-001',
+      orElse: () => DroneModel(
+        id: 'DRN-001',
+        name: 'AeroCarrier Alpha',
+        batteryLevel: 100.0,
+        status: DroneStatus.available,
+        maxPayload: 0.5,
+        modelType: '001',
+        currentCoordinates: '10.3456,123.9478',
+      ),
+    );
+    final showLowBatteryWarning = lowBatteryAlerts && drone001.batteryLevel < 10.0;
 
     return Scaffold(
       backgroundColor: AppColors.bgDark,
@@ -87,6 +103,34 @@ class AdminDronesScreen extends ConsumerWidget {
                       ),
                     ],
                   ).animate().fadeIn(delay: 150.ms).slideY(begin: 0.1),
+                  if (showLowBatteryWarning) ...[
+                    const SizedBox(height: 20),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: AppColors.danger.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: AppColors.danger.withValues(alpha: 0.3)),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.battery_alert_rounded, color: AppColors.danger, size: 24),
+                          SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'Drone battery is low. Recharge required before accepting deliveries.',
+                              style: TextStyle(
+                                color: AppColors.danger,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ).animate().shake(hz: 4, curve: Curves.easeInOut),
+                  ],
                 ],
               ),
             ),

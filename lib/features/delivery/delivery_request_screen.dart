@@ -14,6 +14,8 @@ import '../../core/providers/delivery_provider.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/services/supabase_service.dart';
 import '../../core/providers/drone_provider.dart';
+import '../../core/providers/weather_provider.dart';
+import '../../core/widgets/aerodrop_warning_dialog.dart';
 
 class CampusLocation {
   final String id;
@@ -65,7 +67,9 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
   final _pickupController = TextEditingController();
   final _dropoffController = TextEditingController();
   final _recipientController = TextEditingController();
+  final _recipientPhoneController = TextEditingController();
   final _weightController = TextEditingController(text: '0.0');
+
   final _notesController = TextEditingController();
 
   String _packageType = 'Documents';
@@ -96,6 +100,7 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
     _pickupController.dispose();
     _dropoffController.dispose();
     _recipientController.dispose();
+    _recipientPhoneController.dispose();
     _weightController.dispose();
     _notesController.dispose();
     super.dispose();
@@ -383,6 +388,17 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
         _showValidationError('Recipient name is required');
         return false;
       }
+
+      final recipientPhone = _recipientPhoneController.text.trim();
+      if (recipientPhone.isEmpty) {
+        _showValidationError('Recipient phone number must be exactly 11 digits.');
+        return false;
+      }
+
+      if (recipientPhone.length != 11) {
+        _showValidationError('Recipient phone number must be exactly 11 digits.');
+        return false;
+      }
     }
 
     return true;
@@ -481,10 +497,31 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
 
     setState(() => _loading = true);
 
+    try {
+      if (SupabaseService.isConfigured) {
+        final droneResponse = await SupabaseService.client
+            .from('drones')
+            .select('battery_level')
+            .eq('id', 'DRN-001')
+            .maybeSingle();
+
+        if (droneResponse != null) {
+          final droneBattery = double.tryParse(droneResponse['battery_level']?.toString() ?? '100') ?? 100.0;
+          if (droneBattery < 10.0) {
+            setState(() => _loading = false);
+            _showLowBatteryDialog();
+            return;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Drone battery check failed: $e');
+    }
+
     final error = await ref.read(deliveryProvider.notifier).createDelivery(
           senderName: user.name,
           recipientName: _recipientController.text.trim(),
-          recipientPhone: '+63 900 000 0000',
+          recipientPhone: _recipientPhoneController.text.trim(),
           deliveryAddress: 'From $pickupName to $dropoffName',
           packageName: 'AeroDrop $_packageType',
           packageWeight: weight,
@@ -505,13 +542,55 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
 
     setState(() => _loading = false);
 
+    if (error == 'Delivery cancelled due to unsafe weather.') {
+      showAeroDropWarningDialog(
+        context: context,
+        title: 'Delivery Cancelled',
+        message:
+            'Your delivery request was automatically cancelled because the weather is unsafe for drone delivery. Please try again later.',
+        icon: Icons.thunderstorm_rounded,
+        iconColor: AppColors.danger,
+        centerIcon: Icons.flight_land_rounded,
+        centerIconColor: AppColors.danger,
+      );
+      return;
+    }
+
     if (error != null) {
       _showMessage(error, false);
       return;
     }
 
+    // Show caution notice if current weather is caution
+    final weatherState = ref.read(weatherProvider);
+    if (weatherState.status == WeatherStatus.caution) {
+      showAeroDropWarningDialog(
+        context: context,
+        title: 'Caution Weather',
+        message:
+            'Delivery may be delayed due to caution-level weather conditions.',
+        icon: Icons.air_rounded,
+        iconColor: AppColors.warning,
+        centerIcon: Icons.flight_rounded,
+        centerIconColor: AppColors.warning,
+      );
+    }
+
     _showMessage('Delivery request submitted!', true);
     context.go('/user/track');
+  }
+
+  void _showLowBatteryDialog() {
+    showAeroDropWarningDialog(
+      context: context,
+      title: 'Drone Battery Low',
+      message:
+          'AeroCarrier Alpha needs to be recharged before accepting new deliveries. Please try again later.',
+      icon: Icons.battery_alert_rounded,
+      iconColor: AppColors.danger,
+      centerIcon: Icons.flight_rounded,
+      centerIconColor: AppColors.danger,
+    );
   }
 
   @override
@@ -655,7 +734,9 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
                       pickupController: _pickupController,
                       dropoffController: _dropoffController,
                       recipientController: _recipientController,
+                      recipientPhoneController: _recipientPhoneController,
                       pickupLocations: _pickupLocations,
+
                       dropoffLocations: _dropoffLocations,
                       selectedPickup: _selectedPickup,
                       selectedDropoff: _selectedDropoff,
@@ -730,17 +811,79 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
                   ],
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
-                child: GradientButton(
-                  text: _currentPage == 3 ? 'Confirm Order' : 'Continue',
-                  isLoading: _loading,
-                  onPressed: _next,
-                  icon: _currentPage == 3
-                      ? Icons.flight_takeoff_rounded
-                      : Icons.arrow_forward_rounded,
-                ),
-              ),
+              Builder(builder: (context) {
+                final weatherState = ref.watch(weatherProvider);
+                final isGrounded = weatherState.isGrounded;
+                final isCaution = weatherState.isCaution;
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Weather warning banner
+                    if (isGrounded || isCaution)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(24, 0, 24, 0),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: isGrounded
+                                ? AppColors.danger.withValues(alpha: 0.12)
+                                : AppColors.warning.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: isGrounded
+                                  ? AppColors.danger.withValues(alpha: 0.4)
+                                  : AppColors.warning.withValues(alpha: 0.4),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                isGrounded
+                                    ? Icons.thunderstorm_rounded
+                                    : Icons.air_rounded,
+                                color: isGrounded
+                                    ? AppColors.danger
+                                    : AppColors.warning,
+                                size: 18,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  isGrounded
+                                      ? 'Drone deliveries are grounded due to unsafe weather.'
+                                      : 'Deliveries may be delayed due to weather.',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: isGrounded
+                                        ? AppColors.danger
+                                        : AppColors.warning,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+                      child: GradientButton(
+                        text: isGrounded && _currentPage == 3
+                            ? 'Delivery Unavailable'
+                            : (_currentPage == 3 ? 'Confirm Order' : 'Continue'),
+                        isLoading: _loading,
+                        onPressed: isGrounded && _currentPage == 3 ? null : _next,
+                        icon: isGrounded && _currentPage == 3
+                            ? Icons.block_rounded
+                            : (_currentPage == 3
+                                ? Icons.flight_takeoff_rounded
+                                : Icons.arrow_forward_rounded),
+                      ),
+                    ),
+                  ],
+                );
+              }),
             ],
           ),
         ),
@@ -932,6 +1075,7 @@ class _LocationPage extends StatelessWidget {
   final TextEditingController pickupController;
   final TextEditingController dropoffController;
   final TextEditingController recipientController;
+  final TextEditingController recipientPhoneController;
   final List<CampusLocation> pickupLocations;
   final List<CampusLocation> dropoffLocations;
   final CampusLocation? selectedPickup;
@@ -944,6 +1088,7 @@ class _LocationPage extends StatelessWidget {
     required this.pickupController,
     required this.dropoffController,
     required this.recipientController,
+    required this.recipientPhoneController,
     required this.pickupLocations,
     required this.dropoffLocations,
     required this.selectedPickup,
@@ -1053,6 +1198,18 @@ class _LocationPage extends StatelessWidget {
                   hintText: 'Name of person receiving',
                   prefixIcon: Icons.person_rounded,
                   controller: recipientController,
+                ),
+                const SizedBox(height: 14),
+                CustomTextField(
+                  labelText: 'Recipient Phone Number',
+                  hintText: 'e.g. 09XXXXXXXXX',
+                  prefixIcon: Icons.phone_rounded,
+                  controller: recipientPhoneController,
+                  keyboardType: TextInputType.phone,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(11),
+                  ],
                 ),
                 const SizedBox(height: 14),
                 Container(

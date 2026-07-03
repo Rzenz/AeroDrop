@@ -41,4 +41,15 @@ class RegisterController {
     }
     return null;
   }
+
+  static String? validatePhone(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'Phone number is required';
+    }
+    final trimmed = value.trim();
+    if (trimmed.length != 11) {
+      return 'Phone number must be exactly 11 digits.';
+    }
+    return null;
+  }
 }

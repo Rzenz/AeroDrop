@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/theme/app_theme.dart';
 import '../../core/widgets/glass_card.dart';
 import '../../core/widgets/custom_app_bar.dart';
 import '../../core/widgets/section_header.dart';
@@ -11,6 +12,7 @@ import '../../core/widgets/spring_switch.dart';
 import '../../core/config/simulation_config.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/models/user_model.dart';
+import '../../core/providers/settings_provider.dart';
 
 class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
@@ -20,20 +22,25 @@ class SettingsPage extends ConsumerStatefulWidget {
 }
 
 class _SettingsPageState extends ConsumerState<SettingsPage> {
-  bool _darkMode = true;
   bool _pushNotifications = true;
   bool _emailAlerts = false;
   String _selectedLanguage = 'English';
 
   @override
   Widget build(BuildContext context) {
+    final themeMode = ref.watch(themeModeProvider);
+
+    final isDark = AppTheme.isDarkMode;
+
     return Scaffold(
-      backgroundColor: AppColors.bgDark,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: const CustomAppBar(title: 'Settings'),
       body: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [Color(0xFF0F243A), AppColors.bgDark],
+            colors: isDark
+                ? const [Color(0xFF0F243A), AppColors.bgDark]
+                : const [Color(0xFFE6EFFF), AppColors.bgLight],
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
           ),
@@ -73,8 +80,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                                 icon: Icons.dark_mode_outlined,
                                 title: 'Dark Color Mode',
                                 subtitle: 'Always render deep navy theme',
-                                value: _darkMode,
-                                onChanged: (val) => setState(() => _darkMode = val),
+                                value: themeMode == ThemeMode.dark,
+                                onChanged: (val) {
+                                  ref.read(themeModeProvider.notifier).setTheme(val ? ThemeMode.dark : ThemeMode.light);
+                                },
                                 activeColor: AppColors.primaryLight,
                               ),
                               _buildDivider(),
@@ -164,8 +173,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }
 
   Widget _buildDivider() {
+    final isDark = AppTheme.isDarkMode;
     return Divider(
-      color: AppColors.borderDark.withValues(alpha: 0.5),
+      color: (isDark ? AppColors.borderDark : AppColors.borderLight).withValues(alpha: 0.5),
       indent: 56,
       endIndent: 16,
       height: 1,
@@ -180,24 +190,32 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     required ValueChanged<bool> onChanged,
     required Color activeColor,
   }) {
+    final isDark = AppTheme.isDarkMode;
     return Material(
       color: Colors.transparent,
       child: ListTile(
         leading: Container(
           padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.05),
+            color: (isDark ? Colors.white : AppColors.primary).withValues(alpha: 0.05),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Icon(icon, color: Colors.white, size: 18),
+          child: Icon(icon, color: isDark ? Colors.white : AppColors.primary, size: 18),
         ),
         title: Text(
           title,
-          style: AppTextStyles.title(fontSize: 14.5, fontWeight: FontWeight.bold, color: Colors.white),
+          style: AppTextStyles.title(
+            fontSize: 14.5,
+            fontWeight: FontWeight.bold,
+            color: isDark ? Colors.white : AppColors.textPrimaryLight,
+          ),
         ),
         subtitle: Text(
           subtitle,
-          style: AppTextStyles.body(fontSize: 11.5, color: AppColors.textSecondaryDark),
+          style: AppTextStyles.body(
+            fontSize: 11.5,
+            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+          ),
         ),
         trailing: SpringSwitch(
           value: value,
@@ -209,34 +227,69 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }
 
   Widget _buildLanguageTile() {
+    final isDark = AppTheme.isDarkMode;
     return Material(
       color: Colors.transparent,
       child: ListTile(
         leading: Container(
           padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.05),
+            color: (isDark ? Colors.white : AppColors.primary).withValues(alpha: 0.05),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: const Icon(Icons.language_rounded, color: Colors.white, size: 18),
+          child: Icon(Icons.language_rounded, color: isDark ? Colors.white : AppColors.primary, size: 18),
         ),
         title: Text(
           'Language',
-          style: AppTextStyles.title(fontSize: 14.5, fontWeight: FontWeight.bold, color: Colors.white),
+          style: AppTextStyles.title(
+            fontSize: 14.5,
+            fontWeight: FontWeight.bold,
+            color: isDark ? Colors.white : AppColors.textPrimaryLight,
+          ),
         ),
         subtitle: Text(
           'Change app localization settings',
-          style: AppTextStyles.body(fontSize: 11.5, color: AppColors.textSecondaryDark),
+          style: AppTextStyles.body(
+            fontSize: 11.5,
+            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+          ),
         ),
         trailing: DropdownButton<String>(
           value: _selectedLanguage,
-          dropdownColor: AppColors.cardDark,
+          dropdownColor: isDark ? AppColors.cardDark : AppColors.cardLight,
           underline: const SizedBox(),
           icon: const Icon(Icons.arrow_drop_down_rounded, color: AppColors.accent),
-          items: const [
-            DropdownMenuItem(value: 'English', child: Text('English', style: TextStyle(color: Colors.white, fontSize: 13))),
-            DropdownMenuItem(value: 'Spanish', child: Text('Español', style: TextStyle(color: Colors.white, fontSize: 13))),
-            DropdownMenuItem(value: 'Filipino', child: Text('Filipino', style: TextStyle(color: Colors.white, fontSize: 13))),
+          items: [
+            DropdownMenuItem(
+              value: 'English',
+              child: Text(
+                'English',
+                style: TextStyle(
+                  color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+            DropdownMenuItem(
+              value: 'Spanish',
+              child: Text(
+                'Español',
+                style: TextStyle(
+                  color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+            DropdownMenuItem(
+              value: 'Filipino',
+              child: Text(
+                'Filipino',
+                style: TextStyle(
+                  color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                  fontSize: 13,
+                ),
+              ),
+            ),
           ],
           onChanged: (val) {
             if (val != null) {
@@ -255,6 +308,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     required Color color,
     required VoidCallback onTap,
   }) {
+    final isDark = AppTheme.isDarkMode;
     return Material(
       color: Colors.transparent,
       child: ListTile(
@@ -268,9 +322,17 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         ),
         title: Text(
           title,
-          style: AppTextStyles.title(fontSize: 14.5, fontWeight: FontWeight.bold, color: Colors.white),
+          style: AppTextStyles.title(
+            fontSize: 14.5,
+            fontWeight: FontWeight.bold,
+            color: isDark ? Colors.white : AppColors.textPrimaryLight,
+          ),
         ),
-        trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.textSecondaryDark, size: 20),
+        trailing: Icon(
+          Icons.chevron_right_rounded,
+          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+          size: 20,
+        ),
         onTap: () {
           HapticFeedback.lightImpact();
           onTap();
@@ -283,6 +345,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final authState = ref.watch(authProvider);
     final user = authState.user;
     final isAdmin = user?.role == UserRole.admin;
+    final isDark = AppTheme.isDarkMode;
 
     return Material(
       color: Colors.transparent,
@@ -298,14 +361,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           style: AppTextStyles.title(
             fontSize: 14.5,
             fontWeight: FontWeight.bold,
-            color: Colors.white,
+            color: isDark ? Colors.white : AppColors.textPrimaryLight,
           ),
         ),
         subtitle: Text(
           'Current Role: ${user?.role == UserRole.admin ? "Admin" : "User"}',
           style: AppTextStyles.body(
             fontSize: 11.5,
-            color: AppColors.textSecondaryDark,
+            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
           ),
         ),
         trailing: Container(
@@ -313,13 +376,16 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           decoration: BoxDecoration(
             color: AppColors.primary.withValues(alpha: 0.25),
             borderRadius: BorderRadius.circular(32),
-            border: Border.all(color: AppColors.borderDark, width: 1.5),
+            border: Border.all(
+              color: isDark ? AppColors.borderDark : AppColors.borderLight,
+              width: 1.5,
+            ),
           ),
           child: Text(
             isAdmin ? 'Switch to User' : 'Switch to Admin',
             style: AppTextStyles.label(
               fontSize: 10,
-              color: Colors.white,
+              color: isDark ? Colors.white : AppColors.textPrimaryLight,
             ),
           ),
         ),

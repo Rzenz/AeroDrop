@@ -1,12 +1,12 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/custom_text_field.dart';
-
 import '../../core/services/supabase_service.dart';
+import '../../core/providers/auth_provider.dart';
 
 class AdminUsersScreen extends ConsumerStatefulWidget {
   const AdminUsersScreen({super.key});
@@ -18,6 +18,7 @@ class AdminUsersScreen extends ConsumerStatefulWidget {
 class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
+  String _selectedFilter = 'All'; // 'All', 'Active', 'Suspended', 'Deleted'
   List<Map<String, dynamic>> _users = [];
   bool _loading = true;
 
@@ -48,10 +49,10 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
         if (mounted) {
           setState(() {
             _users = [
-              {'name': 'Professor Green', 'email': 'p.green@uclm.edu', 'role': 'faculty_staff', 'dept': 'Science Department'},
-              {'name': 'Dean Harrison', 'email': 'd.harrison@uclm.edu', 'role': 'faculty_staff', 'dept': 'Engineering Department'},
-              {'name': 'Sarah Jenkins', 'email': 's.jenkins@uclm.edu', 'role': 'admin', 'dept': 'Logistics & Fleet control'},
-              {'name': 'John Doe', 'email': 'john.doe@gmail.com', 'role': 'student', 'dept': 'Computer Studies Council'},
+              {'id': 'usr_mock_1', 'name': 'Professor Green', 'email': 'p.green@uclm.edu', 'role': 'faculty_staff', 'phone_number': '09123456789', 'account_status': 'active'},
+              {'id': 'usr_mock_2', 'name': 'Dean Harrison', 'email': 'd.harrison@uclm.edu', 'role': 'faculty_staff', 'phone_number': '09123456788', 'account_status': 'active'},
+              {'id': 'usr_mock_3', 'name': 'Sarah Jenkins', 'email': 's.jenkins@uclm.edu', 'role': 'admin', 'phone_number': '09123456787', 'account_status': 'active'},
+              {'id': 'usr_mock_4', 'name': 'John Doe', 'email': 'john.doe@gmail.com', 'role': 'student', 'phone_number': '09123456786', 'account_status': 'suspended'},
             ];
             _loading = false;
           });
@@ -65,6 +66,154 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
     }
   }
 
+  Future<void> _confirmSuspend(String userId, String name) async {
+    final reasonController = TextEditingController(text: 'Suspended by admin');
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.cardDark,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('Suspend $name?', style: const TextStyle(color: Colors.white)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Are you sure you want to suspend this account? The user will be blocked from logging in.',
+              style: TextStyle(color: Colors.white70, fontSize: 14),
+            ),
+            const SizedBox(height: 16),
+            CustomTextField(
+              labelText: 'Suspension Reason',
+              hintText: 'e.g. Policy violation',
+              controller: reasonController,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Suspend', style: TextStyle(color: AppColors.danger)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true && mounted) {
+      final error = await ref.read(authProvider.notifier).suspendUser(
+            userId,
+            reason: reasonController.text,
+          );
+      if (!mounted) return;
+
+      if (error == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('User account suspended.'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+        _fetchUsers();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to suspend user: $error'),
+            backgroundColor: AppColors.danger,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _handleActivate(String userId) async {
+    final error = await ref.read(authProvider.notifier).activateUser(userId);
+    if (!mounted) return;
+
+    if (error == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('User account activated.'),
+          backgroundColor: AppColors.success,
+        ),
+      );
+      _fetchUsers();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to activate user: $error'),
+          backgroundColor: AppColors.danger,
+        ),
+      );
+    }
+  }
+
+  Future<void> _confirmDelete(String userId, String name) async {
+    final reasonController = TextEditingController(text: 'Deleted by admin');
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.cardDark,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('Delete $name?', style: const TextStyle(color: Colors.white)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'This will mark the account as deleted and prevent the user from logging in. Delivery records will remain for history and accountability.',
+              style: TextStyle(color: Colors.white70, fontSize: 14),
+            ),
+            const SizedBox(height: 16),
+            CustomTextField(
+              labelText: 'Delete Reason',
+              hintText: 'e.g. Account closure request',
+              controller: reasonController,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Delete', style: TextStyle(color: AppColors.danger)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true && mounted) {
+      final error = await ref.read(authProvider.notifier).deleteUserAccount(
+            userId,
+            reason: reasonController.text,
+          );
+      if (!mounted) return;
+
+      if (error == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('User account deleted.'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+        _fetchUsers();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to delete user: $error'),
+            backgroundColor: AppColors.danger,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   void dispose() {
     _searchController.dispose();
@@ -73,13 +222,31 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final currentUser = ref.read(authProvider).user;
+
     final filteredUsers = _users.where((user) {
+      // 1. Status Filter
+      final status = (user['account_status']?.toString() ?? 'active').toLowerCase();
+      if (_selectedFilter != 'All') {
+        if (_selectedFilter.toLowerCase() != status) {
+          return false;
+        }
+      }
+
+      // 2. Search Query
       final name = (user['name']?.toString() ?? '').toLowerCase();
       final email = (user['email']?.toString() ?? '').toLowerCase();
-      final role = (user['role']?.toString() ?? '').toLowerCase();
-      final dept = (user['dept']?.toString() ?? user['department']?.toString() ?? '').toLowerCase();
+      final roleStr = (user['role']?.toString() ?? '').toLowerCase();
+      final roleLabel = roleStr == 'admin' ? 'admin' : (roleStr == 'faculty_staff' ? 'faculty/staff' : 'student');
+      final phone = (user['phone_number']?.toString() ?? '').toLowerCase();
+      
       final query = _searchQuery.toLowerCase();
-      return name.contains(query) || email.contains(query) || role.contains(query) || dept.contains(query);
+      return name.contains(query) ||
+          email.contains(query) ||
+          roleStr.contains(query) ||
+          roleLabel.contains(query) ||
+          phone.contains(query) ||
+          status.contains(query);
     }).toList();
 
     return Scaffold(
@@ -101,7 +268,7 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
                   ),
                 ),
                 Text(
-                  'Manage campus delivery roles and access permissions',
+                  'Manage campus delivery roles and access standing',
                   style: AppTextStyles.body(
                     fontSize: 13,
                     color: AppColors.textSecondaryDark,
@@ -110,7 +277,7 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
                 const SizedBox(height: 18),
                 CustomTextField(
                   labelText: '',
-                  hintText: 'Search by name, email, department...',
+                  hintText: 'Search by name, email, phone, role...',
                   prefixIcon: Icons.search_rounded,
                   controller: _searchController,
                   onChanged: (val) {
@@ -119,6 +286,45 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
                     });
                   },
                 ).animate().fadeIn().slideY(begin: 0.1),
+                const SizedBox(height: 12),
+                
+                // Filter chips
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  child: Row(
+                    children: ['All', 'Active', 'Suspended', 'Deleted'].map((filter) {
+                      final isSelected = _selectedFilter == filter;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 8.0),
+                        child: ChoiceChip(
+                          label: Text(filter),
+                          selected: isSelected,
+                          onSelected: (selected) {
+                            if (selected) {
+                              setState(() {
+                                _selectedFilter = filter;
+                              });
+                            }
+                          },
+                          backgroundColor: AppColors.cardDark,
+                          selectedColor: AppColors.accent,
+                          labelStyle: TextStyle(
+                            color: isSelected ? AppColors.bgDark : Colors.white70,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: BorderSide(
+                              color: isSelected ? Colors.transparent : AppColors.borderDark,
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
               ],
             ),
           ),
@@ -161,10 +367,14 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
                                 ? name.split(' ').map((e) => e[0]).take(2).join().toUpperCase()
                                 : 'U';
                             final isAdmin = role == 'admin';
+                            final status = (user['account_status']?.toString() ?? 'active').toLowerCase();
 
-                            final dept = user['dept']?.toString() ?? 
-                                         user['department']?.toString() ?? 
-                                         (role == 'faculty_staff' ? 'Engineering & Technology' : 'Computer Studies Council');
+                            final isCurrentUser = currentUser?.id == user['id'];
+                            final canManage = !isCurrentUser && !isAdmin;
+
+                            final dept = role == 'faculty_staff' 
+                                ? 'Engineering & Technology' 
+                                : (isAdmin ? 'Logistics & Fleet control' : 'Computer Studies Council');
 
                             return Container(
                               margin: const EdgeInsets.only(bottom: 12),
@@ -215,42 +425,86 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
                                         color: Colors.white,
                                       ),
                                     ),
-                                    subtitle: Text(
-                                      email,
-                                      style: AppTextStyles.body(
-                                        fontSize: 12,
-                                        color: AppColors.textSecondaryDark,
-                                      ),
+                                    subtitle: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          email,
+                                          style: AppTextStyles.body(
+                                            fontSize: 12,
+                                            color: AppColors.textSecondaryDark,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          'Phone: ${user['phone_number'] ?? 'Not provided'}',
+                                          style: AppTextStyles.body(
+                                            fontSize: 11,
+                                            color: AppColors.textSecondaryDark,
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                    trailing: Builder(
-                                      builder: (context) {
-                                        final isFaculty = role == 'faculty_staff';
-                                        final chipColor = isAdmin 
-                                            ? AppColors.success 
-                                            : (isFaculty ? AppColors.accent : AppColors.primaryLight);
-                                        final label = isAdmin 
-                                            ? 'ADMIN' 
-                                            : (isFaculty ? 'FACULTY/STAFF' : 'STUDENT');
+                                    trailing: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      crossAxisAlignment: CrossAxisAlignment.end,
+                                      children: [
+                                        // Role Chip
+                                        Builder(
+                                          builder: (context) {
+                                            final isFaculty = role == 'faculty_staff';
+                                            final chipColor = isAdmin 
+                                                ? AppColors.success 
+                                                : (isFaculty ? AppColors.accent : AppColors.primaryLight);
+                                            final label = isAdmin 
+                                                ? 'ADMIN' 
+                                                : (isFaculty ? 'FACULTY/STAFF' : 'STUDENT');
 
-                                        return Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                          decoration: BoxDecoration(
-                                            color: chipColor.withValues(alpha: 0.12),
-                                            borderRadius: BorderRadius.circular(10),
-                                            border: Border.all(
-                                              color: chipColor.withValues(alpha: 0.25),
-                                            ),
-                                          ),
-                                          child: Text(
-                                            label,
-                                            style: TextStyle(
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.bold,
-                                              color: chipColor,
-                                            ),
-                                          ),
-                                        );
-                                      },
+                                            return Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                              decoration: BoxDecoration(
+                                                color: chipColor.withValues(alpha: 0.12),
+                                                borderRadius: BorderRadius.circular(8),
+                                                border: Border.all(
+                                                  color: chipColor.withValues(alpha: 0.25),
+                                                ),
+                                              ),
+                                              child: Text(
+                                                label,
+                                                style: TextStyle(
+                                                  fontSize: 9,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: chipColor,
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                        const SizedBox(height: 4),
+                                        // Status Chip
+                                        Builder(
+                                          builder: (context) {
+                                            final statusColor = status == 'active' 
+                                                ? AppColors.success 
+                                                : (status == 'suspended' ? AppColors.warning : AppColors.danger);
+                                            return Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: statusColor.withValues(alpha: 0.1),
+                                                borderRadius: BorderRadius.circular(6),
+                                              ),
+                                              child: Text(
+                                                status.toUpperCase(),
+                                                style: TextStyle(
+                                                  fontSize: 8,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: statusColor,
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                      ],
                                     ),
                                     children: [
                                       Padding(
@@ -274,25 +528,83 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
                                               ],
                                             ),
                                             const SizedBox(height: 12),
-                                            GestureDetector(
-                                              onTap: () => GoRouter.of(context).push('/admin/users/details?email=$email'),
-                                              child: Container(
-                                                padding: const EdgeInsets.symmetric(vertical: 8),
-                                                decoration: BoxDecoration(
-                                                  color: AppColors.primary.withValues(alpha: 0.1),
-                                                  borderRadius: BorderRadius.circular(10),
-                                                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
-                                                ),
-                                                alignment: Alignment.center,
-                                                child: const Text(
-                                                  'Manage Account Details',
-                                                  style: TextStyle(
-                                                    fontSize: 12,
-                                                    fontWeight: FontWeight.bold,
-                                                    color: AppColors.primary,
+                                            Row(
+                                              children: [
+                                                Expanded(
+                                                  child: GestureDetector(
+                                                    onTap: () => GoRouter.of(context).push('/admin/users/details?email=$email'),
+                                                    child: Container(
+                                                      padding: const EdgeInsets.symmetric(vertical: 8),
+                                                      decoration: BoxDecoration(
+                                                        color: AppColors.primary.withValues(alpha: 0.1),
+                                                        borderRadius: BorderRadius.circular(10),
+                                                        border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
+                                                      ),
+                                                      alignment: Alignment.center,
+                                                      child: const Text(
+                                                        'View Details',
+                                                        style: TextStyle(
+                                                          fontSize: 12,
+                                                          fontWeight: FontWeight.bold,
+                                                          color: AppColors.primary,
+                                                        ),
+                                                      ),
+                                                    ),
                                                   ),
                                                 ),
-                                              ),
+                                                if (canManage && status != 'deleted') ...[
+                                                  const SizedBox(width: 8),
+                                                  Expanded(
+                                                    child: GestureDetector(
+                                                      onTap: () => status == 'active' 
+                                                          ? _confirmSuspend(user['id'], name) 
+                                                          : _handleActivate(user['id']),
+                                                      child: Container(
+                                                        padding: const EdgeInsets.symmetric(vertical: 8),
+                                                        decoration: BoxDecoration(
+                                                          color: (status == 'active' ? AppColors.warning : AppColors.success).withValues(alpha: 0.1),
+                                                          borderRadius: BorderRadius.circular(10),
+                                                          border: Border.all(
+                                                            color: (status == 'active' ? AppColors.warning : AppColors.success).withValues(alpha: 0.25),
+                                                          ),
+                                                        ),
+                                                        alignment: Alignment.center,
+                                                        child: Text(
+                                                          status == 'active' ? 'Suspend' : 'Activate',
+                                                          style: TextStyle(
+                                                            fontSize: 12,
+                                                            fontWeight: FontWeight.bold,
+                                                            color: status == 'active' ? AppColors.warning : AppColors.success,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  Expanded(
+                                                    child: GestureDetector(
+                                                      onTap: () => _confirmDelete(user['id'], name),
+                                                      child: Container(
+                                                        padding: const EdgeInsets.symmetric(vertical: 8),
+                                                        decoration: BoxDecoration(
+                                                          color: AppColors.danger.withValues(alpha: 0.1),
+                                                          borderRadius: BorderRadius.circular(10),
+                                                          border: Border.all(color: AppColors.danger.withValues(alpha: 0.25)),
+                                                        ),
+                                                        alignment: Alignment.center,
+                                                        child: const Text(
+                                                          'Delete',
+                                                          style: TextStyle(
+                                                            fontSize: 12,
+                                                            fontWeight: FontWeight.bold,
+                                                            color: AppColors.danger,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ],
                                             ),
                                           ],
                                         ),

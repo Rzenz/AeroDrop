@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'dart:math' as math;
@@ -15,6 +14,9 @@ import '../../core/providers/auth_provider.dart';
 import '../../core/models/delivery_model.dart';
 
 import '../../core/providers/notification_provider.dart';
+import '../../core/providers/weather_provider.dart';
+import '../../core/widgets/aerodrop_warning_dialog.dart';
+import '../../core/theme/app_theme.dart';
 
 class UserDashboardScreen extends ConsumerWidget {
   const UserDashboardScreen({super.key});
@@ -253,13 +255,18 @@ class UserDashboardScreen extends ConsumerWidget {
                                       Row(
                                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                         children: [
-                                          Text(
-                                            delivery.id,
-                                            style: AppTextStyles.label(
-                                              fontSize: 11,
-                                              color: AppColors.accentLight,
+                                          Expanded(
+                                            child: Text(
+                                              delivery.id,
+                                              style: AppTextStyles.label(
+                                                fontSize: 11,
+                                                color: AppColors.accentLight,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
                                             ),
                                           ),
+                                          const SizedBox(width: 8),
                                           StatusChip.delivery(delivery.status.name),
                                         ],
                                       ),
@@ -449,140 +456,167 @@ class _QuickActionData {
   });
 }
 
-class AeroDropWeatherWidget extends StatefulWidget {
+class AeroDropWeatherWidget extends ConsumerStatefulWidget {
   const AeroDropWeatherWidget({super.key});
 
   @override
-  State<AeroDropWeatherWidget> createState() => _AeroDropWeatherWidgetState();
+  ConsumerState<AeroDropWeatherWidget> createState() =>
+      _AeroDropWeatherWidgetState();
 }
 
-class _AeroDropWeatherWidgetState extends State<AeroDropWeatherWidget>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _refreshController;
-  bool _isLoading = false;
+class _AeroDropWeatherWidgetState
+    extends ConsumerState<AeroDropWeatherWidget> {
 
-  // Initial Weather States
-  String _condition = 'Clear Skies';
-  double _temp = 30.2;
-  double _windSpeed = 11.4;
-  double _humidity = 62.0;
-  String _status = 'EXCELLENT';
-  Color _statusColor = AppColors.success;
-  IconData _weatherIcon = Icons.wb_sunny_rounded;
-  Color _iconColor = AppColors.accent;
-
-  final List<Map<String, dynamic>> _conditions = [
-    {
-      'condition': 'Clear Skies',
-      'tempRange': [29.0, 34.0],
-      'windRange': [5.0, 12.0],
-      'humidityRange': [45.0, 60.0],
-      'status': 'EXCELLENT',
-      'statusColor': AppColors.success,
-      'icon': Icons.wb_sunny_rounded,
-      'iconColor': AppColors.accent,
-    },
-    {
-      'condition': 'Partly Cloudy',
-      'tempRange': [26.0, 29.5],
-      'windRange': [9.0, 16.0],
-      'humidityRange': [60.0, 72.0],
-      'status': 'SAFE',
-      'statusColor': AppColors.success,
-      'icon': Icons.cloud_rounded,
-      'iconColor': AppColors.primaryLight,
-    },
-    {
-      'condition': 'High Winds',
-      'tempRange': [25.0, 27.8],
-      'windRange': [25.0, 36.0],
-      'humidityRange': [55.0, 68.0],
-      'status': 'CAUTION',
-      'statusColor': AppColors.warning,
-      'icon': Icons.air_rounded,
-      'iconColor': Colors.cyanAccent,
-    },
-    {
-      'condition': 'Heavy Rain',
-      'tempRange': [22.5, 25.0],
-      'windRange': [18.0, 28.0],
-      'humidityRange': [85.0, 96.0],
-      'status': 'GROUNDED',
-      'statusColor': AppColors.danger,
-      'icon': Icons.thunderstorm_rounded,
-      'iconColor': AppColors.primaryLight,
-    }
-  ];
-
-  @override
-  void initState() {
-    super.initState();
-    _refreshController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
+  void _showWeatherSelectDialog() {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppTheme.isDarkMode ? AppColors.cardDark : AppColors.cardLight,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: Text(
+          'Change Campus Weather Simulation',
+          style: TextStyle(
+            color: AppTheme.isDarkMode ? Colors.white : AppColors.textPrimaryLight,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.wb_sunny_rounded, color: AppColors.accent),
+              title: Text('Excellent (Clear & Safe)',
+                  style: TextStyle(
+                    color: AppTheme.isDarkMode ? Colors.white : AppColors.textPrimaryLight,
+                  )),
+              onTap: () async {
+                Navigator.of(dialogContext).pop();
+                await _applyWeather('safe');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.air_rounded, color: AppColors.warning),
+              title: Text('Caution (High Winds)',
+                  style: TextStyle(
+                    color: AppTheme.isDarkMode ? Colors.white : AppColors.textPrimaryLight,
+                  )),
+              onTap: () async {
+                Navigator.of(dialogContext).pop();
+                await _applyWeather('caution');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.thunderstorm_rounded, color: AppColors.danger),
+              title: Text('Grounded (Heavy Rain/Storm)',
+                  style: TextStyle(
+                    color: AppTheme.isDarkMode ? Colors.white : AppColors.textPrimaryLight,
+                  )),
+              onTap: () async {
+                Navigator.of(dialogContext).pop();
+                await _applyWeather('grounded');
+              },
+            ),
+          ],
+        ),
+      ),
     );
   }
 
-  @override
-  void dispose() {
-    _refreshController.dispose();
-    super.dispose();
-  }
+  Future<void> _applyWeather(String statusKey) async {
+    final error =
+        await ref.read(weatherProvider.notifier).updateWeatherStatus(statusKey);
 
-  void _refreshWeather() async {
-    if (_isLoading) return;
-    setState(() => _isLoading = true);
-    _refreshController.repeat();
+    if (!mounted) return;
 
-    // Simulate network/telemetry fetch delay
-    await Future.delayed(const Duration(milliseconds: 700));
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error),
+          backgroundColor: AppColors.danger,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
 
-    final random = math.Random();
-    // Ensure we pick a different condition than the current one
-    final currentIdx = _conditions.indexWhere((c) => c['condition'] == _condition);
-    int nextIdx;
-    do {
-      nextIdx = random.nextInt(_conditions.length);
-    } while (nextIdx == currentIdx && _conditions.length > 1);
-
-    final selected = _conditions[nextIdx];
-
-    final double minTemp = selected['tempRange'][0];
-    final double maxTemp = selected['tempRange'][1];
-    final double minWind = selected['windRange'][0];
-    final double maxWind = selected['windRange'][1];
-    final double minHum = selected['humidityRange'][0];
-    final double maxHum = selected['humidityRange'][1];
-
-    if (mounted) {
-      setState(() {
-        _condition = selected['condition'];
-        _temp = minTemp + random.nextDouble() * (maxTemp - minTemp);
-        _windSpeed = minWind + random.nextDouble() * (maxWind - minWind);
-        _humidity = minHum + random.nextDouble() * (maxHum - minHum);
-        _status = selected['status'];
-        _statusColor = selected['statusColor'];
-        _weatherIcon = selected['icon'];
-        _iconColor = selected['iconColor'];
-        _isLoading = false;
-      });
-      _refreshController.stop();
-      _refreshController.reset();
-      HapticFeedback.lightImpact();
+    switch (statusKey) {
+      case 'safe':
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Weather updated to Safe.'),
+            backgroundColor: AppColors.success,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      case 'caution':
+        showAeroDropWarningDialog(
+          context: context,
+          title: 'Caution Weather',
+          message:
+              'Delivery may be delayed due to caution-level weather conditions.',
+          icon: Icons.air_rounded,
+          iconColor: AppColors.warning,
+          centerIcon: Icons.flight_rounded,
+          centerIconColor: AppColors.warning,
+        );
+      case 'grounded':
+        showAeroDropWarningDialog(
+          context: context,
+          title: 'Drone Delivery Grounded',
+          message:
+              'Weather is currently unsafe for drone delivery. New delivery requests will be automatically cancelled.',
+          icon: Icons.thunderstorm_rounded,
+          iconColor: AppColors.danger,
+          centerIcon: Icons.flight_land_rounded,
+          centerIconColor: AppColors.danger,
+        );
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final weather = ref.watch(weatherProvider);
+
+    // Map WeatherStatus → display values
+    final String status;
+    final Color statusColor;
+    final IconData weatherIcon;
+    final Color iconColor;
+    final String condition;
+    switch (weather.status) {
+      case WeatherStatus.grounded:
+        status = 'GROUNDED';
+        statusColor = AppColors.danger;
+        weatherIcon = Icons.thunderstorm_rounded;
+        iconColor = AppColors.primaryLight;
+        condition = 'Heavy Rain';
+      case WeatherStatus.caution:
+        status = 'CAUTION';
+        statusColor = AppColors.warning;
+        weatherIcon = Icons.air_rounded;
+        iconColor = Colors.cyanAccent;
+        condition = 'High Winds';
+      case WeatherStatus.safe:
+        status = 'EXCELLENT';
+        statusColor = AppColors.success;
+        weatherIcon = Icons.wb_sunny_rounded;
+        iconColor = AppColors.accent;
+        condition = 'Clear Skies';
+    }
+
     return GlassCard(
-      padding: const EdgeInsets.all(20),
-      borderGradient: const LinearGradient(
-        colors: [AppColors.primary, Colors.transparent],
+      borderGradient: LinearGradient(
+        colors: [
+          const Color(0xFF1A2B45).withValues(alpha: 0.85),
+          const Color(0xFF0F243A).withValues(alpha: 0.9),
+        ],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header Row (Wrap left Column in Expanded to prevent right overflow)
+          // Header Row
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -592,7 +626,8 @@ class _AeroDropWeatherWidgetState extends State<AeroDropWeatherWidget>
                   children: [
                     Text(
                       'UCLM Campus Weather',
-                      style: AppTextStyles.subHead(fontSize: 15, color: Colors.white),
+                      style: AppTextStyles.subHead(
+                          fontSize: 15, color: Colors.white),
                     ),
                     const SizedBox(height: 2),
                     Text(
@@ -608,54 +643,44 @@ class _AeroDropWeatherWidgetState extends State<AeroDropWeatherWidget>
                 ),
               ),
               const SizedBox(width: 8),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Status Chip
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: _statusColor.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: _statusColor.withValues(alpha: 0.3),
-                        width: 1,
-                      ),
-                    ),
-                    child: Text(
-                      _status,
-                      style: AppTextStyles.body(
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        color: _statusColor,
-                      ),
-                    ),
+              // Status chip — tapping opens selector
+              GestureDetector(
+                onTap: weather.isLoading ? null : _showWeatherSelectDialog,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                        color: statusColor.withValues(alpha: 0.3), width: 1),
                   ),
-                  const SizedBox(width: 8),
-                  // Refresh Button
-                  RotationTransition(
-                    turns: _refreshController,
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        onTap: _refreshWeather,
-                        customBorder: const CircleBorder(),
-                        child: Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.05),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.refresh_rounded,
-                            color: Colors.white,
-                            size: 16,
-                          ),
-                        ),
-                      ),
-                    ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      weather.isLoading
+                          ? SizedBox(
+                              width: 10,
+                              height: 10,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 1.5,
+                                color: statusColor,
+                              ),
+                            )
+                          : Text(
+                              status,
+                              style: AppTextStyles.body(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: statusColor,
+                              ),
+                            ),
+                      const SizedBox(width: 4),
+                      Icon(Icons.edit_location_outlined,
+                          size: 10, color: statusColor),
+                    ],
                   ),
-                ],
+                ),
               ),
             ],
           ),
@@ -663,15 +688,10 @@ class _AeroDropWeatherWidgetState extends State<AeroDropWeatherWidget>
           // Weather Info Row
           Row(
             children: [
-              // Weather Icon + Temp (Wrapped in Expanded/Flexible to prevent overflow)
               Expanded(
                 child: Row(
                   children: [
-                    Icon(
-                      _weatherIcon,
-                      color: _iconColor,
-                      size: 38,
-                    ),
+                    Icon(weatherIcon, color: iconColor, size: 38),
                     const SizedBox(width: 12),
                     Flexible(
                       child: Column(
@@ -679,14 +699,18 @@ class _AeroDropWeatherWidgetState extends State<AeroDropWeatherWidget>
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            '${_temp.toStringAsFixed(1)}°C',
+                            switch (weather.weatherStatus) {
+                              'grounded' => '22.0°C',
+                              'caution' => '32.0°C',
+                              _ => '30.0°C',
+                            },
                             style: AppTextStyles.display(
                               fontSize: 24,
                               color: Colors.white,
                             ),
                           ),
                           Text(
-                            _condition,
+                            condition,
                             style: AppTextStyles.body(
                               fontSize: 12,
                               color: AppColors.textSecondaryDark,
@@ -701,35 +725,38 @@ class _AeroDropWeatherWidgetState extends State<AeroDropWeatherWidget>
                 ),
               ),
               const SizedBox(width: 16),
-              // Telemetry stats vertical divider
               Container(
                 height: 40,
                 width: 1.5,
                 color: AppColors.borderDark,
               ),
               const SizedBox(width: 16),
-              // Right block: Metrics stacked vertically to prevent horizontal overflow
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   _WeatherMetric(
                     icon: Icons.air_rounded,
-                    value: '${_windSpeed.toStringAsFixed(1)} km/h',
+                    value: switch (weather.weatherStatus) {
+                      'grounded' => '40.0 km/h',
+                      'caution' => '28.0 km/h',
+                      _ => '10.0 km/h',
+                    },
                     label: 'Wind Speed',
                     iconColor: Colors.cyanAccent,
                   ),
                   const SizedBox(height: 8),
                   _WeatherMetric(
                     icon: Icons.water_drop_rounded,
-                    value: '${_humidity.toStringAsFixed(0)}%',
+                    value: '62%',
                     label: 'Humidity',
                     iconColor: AppColors.info,
                   ),
                 ],
               ),
             ],
-          ),        ],
+          ),
+        ],
       ),
     );
   }

@@ -275,14 +275,21 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
           .eq('id', 1)
           .maybeSingle();
 
-      if (weather == null) return null;
+      final weatherData = weather ?? {
+        'dispatch_enabled': true,
+        'wind_speed_kph': 10.0,
+        'temperature_c': 30.0,
+        'max_safe_wind_kph': 35.0,
+        'max_safe_temperature_c': 38.0,
+        'advisory_message': 'Weather conditions are safe for campus drone dispatch.',
+      };
 
-      final dispatchEnabled = weather['dispatch_enabled'] == true;
-      final windSpeed = _toDouble(weather['wind_speed_kph']);
-      final temp = _toDouble(weather['temperature_c']);
-      final maxWind = _toDouble(weather['max_safe_wind_kph'], 35);
-      final maxTemp = _toDouble(weather['max_safe_temperature_c'], 38);
-      final advisory = weather['advisory_message']?.toString() ??
+      final dispatchEnabled = weatherData['dispatch_enabled'] == true;
+      final windSpeed = _toDouble(weatherData['wind_speed_kph']);
+      final temp = _toDouble(weatherData['temperature_c']);
+      final maxWind = _toDouble(weatherData['max_safe_wind_kph'], 35);
+      final maxTemp = _toDouble(weatherData['max_safe_temperature_c'], 38);
+      final advisory = weatherData['advisory_message']?.toString() ??
           'Weather conditions are unsafe for dispatch.';
 
       if (!dispatchEnabled) {
@@ -510,6 +517,90 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
     }
 
     try {
+      // 1. Check DRN-001 Drone Battery
+      final droneResponse = await SupabaseService.client
+          .from('drones')
+          .select('battery_level')
+          .eq('id', 'DRN-001')
+          .maybeSingle();
+
+      if (droneResponse != null) {
+        final droneBattery = _toDouble(droneResponse['battery_level'], 100.0);
+        if (droneBattery < 10.0) {
+          return 'Drone battery is too low. Please try again later.';
+        }
+      }
+
+      // 2. Check Weather Safety — use weather_status column as source of truth
+      final weatherResponse = await SupabaseService.client
+          .from('weather_safety')
+          .select()
+          .eq('id', 1)
+          .maybeSingle();
+
+      String safetyStatus = 'Safe';
+      String safetyMessage =
+          'Weather conditions are safe for campus drone dispatch.';
+
+      final weatherStatus =
+          weatherResponse?['weather_status']?.toString() ?? 'safe';
+      final dispatchEnabled = weatherResponse?['dispatch_enabled'] != false;
+
+      // Grounded check — insert a cancelled record for audit trail then block
+      if (weatherStatus == 'grounded' || !dispatchEnabled) {
+        // ponytail: fire-and-forget insert; failure just means no audit row, delivery is still blocked
+        try {
+          final paymentAmountGrounded = _calculatePaymentAmount(
+            packageWeight: packageWeight,
+            priority: priority,
+            packageType: packageType,
+            estimatedDistanceKm: estimatedDistanceKm,
+          );
+          final nowStr = DateTime.now().toUtc().toIso8601String();
+          final groundedPayload = <String, dynamic>{
+            'user_id': currentUser.id,
+            'sender_name': senderName,
+            'recipient_name': recipientName,
+            'recipient_phone': recipientPhone,
+            'delivery_address': deliveryAddress,
+            'package_name': packageName,
+            'package_weight': packageWeight,
+            'package_type': packageType,
+            'status': 'cancelled',
+            'eta': 'Cancelled',
+            'priority': priority,
+            'pickup_location_id': pickupLocationId,
+            'dropoff_location_id': dropoffLocationId,
+            'pickup_latitude': pickupLatitude,
+            'pickup_longitude': pickupLongitude,
+            'dropoff_latitude': dropoffLatitude,
+            'dropoff_longitude': dropoffLongitude,
+            'safety_status': 'Grounded',
+            'safety_message': 'Weather is currently unsafe for drone delivery.',
+            'payment_method': paymentMethod,
+            'payment_status': 'unpaid',
+            'payment_amount': paymentAmountGrounded,
+            'payment_reference': _generatePaymentReference(),
+            'cancellation_reason': 'Cancelled due to unsafe weather.',
+            'cancelled_at': nowStr,
+            'cancelled_by': currentUser.id,
+            'estimated_distance_km': estimatedDistanceKm,
+          };
+          groundedPayload.removeWhere((key, value) => value == null);
+          await SupabaseService.client.from('deliveries').insert(groundedPayload);
+        } catch (e) {
+          debugPrint('Grounded delivery audit insert failed (non-fatal): $e');
+        }
+        return 'Delivery cancelled due to unsafe weather.'; // sentinel for UI to show grounded popup
+      }
+
+      // Caution check
+      if (weatherStatus == 'caution') {
+        safetyStatus = 'Caution';
+        safetyMessage =
+            'Delivery may be delayed due to caution-level weather conditions.';
+      }
+
       final status = DeliveryStatus.pending;
       const eta = 'Waiting for admin approval';
 
@@ -542,8 +633,8 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
         'pickup_longitude': pickupLongitude,
         'dropoff_latitude': dropoffLatitude,
         'dropoff_longitude': dropoffLongitude,
-        'safety_status': 'Pending',
-        'safety_message': 'Awaiting admin review.',
+        'safety_status': safetyStatus,
+        'safety_message': safetyMessage,
         'payment_method': paymentMethod,
         'payment_status': paymentStatus,
         'payment_amount': paymentAmount,

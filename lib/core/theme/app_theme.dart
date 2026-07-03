@@ -3,6 +3,8 @@ import 'app_colors.dart';
 import 'app_text_styles.dart';
 
 class AppTheme {
+  static bool isDarkMode = true;
+
   static ThemeData get darkTheme {
     return ThemeData(
       useMaterial3: true,
@@ -96,5 +98,97 @@ class AppTheme {
     );
   }
 
-  static ThemeData get lightTheme => darkTheme; // Enforce deep navy dark mode across all views for visual consistency and premium aesthetic
+  static ThemeData get lightTheme {
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.light,
+      primaryColor: AppColors.primary,
+      scaffoldBackgroundColor: AppColors.bgLight,
+      colorScheme: const ColorScheme.light(
+        primary: AppColors.primary,
+        secondary: AppColors.accent,
+        surface: AppColors.cardLight,
+        error: AppColors.danger,
+        onPrimary: Colors.white,
+        onSecondary: Color(0xFF0D1B2A),
+        onSurface: AppColors.textPrimaryLight,
+      ),
+      cardTheme: CardThemeData(
+        color: AppColors.cardLight,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(22),
+          side: const BorderSide(color: AppColors.borderLight),
+        ),
+      ),
+      appBarTheme: const AppBarTheme(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        iconTheme: IconThemeData(color: AppColors.textPrimaryLight),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: AppColors.cardLight,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: AppColors.borderLight),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: AppColors.primary, width: 2),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: AppColors.danger, width: 1.5),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: AppColors.danger, width: 2),
+        ),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.accent,
+          foregroundColor: AppColors.bgDark,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(32)),
+          elevation: 0,
+          minimumSize: const Size.fromHeight(56),
+        ),
+      ),
+      floatingActionButtonTheme: const FloatingActionButtonThemeData(
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        elevation: 8,
+      ),
+      chipTheme: ChipThemeData(
+        backgroundColor: AppColors.bgLight,
+        selectedColor: AppColors.primary,
+        labelStyle: AppTextStyles.label(color: AppColors.textPrimaryLight),
+        side: const BorderSide(color: AppColors.borderLight),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      ),
+      bottomSheetTheme: const BottomSheetThemeData(
+        backgroundColor: AppColors.bgLight,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+      ),
+      dividerTheme: const DividerThemeData(
+        color: AppColors.borderLight,
+        thickness: 1,
+      ),
+      textTheme: TextTheme(
+        headlineLarge: AppTextStyles.display(fontSize: 38, color: AppColors.textPrimaryLight),
+        headlineMedium: AppTextStyles.heading(fontSize: 28, color: AppColors.textPrimaryLight),
+        titleLarge: AppTextStyles.subHead(fontSize: 18, color: AppColors.textPrimaryLight),
+        titleMedium: AppTextStyles.subHead(fontSize: 16, color: AppColors.textPrimaryLight),
+        bodyLarge: AppTextStyles.body(fontSize: 16, color: AppColors.textPrimaryLight),
+        bodyMedium: AppTextStyles.body(fontSize: 14, color: AppColors.textSecondaryLight),
+        bodySmall: AppTextStyles.body(fontSize: 12, color: AppColors.textSecondaryLight),
+        labelLarge: AppTextStyles.label(fontSize: 12),
+      ),
+    );
+  }
 }

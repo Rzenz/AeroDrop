@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 
@@ -16,6 +17,7 @@ class CustomTextField extends StatefulWidget {
   final TextInputAction? textInputAction;
   final FocusNode? focusNode;
   final bool readOnly;
+  final List<TextInputFormatter>? inputFormatters;
 
   const CustomTextField({
     super.key,
@@ -32,6 +34,7 @@ class CustomTextField extends StatefulWidget {
     this.textInputAction,
     this.focusNode,
     this.readOnly = false,
+    this.inputFormatters,
   });
 
   @override
@@ -108,6 +111,7 @@ class _CustomTextFieldState extends State<CustomTextField> {
             textInputAction: widget.textInputAction,
             focusNode: _focusNode,
             readOnly: widget.readOnly,
+            inputFormatters: widget.inputFormatters,
             style: AppTextStyles.body(
               fontSize: 15,
               color: AppColors.textPrimaryDark,

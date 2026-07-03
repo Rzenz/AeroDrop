@@ -1,28 +1,34 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/theme/app_theme.dart';
 import '../../core/widgets/glass_card.dart';
+import '../../core/providers/settings_provider.dart';
 
-class AdminSettingsScreen extends StatefulWidget {
+class AdminSettingsScreen extends ConsumerStatefulWidget {
   const AdminSettingsScreen({super.key});
 
   @override
-  State<AdminSettingsScreen> createState() => _AdminSettingsScreenState();
+  ConsumerState<AdminSettingsScreen> createState() => _AdminSettingsScreenState();
 }
 
-class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
+class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
   bool _liveTracking = true;
   bool _autoAssign = true;
   bool _weatherAlerts = true;
   bool _maintenanceAlerts = false;
-  bool _lowBatteryAlerts = true;
   double _maxPayloadLimit = 10.0;
 
   @override
   Widget build(BuildContext context) {
+    final lowBatteryAlerts = ref.watch(lowBatteryAlertsProvider);
+    final themeMode = ref.watch(themeModeProvider);
+    final isDark = AppTheme.isDarkMode;
+
     return Scaffold(
-      backgroundColor: AppColors.bgDark,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         child: Column(
@@ -34,14 +40,14 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
               style: AppTextStyles.title(
                 fontSize: 22,
                 fontWeight: FontWeight.w900,
-                color: Colors.white,
+                color: isDark ? Colors.white : AppColors.textPrimaryLight,
               ),
             ),
             Text(
               'Configure global parameters and fleet defaults',
               style: AppTextStyles.body(
                 fontSize: 13,
-                color: AppColors.textSecondaryDark,
+                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
               ),
             ),
             const SizedBox(height: 24),
@@ -87,12 +93,23 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
 
             _buildSwitchTile(
               'Low Battery Warnings',
-              'Alert when a drone battery drops below 20%.',
-              _lowBatteryAlerts,
-              (val) => setState(() => _lowBatteryAlerts = val),
+              'Alert when a drone battery drops below 10%.',
+              lowBatteryAlerts,
+              (val) => ref.read(lowBatteryAlertsProvider.notifier).setAlerts(val),
               Icons.battery_alert_rounded,
               AppColors.danger,
             ).animate(delay: 420.ms).fadeIn().slideY(begin: 0.05),
+
+            const SizedBox(height: 24),
+            _buildSectionHeader('Appearance'),
+            _buildSwitchTile(
+              'Dark Color Theme',
+              'Use dark color theme across all screens.',
+              themeMode == ThemeMode.dark,
+              (val) => ref.read(themeModeProvider.notifier).setTheme(val ? ThemeMode.dark : ThemeMode.light),
+              Icons.dark_mode_outlined,
+              AppColors.primaryLight,
+            ).animate(delay: 460.ms).fadeIn().slideY(begin: 0.05),
 
             const SizedBox(height: 24),
             _buildSectionHeader('Delivery Limits'),
@@ -121,7 +138,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
                             style: AppTextStyles.title(
                               fontSize: 14,
                               fontWeight: FontWeight.bold,
-                              color: Colors.white,
+                              color: isDark ? Colors.white : AppColors.textPrimaryLight,
                             ),
                           ),
                         ],
@@ -146,13 +163,16 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
                   const SizedBox(height: 12),
                   Text(
                     'System-wide maximum package weight per delivery.',
-                    style: AppTextStyles.body(fontSize: 12, color: AppColors.textSecondaryDark),
+                    style: AppTextStyles.body(
+                      fontSize: 12,
+                      color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   SliderTheme(
                     data: SliderThemeData(
                       activeTrackColor: AppColors.primary,
-                      inactiveTrackColor: AppColors.borderDark,
+                      inactiveTrackColor: isDark ? AppColors.borderDark : AppColors.borderLight,
                       thumbColor: AppColors.secondary,
                       overlayColor: AppColors.secondary.withValues(alpha: 0.12),
                       valueIndicatorColor: AppColors.primary,
@@ -233,12 +253,13 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
     IconData icon,
     Color iconColor,
   ) {
+    final isDark = AppTheme.isDarkMode;
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        color: AppColors.cardDark,
+        color: isDark ? AppColors.cardDark : AppColors.cardLight,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.borderDark),
+        border: Border.all(color: isDark ? AppColors.borderDark : AppColors.borderLight),
       ),
       child: Material(
         color: Colors.transparent,
@@ -256,19 +277,22 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
             style: AppTextStyles.title(
               fontSize: 14,
               fontWeight: FontWeight.bold,
-              color: Colors.white,
+              color: isDark ? Colors.white : AppColors.textPrimaryLight,
             ),
           ),
           subtitle: Text(
             subtitle,
-            style: AppTextStyles.body(fontSize: 12, color: AppColors.textSecondaryDark),
+            style: AppTextStyles.body(
+              fontSize: 12,
+              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+            ),
           ),
           value: value,
           onChanged: onChanged,
           activeThumbColor: AppColors.primary,
           activeTrackColor: AppColors.primary.withValues(alpha: 0.3),
-          inactiveThumbColor: AppColors.textSecondaryDark,
-          inactiveTrackColor: AppColors.borderDark,
+          inactiveThumbColor: isDark ? AppColors.textSecondaryDark : Colors.grey[400],
+          inactiveTrackColor: isDark ? AppColors.borderDark : AppColors.borderLight,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         ),
       ),
@@ -282,12 +306,13 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
     Color color,
     VoidCallback onTap,
   ) {
+    final isDark = AppTheme.isDarkMode;
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        color: AppColors.cardDark,
+        color: isDark ? AppColors.cardDark : AppColors.cardLight,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.borderDark),
+        border: Border.all(color: isDark ? AppColors.borderDark : AppColors.borderLight),
       ),
       child: Material(
         color: Colors.transparent,
@@ -305,15 +330,21 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
             style: AppTextStyles.title(
               fontSize: 14,
               fontWeight: FontWeight.bold,
-              color: Colors.white,
+              color: isDark ? Colors.white : AppColors.textPrimaryLight,
             ),
           ),
           subtitle: Text(
             subtitle,
-            style: AppTextStyles.body(fontSize: 12, color: AppColors.textSecondaryDark),
+            style: AppTextStyles.body(
+              fontSize: 12,
+              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+            ),
           ),
           onTap: onTap,
-          trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.textSecondaryDark),
+          trailing: Icon(
+            Icons.chevron_right_rounded,
+            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+          ),
         ),
       ),
     );

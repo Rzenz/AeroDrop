@@ -137,6 +137,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
     required String email,
     required String name,
     required UserRole role,
+    String? phoneNumber,
+    String accountStatus = 'active',
   }) async {
     if (!SupabaseService.isConfigured) return;
 
@@ -147,6 +149,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
           'email': email,
           'name': name.trim(),
           'role': _roleToString(role),
+          // ignore: use_null_aware_elements
+          if (phoneNumber != null) 'phone_number': phoneNumber,
+          'account_status': accountStatus,
           'updated_at': DateTime.now().toUtc().toIso8601String(),
         },
         onConflict: 'id',
@@ -184,10 +189,30 @@ class AuthNotifier extends StateNotifier<AuthState> {
           .eq('id', authUser.id)
           .maybeSingle();
 
+      final profileStatus = profile?['account_status']?.toString() ?? 'active';
+
+      if (profileStatus == 'suspended') {
+        await SupabaseService.client.auth.signOut();
+        state = state.copyWith(
+          isLoading: false,
+          errorMessage: 'Your account has been suspended. Please contact the administrator.',
+        );
+        return false;
+      }
+      if (profileStatus == 'deleted' || profile?['deleted_at'] != null) {
+        await SupabaseService.client.auth.signOut();
+        state = state.copyWith(
+          isLoading: false,
+          errorMessage: 'This account has been deleted. Please contact the administrator.',
+        );
+        return false;
+      }
+
       final metadata = authUser.userMetadata ?? {};
 
       final profileName = profile?['name']?.toString();
       final profileRole = profile?['role']?.toString();
+      final profilePhone = profile?['phone_number']?.toString() ?? metadata['phone_number']?.toString();
 
       final name = profileName ??
           metadata['name']?.toString() ??
@@ -204,6 +229,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
         email: authEmail,
         name: name,
         role: role,
+        phoneNumber: profilePhone,
+        accountStatus: profileStatus,
       );
 
       final loggedInUser = UserModel(
@@ -213,6 +240,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
         role: role,
         avatarUrl:
             'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
+        phoneNumber: profilePhone,
+        accountStatus: profileStatus,
+        suspendedAt: profile?['suspended_at'] != null ? DateTime.tryParse(profile!['suspended_at'].toString()) : null,
+        suspensionReason: profile?['suspension_reason']?.toString(),
+        deletedAt: profile?['deleted_at'] != null ? DateTime.tryParse(profile!['deleted_at'].toString()) : null,
       );
 
       state = state.copyWith(
@@ -244,6 +276,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     String email,
     String password,
     UserRole role,
+    String phoneNumber,
   ) async {
     if ((kSimulationMode || !SupabaseService.isConfigured) && ref != null) {
       return ref!.read(authMockProvider.notifier).login(email, password);
@@ -275,6 +308,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         data: {
           'name': name.trim(),
           'role': _roleToString(effectiveRole),
+          'phone_number': phoneNumber.trim(),
         },
       );
 
@@ -290,6 +324,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
         email: authEmail,
         name: name,
         role: effectiveRole,
+        phoneNumber: phoneNumber.trim(),
+        accountStatus: 'active',
       );
 
       final newUser = UserModel(
@@ -299,6 +335,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
         role: effectiveRole,
         avatarUrl:
             'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
+        phoneNumber: phoneNumber.trim(),
+        accountStatus: 'active',
       );
 
       state = state.copyWith(
@@ -320,8 +358,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  Future<bool> updateProfile(String name, String email) async {
+  Future<bool> updateProfile(String name, String email, {String? phoneNumber}) async {
     final trimmedName = name.trim();
+    final trimmedPhone = phoneNumber?.trim();
 
     if ((kSimulationMode || !SupabaseService.isConfigured) && ref != null) {
       if (state.user != null) {
@@ -331,6 +370,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
           email: state.user!.email,
           role: state.user!.role,
           avatarUrl: state.user!.avatarUrl,
+          phoneNumber: trimmedPhone ?? state.user!.phoneNumber,
+          accountStatus: state.user!.accountStatus,
+          suspendedAt: state.user!.suspendedAt,
+          suspensionReason: state.user!.suspensionReason,
+          deletedAt: state.user!.deletedAt,
         );
 
         state = state.copyWith(user: updated);
@@ -351,12 +395,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final userId = currentUser?.id ?? state.user!.id;
       final currentEmail = currentUser?.email ?? state.user!.email;
 
-      // Update only user metadata, NOT auth email.
+      // Update user metadata in Auth.
       await SupabaseService.client.auth.updateUser(
         UserAttributes(
           data: {
             'name': trimmedName,
             'role': _roleToString(state.user!.role),
+            // ignore: use_null_aware_elements
+            if (trimmedPhone != null) 'phone_number': trimmedPhone,
           },
         ),
       );
@@ -366,6 +412,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
         'name': trimmedName,
         'email': currentEmail,
         'role': _roleToString(state.user!.role),
+        // ignore: use_null_aware_elements
+        if (trimmedPhone != null) 'phone_number': trimmedPhone,
         'updated_at': DateTime.now().toUtc().toIso8601String(),
       }).eq('id', userId);
 
@@ -375,6 +423,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
         email: currentEmail,
         role: state.user!.role,
         avatarUrl: state.user!.avatarUrl,
+        phoneNumber: trimmedPhone ?? state.user!.phoneNumber,
+        accountStatus: state.user!.accountStatus,
+        suspendedAt: state.user!.suspendedAt,
+        suspensionReason: state.user!.suspensionReason,
+        deletedAt: state.user!.deletedAt,
       );
 
       state = state.copyWith(
@@ -420,6 +473,64 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
 
     state = AuthState();
+  }
+
+  Future<String?> suspendUser(String userId, {String reason = 'Suspended by admin'}) async {
+    if (!SupabaseService.isConfigured) return 'Supabase is not configured.';
+    final adminId = SupabaseService.client.auth.currentUser?.id;
+    if (adminId == null) return 'Not authenticated.';
+
+    try {
+      await SupabaseService.client.from('users').update({
+        'account_status': 'suspended',
+        'suspended_at': DateTime.now().toUtc().toIso8601String(),
+        'suspended_by': adminId,
+        'suspension_reason': reason,
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      }).eq('id', userId);
+      return null;
+    } catch (e) {
+      debugPrint('Suspend user failed: $e');
+      return e.toString();
+    }
+  }
+
+  Future<String?> activateUser(String userId) async {
+    if (!SupabaseService.isConfigured) return 'Supabase is not configured.';
+
+    try {
+      await SupabaseService.client.from('users').update({
+        'account_status': 'active',
+        'suspended_at': null,
+        'suspended_by': null,
+        'suspension_reason': null,
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      }).eq('id', userId);
+      return null;
+    } catch (e) {
+      debugPrint('Activate user failed: $e');
+      return e.toString();
+    }
+  }
+
+  Future<String?> deleteUserAccount(String userId, {String reason = 'Deleted by admin'}) async {
+    if (!SupabaseService.isConfigured) return 'Supabase is not configured.';
+    final adminId = SupabaseService.client.auth.currentUser?.id;
+    if (adminId == null) return 'Not authenticated.';
+
+    try {
+      await SupabaseService.client.from('users').update({
+        'account_status': 'deleted',
+        'deleted_at': DateTime.now().toUtc().toIso8601String(),
+        'deleted_by': adminId,
+        'delete_reason': reason,
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      }).eq('id', userId);
+      return null;
+    } catch (e) {
+      debugPrint('Delete user account failed: $e');
+      return e.toString();
+    }
   }
 }
 

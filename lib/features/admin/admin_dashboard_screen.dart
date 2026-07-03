@@ -12,6 +12,7 @@ import '../../core/providers/delivery_provider.dart';
 import '../../core/providers/drone_provider.dart';
 import '../../core/models/delivery_model.dart';
 import '../../core/models/drone_model.dart';
+import '../../core/providers/settings_provider.dart';
 
 class AdminDashboardScreen extends ConsumerWidget {
   const AdminDashboardScreen({super.key});
@@ -23,6 +24,38 @@ class AdminDashboardScreen extends ConsumerWidget {
     final active = deliveries.where((d) => d.status == DeliveryStatus.inTransit).length;
     final pending = deliveries.where((d) => d.status == DeliveryStatus.pending).length;
     final availDrones = drones.where((d) => d.status == DroneStatus.available).length;
+    final lowBatteryAlerts = ref.watch(lowBatteryAlertsProvider);
+    final drone001 = drones.firstWhere(
+      (d) => d.id == 'DRN-001',
+      orElse: () => DroneModel(
+        id: 'DRN-001',
+        name: 'AeroCarrier Alpha',
+        batteryLevel: 100.0,
+        status: DroneStatus.available,
+        maxPayload: 0.5,
+        modelType: '001',
+        currentCoordinates: '10.3456,123.9478',
+      ),
+    );
+    final showLowBatteryWarning = lowBatteryAlerts && drone001.batteryLevel < 10.0;
+    final totalCount = deliveries.length;
+    final deliveredCount = deliveries.where((d) => d.status == DeliveryStatus.delivered).length;
+    final successRate = totalCount > 0 ? (deliveredCount / totalCount * 100) : 100.0;
+
+    final now = DateTime.now();
+    final last7Days = List.generate(7, (i) => now.subtract(Duration(days: 6 - i)));
+    final lineSpots = <FlSpot>[];
+    double maxLineVal = 5.0;
+    for (int i = 0; i < 7; i++) {
+      final day = last7Days[i];
+      final count = deliveries.where((d) {
+        return d.createdAt.year == day.year &&
+            d.createdAt.month == day.month &&
+            d.createdAt.day == day.day;
+      }).length;
+      if (count > maxLineVal) maxLineVal = count.toDouble();
+      lineSpots.add(FlSpot(i.toDouble(), count.toDouble()));
+    }
 
     return Scaffold(
       backgroundColor: AppColors.bgDark,
@@ -49,6 +82,35 @@ class AdminDashboardScreen extends ConsumerWidget {
                 .animate().fadeIn(delay: 100.ms),
 
             const SizedBox(height: 24),
+
+            if (showLowBatteryWarning) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                margin: const EdgeInsets.only(bottom: 20),
+                decoration: BoxDecoration(
+                  color: AppColors.danger.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.danger.withValues(alpha: 0.3)),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.battery_alert_rounded, color: AppColors.danger, size: 24),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Drone battery is low. Recharge required before accepting deliveries.',
+                        style: TextStyle(
+                          color: AppColors.danger,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ).animate().shake(hz: 4, curve: Curves.easeInOut),
+            ],
 
             // Hero Banner Card: Accent Gradient Highlight (Moved from User Dashboard)
             Container(
@@ -153,8 +215,8 @@ class AdminDashboardScreen extends ConsumerWidget {
                 ),
                 AnalyticsCard(
                   title: 'Success Rate',
-                  value: '98.4%',
-                  change: '+0.2%',
+                  value: '${successRate.toStringAsFixed(1)}%',
+                  change: 'Delivered: $deliveredCount',
                   isPositive: true,
                   icon: Icons.verified_rounded,
                   iconColor: AppColors.accent,
@@ -232,13 +294,10 @@ class AdminDashboardScreen extends ConsumerWidget {
                         minX: 0,
                         maxX: 6,
                         minY: 0,
-                        maxY: 90,
+                        maxY: maxLineVal + 1,
                         lineBarsData: [
                           LineChartBarData(
-                            spots: const [
-                              FlSpot(0, 42), FlSpot(1, 58), FlSpot(2, 35),
-                              FlSpot(3, 71), FlSpot(4, 64), FlSpot(5, 80), FlSpot(6, 55),
-                            ],
+                            spots: lineSpots,
                             isCurved: true,
                             gradient: const LinearGradient(
                               colors: [AppColors.primary, AppColors.accent],

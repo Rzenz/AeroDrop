@@ -8,13 +8,210 @@ import '../../core/widgets/custom_app_bar.dart';
 import '../../core/widgets/staggered_list.dart';
 import '../../core/providers/delivery_provider.dart';
 import '../../core/models/delivery_model.dart';
+import '../../core/services/supabase_service.dart';
 
-class TrackingDetailsPage extends ConsumerWidget {
+class TrackingDetailsPage extends ConsumerStatefulWidget {
   final String deliveryId;
   const TrackingDetailsPage({super.key, required this.deliveryId});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<TrackingDetailsPage> createState() => _TrackingDetailsPageState();
+}
+
+class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
+  String _pickupName = 'Pickup location unavailable';
+  String _dropoffName = 'Drop-off location unavailable';
+  String _droneBatteryText = 'Drone not assigned yet';
+  String _droneName = 'Assigning...';
+  String _flightSpeed = '-- km/h';
+  String _flightAltitude = '-- m';
+  DeliveryModel? _fetchedDelivery;
+
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(_fetchDetails);
+  }
+
+  Future<void> _fetchDetails() async {
+    if (!SupabaseService.isConfigured) return;
+    if (!mounted) return;
+
+    try {
+      // 1. Fetch latest delivery details from deliveries table
+      final delResponse = await SupabaseService.client
+          .from('deliveries')
+          .select()
+          .eq('id', widget.deliveryId)
+          .maybeSingle();
+
+      if (delResponse != null) {
+        final data = Map<String, dynamic>.from(delResponse);
+        
+        // Convert map to DeliveryModel status
+        final isComplete = data['status']?.toString().toLowerCase() == 'delivered';
+        final status = isComplete
+            ? DeliveryStatus.delivered
+            : (data['status']?.toString().toLowerCase() == 'intransit' ||
+                    data['status']?.toString().toLowerCase() == 'in_transit')
+                ? DeliveryStatus.inTransit
+                : data['status']?.toString().toLowerCase() == 'cancelled'
+                    ? DeliveryStatus.cancelled
+                    : DeliveryStatus.pending;
+
+        // Progress helper
+        double progress = 0.0;
+        if (status == DeliveryStatus.delivered) {
+          progress = 1.0;
+        } else if (status == DeliveryStatus.inTransit) {
+          final startedAt = data['delivery_started_at'] != null
+              ? DateTime.tryParse(data['delivery_started_at'].toString())
+              : null;
+          if (startedAt != null) {
+            final totalSecs = (data['estimated_delivery_seconds'] as num?)?.toInt() ?? 60;
+            final elapsed = DateTime.now().difference(startedAt).inSeconds;
+            progress = (elapsed / totalSecs).clamp(0.0, 1.0);
+          }
+        }
+
+        // ETA helper
+        String etaStr = data['eta']?.toString() ?? 'TBD';
+        if (status == DeliveryStatus.delivered) {
+          etaStr = '0 mins';
+        } else if (status == DeliveryStatus.inTransit) {
+          final startedAt = data['delivery_started_at'] != null
+              ? DateTime.tryParse(data['delivery_started_at'].toString())
+              : null;
+          if (startedAt != null) {
+            final totalSecs = (data['estimated_delivery_seconds'] as num?)?.toInt() ?? 60;
+            final elapsed = DateTime.now().difference(startedAt).inSeconds;
+            final remaining = (totalSecs - elapsed).clamp(0, totalSecs);
+            etaStr = remaining <= 0
+                ? '0 mins'
+                : remaining < 60
+                    ? '$remaining secs'
+                    : '${(remaining / 60).ceil()} mins';
+          }
+        }
+
+        final model = DeliveryModel(
+          id: data['id'].toString(),
+          senderName: data['sender_name']?.toString() ?? 'Unknown Sender',
+          recipientName: data['recipient_name']?.toString() ?? 'Unknown Recipient',
+          recipientPhone: data['recipient_phone']?.toString() ?? '',
+          deliveryAddress: data['delivery_address']?.toString() ?? '',
+          packageName: data['package_name']?.toString() ?? 'AeroDrop Package',
+          packageWeight: (data['package_weight'] as num?)?.toDouble() ?? 0.0,
+          packageType: data['package_type']?.toString() ?? 'Other',
+          status: status,
+          droneId: data['drone_id']?.toString(),
+          eta: etaStr,
+          createdAt: data['created_at'] != null ? DateTime.tryParse(data['created_at'].toString()) ?? DateTime.now() : DateTime.now(),
+          progress: progress,
+          estimatedDistanceKm: data['estimated_distance_km'] != null ? (data['estimated_distance_km'] as num).toDouble() : null,
+          paymentAmount: data['payment_amount'] != null ? (data['payment_amount'] as num).toDouble() : null,
+          deliveryStartedAt: data['delivery_started_at'] != null ? DateTime.tryParse(data['delivery_started_at'].toString()) : null,
+          estimatedDeliverySeconds: (data['estimated_delivery_seconds'] as num?)?.toInt() ?? 60,
+          deliveredAt: data['delivered_at'] != null ? DateTime.tryParse(data['delivered_at'].toString()) : null,
+        );
+
+        if (mounted) {
+          setState(() {
+            _fetchedDelivery = model;
+          });
+        }
+
+        // 2. Fetch locations
+        final pickupId = data['pickup_location_id'];
+        final dropoffId = data['dropoff_location_id'];
+        if (pickupId != null) {
+          final p = await SupabaseService.client
+              .from('campus_locations')
+              .select('name')
+              .eq('id', pickupId)
+              .maybeSingle();
+          if (p != null && mounted) {
+            setState(() {
+              _pickupName = p['name']?.toString() ?? 'Pickup location unavailable';
+            });
+          }
+        }
+        if (dropoffId != null) {
+          final d = await SupabaseService.client
+              .from('campus_locations')
+              .select('name')
+              .eq('id', dropoffId)
+              .maybeSingle();
+          if (d != null && mounted) {
+            setState(() {
+              _dropoffName = d['name']?.toString() ?? 'Drop-off location unavailable';
+            });
+          }
+        }
+
+        // 3. Fetch Drone details
+        final droneId = data['drone_id'];
+        if (droneId != null) {
+          final drone = await SupabaseService.client
+              .from('drones')
+              .select('name, battery_level')
+              .eq('id', droneId)
+              .maybeSingle();
+          if (drone != null && mounted) {
+            setState(() {
+              _droneName = drone['name']?.toString() ?? droneId.toString();
+              final lvl = drone['battery_level'];
+              _droneBatteryText = lvl != null ? 'Drone Battery: $lvl%' : 'Drone Battery: Unknown';
+            });
+          }
+
+          // 4. Fetch latest telemetry
+          final tel = await SupabaseService.client
+              .from('drone_telemetry')
+              .select()
+              .eq('drone_id', droneId)
+              .order('recorded_at', ascending: false)
+              .limit(1)
+              .maybeSingle();
+          if (tel != null && mounted) {
+            setState(() {
+              final speed = tel['speed'];
+              final alt = tel['altitude'];
+              final battery = tel['battery_level'];
+              
+              if (speed != null) {
+                _flightSpeed = '$speed km/h';
+              } else {
+                _flightSpeed = '-- km/h';
+              }
+              if (alt != null) {
+                _flightAltitude = '$alt m';
+              } else {
+                _flightAltitude = '-- m';
+              }
+              if (battery != null) {
+                _droneBatteryText = 'Drone Battery: $battery%';
+              }
+            });
+          }
+        } else {
+          if (mounted) {
+            setState(() {
+              _droneName = 'Assigning...';
+              _droneBatteryText = 'Drone not assigned yet';
+              _flightSpeed = '-- km/h';
+              _flightAltitude = '-- m';
+            });
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error in _fetchDetails: $e');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     ref.listen<List<DeliveryModel>>(deliveryProvider, (previous, next) {
       if (previous != null) {
         for (final nextDel in next) {
@@ -28,10 +225,10 @@ class TrackingDetailsPage extends ConsumerWidget {
     });
 
     final deliveries = ref.watch(deliveryProvider);
-    final delivery = deliveries.firstWhere(
-      (d) => d.id == deliveryId,
+    final providerDelivery = deliveries.firstWhere(
+      (d) => d.id == widget.deliveryId,
       orElse: () => DeliveryModel(
-        id: deliveryId,
+        id: widget.deliveryId,
         senderName: '',
         recipientName: '',
         recipientPhone: '',
@@ -46,6 +243,8 @@ class TrackingDetailsPage extends ConsumerWidget {
       ),
     );
 
+    final delivery = _fetchedDelivery ?? providerDelivery;
+
     return Scaffold(
       backgroundColor: AppColors.bgDark,
       appBar: const CustomAppBar(title: 'Tracking Telemetry'),
@@ -58,133 +257,138 @@ class TrackingDetailsPage extends ConsumerWidget {
           ),
         ),
         child: SafeArea(
-          child: SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: StaggeredColumn(
-                delayMs: 60,
-                children: [
-                  const SizedBox(height: 12),
+          child: RefreshIndicator(
+            color: AppColors.accent,
+            backgroundColor: AppColors.cardDark,
+            onRefresh: _fetchDetails,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: StaggeredColumn(
+                  delayMs: 60,
+                  children: [
+                    const SizedBox(height: 12),
 
-                  // ETA Card
-                  GlassCard(
-                    padding: const EdgeInsets.all(20),
-                    borderGradient: const LinearGradient(
-                      colors: [AppColors.primary, Colors.transparent],
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withValues(alpha: 0.15),
-                            shape: BoxShape.circle,
+                    // ETA Card
+                    GlassCard(
+                      padding: const EdgeInsets.all(20),
+                      borderGradient: const LinearGradient(
+                        colors: [AppColors.primary, Colors.transparent],
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withValues(alpha: 0.15),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.timer_rounded, color: AppColors.primaryLight, size: 28),
                           ),
-                          child: const Icon(Icons.timer_rounded, color: AppColors.primaryLight, size: 28),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Estimated Arrival Time',
-                                style: AppTextStyles.body(fontSize: 12, color: AppColors.textSecondaryDark),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                delivery.status == DeliveryStatus.delivered
-                                    ? 'Delivered'
-                                    : delivery.status == DeliveryStatus.cancelled
-                                        ? 'Cancelled'
-                                        : '${delivery.eta} remaining',
-                                style: AppTextStyles.title(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
-                              ),
-                            ],
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Estimated Arrival Time',
+                                  style: AppTextStyles.body(fontSize: 12, color: AppColors.textSecondaryDark),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  delivery.status == DeliveryStatus.delivered
+                                      ? 'Delivered'
+                                      : delivery.status == DeliveryStatus.cancelled
+                                          ? 'Cancelled'
+                                          : '${delivery.eta} remaining',
+                                  style: AppTextStyles.title(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
+                    const SizedBox(height: 16),
 
-                  // Drone info
-                  GlassCard(
-                    padding: const EdgeInsets.all(20),
-                    borderGradient: const LinearGradient(
-                      colors: [AppColors.accent, Colors.transparent],
+                    // Drone info
+                    GlassCard(
+                      padding: const EdgeInsets.all(20),
+                      borderGradient: const LinearGradient(
+                        colors: [AppColors.accent, Colors.transparent],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Assigned Hardware',
+                            style: AppTextStyles.title(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.accent),
+                          ),
+                          const Divider(color: AppColors.borderDark, height: 24),
+                          _rowDetail(Icons.airplay_rounded, 'Drone ID', _droneName),
+                          _rowDetail(Icons.battery_charging_full_rounded, 'Drone Battery', _droneBatteryText),
+                          _rowDetail(Icons.speed_rounded, 'Flight Speed', _flightSpeed),
+                          _rowDetail(Icons.height_rounded, 'Flight Altitude', _flightAltitude),
+                        ],
+                      ),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Assigned Hardware',
-                          style: AppTextStyles.title(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.accent),
-                        ),
-                        const Divider(color: AppColors.borderDark, height: 24),
-                        _rowDetail(Icons.airplay_rounded, 'Drone ID', delivery.droneId ?? 'Assigning...'),
-                        _rowDetail(Icons.battery_charging_full_rounded, 'Hardware Battery', delivery.status == DeliveryStatus.inTransit ? '${(85 - (delivery.progress * 10).toInt())}% Operational' : '85% Operational'),
-                        _rowDetail(Icons.speed_rounded, 'Flight Speed', delivery.status == DeliveryStatus.inTransit ? '12.4 m/s' : '0.0 m/s'),
-                        _rowDetail(Icons.height_rounded, 'Flight Altitude', delivery.status == DeliveryStatus.inTransit ? '34.2 m' : '0.0 m'),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
+                    const SizedBox(height: 16),
 
-                  // Pilot info
-                  GlassCard(
-                    padding: const EdgeInsets.all(20),
-                    borderGradient: const LinearGradient(
-                      colors: [AppColors.primary, Colors.transparent],
+                    // Pilot info
+                    GlassCard(
+                      padding: const EdgeInsets.all(20),
+                      borderGradient: const LinearGradient(
+                        colors: [AppColors.primary, Colors.transparent],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Pilot Telemetry Logs',
+                            style: AppTextStyles.title(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.primaryLight),
+                          ),
+                          const Divider(color: AppColors.borderDark, height: 24),
+                          _rowDetail(Icons.shield_rounded, 'System Mode', 'UCLM Autonomous Autopilot Core'),
+                          _rowDetail(Icons.wifi_rounded, 'Signal Connection', 'Excellent RSSI (-45dB)'),
+                          _rowDetail(Icons.compass_calibration_rounded, 'Telemetry Lock', '3D GPS Fix Locked'),
+                        ],
+                      ),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Pilot Telemetry Logs',
-                          style: AppTextStyles.title(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.primaryLight),
-                        ),
-                        const Divider(color: AppColors.borderDark, height: 24),
-                        _rowDetail(Icons.shield_rounded, 'System Mode', 'UCLM Autonomous Autopilot Core'),
-                        _rowDetail(Icons.wifi_rounded, 'Signal Connection', 'Excellent RSSI (-45dB)'),
-                        _rowDetail(Icons.compass_calibration_rounded, 'Telemetry Lock', '3D GPS Fix Locked'),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
+                    const SizedBox(height: 16),
 
-                  // Route details
-                  GlassCard(
-                    padding: const EdgeInsets.all(20),
-                    borderGradient: const LinearGradient(
-                      colors: [Colors.white12, Colors.transparent],
+                    // Route details
+                    GlassCard(
+                      padding: const EdgeInsets.all(20),
+                      borderGradient: const LinearGradient(
+                        colors: [Colors.white12, Colors.transparent],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Route Tracking',
+                            style: AppTextStyles.title(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white70),
+                          ),
+                          const Divider(color: AppColors.borderDark, height: 24),
+                          _rowDetail(Icons.my_location_rounded, 'From', _pickupName),
+                          _rowDetail(Icons.flag_rounded, 'To', _dropoffName),
+                        ],
+                      ),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Route Tracking',
-                          style: AppTextStyles.title(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white70),
-                        ),
-                        const Divider(color: AppColors.borderDark, height: 24),
-                        _rowDetail(Icons.my_location_rounded, 'Origin', 'UCLM Science Lab Ground Hub'),
-                        _rowDetail(Icons.flag_rounded, 'Destination', delivery.deliveryAddress),
-                      ],
-                    ),
-                  ),
 
-                  // Cancel Button
-                  if (delivery.status == DeliveryStatus.pending) ...[
+                    // Cancel Button
+                    if (delivery.status == DeliveryStatus.pending) ...[
+                      const SizedBox(height: 24),
+                      _DestructiveButton(
+                        text: 'Cancel Request',
+                        icon: Icons.cancel_outlined,
+                        onPressed: () => _showCancelConfirmation(context, ref),
+                      ),
+                    ],
                     const SizedBox(height: 24),
-                    _DestructiveButton(
-                      text: 'Cancel Request',
-                      icon: Icons.cancel_outlined,
-                      onPressed: () => _showCancelConfirmation(context, ref),
-                    ),
                   ],
-                  const SizedBox(height: 24),
-                ],
+                ),
               ),
             ),
           ),
@@ -253,7 +457,7 @@ class TrackingDetailsPage extends ConsumerWidget {
             ),
             onPressed: () async {
               Navigator.pop(context); // Close dialog
-              final error = await ref.read(deliveryProvider.notifier).cancelDeliveryRequest(deliveryId);
+              final error = await ref.read(deliveryProvider.notifier).cancelDeliveryRequest(widget.deliveryId);
               
               if (!context.mounted) return;
 

@@ -217,6 +217,8 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
 
     return Scaffold(
       backgroundColor: AppColors.bgDark,
+      extendBody: true,
+      resizeToAvoidBottomInset: false,
       body: RefreshIndicator(
         color: AppColors.accent,
         backgroundColor: AppColors.cardDark,
@@ -326,10 +328,9 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
               }
 
               // ---- panel heights ----
-              final safeBottom  = MediaQuery.of(context).padding.bottom;
-              const double bottomNavVisualHeight = 72.0;
-              const double gapAboveNav = 4.0;
-              final navOffset   = safeBottom + bottomNavVisualHeight + gapAboveNav;
+              // ponytail: Position the panel exactly 16px above the bottom navigation bar.
+              // MediaQuery.of(context).padding.bottom is set by the parent Scaffold to match the bottom nav height.
+              final navOffset = MediaQuery.of(context).padding.bottom + 16.0;
               final collapsedH  = 100.0;
               final expandedH   = activeDelivery != null ? 360.0 : 120.0;
               final panelHeight = _panelExpanded ? expandedH : collapsedH;

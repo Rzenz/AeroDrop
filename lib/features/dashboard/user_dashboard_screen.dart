@@ -28,7 +28,8 @@ class UserDashboardScreen extends ConsumerWidget {
     final notifications = ref.watch(notificationProvider);
     final unreadCount = notifications.where((n) => !n.isRead).length;
 
-    final active = deliveries.where((d) => d.status == DeliveryStatus.inTransit).toList();
+    final active = deliveries.where((d) => d.status == DeliveryStatus.inTransit || d.status == DeliveryStatus.pending).toList();
+    active.sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
     final hour = DateTime.now().hour;
     final greeting = hour < 12

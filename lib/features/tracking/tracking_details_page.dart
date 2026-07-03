@@ -349,7 +349,7 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
                             style: AppTextStyles.title(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.primaryLight),
                           ),
                           const Divider(color: AppColors.borderDark, height: 24),
-                          _rowDetail(Icons.shield_rounded, 'System Mode', 'UCLM Autonomous Autopilot Core'),
+                          _rowDetail(Icons.shield_rounded, 'System Mode', 'Prototype Telemetry (UCLM Autonomous Autopilot Core)'),
                           _rowDetail(Icons.wifi_rounded, 'Signal Connection', 'Excellent RSSI (-45dB)'),
                           _rowDetail(Icons.compass_calibration_rounded, 'Telemetry Lock', '3D GPS Fix Locked'),
                         ],

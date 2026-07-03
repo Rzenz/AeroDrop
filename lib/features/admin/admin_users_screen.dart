@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
@@ -372,10 +372,6 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
                             final isCurrentUser = currentUser?.id == user['id'];
                             final canManage = !isCurrentUser && !isAdmin;
 
-                            final dept = role == 'faculty_staff' 
-                                ? 'Engineering & Technology' 
-                                : (isAdmin ? 'Logistics & Fleet control' : 'Computer Studies Council');
-
                             return Container(
                               margin: const EdgeInsets.only(bottom: 12),
                               decoration: BoxDecoration(
@@ -512,22 +508,7 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
                                         child: Column(
                                           crossAxisAlignment: CrossAxisAlignment.stretch,
                                           children: [
-                                            Row(
-                                              children: [
-                                                const Icon(Icons.business_center_outlined, size: 16, color: AppColors.secondary),
-                                                const SizedBox(width: 8),
-                                                Expanded(
-                                                  child: Text(
-                                                    'Department: $dept',
-                                                    style: TextStyle(
-                                                      fontSize: 13,
-                                                      color: AppColors.textSecondaryDark,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                            const SizedBox(height: 12),
+
                                             Row(
                                               children: [
                                                 Expanded(

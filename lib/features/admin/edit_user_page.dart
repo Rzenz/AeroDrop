@@ -19,7 +19,6 @@ class EditUserPage extends ConsumerStatefulWidget {
 class _EditUserPageState extends ConsumerState<EditUserPage> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _nameController;
-  late final TextEditingController _deptController;
   String _selectedRole = 'Student';
   String _selectedStatus = 'Active';
 
@@ -32,16 +31,12 @@ class _EditUserPageState extends ConsumerState<EditUserPage> {
     final isFaculty = widget.email.contains('.edu') && !widget.email.contains('student');
 
     _nameController = TextEditingController(text: displayName);
-    _deptController = TextEditingController(
-      text: isFaculty ? 'Engineering & Technology' : 'Computer Studies Council',
-    );
     _selectedRole = isFaculty ? 'Faculty/Staff' : 'Student';
   }
 
   @override
   void dispose() {
     _nameController.dispose();
-    _deptController.dispose();
     super.dispose();
   }
 
@@ -112,14 +107,7 @@ class _EditUserPageState extends ConsumerState<EditUserPage> {
                               prefixIcon: Icons.person_outline_rounded,
                               validator: (val) => val == null || val.isEmpty ? 'Required' : null,
                             ),
-                            const SizedBox(height: 20),
-                            CustomTextField(
-                              labelText: 'Department / Council',
-                              hintText: 'e.g. Engineering Department',
-                              controller: _deptController,
-                              prefixIcon: Icons.business_center_outlined,
-                              validator: (val) => val == null || val.isEmpty ? 'Required' : null,
-                            ),
+
                             const SizedBox(height: 20),
                             _buildDropdownField(
                               labelText: 'System Access Role (Editing Disabled)',

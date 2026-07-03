@@ -1,11 +1,13 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/delivery_model.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import 'status_chip.dart';
 import 'animated_card.dart';
 
-class DeliveryCard extends StatelessWidget {
+class DeliveryCard extends ConsumerStatefulWidget {
   final DeliveryModel delivery;
   final VoidCallback? onTap;
 
@@ -15,17 +17,84 @@ class DeliveryCard extends StatelessWidget {
     this.onTap,
   });
 
+  @override
+  ConsumerState<DeliveryCard> createState() => _DeliveryCardState();
+}
+
+class _DeliveryCardState extends ConsumerState<DeliveryCard> {
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.delivery.status == DeliveryStatus.inTransit) {
+      _startTimer();
+    }
+  }
+
+  @override
+  void didUpdateWidget(DeliveryCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.delivery.status == DeliveryStatus.inTransit) {
+      if (_timer == null) {
+        _startTimer();
+      }
+    } else {
+      _timer?.cancel();
+      _timer = null;
+    }
+  }
+
+  void _startTimer() {
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) {
+        setState(() {});
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
   String get _displayId {
-    if (delivery.id.length <= 12) return delivery.id;
-    return 'DEL-${delivery.id.substring(0, 8).toUpperCase()}';
+    if (widget.delivery.id.length <= 12) return widget.delivery.id;
+    return 'DEL-${widget.delivery.id.substring(0, 8).toUpperCase()}';
+  }
+
+  String _formatTimeRemaining(int totalSeconds) {
+    if (totalSeconds <= 0) return 'Arrived';
+    final mins = totalSeconds ~/ 60;
+    final secs = totalSeconds % 60;
+    return 'Time Remaining: ${mins.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
   }
 
   @override
   Widget build(BuildContext context) {
-    final isInTransit = delivery.status == DeliveryStatus.inTransit;
+    final status = widget.delivery.status;
+    final isInTransit = status == DeliveryStatus.inTransit;
+
+    double progress = widget.delivery.progress;
+    int remainingSeconds = 0;
+
+    if (isInTransit) {
+      final startedAt = widget.delivery.deliveryStartedAt;
+      if (startedAt != null) {
+        final totalSecs = widget.delivery.estimatedDeliverySeconds;
+        final elapsed = DateTime.now().difference(startedAt).inSeconds;
+        progress = (elapsed / totalSecs).clamp(0.0, 1.0);
+        remainingSeconds = (totalSecs - elapsed).clamp(0, totalSecs);
+      }
+    } else if (status == DeliveryStatus.delivered) {
+      progress = 1.0;
+    }
+
+    final percentage = (progress * 100).toInt();
 
     return AnimatedCard(
-      onTap: onTap,
+      onTap: widget.onTap,
       borderGradient: LinearGradient(
         colors: isInTransit
             ? [AppColors.accent, AppColors.primary]
@@ -68,12 +137,12 @@ class DeliveryCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  StatusChip.delivery(delivery.status.name),
+                  StatusChip.delivery(status.name),
                 ],
               ),
               const SizedBox(height: 12),
               Text(
-                delivery.packageName,
+                widget.delivery.packageName,
                 style: AppTextStyles.title(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -93,7 +162,7 @@ class DeliveryCard extends StatelessWidget {
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      delivery.deliveryAddress,
+                      widget.delivery.deliveryAddress,
                       style: AppTextStyles.body(
                         fontSize: 12.5,
                         color: AppColors.textSecondaryDark,
@@ -110,7 +179,7 @@ class DeliveryCard extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        'ETA: ${delivery.eta}',
+                        _formatTimeRemaining(remainingSeconds),
                         style: AppTextStyles.body(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
@@ -122,7 +191,7 @@ class DeliveryCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      '${(delivery.progress * 100).toInt()}%',
+                      '$percentage%',
                       style: AppTextStyles.body(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
@@ -135,7 +204,7 @@ class DeliveryCard extends StatelessWidget {
                 ClipRRect(
                   borderRadius: BorderRadius.circular(4),
                   child: LinearProgressIndicator(
-                    value: delivery.progress.clamp(0.0, 1.0),
+                    value: progress,
                     backgroundColor: AppColors.borderDark,
                     valueColor: const AlwaysStoppedAnimation<Color>(
                       AppColors.accent,
@@ -148,7 +217,7 @@ class DeliveryCard extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        delivery.packageType,
+                        widget.delivery.packageType,
                         style: AppTextStyles.body(
                           fontSize: 12,
                           color: AppColors.textSecondaryDark,
@@ -159,7 +228,7 @@ class DeliveryCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      '${delivery.packageWeight} kg',
+                      '${widget.delivery.packageWeight} kg',
                       style: AppTextStyles.body(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,

@@ -30,6 +30,10 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
 
   Future<void> _fetchUsers() async {
     if (!mounted) return;
+    if (_users.isNotEmpty && !SupabaseService.isConfigured) {
+      setState(() => _loading = false);
+      return;
+    }
     setState(() => _loading = true);
 
     try {
@@ -49,9 +53,11 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
         if (mounted) {
           setState(() {
             _users = [
-              {'id': 'usr_mock_1', 'name': 'Professor Green', 'email': 'p.green@uclm.edu', 'role': 'faculty_staff', 'phone_number': '09123456789', 'account_status': 'active'},
-              {'id': 'usr_mock_2', 'name': 'Dean Harrison', 'email': 'd.harrison@uclm.edu', 'role': 'faculty_staff', 'phone_number': '09123456788', 'account_status': 'active'},
-              {'id': 'usr_mock_3', 'name': 'Sarah Jenkins', 'email': 's.jenkins@uclm.edu', 'role': 'admin', 'phone_number': '09123456787', 'account_status': 'active'},
+              {'id': 'usr_mock_1', 'name': 'Canteen Express', 'email': 'canteen@gmail.com', 'role': 'faculty_staff', 'phone_number': '09123456789', 'account_status': 'active'},
+              {'id': 'usr_mock_2', 'name': 'UCLM Café Brews', 'email': 'brews@gmail.com', 'role': 'faculty_staff', 'phone_number': '09123456788', 'account_status': 'active'},
+              {'id': 'usr_mock_5', 'name': 'Sweet Escape Delights', 'email': 'sweetescape@gmail.com', 'role': 'faculty_staff', 'phone_number': '09171112222', 'account_status': 'pending_approval'},
+              {'id': 'usr_mock_6', 'name': 'Quick Byte Canteen', 'email': 'quickbyte@gmail.com', 'role': 'faculty_staff', 'phone_number': '09172223333', 'account_status': 'pending_approval'},
+              {'id': 'usr_mock_3', 'name': 'Sarah Jenkins', 'email': 's.jenkins@gmail.com', 'role': 'admin', 'phone_number': '09123456787', 'account_status': 'active'},
               {'id': 'usr_mock_4', 'name': 'John Doe', 'email': 'john.doe@gmail.com', 'role': 'student', 'phone_number': '09123456786', 'account_status': 'suspended'},
             ];
             _loading = false;
@@ -64,6 +70,55 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
         setState(() => _loading = false);
       }
     }
+  }
+
+  Future<void> _handleApproveStore(String userId, String name) async {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.cardDark,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.check_circle_outline_rounded, color: AppColors.success, size: 28),
+            SizedBox(width: 8),
+            Text('Approve Store', style: TextStyle(color: Colors.white)),
+          ],
+        ),
+        content: Text(
+          'Do you want to approve the vendor application for "$name"? They will immediately be authorized to list products on the platform.',
+          style: const TextStyle(color: Colors.white70, fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.success,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () {
+              Navigator.pop(ctx);
+              setState(() {
+                final idx = _users.indexWhere((u) => u['id'] == userId);
+                if (idx != -1) {
+                  _users[idx] = {..._users[idx], 'account_status': 'active'};
+                }
+              });
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Vendor "$name" is now an Approved Partner!'),
+                  backgroundColor: AppColors.success,
+                ),
+              );
+            },
+            child: const Text('Approve Application', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _confirmSuspend(String userId, String name) async {
@@ -104,6 +159,22 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
     );
 
     if (confirm == true && mounted) {
+      if (!SupabaseService.isConfigured) {
+        setState(() {
+          final idx = _users.indexWhere((u) => u['id'] == userId);
+          if (idx != -1) {
+            _users[idx] = {..._users[idx], 'account_status': 'suspended'};
+          }
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('User account suspended.'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+        return;
+      }
+
       final error = await ref.read(authProvider.notifier).suspendUser(
             userId,
             reason: reasonController.text,
@@ -130,6 +201,22 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
   }
 
   Future<void> _handleActivate(String userId) async {
+    if (!SupabaseService.isConfigured) {
+      setState(() {
+        final idx = _users.indexWhere((u) => u['id'] == userId);
+        if (idx != -1) {
+          _users[idx] = {..._users[idx], 'account_status': 'active'};
+        }
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('User account activated.'),
+          backgroundColor: AppColors.success,
+        ),
+      );
+      return;
+    }
+
     final error = await ref.read(authProvider.notifier).activateUser(userId);
     if (!mounted) return;
 
@@ -189,6 +276,22 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
     );
 
     if (confirm == true && mounted) {
+      if (!SupabaseService.isConfigured) {
+        setState(() {
+          final idx = _users.indexWhere((u) => u['id'] == userId);
+          if (idx != -1) {
+            _users[idx] = {..._users[idx], 'account_status': 'deleted'};
+          }
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('User account marked as deleted.'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+        return;
+      }
+
       final error = await ref.read(authProvider.notifier).deleteUserAccount(
             userId,
             reason: reasonController.text,
@@ -237,7 +340,7 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
       final name = (user['name']?.toString() ?? '').toLowerCase();
       final email = (user['email']?.toString() ?? '').toLowerCase();
       final roleStr = (user['role']?.toString() ?? '').toLowerCase();
-      final roleLabel = roleStr == 'admin' ? 'admin' : (roleStr == 'faculty_staff' ? 'faculty/staff' : 'student');
+      final roleLabel = roleStr == 'admin' ? 'admin' : (roleStr == 'faculty_staff' ? 'vendor' : 'user');
       final phone = (user['phone_number']?.toString() ?? '').toLowerCase();
       
       final query = _searchQuery.toLowerCase();
@@ -454,7 +557,7 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
                                                 : (isFaculty ? AppColors.accent : AppColors.primaryLight);
                                             final label = isAdmin 
                                                 ? 'ADMIN' 
-                                                : (isFaculty ? 'FACULTY/STAFF' : 'STUDENT');
+                                                : (isFaculty ? 'VENDOR' : 'USER');
 
                                             return Container(
                                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -482,7 +585,15 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
                                           builder: (context) {
                                             final statusColor = status == 'active' 
                                                 ? AppColors.success 
-                                                : (status == 'suspended' ? AppColors.warning : AppColors.danger);
+                                                : (status == 'suspended' 
+                                                    ? AppColors.warning 
+                                                    : (status == 'pending_approval' 
+                                                        ? const Color(0xFFFFD54F) 
+                                                        : AppColors.danger));
+                                            final displayStatus = status == 'pending_approval' 
+                                                ? 'PENDING APPROVAL' 
+                                                : status.toUpperCase();
+
                                             return Container(
                                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                               decoration: BoxDecoration(
@@ -490,7 +601,7 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
                                                 borderRadius: BorderRadius.circular(6),
                                               ),
                                               child: Text(
-                                                status.toUpperCase(),
+                                                displayStatus,
                                                 style: TextStyle(
                                                   fontSize: 8,
                                                   fontWeight: FontWeight.bold,
@@ -508,7 +619,6 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
                                         child: Column(
                                           crossAxisAlignment: CrossAxisAlignment.stretch,
                                           children: [
-
                                             Row(
                                               children: [
                                                 Expanded(
@@ -535,32 +645,56 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
                                                 ),
                                                 if (canManage && status != 'deleted') ...[
                                                   const SizedBox(width: 8),
-                                                  Expanded(
-                                                    child: GestureDetector(
-                                                      onTap: () => status == 'active' 
-                                                          ? _confirmSuspend(user['id'], name) 
-                                                          : _handleActivate(user['id']),
-                                                      child: Container(
-                                                        padding: const EdgeInsets.symmetric(vertical: 8),
-                                                        decoration: BoxDecoration(
-                                                          color: (status == 'active' ? AppColors.warning : AppColors.success).withValues(alpha: 0.1),
-                                                          borderRadius: BorderRadius.circular(10),
-                                                          border: Border.all(
-                                                            color: (status == 'active' ? AppColors.warning : AppColors.success).withValues(alpha: 0.25),
+                                                  if (status == 'pending_approval')
+                                                    Expanded(
+                                                      child: GestureDetector(
+                                                        onTap: () => _handleApproveStore(user['id'], name),
+                                                        child: Container(
+                                                          padding: const EdgeInsets.symmetric(vertical: 8),
+                                                          decoration: BoxDecoration(
+                                                            color: AppColors.success.withValues(alpha: 0.15),
+                                                            borderRadius: BorderRadius.circular(10),
+                                                            border: Border.all(color: AppColors.success),
+                                                          ),
+                                                          alignment: Alignment.center,
+                                                          child: const Text(
+                                                            'Approve Store',
+                                                            style: TextStyle(
+                                                              fontSize: 12,
+                                                              fontWeight: FontWeight.bold,
+                                                              color: AppColors.success,
+                                                            ),
                                                           ),
                                                         ),
-                                                        alignment: Alignment.center,
-                                                        child: Text(
-                                                          status == 'active' ? 'Suspend' : 'Activate',
-                                                          style: TextStyle(
-                                                            fontSize: 12,
-                                                            fontWeight: FontWeight.bold,
-                                                            color: status == 'active' ? AppColors.warning : AppColors.success,
+                                                      ),
+                                                    )
+                                                  else
+                                                    Expanded(
+                                                      child: GestureDetector(
+                                                        onTap: () => status == 'active' 
+                                                            ? _confirmSuspend(user['id'], name) 
+                                                            : _handleActivate(user['id']),
+                                                        child: Container(
+                                                          padding: const EdgeInsets.symmetric(vertical: 8),
+                                                          decoration: BoxDecoration(
+                                                            color: (status == 'active' ? AppColors.warning : AppColors.success).withValues(alpha: 0.1),
+                                                            borderRadius: BorderRadius.circular(10),
+                                                            border: Border.all(
+                                                              color: (status == 'active' ? AppColors.warning : AppColors.success).withValues(alpha: 0.25),
+                                                            ),
+                                                          ),
+                                                          alignment: Alignment.center,
+                                                          child: Text(
+                                                            status == 'active' ? 'Suspend' : 'Activate',
+                                                            style: TextStyle(
+                                                              fontSize: 12,
+                                                              fontWeight: FontWeight.bold,
+                                                              color: status == 'active' ? AppColors.warning : AppColors.success,
+                                                            ),
                                                           ),
                                                         ),
                                                       ),
                                                     ),
-                                                  ),
                                                   const SizedBox(width: 8),
                                                   Expanded(
                                                     child: GestureDetector(

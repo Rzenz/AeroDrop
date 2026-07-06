@@ -69,30 +69,36 @@ class AnalyticsCard extends StatelessWidget {
                 ),
                 child: Icon(icon, color: iconColor, size: 18),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: (isPositive ? AppColors.success : AppColors.danger).withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      isPositive ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
-                      color: isPositive ? AppColors.success : AppColors.danger,
-                      size: 10,
-                    ),
-                    const SizedBox(width: 2),
-                    Text(
-                      change,
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
+              Flexible(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: (isPositive ? AppColors.success : AppColors.danger).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isPositive ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
                         color: isPositive ? AppColors.success : AppColors.danger,
+                        size: 10,
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 2),
+                      Flexible(
+                        child: Text(
+                          change,
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: isPositive ? AppColors.success : AppColors.danger,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],

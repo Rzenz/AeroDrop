@@ -2,9 +2,9 @@ import '../core/models/user_model.dart';
 
 final List<UserModel> mockUsers = [
   UserModel(id: 'usr_1', name: 'John Doe', email: 'john.doe@gmail.com', role: UserRole.user, avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'),
-  UserModel(id: 'usr_2', name: 'Sarah Jenkins', email: 'sarah.j@uclm.edu', role: UserRole.admin, avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150'),
-  UserModel(id: 'usr_3', name: 'Professor Green', email: 'p.green@uclm.edu', role: UserRole.admin, avatarUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150'),
-  UserModel(id: 'usr_4', name: 'Dean Harrison', email: 'd.harrison@uclm.edu', role: UserRole.admin, avatarUrl: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=150'),
+  UserModel(id: 'usr_2', name: 'Sarah Jenkins', email: 'sarah.j@gmail.com', role: UserRole.admin, avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150'),
+  UserModel(id: 'usr_3', name: 'Professor Green', email: 'p.green@gmail.com', role: UserRole.admin, avatarUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150'),
+  UserModel(id: 'usr_4', name: 'Dean Harrison', email: 'd.harrison@gmail.com', role: UserRole.admin, avatarUrl: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=150'),
   UserModel(id: 'usr_5', name: 'Alice Smith', email: 'alice.smith@gmail.com', role: UserRole.user, avatarUrl: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150'),
   UserModel(id: 'usr_6', name: 'Bob Johnson', email: 'bob.j@gmail.com', role: UserRole.user, avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150'),
   UserModel(id: 'usr_7', name: 'Charlie Brown', email: 'charlie.b@gmail.com', role: UserRole.user, avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150'),
@@ -21,5 +21,5 @@ final List<UserModel> mockUsers = [
   UserModel(id: 'usr_18', name: 'Nancy Drew', email: 'nancy.d@gmail.com', role: UserRole.user, avatarUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150'),
   UserModel(id: 'usr_19', name: 'Oliver Twist', email: 'oliver.t@gmail.com', role: UserRole.user, avatarUrl: 'https://images.unsplash.com/photo-1552058544-f2b08422138a?w=150'),
   UserModel(id: 'usr_20', name: 'Peter Parker', email: 'peter.p@gmail.com', role: UserRole.user, avatarUrl: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=150'),
-  UserModel(id: 'usr_admin', name: 'Admin Commander', email: 'admin.portal@uclm.edu', role: UserRole.admin, avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'),
+  UserModel(id: 'usr_admin', name: 'Admin Commander', email: 'admin.portal@gmail.com', role: UserRole.admin, avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'),
 ];

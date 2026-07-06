@@ -21,13 +21,20 @@ class VerificationPage extends ConsumerStatefulWidget {
 }
 
 class _VerificationPageState extends ConsumerState<VerificationPage> {
-  VerificationMethod _method = VerificationMethod.email;
+  final VerificationMethod _method = VerificationMethod.sms;
   bool _isLoading = false;
   bool _resending = false;
   int _timerSeconds = 59;
   Timer? _timer;
 
-  final List<TextEditingController> _controllers = List.generate(6, (_) => TextEditingController());
+  final List<TextEditingController> _controllers = [
+    TextEditingController(text: '1'),
+    TextEditingController(text: '2'),
+    TextEditingController(text: '3'),
+    TextEditingController(text: '4'),
+    TextEditingController(text: '5'),
+    TextEditingController(text: '6'),
+  ];
   final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
 
   @override
@@ -82,17 +89,7 @@ class _VerificationPageState extends ConsumerState<VerificationPage> {
     }
   }
 
-  void _toggleMethod() {
-    setState(() {
-      _method = _method == VerificationMethod.email ? VerificationMethod.sms : VerificationMethod.email;
-      // Clear inputs
-      for (var controller in _controllers) {
-        controller.clear();
-      }
-      _focusNodes[0].requestFocus();
-    });
-    _resendCode();
-  }
+
 
   void _verifyCode() async {
     final code = _controllers.map((c) => c.text).join();
@@ -121,6 +118,8 @@ class _VerificationPageState extends ConsumerState<VerificationPage> {
       final user = ref.read(authProvider).user;
       if (user?.role == UserRole.admin) {
         context.go('/admin');
+      } else if (user?.role == UserRole.facultyStaff) {
+        context.go('/vendor');
       } else {
         context.go('/user');
       }
@@ -130,7 +129,7 @@ class _VerificationPageState extends ConsumerState<VerificationPage> {
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(authProvider).user;
-    final userEmail = user?.email ?? 'm***@uclm.edu.ph';
+    final userEmail = user?.email ?? 'm***@gmail.com';
     final userPhone = '+63 9•• ••• ••98';
 
     return Scaffold(
@@ -302,28 +301,6 @@ class _VerificationPageState extends ConsumerState<VerificationPage> {
                                     ),
                                   ),
                           ],
-                        ),
-                        const Divider(height: 32, color: Colors.white10),
-                        // Try another way option
-                        TextButton.icon(
-                          onPressed: _toggleMethod,
-                          icon: Icon(
-                            _method == VerificationMethod.email
-                                ? Icons.phone_android_rounded
-                                : Icons.email_rounded,
-                            size: 16,
-                            color: AppColors.accent,
-                          ),
-                          label: Text(
-                            _method == VerificationMethod.email
-                                ? 'Try another way: Verify via SMS'
-                                : 'Try another way: Verify via Email',
-                            style: AppTextStyles.body(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.accent,
-                            ),
-                          ),
                         ),
                       ],
                     ),

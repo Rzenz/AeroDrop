@@ -12,6 +12,7 @@ import '../../features/auth/onboarding_screen.dart';
 import '../../features/auth/login_screen.dart';
 import '../../features/auth/register_screen.dart';
 import '../../features/auth/forgot_password_screen.dart';
+import '../../features/auth/otp_email_sent_screen.dart';
 import '../../features/auth/verification_page.dart';
 import '../../features/auth/presentation/pages/account_pending_page.dart';
 
@@ -19,11 +20,8 @@ import '../../features/dashboard/user_shell.dart';
 import '../../features/dashboard/user_dashboard_screen.dart';
 import '../../features/tracking/tracking_screen.dart';
 import '../../features/tracking/tracking_details_page.dart';
-import '../../features/delivery/delivery_history_screen.dart';
-import '../../features/delivery/delivery_request_screen.dart';
-import '../../features/delivery/presentation/pages/delivery_summary_page.dart';
-import '../../features/delivery/presentation/pages/delivery_success_page.dart';
-import '../../features/delivery/presentation/pages/delivery_completed_page.dart';
+// delivery_history_screen.dart removed — replaced by orders_screen
+// delivery_summary/success/completed pages removed — replaced by payment_screen
 import '../../features/notifications/notifications_screen.dart';
 import '../../features/notifications/notification_details_page.dart';
 import '../../features/profile/profile_screen.dart';
@@ -34,32 +32,38 @@ import '../../features/profile/settings_page.dart';
 import '../../features/admin/admin_shell.dart';
 import '../../features/admin/admin_dashboard_screen.dart';
 import '../../features/admin/admin_users_screen.dart';
-import '../../features/admin/user_details_page.dart';
-import '../../features/admin/edit_user_page.dart';
-import '../../features/admin/user_activity_page.dart';
 import '../../features/admin/admin_drones_screen.dart';
-import '../../features/admin/add_edit_drone_screen.dart';
-import '../../features/admin/drone_details_page.dart';
-import '../../features/admin/drone_monitoring_page.dart';
 import '../../features/admin/admin_deliveries_screen.dart';
 import '../../features/admin/delivery_details_screen.dart';
 import '../../features/admin/admin_analytics_screen.dart';
 import '../../features/admin/admin_settings_screen.dart';
-import '../../features/admin/mission_list_page.dart';
-import '../../features/admin/mission_details_page.dart';
-import '../../features/admin/route_planner_page.dart';
 import '../../features/admin/no_fly_zone_page.dart';
-import '../../features/admin/create_no_fly_zone_page.dart';
-import '../../features/admin/edit_no_fly_zone_page.dart';
 import '../../features/admin/reports_page.dart';
-import '../../features/admin/delivery_reports_page.dart';
-import '../../features/admin/drone_reports_page.dart';
-import '../../features/admin/user_reports_page.dart';
 
 import '../../features/shared/about_page.dart';
 import '../../features/shared/help_support_page.dart';
 import '../../features/shared/privacy_policy_page.dart';
 import '../../features/shared/terms_conditions_page.dart';
+
+// Marketplace
+import '../../features/vendors/vendors_screen.dart';
+import '../../features/vendors/vendor_details_screen.dart';
+import '../../features/products/products_screen.dart';
+import '../../features/products/product_details_screen.dart';
+import '../../features/cart/cart_screen.dart';
+import '../../features/cart/checkout_screen.dart';
+import '../../features/orders/orders_screen.dart';
+import '../../features/orders/order_details_screen.dart';
+import '../../features/payment/payment_screen.dart';
+
+// Vendor
+import '../../features/vendor/vendor_shell.dart';
+import '../../features/vendor/vendor_dashboard_screen.dart';
+import '../../features/vendor/vendor_orders_screen.dart';
+import '../../features/vendor/vendor_products_screen.dart';
+import '../../features/vendor/add_edit_product_screen.dart';
+import '../../features/vendor/vendor_profile_screen.dart';
+import '../../features/vendor/vendor_notifications_screen.dart';
 
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -86,18 +90,24 @@ final routerProvider = Provider<GoRouter>((ref) {
       }
 
       if (isLoggingIn) {
-        return user.role == UserRole.admin ? '/admin' : '/user';
+        if (user.role == UserRole.admin) return '/admin';
+        if (user.role == UserRole.facultyStaff) return '/vendor';
+        return '/user';
       }
 
       final isAdminPath = state.uri.path.startsWith('/admin');
       final isUserPath = state.uri.path.startsWith('/user');
+      final isVendorPath = state.uri.path.startsWith('/vendor');
 
       if (isAdminPath && user.role != UserRole.admin) {
-        return '/user';
+        return user.role == UserRole.facultyStaff ? '/vendor' : '/user';
       }
-     if (isUserPath && user.role == UserRole.admin) {
-  return '/admin';
-}
+      if (isUserPath && user.role != UserRole.user) {
+        return user.role == UserRole.admin ? '/admin' : '/vendor';
+      }
+      if (isVendorPath && user.role != UserRole.facultyStaff) {
+        return user.role == UserRole.admin ? '/admin' : '/user';
+      }
 
       return null;
     },
@@ -124,6 +134,18 @@ final routerProvider = Provider<GoRouter>((ref) {
         pageBuilder: (context, state) => _slide(state, const ForgotPasswordScreen()),
       ),
       GoRoute(
+        path: '/email-sent',
+        pageBuilder: (context, state) {
+          final extra = state.extra as Map<String, String>? ?? {};
+          final email = extra['email'] ?? '';
+          final type = extra['type'] ?? 'verification';
+          return _fade(
+            state,
+            OtpEmailSentScreen(email: email, type: type),
+          );
+        },
+      ),
+      GoRoute(
         path: '/verification',
         pageBuilder: (context, state) => _fade(state, const VerificationPage()),
       ),
@@ -141,12 +163,20 @@ final routerProvider = Provider<GoRouter>((ref) {
             pageBuilder: (context, state) => _fade(state, const UserDashboardScreen()),
           ),
           GoRoute(
+            path: '/user/shop',
+            pageBuilder: (context, state) => _fade(state, const ProductsScreen()),
+          ),
+          GoRoute(
+            path: '/user/vendors',
+            pageBuilder: (context, state) => _fade(state, const VendorsScreen()),
+          ),
+          GoRoute(
             path: '/user/track',
             pageBuilder: (context, state) => _fade(state, const TrackingScreen()),
           ),
           GoRoute(
-            path: '/user/history',
-            pageBuilder: (context, state) => _fade(state, const DeliveryHistoryScreen()),
+            path: '/user/orders',
+            pageBuilder: (context, state) => _fade(state, const OrdersScreen()),
           ),
           GoRoute(
             path: '/user/notifications',
@@ -159,10 +189,52 @@ final routerProvider = Provider<GoRouter>((ref) {
         ],
       ),
 
-      // ─── User Full-Screen Pushes ─────────────────────────────────────────
+      // /user/request → redirect to shop (old concept removed)
       GoRoute(
         path: '/user/request',
-        pageBuilder: (context, state) => _slide(state, const DeliveryRequestScreen()),
+        redirect: (_, _) => '/user/shop',
+      ),
+      // /user/history → redirect to orders (old concept removed)
+      GoRoute(
+        path: '/user/history',
+        redirect: (_, _) => '/user/orders',
+      ),
+      // Marketplace push routes
+      GoRoute(
+        path: '/user/vendors/:id',
+        pageBuilder: (context, state) {
+          final id = state.pathParameters['id'] ?? '';
+          return _slide(state, VendorDetailsScreen(vendorId: id));
+        },
+      ),
+      GoRoute(
+        path: '/user/products/:id',
+        pageBuilder: (context, state) {
+          final id = state.pathParameters['id'] ?? '';
+          return _slide(state, ProductDetailsScreen(productId: id));
+        },
+      ),
+      GoRoute(
+        path: '/user/cart',
+        pageBuilder: (context, state) => _slide(state, const CartScreen()),
+      ),
+      GoRoute(
+        path: '/user/checkout',
+        pageBuilder: (context, state) => _slide(state, const CheckoutScreen()),
+      ),
+      GoRoute(
+        path: '/user/orders/:id',
+        pageBuilder: (context, state) {
+          final id = state.pathParameters['id'] ?? '';
+          return _slide(state, OrderDetailsScreen(orderId: id));
+        },
+      ),
+      GoRoute(
+        path: '/user/payment',
+        pageBuilder: (context, state) {
+          final orderId = state.uri.queryParameters['orderId'];
+          return _slide(state, PaymentScreen(orderId: orderId));
+        },
       ),
       GoRoute(
         path: '/user/profile/edit',
@@ -176,18 +248,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/user/settings',
         pageBuilder: (context, state) => _slide(state, const SettingsPage()),
       ),
-      GoRoute(
-        path: '/user/delivery/summary',
-        pageBuilder: (context, state) => _slide(state, const DeliverySummaryPage()),
-      ),
-      GoRoute(
-        path: '/user/delivery/success',
-        pageBuilder: (context, state) => _slide(state, const DeliverySuccessPage()),
-      ),
-      GoRoute(
-        path: '/user/delivery/completed',
-        pageBuilder: (context, state) => _slide(state, const DeliveryCompletedPage()),
-      ),
+      // Delivery summary/success/completed routes removed — replaced by /user/payment
       GoRoute(
         path: '/user/track/details',
         pageBuilder: (context, state) {
@@ -200,6 +261,44 @@ final routerProvider = Provider<GoRouter>((ref) {
         pageBuilder: (context, state) {
           final id = state.uri.queryParameters['id'] ?? '';
           return _slide(state, NotificationDetailsPage(notificationId: id));
+        },
+      ),
+
+      // ─── Vendor Shell ────────────────────────────────────────────────────
+      ShellRoute(
+        builder: (context, state, child) => VendorShell(child: child),
+        routes: [
+          GoRoute(
+            path: '/vendor',
+            pageBuilder: (context, state) => _fade(state, const VendorDashboardScreen()),
+          ),
+          GoRoute(
+            path: '/vendor/orders',
+            pageBuilder: (context, state) => _fade(state, const VendorOrdersScreen()),
+          ),
+          GoRoute(
+            path: '/vendor/products',
+            pageBuilder: (context, state) => _fade(state, const VendorProductsScreen()),
+          ),
+          GoRoute(
+            path: '/vendor/profile',
+            pageBuilder: (context, state) => _fade(state, const VendorProfileScreen()),
+          ),
+          GoRoute(
+            path: '/vendor/notifications',
+            pageBuilder: (context, state) => _fade(state, const VendorNotificationsScreen()),
+          ),
+        ],
+      ),
+      GoRoute(
+        path: '/vendor/products/add',
+        pageBuilder: (context, state) => _slide(state, const AddEditProductScreen()),
+      ),
+      GoRoute(
+        path: '/vendor/products/edit',
+        pageBuilder: (context, state) {
+          final id = state.uri.queryParameters['id'] ?? '';
+          return _slide(state, AddEditProductScreen(productId: id));
         },
       ),
 
@@ -237,28 +336,19 @@ final routerProvider = Provider<GoRouter>((ref) {
       // ─── Admin Full-Screen Pushes ────────────────────────────────────────
       GoRoute(
         path: '/admin/drones/add',
-        pageBuilder: (context, state) => _slide(state, const AddEditDroneScreen()),
+        pageBuilder: (context, state) => _slide(state, const AdminDronesScreen()),
       ),
       GoRoute(
         path: '/admin/drones/edit',
-        pageBuilder: (context, state) {
-          final droneId = state.uri.queryParameters['id'] ?? '';
-          return _slide(state, AddEditDroneScreen(droneId: droneId));
-        },
+        pageBuilder: (context, state) => _slide(state, const AdminDronesScreen()),
       ),
       GoRoute(
         path: '/admin/drones/details',
-        pageBuilder: (context, state) {
-          final droneId = state.uri.queryParameters['id'] ?? '';
-          return _slide(state, DroneDetailsPage(droneId: droneId));
-        },
+        pageBuilder: (context, state) => _slide(state, const AdminDronesScreen()),
       ),
       GoRoute(
         path: '/admin/drones/monitor',
-        pageBuilder: (context, state) {
-          final droneId = state.uri.queryParameters['id'] ?? '';
-          return _slide(state, DroneMonitoringPage(droneId: droneId));
-        },
+        pageBuilder: (context, state) => _slide(state, const AdminDronesScreen()),
       ),
       GoRoute(
         path: '/admin/deliveries/details',
@@ -269,39 +359,27 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/admin/users/details',
-        pageBuilder: (context, state) {
-          final email = state.uri.queryParameters['email'] ?? '';
-          return _slide(state, UserDetailsPage(email: email));
-        },
+        pageBuilder: (context, state) => _slide(state, const AdminUsersScreen()),
       ),
       GoRoute(
         path: '/admin/users/edit',
-        pageBuilder: (context, state) {
-          final email = state.uri.queryParameters['email'] ?? '';
-          return _slide(state, EditUserPage(email: email));
-        },
+        pageBuilder: (context, state) => _slide(state, const AdminUsersScreen()),
       ),
       GoRoute(
         path: '/admin/users/activity',
-        pageBuilder: (context, state) {
-          final email = state.uri.queryParameters['email'] ?? '';
-          return _slide(state, UserActivityPage(email: email));
-        },
+        pageBuilder: (context, state) => _slide(state, const AdminUsersScreen()),
       ),
       GoRoute(
         path: '/admin/missions',
-        pageBuilder: (context, state) => _slide(state, const MissionListPage()),
+        pageBuilder: (context, state) => _slide(state, const AdminDronesScreen()),
       ),
       GoRoute(
         path: '/admin/missions/details',
-        pageBuilder: (context, state) {
-          final id = state.uri.queryParameters['id'] ?? '';
-          return _slide(state, MissionDetailsPage(missionId: id));
-        },
+        pageBuilder: (context, state) => _slide(state, const AdminDronesScreen()),
       ),
       GoRoute(
         path: '/admin/routes/planner',
-        pageBuilder: (context, state) => _slide(state, const RoutePlannerPage()),
+        pageBuilder: (context, state) => _slide(state, const NoFlyZonePage()),
       ),
       GoRoute(
         path: '/admin/routes/no-fly-zones',
@@ -309,23 +387,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/admin/routes/no-fly-zones/create',
-        pageBuilder: (context, state) => _slide(state, const CreateNoFlyZonePage()),
+        pageBuilder: (context, state) => _slide(state, const NoFlyZonePage()),
       ),
       GoRoute(
         path: '/admin/routes/no-fly-zones/edit',
-        pageBuilder: (context, state) {
-          final id = state.uri.queryParameters['id'] ?? '';
-          final name = state.uri.queryParameters['name'] ?? '';
-          final reason = state.uri.queryParameters['reason'] ?? '';
-          return _slide(
-            state,
-            EditNoFlyZonePage(
-              zoneId: id,
-              name: name,
-              reason: reason,
-            ),
-          );
-        },
+        pageBuilder: (context, state) => _slide(state, const NoFlyZonePage()),
       ),
       GoRoute(
         path: '/admin/reports',
@@ -333,15 +399,15 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/admin/reports/deliveries',
-        pageBuilder: (context, state) => _slide(state, const DeliveryReportsPage()),
+        pageBuilder: (context, state) => _slide(state, const ReportsPage()),
       ),
       GoRoute(
         path: '/admin/reports/drones',
-        pageBuilder: (context, state) => _slide(state, const DroneReportsPage()),
+        pageBuilder: (context, state) => _slide(state, const ReportsPage()),
       ),
       GoRoute(
         path: '/admin/reports/users',
-        pageBuilder: (context, state) => _slide(state, const UserReportsPage()),
+        pageBuilder: (context, state) => _slide(state, const ReportsPage()),
       ),
 
       // ─── Shared ──────────────────────────────────────────────────────────

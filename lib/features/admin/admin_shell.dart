@@ -35,10 +35,12 @@ class _AdminAppBar extends StatelessWidget implements PreferredSizeWidget {
   const _AdminAppBar();
 
   String _titleForRoute(String loc) {
-    if (loc.startsWith('/admin/users')) return 'Users';
+    if (loc.startsWith('/admin/users')) return 'Users & Vendors';
     if (loc.startsWith('/admin/drones')) return 'Drone Fleet';
     if (loc.startsWith('/admin/deliveries')) return 'Deliveries';
     if (loc.startsWith('/admin/analytics')) return 'Analytics';
+    if (loc.startsWith('/admin/routes/no-fly-zones')) return 'Flight Boundaries';
+    if (loc.startsWith('/admin/reports')) return 'System Logs';
     if (loc.startsWith('/admin/settings')) return 'Settings';
     return 'Command Deck';
   }
@@ -46,50 +48,59 @@ class _AdminAppBar extends StatelessWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext ctx) {
     final loc = GoRouterState.of(ctx).uri.toString();
-    return AppBar(
-      backgroundColor: AppColors.bgDark,
-      elevation: 0,
-      centerTitle: false,
-      leading: Builder(
-        builder: (c) => GestureDetector(
-          onTap: () => Scaffold.of(c).openDrawer(),
-          child: Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: AppColors.cardDark,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.borderDark),
+    return PreferredSize(
+      preferredSize: const Size.fromHeight(kToolbarHeight),
+      child: ClipRRect(
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: AppBar(
+            backgroundColor: AppColors.bgDark.withValues(alpha: 0.8),
+            elevation: 0,
+            centerTitle: false,
+            leading: Builder(
+              builder: (c) => GestureDetector(
+                onTap: () => Scaffold.of(c).openDrawer(),
+                child: Container(
+                  margin: const EdgeInsets.only(left: 12, top: 8, bottom: 8),
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.cardDark,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                  ),
+                  child: const Icon(Icons.menu_rounded, color: Colors.white, size: 20),
+                ),
+              ),
             ),
-            child: const Icon(Icons.menu_rounded, color: Colors.white, size: 20),
-          ),
-        ),
-      ),
-      title: Text(
-        _titleForRoute(loc),
-        style: AppTextStyles.title(
-            fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
-      ),
-      actions: [
-        Container(
-          margin: const EdgeInsets.only(right: 16),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-          decoration: BoxDecoration(
-            color: AppColors.accent.withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: AppColors.accent.withValues(alpha: 0.4)),
-          ),
-          child: const Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.shield_rounded, color: AppColors.accent, size: 14),
-              SizedBox(width: 4),
-              Text('ADMIN',
-                  style: TextStyle(
-                      color: AppColors.accent, fontSize: 10, fontWeight: FontWeight.bold)),
+            title: Text(
+              _titleForRoute(loc),
+              style: AppTextStyles.title(
+                  fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+            ),
+            actions: [
+              Container(
+                margin: const EdgeInsets.only(right: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: AppColors.accent.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.accent.withValues(alpha: 0.4)),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.shield_rounded, color: AppColors.accent, size: 14),
+                    SizedBox(width: 4),
+                    Text('ADMIN',
+                        style: TextStyle(
+                            color: AppColors.accent, fontSize: 10, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
-      ],
+      ),
     );
   }
 
@@ -179,10 +190,8 @@ class _AdminDrawer extends StatelessWidget {
                         route: '/admin/users', current: loc, onTap: () => context.go('/admin/users')),
                     _NavItem(icon: Icons.flight_takeoff_rounded, label: 'Drone Fleet',
                         route: '/admin/drones', current: loc, onTap: () => context.go('/admin/drones')),
-                    _NavItem(icon: Icons.hub_rounded, label: 'Mission Control',
-                        route: '/admin/missions', current: loc, onTap: () => context.push('/admin/missions')),
-                    _NavItem(icon: Icons.map_rounded, label: 'Route Planner',
-                        route: '/admin/routes/planner', current: loc, onTap: () => context.push('/admin/routes/planner')),
+                    _NavItem(icon: Icons.map_rounded, label: 'Flight Boundaries',
+                        route: '/admin/routes/no-fly-zones', current: loc, onTap: () => context.go('/admin/routes/no-fly-zones')),
                     _NavItem(icon: Icons.local_shipping_rounded, label: 'Deliveries',
                         route: '/admin/deliveries', current: loc,
                         onTap: () => context.go('/admin/deliveries'),
@@ -206,8 +215,8 @@ class _AdminDrawer extends StatelessWidget {
                     _NavItem(icon: Icons.bar_chart_rounded, label: 'Analytics',
                         route: '/admin/analytics', current: loc,
                         onTap: () => context.go('/admin/analytics')),
-                    _NavItem(icon: Icons.analytics_outlined, label: 'Analytical Reports',
-                        route: '/admin/reports', current: loc, onTap: () => context.push('/admin/reports')),
+                    _NavItem(icon: Icons.analytics_outlined, label: 'System Logs',
+                        route: '/admin/reports', current: loc, onTap: () => context.go('/admin/reports')),
                     _NavItem(icon: Icons.settings_rounded, label: 'Settings',
                         route: '/admin/settings', current: loc,
                         onTap: () => context.go('/admin/settings')),

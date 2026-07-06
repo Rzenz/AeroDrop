@@ -279,7 +279,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
                       remainingSeconds = (total - elapsed).clamp(0, total);
                       if (remainingSeconds <= 0) {
                         statusLabel  = 'Arrived at destination';
-                        messageText  = 'Your package has arrived.';
+                        messageText  = 'Your order has arrived! 🎉';
                         progress     = 1.0;
                       } else {
                         final mm = (remainingSeconds ~/ 60).toString().padLeft(2, '0');
@@ -296,7 +296,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
 
                   case DeliveryStatus.delivered:
                     statusLabel     = 'Arrived at destination';
-                    messageText     = 'Your package has arrived.';
+                    messageText     = 'Your order has arrived! 🎉';
                     progress        = 1.0;
                     showActiveRoute = hasRoute;
                     showDrone       = hasRoute;
@@ -710,7 +710,7 @@ class _CollapsedSummary extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                packageName.isNotEmpty ? packageName : 'No active delivery',
+                packageName.isNotEmpty ? packageName : 'No active order',
                 style: AppTextStyles.title(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
                 overflow: TextOverflow.ellipsis,
               ),

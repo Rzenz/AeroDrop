@@ -7,6 +7,7 @@ import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/glass_card.dart';
 import '../../core/widgets/status_chip.dart';
 import '../../core/widgets/animated_fab.dart';
+import '../../core/widgets/custom_text_field.dart';
 
 class NoFlyZonePage extends ConsumerStatefulWidget {
   const NoFlyZonePage({super.key});
@@ -56,6 +57,127 @@ class _NoFlyZonePageState extends ConsumerState<NoFlyZonePage> {
     );
   }
 
+  void _showCreateZoneDialog(BuildContext context) {
+    final nameController = TextEditingController();
+    final radiusController = TextEditingController(text: '50m');
+    final coordsController = TextEditingController(text: '10.3295° N, 123.9530° E');
+    final reasonController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.cardDark,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('New Restricted Zone', style: TextStyle(color: Colors.white)),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CustomTextField(labelText: 'Zone Name', hintText: 'e.g. Science Lab Wing', controller: nameController),
+              const SizedBox(height: 12),
+              CustomTextField(labelText: 'Radius', hintText: 'e.g. 50m', controller: radiusController),
+              const SizedBox(height: 12),
+              CustomTextField(labelText: 'GPS Coordinates', hintText: 'Lat, Lng', controller: coordsController),
+              const SizedBox(height: 12),
+              CustomTextField(labelText: 'Reason for Restriction', hintText: 'e.g. Construction crane hazard', controller: reasonController),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.accent,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () {
+              if (nameController.text.isEmpty || reasonController.text.isEmpty) return;
+              setState(() {
+                _zones.add({
+                  'id': 'NFZ-${100 + _zones.length + 1}',
+                  'name': nameController.text,
+                  'radius': radiusController.text,
+                  'coords': coordsController.text,
+                  'reason': reasonController.text,
+                  'status': 'active',
+                });
+              });
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('New geofence restriction active!'), backgroundColor: AppColors.success),
+              );
+            },
+            child: const Text('Save Zone', style: TextStyle(color: AppColors.bgDark, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showEditZoneDialog(BuildContext context, Map<String, String> zone) {
+    final nameController = TextEditingController(text: zone['name']);
+    final radiusController = TextEditingController(text: zone['radius']);
+    final coordsController = TextEditingController(text: zone['coords']);
+    final reasonController = TextEditingController(text: zone['reason']);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.cardDark,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('Edit Geofence ${zone['id']}', style: const TextStyle(color: Colors.white)),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CustomTextField(labelText: 'Zone Name', hintText: '', controller: nameController),
+              const SizedBox(height: 12),
+              CustomTextField(labelText: 'Radius', hintText: '', controller: radiusController),
+              const SizedBox(height: 12),
+              CustomTextField(labelText: 'GPS Coordinates', hintText: '', controller: coordsController),
+              const SizedBox(height: 12),
+              CustomTextField(labelText: 'Reason for Restriction', hintText: '', controller: reasonController),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.accent,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () {
+              setState(() {
+                final idx = _zones.indexWhere((z) => z['id'] == zone['id']);
+                if (idx != -1) {
+                  _zones[idx] = {
+                    ..._zones[idx],
+                    'name': nameController.text,
+                    'radius': radiusController.text,
+                    'coords': coordsController.text,
+                    'reason': reasonController.text,
+                  };
+                }
+              });
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Restriction parameters updated!'), backgroundColor: AppColors.success),
+              );
+            },
+            child: const Text('Update parameters', style: TextStyle(color: AppColors.bgDark, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -63,7 +185,7 @@ class _NoFlyZonePageState extends ConsumerState<NoFlyZonePage> {
       floatingActionButton: AnimatedFAB(
         icon: Icons.add_rounded,
         tooltip: 'New Zone',
-        onPressed: () => context.push('/admin/routes/no-fly-zones/create'),
+        onPressed: () => _showCreateZoneDialog(context),
       ),
       body: Container(
         decoration: const BoxDecoration(gradient: AppColors.bgGradientDark),
@@ -158,7 +280,7 @@ class _NoFlyZonePageState extends ConsumerState<NoFlyZonePage> {
                                       mainAxisAlignment: MainAxisAlignment.end,
                                       children: [
                                         TextButton.icon(
-                                          onPressed: () => context.push('/admin/routes/no-fly-zones/edit?id=$id&name=$name&reason=$reason'),
+                                          onPressed: () => _showEditZoneDialog(context, zone),
                                           icon: const Icon(Icons.edit_outlined, size: 14, color: AppColors.secondary),
                                           label: const Text('Edit Parameters', style: TextStyle(color: AppColors.secondary, fontSize: 11, fontWeight: FontWeight.bold)),
                                         ),

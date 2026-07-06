@@ -141,9 +141,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     ),
                     _ProfileMenuItem(
                       icon: Icons.history_toggle_off_rounded,
-                      label: 'Delivery History Logs',
+                      label: 'Order History',
                       color: AppColors.accent,
-                      onTap: () => context.go('/user/history'),
+                      onTap: () => context.go('/user/orders'),
                     ),
                   ],
                 ),
@@ -228,8 +228,8 @@ final isAdmin = role == UserRole.admin;
 final label = isAdmin
     ? 'ADMIN'
     : isFaculty
-        ? 'FACULTY/STAFF'
-        : 'STUDENT';
+        ? 'VENDOR'
+        : 'USER';
 
 final color = isAdmin
     ? AppColors.danger
@@ -240,8 +240,8 @@ final color = isAdmin
 final icon = isAdmin
     ? Icons.admin_panel_settings_rounded
     : isFaculty
-        ? Icons.badge_rounded
-        : Icons.school_rounded;
+        ? Icons.storefront_rounded
+        : Icons.person_rounded;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),

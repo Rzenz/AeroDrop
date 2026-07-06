@@ -161,8 +161,8 @@ class _UserShellState extends ConsumerState<UserShell> with TickerProviderStateM
 
   int _selectedIndex(BuildContext context) {
     final loc = GoRouterState.of(context).uri.toString();
-    if (loc.startsWith('/user/track')) return 1;
-    if (loc.startsWith('/user/history')) return 2;
+    if (loc.startsWith('/user/shop') || loc.startsWith('/user/vendors')) return 1;
+    if (loc.startsWith('/user/orders')) return 2;
     if (loc.startsWith('/user/profile')) return 3;
     return 0;
   }
@@ -178,10 +178,10 @@ class _UserShellState extends ConsumerState<UserShell> with TickerProviderStateM
         context.go('/user');
         break;
       case 1:
-        context.go('/user/track');
+        context.go('/user/shop');
         break;
       case 2:
-        context.go('/user/history');
+        context.go('/user/orders');
         break;
       case 3:
         context.go('/user/profile');
@@ -204,9 +204,9 @@ class _UserShellState extends ConsumerState<UserShell> with TickerProviderStateM
             selectedIndex: selected,
             onTap: (index) => _onTap(index, context),
             onFabPressed: () {
-              _checkAccountStatus(); // Check on tapping New Request FAB
+              _checkAccountStatus(); // Check account status
               HapticFeedback.mediumImpact();
-              context.push('/user/request');
+              context.push('/user/cart');
             },
           ),
         ),

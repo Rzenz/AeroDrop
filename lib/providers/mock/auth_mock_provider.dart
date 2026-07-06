@@ -13,7 +13,7 @@ class AuthMockNotifier extends StateNotifier<AuthState> {
     // ponytail: accept any email/password, defaulting to admin/user based on domain or email prefix
     UserModel matchedUser;
     final lowerEmail = email.toLowerCase();
-    if (lowerEmail.endsWith('@uclm.edu')) {
+    if (lowerEmail.contains('admin') || lowerEmail.startsWith('admin.')) {
       matchedUser = mockUsers.firstWhere((u) => u.role == UserRole.admin);
     } else {
       matchedUser = mockUsers.firstWhere((u) => u.role == UserRole.user);
@@ -37,7 +37,7 @@ class AuthMockNotifier extends StateNotifier<AuthState> {
       final updated = UserModel(
         id: state.user!.id,
         name: role == UserRole.admin ? 'Admin Commander' : 'John Doe',
-        email: role == UserRole.admin ? 'admin.portal@uclm.edu' : 'john.doe@gmail.com',
+        email: role == UserRole.admin ? 'admin.portal@gmail.com' : 'john.doe@gmail.com',
         role: role,
         avatarUrl: state.user!.avatarUrl,
       );

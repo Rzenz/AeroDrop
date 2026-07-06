@@ -104,7 +104,7 @@ class HelpSupportPage extends StatelessWidget {
                           padding: const EdgeInsets.all(16),
                           child: Column(
                             children: [
-                              _buildContactRow(Icons.mail_outline_rounded, 'fleet-support@uclm.edu'),
+                              _buildContactRow(Icons.mail_outline_rounded, 'aerodrop.fleet.support@gmail.com'),
                               const Divider(color: AppColors.borderDark, height: 24),
                               _buildContactRow(Icons.phone_outlined, 'Local Campus Tel: +63 32 400 9011'),
                             ],

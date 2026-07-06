@@ -20,12 +20,12 @@ class AeroDropBottomNavigation extends StatelessWidget {
   Widget build(BuildContext context) {
     final icons = [
       Icons.home_rounded,
-      Icons.radar_rounded,
+      Icons.storefront_rounded,
       Icons.receipt_long_rounded,
       Icons.person_rounded,
     ];
 
-    final labels = ['Home', 'Track', 'History', 'Profile'];
+    final labels = ['Home', 'Shop', 'Orders', 'Profile'];
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(32), // Rounded corners (28-32px)

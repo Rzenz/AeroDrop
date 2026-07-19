@@ -49,10 +49,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
         });
         context.push(
           '/email-sent',
-          extra: {
-            'email': _emailController.text,
-            'type': 'reset',
-          },
+          extra: {'email': _emailController.text, 'type': 'reset'},
         );
       }
     }
@@ -71,10 +68,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                 gradient: RadialGradient(
                   center: Alignment(0.3, -0.2),
                   radius: 0.8,
-                  colors: [
-                    Color(0xFF102847),
-                    AppColors.bgDark,
-                  ],
+                  colors: [Color(0xFF102847), AppColors.bgDark],
                 ),
               ),
             ),
@@ -166,9 +160,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                         color: Colors.white,
                       ),
                     ),
-                  )
-                      .animate()
-                      .scale(curve: Curves.elasticOut, duration: 600.ms),
+                  ).animate().scale(curve: Curves.elasticOut, duration: 600.ms),
                   const SizedBox(height: 28),
                   Text(
                     'Reset Password',
@@ -196,7 +188,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                     padding: const EdgeInsets.all(24),
                     borderRadius: BorderRadius.circular(28),
                     borderGradient: const LinearGradient(
-                      colors: [AppColors.accent, AppColors.primary, Colors.transparent],
+                      colors: [
+                        AppColors.accent,
+                        AppColors.primary,
+                        Colors.transparent,
+                      ],
                       stops: [0.0, 0.5, 1.0],
                     ),
                     child: Form(

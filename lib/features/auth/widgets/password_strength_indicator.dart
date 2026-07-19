@@ -51,7 +51,10 @@ class PasswordStrengthIndicator extends StatelessWidget {
           children: [
             Text(
               'Password Strength:',
-              style: AppTextStyles.body(fontSize: 12, color: AppColors.textSecondaryDark),
+              style: AppTextStyles.body(
+                fontSize: 12,
+                color: AppColors.textSecondaryDark,
+              ),
             ),
             Text(
               strengthText,
@@ -76,13 +79,22 @@ class PasswordStrengthIndicator extends StatelessWidget {
         const SizedBox(height: 12),
         _RequirementRow(label: 'Minimum 8 characters', met: hasMinLength),
         const SizedBox(height: 6),
-        _RequirementRow(label: 'At least one uppercase letter', met: hasUppercase),
+        _RequirementRow(
+          label: 'At least one uppercase letter',
+          met: hasUppercase,
+        ),
         const SizedBox(height: 6),
-        _RequirementRow(label: 'At least one lowercase letter', met: hasLowercase),
+        _RequirementRow(
+          label: 'At least one lowercase letter',
+          met: hasLowercase,
+        ),
         const SizedBox(height: 6),
         _RequirementRow(label: 'At least one number', met: hasDigits),
         const SizedBox(height: 6),
-        _RequirementRow(label: 'At least one special character (!@#\$%^&*)', met: hasSpecial),
+        _RequirementRow(
+          label: 'At least one special character (!@#\$%^&*)',
+          met: hasSpecial,
+        ),
         const SizedBox(height: 12),
       ],
     );
@@ -100,7 +112,9 @@ class _RequirementRow extends StatelessWidget {
     return Row(
       children: [
         Icon(
-          met ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+          met
+              ? Icons.check_circle_rounded
+              : Icons.radio_button_unchecked_rounded,
           color: met ? AppColors.success : AppColors.textSecondaryDark,
           size: 14,
         ),

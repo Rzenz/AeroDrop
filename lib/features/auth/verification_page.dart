@@ -3,13 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/custom_button.dart';
 import '../../core/widgets/glass_card.dart';
 import '../../core/providers/auth_provider.dart';
-import '../../core/models/user_model.dart';
 
 enum VerificationMethod { email, sms }
 
@@ -77,19 +75,21 @@ class _VerificationPageState extends ConsumerState<VerificationPage> {
     if (mounted) {
       setState(() => _resending = false);
       _startTimer();
-      final destination = _method == VerificationMethod.email ? 'email' : 'phone number';
+      final destination = _method == VerificationMethod.email
+          ? 'email'
+          : 'phone number';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Verification code resent to your $destination!'),
           backgroundColor: AppColors.success,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
         ),
       );
     }
   }
-
-
 
   void _verifyCode() async {
     final code = _controllers.map((c) => c.text).join();
@@ -99,7 +99,9 @@ class _VerificationPageState extends ConsumerState<VerificationPage> {
           content: const Text('Please enter the complete 6-digit code.'),
           backgroundColor: Colors.redAccent,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
         ),
       );
       return;
@@ -107,30 +109,58 @@ class _VerificationPageState extends ConsumerState<VerificationPage> {
 
     setState(() => _isLoading = true);
     HapticFeedback.mediumImpact();
-    
-    // Simulate verification check
-    await Future.delayed(const Duration(milliseconds: 1200));
-    
-    if (mounted) {
+
+    try {
+      // Simulate verification check
+      await Future.delayed(const Duration(milliseconds: 1200));
+
+      if (!mounted) return;
       setState(() => _isLoading = false);
-      
-      // Navigate to dashboard based on role
-      final user = ref.read(authProvider).user;
-      if (user?.role == UserRole.admin) {
-        context.go('/admin');
-      } else if (user?.role == UserRole.facultyStaff) {
-        context.go('/vendor');
-      } else {
-        context.go('/user');
+
+      // Complete verification session
+      ref.read(authProvider.notifier).completeVerification();
+
+      // GoRouter redirect automatically routes user to their correct dashboard
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Unable to verify the code. Please try again.'),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        );
       }
     }
+  }
+
+  String _maskPhoneNumber(String? phone) {
+    if (phone == null || phone.trim().isEmpty) {
+      return 'No phone number is registered for this account.';
+    }
+    final clean = phone.replaceAll(RegExp(r'[\s\-\(\)]'), '');
+    if (clean.length >= 7) {
+      final end = clean.substring(clean.length - 4);
+      final start = clean.substring(0, clean.length - 4);
+      if (start.length > 3) {
+        final countryAndPrefix = start.substring(0, start.length - 2);
+        return '$countryAndPrefix•• ••• $end';
+      } else {
+        return '$start•• ••• $end';
+      }
+    }
+    return phone;
   }
 
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(authProvider).user;
     final userEmail = user?.email ?? 'm***@gmail.com';
-    final userPhone = '+63 9•• ••• ••98';
+    final userPhone = _maskPhoneNumber(user?.phoneNumber);
 
     return Scaffold(
       backgroundColor: AppColors.bgDark,
@@ -165,9 +195,9 @@ class _VerificationPageState extends ConsumerState<VerificationPage> {
                       size: 40,
                     ),
                   ).animate().scale(curve: Curves.elasticOut, duration: 600.ms),
-                  
+
                   const SizedBox(height: 32),
-                  
+
                   Text(
                     'Security Verification',
                     style: AppTextStyles.title(
@@ -176,14 +206,17 @@ class _VerificationPageState extends ConsumerState<VerificationPage> {
                       color: Colors.white,
                     ),
                   ).animate().fadeIn(delay: 100.ms),
-                  
+
                   const SizedBox(height: 12),
-                  
+
                   AnimatedSwitcher(
                     duration: const Duration(milliseconds: 300),
                     child: Text(
                       _method == VerificationMethod.email
                           ? 'We sent a 6-digit verification code to your email:\n$userEmail'
+                          : (user?.phoneNumber == null ||
+                                user!.phoneNumber!.trim().isEmpty)
+                          ? 'No phone number is registered for this account.'
                           : 'We sent a 6-digit verification code to your registered mobile number:\n$userPhone',
                       key: ValueKey(_method),
                       style: AppTextStyles.body(
@@ -193,9 +226,9 @@ class _VerificationPageState extends ConsumerState<VerificationPage> {
                       textAlign: TextAlign.center,
                     ),
                   ).animate().fadeIn(delay: 200.ms),
-                  
+
                   const SizedBox(height: 36),
-                  
+
                   // OTP Boxes
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -254,9 +287,9 @@ class _VerificationPageState extends ConsumerState<VerificationPage> {
                       );
                     }),
                   ).animate().fadeIn(delay: 300.ms).slideY(begin: 0.05),
-                  
+
                   const SizedBox(height: 36),
-                  
+
                   GlassCard(
                     padding: const EdgeInsets.all(24),
                     borderRadius: BorderRadius.circular(24),

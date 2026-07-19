@@ -80,14 +80,22 @@ final List<MockOrder> mockOrders = [
     vendorName: 'Campus Bites',
     items: const [
       MockOrderItem(
-        productId: 'p-001', productName: 'Chicken Adobo Rice Meal',
-        vendorName: 'Campus Bites', unitPrice: 75.00, quantity: 2,
-        imageUrl: 'https://images.unsplash.com/photo-1569050467447-ce54b3bbc37d?w=200',
+        productId: 'p-001',
+        productName: 'Chicken Adobo Rice Meal',
+        vendorName: 'Campus Bites',
+        unitPrice: 75.00,
+        quantity: 2,
+        imageUrl:
+            'https://images.unsplash.com/photo-1569050467447-ce54b3bbc37d?w=200',
       ),
       MockOrderItem(
-        productId: 'p-002', productName: 'Iced Coffee',
-        vendorName: 'Campus Bites', unitPrice: 45.00, quantity: 1,
-        imageUrl: 'https://images.unsplash.com/photo-1461023058943-07fcbe16d735?w=200',
+        productId: 'p-002',
+        productName: 'Iced Coffee',
+        vendorName: 'Campus Bites',
+        unitPrice: 45.00,
+        quantity: 1,
+        imageUrl:
+            'https://images.unsplash.com/photo-1461023058943-07fcbe16d735?w=200',
       ),
     ],
     status: MockOrderStatus.pending,
@@ -108,9 +116,13 @@ final List<MockOrder> mockOrders = [
     vendorName: 'TechZone Supplies',
     items: const [
       MockOrderItem(
-        productId: 'p-004', productName: 'USB-C Charging Cable',
-        vendorName: 'TechZone Supplies', unitPrice: 180.00, quantity: 1,
-        imageUrl: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=200',
+        productId: 'p-004',
+        productName: 'USB-C Charging Cable',
+        vendorName: 'TechZone Supplies',
+        unitPrice: 180.00,
+        quantity: 1,
+        imageUrl:
+            'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=200',
       ),
     ],
     status: MockOrderStatus.preparing,
@@ -131,14 +143,22 @@ final List<MockOrder> mockOrders = [
     vendorName: 'Book Nook',
     items: const [
       MockOrderItem(
-        productId: 'p-007', productName: 'Engineering Math Reviewer',
-        vendorName: 'Book Nook', unitPrice: 350.00, quantity: 1,
-        imageUrl: 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=200',
+        productId: 'p-007',
+        productName: 'Engineering Math Reviewer',
+        vendorName: 'Book Nook',
+        unitPrice: 350.00,
+        quantity: 1,
+        imageUrl:
+            'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=200',
       ),
       MockOrderItem(
-        productId: 'p-008', productName: 'Spiral Notebook (200 leaves)',
-        vendorName: 'Book Nook', unitPrice: 95.00, quantity: 2,
-        imageUrl: 'https://images.unsplash.com/photo-1531346878377-a5be20888e57?w=200',
+        productId: 'p-008',
+        productName: 'Spiral Notebook (200 leaves)',
+        vendorName: 'Book Nook',
+        unitPrice: 95.00,
+        quantity: 2,
+        imageUrl:
+            'https://images.unsplash.com/photo-1531346878377-a5be20888e57?w=200',
       ),
     ],
     status: MockOrderStatus.ready,
@@ -159,14 +179,22 @@ final List<MockOrder> mockOrders = [
     vendorName: 'Healthy Corner',
     items: const [
       MockOrderItem(
-        productId: 'p-013', productName: 'Fresh Mango Shake',
-        vendorName: 'Healthy Corner', unitPrice: 60.00, quantity: 2,
-        imageUrl: 'https://images.unsplash.com/photo-1553530666-ba11a7da3888?w=200',
+        productId: 'p-013',
+        productName: 'Fresh Mango Shake',
+        vendorName: 'Healthy Corner',
+        unitPrice: 60.00,
+        quantity: 2,
+        imageUrl:
+            'https://images.unsplash.com/photo-1553530666-ba11a7da3888?w=200',
       ),
       MockOrderItem(
-        productId: 'p-015', productName: 'Granola Energy Bar',
-        vendorName: 'Healthy Corner', unitPrice: 55.00, quantity: 3,
-        imageUrl: 'https://images.unsplash.com/photo-1558024920-b41e1887dc32?w=200',
+        productId: 'p-015',
+        productName: 'Granola Energy Bar',
+        vendorName: 'Healthy Corner',
+        unitPrice: 55.00,
+        quantity: 3,
+        imageUrl:
+            'https://images.unsplash.com/photo-1558024920-b41e1887dc32?w=200',
       ),
     ],
     status: MockOrderStatus.pickedUp,
@@ -187,9 +215,13 @@ final List<MockOrder> mockOrders = [
     vendorName: 'Campus Bites',
     items: const [
       MockOrderItem(
-        productId: 'p-003', productName: 'Pork Sinigang Set',
-        vendorName: 'Campus Bites', unitPrice: 85.00, quantity: 1,
-        imageUrl: 'https://images.unsplash.com/photo-1604909052743-94e838986d24?w=200',
+        productId: 'p-003',
+        productName: 'Pork Sinigang Set',
+        vendorName: 'Campus Bites',
+        unitPrice: 85.00,
+        quantity: 1,
+        imageUrl:
+            'https://images.unsplash.com/photo-1604909052743-94e838986d24?w=200',
       ),
     ],
     status: MockOrderStatus.delivered,
@@ -210,9 +242,13 @@ final List<MockOrder> mockOrders = [
     vendorName: 'Merienda Hub',
     items: const [
       MockOrderItem(
-        productId: 'p-009', productName: 'Turon with Langka',
-        vendorName: 'Merienda Hub', unitPrice: 30.00, quantity: 3,
-        imageUrl: 'https://images.unsplash.com/photo-1546241072-48010ad2862c?w=200',
+        productId: 'p-009',
+        productName: 'Turon with Langka',
+        vendorName: 'Merienda Hub',
+        unitPrice: 30.00,
+        quantity: 3,
+        imageUrl:
+            'https://images.unsplash.com/photo-1546241072-48010ad2862c?w=200',
       ),
     ],
     status: MockOrderStatus.cancelled,

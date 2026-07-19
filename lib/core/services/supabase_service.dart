@@ -5,17 +5,17 @@ class SupabaseService {
 
   static Future<void> initialize() async {
     final url = const String.fromEnvironment('SUPABASE_URL', defaultValue: '');
-    final anonKey = const String.fromEnvironment('SUPABASE_ANON_KEY', defaultValue: '');
+    final anonKey = const String.fromEnvironment(
+      'SUPABASE_ANON_KEY',
+      defaultValue: '',
+    );
 
     if (url.isEmpty || anonKey.isEmpty) {
       _initialized = false;
       return;
     }
 
-    await Supabase.initialize(
-      url: url,
-      publishableKey: anonKey,
-    );
+    await Supabase.initialize(url: url, publishableKey: anonKey);
 
     _initialized = true;
   }

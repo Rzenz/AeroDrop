@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'presentation/controllers/login_controller.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
@@ -22,8 +23,8 @@ class LoginScreen extends ConsumerStatefulWidget {
 class _LoginScreenState extends ConsumerState<LoginScreen>
     with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
- final _emailController = TextEditingController();
-final _passwordController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
   bool _obscurePassword = true;
   bool _rememberMe = false;
   late AnimationController _bgRotateController;
@@ -35,6 +36,27 @@ final _passwordController = TextEditingController();
       vsync: this,
       duration: const Duration(seconds: 16),
     )..repeat();
+    _loadRememberedCredentials();
+  }
+
+  Future<void> _loadRememberedCredentials() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final remember = prefs.getBool('remember_me') ?? false;
+      if (remember) {
+        setState(() {
+          _rememberMe = true;
+          _emailController.text = prefs.getString('saved_email') ?? '';
+        });
+      } else {
+        // Invalidate old session on startup if Remember Me is unchecked
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          ref.read(authProvider.notifier).logout();
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading remembered credentials: $e');
+    }
   }
 
   @override
@@ -51,23 +73,43 @@ final _passwordController = TextEditingController();
       // Dismiss keyboard to prevent animation jank during transition
       FocusScope.of(context).unfocus();
 
+      final emailText = _emailController.text.trim().toLowerCase();
       final success = await ref
           .read(authProvider.notifier)
-          .login(_emailController.text, _passwordController.text);
+          .login(emailText, _passwordController.text);
+
       if (success && mounted) {
+        // Persist or clear credentials based on Remember Me check
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          if (_rememberMe) {
+            await prefs.setBool('remember_me', true);
+            await prefs.setString('saved_email', emailText);
+          } else {
+            await prefs.setBool('remember_me', false);
+            await prefs.remove('saved_email');
+          }
+        } catch (e) {
+          debugPrint('Error saving remember me preferences: $e');
+        }
+
         // Let the button state settle before navigating
         await Future.delayed(const Duration(milliseconds: 150));
         if (!mounted) return;
 
         context.go('/verification');
       } else if (!success && mounted) {
-        final errorMsg = ref.read(authProvider).errorMessage ?? 'Login failed. Please try again.';
+        final errorMsg =
+            ref.read(authProvider).errorMessage ??
+            'Login failed. Please try again.';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(errorMsg),
             backgroundColor: AppColors.danger,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
           ),
         );
       }
@@ -326,44 +368,67 @@ final _passwordController = TextEditingController();
                                             LoginController.validatePassword,
                                       ),
                                       Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
                                         children: [
-                                          Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Theme(
-                                                data: Theme.of(context).copyWith(
-                                                  unselectedWidgetColor: AppColors.textSecondaryDark,
+                                          Flexible(
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Theme(
+                                                  data: Theme.of(context).copyWith(
+                                                    unselectedWidgetColor:
+                                                        AppColors
+                                                            .textSecondaryDark,
+                                                  ),
+                                                  child: Checkbox(
+                                                    value: _rememberMe,
+                                                    activeColor:
+                                                        AppColors.accent,
+                                                    checkColor:
+                                                        AppColors.bgDark,
+                                                    onChanged: (val) {
+                                                      setState(() {
+                                                        _rememberMe =
+                                                            val ?? false;
+                                                      });
+                                                    },
+                                                  ),
                                                 ),
-                                                child: Checkbox(
-                                                  value: _rememberMe,
-                                                  activeColor: AppColors.accent,
-                                                  checkColor: AppColors.bgDark,
-                                                  onChanged: (val) {
-                                                    setState(() {
-                                                      _rememberMe = val ?? false;
-                                                    });
-                                                  },
+                                                Flexible(
+                                                  child: Text(
+                                                    'Remember me',
+                                                    style: AppTextStyles.body(
+                                                      fontSize: 13,
+                                                      color: Colors.white70,
+                                                    ),
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                  ),
                                                 ),
+                                              ],
+                                            ),
+                                          ),
+                                          Flexible(
+                                            child: TextButton(
+                                              onPressed: () => context.push(
+                                                '/forgot-password',
                                               ),
-                                              Text(
-                                                'Remember me',
+                                              style: TextButton.styleFrom(
+                                                padding: EdgeInsets.zero,
+                                                minimumSize: Size.zero,
+                                                tapTargetSize:
+                                                    MaterialTapTargetSize
+                                                        .shrinkWrap,
+                                              ),
+                                              child: Text(
+                                                'Forgot Password?',
                                                 style: AppTextStyles.body(
                                                   fontSize: 13,
-                                                  color: Colors.white70,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: AppColors.accentLight,
                                                 ),
-                                              ),
-                                            ],
-                                          ),
-                                          TextButton(
-                                            onPressed: () =>
-                                                context.push('/forgot-password'),
-                                            child: Text(
-                                              'Forgot Password?',
-                                              style: AppTextStyles.body(
-                                                fontSize: 13,
-                                                fontWeight: FontWeight.bold,
-                                                color: AppColors.accentLight,
+                                                overflow: TextOverflow.ellipsis,
                                               ),
                                             ),
                                           ),

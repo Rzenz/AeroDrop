@@ -48,9 +48,7 @@ void showAeroDropWarningDialog({
             const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(centerIcon, color: centerIconColor, size: 48),
-              ],
+              children: [Icon(centerIcon, color: centerIconColor, size: 48)],
             ),
           ],
         ),

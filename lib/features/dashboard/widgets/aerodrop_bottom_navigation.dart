@@ -30,14 +30,21 @@ class AeroDropBottomNavigation extends StatelessWidget {
     return ClipRRect(
       borderRadius: BorderRadius.circular(32), // Rounded corners (28-32px)
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20), // Premium Glassmorphism
+        filter: ImageFilter.blur(
+          sigmaX: 20,
+          sigmaY: 20,
+        ), // Premium Glassmorphism
         child: Container(
           height: 76,
           decoration: BoxDecoration(
-            color: AppColors.cardDark.withValues(alpha: 0.8), // Dark theme surface
+            color: AppColors.cardDark.withValues(
+              alpha: 0.8,
+            ), // Dark theme surface
             borderRadius: BorderRadius.circular(32),
             border: Border.all(
-              color: Colors.white.withValues(alpha: 0.08), // Subtle premium border
+              color: Colors.white.withValues(
+                alpha: 0.08,
+              ), // Subtle premium border
               width: 1.5,
             ),
           ),
@@ -63,10 +70,12 @@ class AeroDropBottomNavigation extends StatelessWidget {
     String label,
   ) {
     final isActive = selectedIndex == index;
-    
+
     // Theme-compatible colors
-    final activeIconColor = AppColors.primaryDark; // Blue icon inside yellow pill
-    final inactiveColor = AppColors.textSecondaryDark; // Slate gray for inactive
+    final activeIconColor =
+        AppColors.primaryDark; // Blue icon inside yellow pill
+    final inactiveColor =
+        AppColors.textSecondaryDark; // Slate gray for inactive
     final yellowIndicator = AppColors.accent; // Brand Vivid Yellow
 
     return Material(
@@ -110,12 +119,15 @@ class AeroDropBottomNavigation extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   label,
-                  style: AppTextStyles.label(
-                    fontSize: 10,
-                    color: isActive ? activeIconColor : inactiveColor,
-                  ).copyWith(
-                    fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-                  ),
+                  style:
+                      AppTextStyles.label(
+                        fontSize: 10,
+                        color: isActive ? activeIconColor : inactiveColor,
+                      ).copyWith(
+                        fontWeight: isActive
+                            ? FontWeight.bold
+                            : FontWeight.normal,
+                      ),
                 ),
               ],
             ),

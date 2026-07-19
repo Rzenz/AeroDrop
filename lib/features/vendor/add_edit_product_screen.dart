@@ -1,51 +1,74 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../mock_data/products_mock.dart';
+import '../../core/providers/product_provider.dart';
 
-class AddEditProductScreen extends StatefulWidget {
+class AddEditProductScreen extends ConsumerStatefulWidget {
   final String? productId; // null = add, non-null = edit
   const AddEditProductScreen({super.key, this.productId});
 
   @override
-  State<AddEditProductScreen> createState() => _AddEditProductScreenState();
+  ConsumerState<AddEditProductScreen> createState() =>
+      _AddEditProductScreenState();
 }
 
-class _AddEditProductScreenState extends State<AddEditProductScreen> {
+class _AddEditProductScreenState extends ConsumerState<AddEditProductScreen> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _name, _description, _price, _stock, _weight;
   String _category = 'Food';
   bool _available = true;
   bool _saving = false;
+  String _imageUrl = '';
 
   bool get _isEdit => widget.productId != null;
 
   static const _categories = [
-    'Food', 'Drinks', 'Snacks', 'Electronics', 'Stationery', 'Books',
-    'Reviewers', 'Maritime Supplies', 'Equipment',
+    'Food',
+    'Drinks',
+    'Snacks',
+    'Electronics',
+    'Stationery',
+    'Books',
+    'Reviewers',
+    'Maritime Supplies',
+    'Equipment',
   ];
 
   @override
   void initState() {
     super.initState();
+    _name = TextEditingController();
+    _description = TextEditingController();
+    _price = TextEditingController();
+    _stock = TextEditingController();
+    _weight = TextEditingController();
+
+    // In edit mode, load state after first build when ref is available
     if (_isEdit) {
-      final product = mockProducts.firstWhere((p) => p.id == widget.productId, orElse: () => mockProducts.first);
-      _name = TextEditingController(text: product.name);
-      _description = TextEditingController(text: product.description);
-      _price = TextEditingController(text: product.price.toString());
-      _stock = TextEditingController(text: product.stock.toString());
-      _weight = TextEditingController(text: (product.weightKg * 1000).toStringAsFixed(0)); // Convert to grams
-      _category = product.category;
-      _available = product.isAvailable;
-    } else {
-      _name = TextEditingController();
-      _description = TextEditingController();
-      _price = TextEditingController();
-      _stock = TextEditingController();
-      _weight = TextEditingController();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final product = ref
+            .read(vendorProductsProvider)
+            .products
+            .firstWhere(
+              (p) => p.id == widget.productId,
+              orElse: () => mockProducts.first,
+            );
+        setState(() {
+          _name.text = product.name;
+          _description.text = product.description;
+          _price.text = product.price.toString();
+          _stock.text = product.stock.toString();
+          _weight.text = (product.weightKg * 1000).toStringAsFixed(0);
+          _category = product.category;
+          _available = product.isAvailable;
+          _imageUrl = product.imageUrl;
+        });
+      });
     }
   }
 
@@ -81,7 +104,7 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
           physics: const BouncingScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
           children: [
-            // Image Upload Area Placeholder
+            // Showcase Image Placeholder
             Container(
               height: 160,
               decoration: BoxDecoration(
@@ -93,33 +116,54 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
                   width: 1.5,
                 ),
               ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.12),
-                      shape: BoxShape.circle,
+              child: _imageUrl.isNotEmpty
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      child: Image.network(
+                        _imageUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) =>
+                            const Icon(
+                              Icons.add_photo_alternate_rounded,
+                              color: AppColors.accent,
+                              size: 32,
+                            ),
+                      ),
+                    )
+                  : Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.12),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.add_photo_alternate_rounded,
+                            color: AppColors.accent,
+                            size: 32,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        const Text(
+                          'Upload Product Showcase Image',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'Supports PNG, JPG up to 5MB',
+                          style: TextStyle(
+                            color: AppColors.textSecondaryDark,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
                     ),
-                    child: const Icon(
-                      Icons.add_photo_alternate_rounded,
-                      color: AppColors.accent,
-                      size: 32,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Upload Product Showcase Image',
-                    style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'Supports PNG, JPG up to 5MB',
-                    style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 11),
-                  ),
-                ],
-              ),
             ).animate().fadeIn(duration: 400.ms),
             const SizedBox(height: 24),
 
@@ -170,7 +214,9 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
               label: 'Weight (grams)',
               hint: 'e.g. 350',
               keyboardType: TextInputType.number,
-              validator: (v) => v!.isEmpty ? 'Weight is required for drone cargo limits' : null,
+              validator: (v) => v!.isEmpty
+                  ? 'Weight is required for drone cargo limits'
+                  : null,
             ),
             const SizedBox(height: 18),
 
@@ -180,7 +226,10 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
               children: [
                 Text(
                   'Category Segment',
-                  style: AppTextStyles.body(fontSize: 12, color: AppColors.textSecondaryDark),
+                  style: AppTextStyles.body(
+                    fontSize: 12,
+                    color: AppColors.textSecondaryDark,
+                  ),
                 ),
                 const SizedBox(height: 10),
                 Wrap(
@@ -192,21 +241,32 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
                       onTap: () => setState(() => _category = c),
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 200),
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 8,
+                        ),
                         decoration: BoxDecoration(
-                          color: isSelected ? AppColors.accent : AppColors.cardDark,
+                          color: isSelected
+                              ? AppColors.accent
+                              : AppColors.cardDark,
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
-                            color: isSelected ? AppColors.accent : Colors.white.withValues(alpha: 0.08),
+                            color: isSelected
+                                ? AppColors.accent
+                                : Colors.white.withValues(alpha: 0.08),
                             width: 1.2,
                           ),
                         ),
                         child: Text(
                           c,
                           style: TextStyle(
-                            color: isSelected ? AppColors.primaryDark : Colors.white,
+                            color: isSelected
+                                ? AppColors.primaryDark
+                                : Colors.white,
                             fontSize: 11.5,
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                            fontWeight: isSelected
+                                ? FontWeight.bold
+                                : FontWeight.normal,
                           ),
                         ),
                       ),
@@ -227,7 +287,11 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.playlist_add_check_rounded, color: AppColors.accent, size: 24),
+                  const Icon(
+                    Icons.playlist_add_check_rounded,
+                    color: AppColors.accent,
+                    size: 24,
+                  ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -235,11 +299,20 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
                       children: [
                         const Text(
                           'Available for Orders',
-                          style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                         Text(
-                          _available ? 'Visible to students on campus' : 'Hidden from campus store catalog',
-                          style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 11),
+                          _available
+                              ? 'Visible to students on campus'
+                              : 'Hidden from campus store catalog',
+                          style: const TextStyle(
+                            color: AppColors.textSecondaryDark,
+                            fontSize: 11,
+                          ),
                         ),
                       ],
                     ),
@@ -264,18 +337,27 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
                 backgroundColor: AppColors.accent,
                 foregroundColor: AppColors.primaryDark,
                 minimumSize: const Size(double.infinity, 54),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
                 elevation: 4,
               ),
               child: _saving
                   ? const SizedBox(
                       width: 22,
                       height: 22,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primaryDark),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppColors.primaryDark,
+                      ),
                     )
                   : Text(
                       _isEdit ? 'Apply Changes' : 'Publish Listing',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, letterSpacing: 0.5),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                        letterSpacing: 0.5,
+                      ),
                     ),
             ).animate().fadeIn(delay: 160.ms),
           ],
@@ -288,18 +370,79 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
     if (!_formKey.currentState!.validate()) return;
     HapticFeedback.mediumImpact();
     setState(() => _saving = true);
-    await Future.delayed(const Duration(milliseconds: 1200));
+
+    final name = _name.text;
+    final description = _description.text;
+    final price = double.tryParse(_price.text) ?? 0.0;
+    final stock = int.tryParse(_stock.text) ?? 0;
+    final weightGrams = double.tryParse(_weight.text) ?? 0.0;
+    final weightKg = weightGrams / 1000.0;
+    final imgUrl = _imageUrl.isNotEmpty
+        ? _imageUrl
+        : 'https://images.unsplash.com/photo-1569050467447-ce54b3bbc37d?w=400';
+
+    bool success;
+    if (_isEdit) {
+      success = await ref
+          .read(vendorProductsProvider.notifier)
+          .editProduct(
+            id: widget.productId!,
+            name: name,
+            description: description,
+            price: price,
+            stock: stock,
+            categoryName: _category,
+            weightKg: weightKg,
+            imageUrl: imgUrl,
+            isAvailable: _available,
+          );
+    } else {
+      success = await ref
+          .read(vendorProductsProvider.notifier)
+          .addProduct(
+            name: name,
+            description: description,
+            price: price,
+            stock: stock,
+            categoryName: _category,
+            weightKg: weightKg,
+            imageUrl: imgUrl,
+          );
+    }
+
     if (!mounted) return;
     setState(() => _saving = false);
-    context.pop();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(_isEdit ? 'Product updated successfully.' : 'Product added successfully.'),
-        backgroundColor: AppColors.success,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-    );
+
+    if (success) {
+      context.pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _isEdit
+                ? 'Product updated successfully.'
+                : 'Product added successfully.',
+          ),
+          backgroundColor: AppColors.success,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _isEdit ? 'Failed to update product.' : 'Failed to add product.',
+          ),
+          backgroundColor: AppColors.danger,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      );
+    }
   }
 }
 
@@ -327,7 +470,10 @@ class _Field extends StatelessWidget {
       children: [
         Text(
           label,
-          style: AppTextStyles.body(fontSize: 12, color: AppColors.textSecondaryDark),
+          style: AppTextStyles.body(
+            fontSize: 12,
+            color: AppColors.textSecondaryDark,
+          ),
         ),
         const SizedBox(height: 8),
         TextFormField(
@@ -338,16 +484,23 @@ class _Field extends StatelessWidget {
           validator: validator,
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: TextStyle(color: AppColors.textSecondaryDark.withValues(alpha: 0.5), fontSize: 13),
+            hintStyle: TextStyle(
+              color: AppColors.textSecondaryDark.withValues(alpha: 0.5),
+              fontSize: 13,
+            ),
             filled: true,
             fillColor: AppColors.cardDark,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+              borderSide: BorderSide(
+                color: Colors.white.withValues(alpha: 0.08),
+              ),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+              borderSide: BorderSide(
+                color: Colors.white.withValues(alpha: 0.08),
+              ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
@@ -361,7 +514,10 @@ class _Field extends StatelessWidget {
               borderRadius: BorderRadius.circular(14),
               borderSide: const BorderSide(color: AppColors.danger, width: 1.5),
             ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 14,
+            ),
           ),
         ),
       ],

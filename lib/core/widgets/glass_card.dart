@@ -28,7 +28,8 @@ class GlassCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final radius = borderRadius ?? BorderRadius.circular(24);
-    final gradient = borderGradient ??
+    final gradient =
+        borderGradient ??
         LinearGradient(
           colors: [
             Colors.white.withValues(alpha: 0.15),
@@ -64,10 +65,7 @@ class GlassCard extends StatelessWidget {
 
     if (boxShadow != null) {
       card = Container(
-        decoration: BoxDecoration(
-          borderRadius: radius,
-          boxShadow: boxShadow,
-        ),
+        decoration: BoxDecoration(borderRadius: radius, boxShadow: boxShadow),
         child: card,
       );
     }
@@ -119,9 +117,13 @@ class _DarkCardState extends State<DarkCard>
   void initState() {
     super.initState();
     _ctrl = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 100));
-    _scale = Tween<double>(begin: 1.0, end: 0.98).animate(
-        CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
+      vsync: this,
+      duration: const Duration(milliseconds: 100),
+    );
+    _scale = Tween<double>(
+      begin: 1.0,
+      end: 0.98,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
   }
 
   @override
@@ -133,7 +135,8 @@ class _DarkCardState extends State<DarkCard>
   @override
   Widget build(BuildContext context) {
     final radius = widget.borderRadius ?? BorderRadius.circular(22);
-    final borderGrad = widget.borderGradient ??
+    final borderGrad =
+        widget.borderGradient ??
         LinearGradient(
           colors: [
             AppColors.borderDark,
@@ -171,8 +174,7 @@ class _DarkCardState extends State<DarkCard>
         _ctrl.reverse();
         final now = DateTime.now();
         if (_lastTapped != null &&
-            now.difference(_lastTapped!) <
-                const Duration(milliseconds: 500)) {
+            now.difference(_lastTapped!) < const Duration(milliseconds: 500)) {
           return;
         }
         _lastTapped = now;
@@ -215,9 +217,13 @@ class _FloatingCardState extends State<FloatingCard>
   void initState() {
     super.initState();
     _ctrl = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 100));
-    _scale = Tween<double>(begin: 1.0, end: 0.98).animate(
-        CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
+      vsync: this,
+      duration: const Duration(milliseconds: 100),
+    );
+    _scale = Tween<double>(
+      begin: 1.0,
+      end: 0.98,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
   }
 
   @override
@@ -262,8 +268,7 @@ class _FloatingCardState extends State<FloatingCard>
         _ctrl.reverse();
         final now = DateTime.now();
         if (_lastTapped != null &&
-            now.difference(_lastTapped!) <
-                const Duration(milliseconds: 500)) {
+            now.difference(_lastTapped!) < const Duration(milliseconds: 500)) {
           return;
         }
         _lastTapped = now;

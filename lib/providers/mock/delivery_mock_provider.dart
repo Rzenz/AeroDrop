@@ -48,15 +48,19 @@ class DeliveryMockNotifier extends StateNotifier<List<DeliveryModel>> {
           if (nextProgress >= 1.0) {
             if (delivery.droneId != null) {
               // Keep reduced battery — admin must recharge manually
-              ref.read(droneProvider.notifier).updateStatus(delivery.droneId!, DroneStatus.available);
+              ref
+                  .read(droneProvider.notifier)
+                  .updateStatus(delivery.droneId!, DroneStatus.available);
             }
             ref.read(analyticsMockProvider.notifier).incrementDeliveries();
-            
+
             // Trigger local success notification
-            ref.read(notificationProvider.notifier).addNotification(
-              'Delivery ${delivery.id} Arrived',
-              'Package "${delivery.packageName}" has been successfully dropped off at ${delivery.deliveryAddress}.',
-            );
+            ref
+                .read(notificationProvider.notifier)
+                .addNotification(
+                  'Delivery ${delivery.id} Arrived',
+                  'Package "${delivery.packageName}" has been successfully dropped off at ${delivery.deliveryAddress}.',
+                );
 
             return delivery.copyWith(
               status: DeliveryStatus.delivered,
@@ -69,23 +73,31 @@ class DeliveryMockNotifier extends StateNotifier<List<DeliveryModel>> {
               final index = drones.indexWhere((d) => d.id == delivery.droneId);
               if (index != -1) {
                 final currentBattery = drones[index].batteryLevel;
-                ref.read(droneProvider.notifier).updateBattery(
-                  delivery.droneId!,
-                  (currentBattery - 1.0).clamp(0.0, 100.0),
-                );
-                
+                ref
+                    .read(droneProvider.notifier)
+                    .updateBattery(
+                      delivery.droneId!,
+                      (currentBattery - 1.0).clamp(0.0, 100.0),
+                    );
+
                 // Interpolate coordinates from UCLM Hub to destination
                 const originLat = 10.3276;
                 const originLng = 123.9507;
-                final target = _getDestinationCoordinates(delivery.deliveryAddress);
-                
-                final currentLat = originLat + (nextProgress * (target.lat - originLat));
-                final currentLng = originLng + (nextProgress * (target.lng - originLng));
-                
-                ref.read(droneProvider.notifier).updateCoordinates(
-                  delivery.droneId!,
-                  '${currentLat.toStringAsFixed(4)}° N, ${currentLng.toStringAsFixed(4)}° E',
+                final target = _getDestinationCoordinates(
+                  delivery.deliveryAddress,
                 );
+
+                final currentLat =
+                    originLat + (nextProgress * (target.lat - originLat));
+                final currentLng =
+                    originLng + (nextProgress * (target.lng - originLng));
+
+                ref
+                    .read(droneProvider.notifier)
+                    .updateCoordinates(
+                      delivery.droneId!,
+                      '${currentLat.toStringAsFixed(4)}° N, ${currentLng.toStringAsFixed(4)}° E',
+                    );
               }
             }
             final remainingMins = ((1.0 - nextProgress) * 10).round();
@@ -113,17 +125,24 @@ class DeliveryMockNotifier extends StateNotifier<List<DeliveryModel>> {
     final uniqueNum = 10000 + rand.nextInt(90000);
     final newId = 'ADR-2026-$uniqueNum';
 
-    final availableDrones = ref.read(droneProvider).where((d) => d.status == DroneStatus.available && d.batteryLevel >= 10.0).toList();
-    
+    final availableDrones = ref
+        .read(droneProvider)
+        .where(
+          (d) => d.status == DroneStatus.available && d.batteryLevel >= 10.0,
+        )
+        .toList();
+
     String? assignedDroneId;
     DeliveryStatus status = DeliveryStatus.pending;
     String eta = 'TBD';
-    
+
     if (availableDrones.isNotEmpty) {
       assignedDroneId = availableDrones.first.id;
       status = DeliveryStatus.inTransit;
       eta = '10 mins';
-      ref.read(droneProvider.notifier).updateStatus(assignedDroneId, DroneStatus.busy);
+      ref
+          .read(droneProvider.notifier)
+          .updateStatus(assignedDroneId, DroneStatus.busy);
     }
 
     final newDelivery = DeliveryModel(
@@ -145,23 +164,35 @@ class DeliveryMockNotifier extends StateNotifier<List<DeliveryModel>> {
     state = [newDelivery, ...state];
 
     // Trigger local notification for creation
-    ref.read(notificationProvider.notifier).addNotification(
-      'Delivery Request Created',
-      'Request $newId for "$packageName" created and ${assignedDroneId != null ? "assigned to $assignedDroneId" : "queued"}.',
-    );
+    ref
+        .read(notificationProvider.notifier)
+        .addNotification(
+          'Delivery Request Created',
+          'Request $newId for "$packageName" created and ${assignedDroneId != null ? "assigned to $assignedDroneId" : "queued"}.',
+        );
   }
 
-  void updateDeliveryStatus(String id, DeliveryStatus status, {String? droneId}) {
+  void updateDeliveryStatus(
+    String id,
+    DeliveryStatus status, {
+    String? droneId,
+  }) {
     state = state.map((delivery) {
       if (delivery.id == id) {
         if (status == DeliveryStatus.delivered && delivery.droneId != null) {
-          ref.read(droneProvider.notifier).updateStatus(delivery.droneId!, DroneStatus.available);
+          ref
+              .read(droneProvider.notifier)
+              .updateStatus(delivery.droneId!, DroneStatus.available);
         }
         return delivery.copyWith(
           status: status,
           droneId: droneId ?? delivery.droneId,
-          progress: status == DeliveryStatus.delivered ? 1.0 : (status == DeliveryStatus.inTransit ? 0.1 : 0.0),
-          eta: status == DeliveryStatus.delivered ? '0 mins' : (status == DeliveryStatus.inTransit ? '10 mins' : 'TBD'),
+          progress: status == DeliveryStatus.delivered
+              ? 1.0
+              : (status == DeliveryStatus.inTransit ? 0.1 : 0.0),
+          eta: status == DeliveryStatus.delivered
+              ? '0 mins'
+              : (status == DeliveryStatus.inTransit ? '10 mins' : 'TBD'),
         );
       }
       return delivery;
@@ -179,6 +210,7 @@ class DeliveryMockNotifier extends StateNotifier<List<DeliveryModel>> {
   }
 }
 
-final deliveryMockProvider = StateNotifierProvider<DeliveryMockNotifier, List<DeliveryModel>>((ref) {
-  return DeliveryMockNotifier(ref);
-});
+final deliveryMockProvider =
+    StateNotifierProvider<DeliveryMockNotifier, List<DeliveryModel>>((ref) {
+      return DeliveryMockNotifier(ref);
+    });

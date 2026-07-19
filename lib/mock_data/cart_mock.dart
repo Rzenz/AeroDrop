@@ -9,6 +9,7 @@ class CartItem {
   final String vendorName;
   final String imageUrl;
   final double unitPrice;
+  final double weightKg;
   int quantity;
 
   CartItem({
@@ -18,6 +19,7 @@ class CartItem {
     required this.vendorName,
     required this.imageUrl,
     required this.unitPrice,
+    this.weightKg = 0.0,
     this.quantity = 1,
   });
 

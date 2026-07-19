@@ -10,7 +10,11 @@ class AppTextStyles {
     Color? color,
     double letterSpacing = -1.0,
   }) {
-    final resolvedColor = color ?? (AppTheme.isDarkMode ? AppColors.textPrimaryDark : AppColors.textPrimaryLight);
+    final resolvedColor =
+        color ??
+        (AppTheme.isDarkMode
+            ? AppColors.textPrimaryDark
+            : AppColors.textPrimaryLight);
     return GoogleFonts.poppins(
       fontSize: fontSize,
       fontWeight: FontWeight.w800,
@@ -20,11 +24,12 @@ class AppTextStyles {
   }
 
   /// Heading: Poppins Bold, 24–32px, white
-  static TextStyle heading({
-    double fontSize = 28,
-    Color? color,
-  }) {
-    final resolvedColor = color ?? (AppTheme.isDarkMode ? AppColors.textPrimaryDark : AppColors.textPrimaryLight);
+  static TextStyle heading({double fontSize = 28, Color? color}) {
+    final resolvedColor =
+        color ??
+        (AppTheme.isDarkMode
+            ? AppColors.textPrimaryDark
+            : AppColors.textPrimaryLight);
     return GoogleFonts.poppins(
       fontSize: fontSize,
       fontWeight: FontWeight.bold,
@@ -33,11 +38,12 @@ class AppTextStyles {
   }
 
   /// SubHead: Poppins SemiBold, 16–18px, #7B8FA1
-  static TextStyle subHead({
-    double fontSize = 16,
-    Color? color,
-  }) {
-    final resolvedColor = color ?? (AppTheme.isDarkMode ? AppColors.textSecondaryDark : AppColors.textSecondaryLight);
+  static TextStyle subHead({double fontSize = 16, Color? color}) {
+    final resolvedColor =
+        color ??
+        (AppTheme.isDarkMode
+            ? AppColors.textSecondaryDark
+            : AppColors.textSecondaryLight);
     return GoogleFonts.poppins(
       fontSize: fontSize,
       fontWeight: FontWeight.w600,
@@ -52,7 +58,11 @@ class AppTextStyles {
     double? height,
     FontWeight fontWeight = FontWeight.normal,
   }) {
-    final resolvedColor = color ?? (AppTheme.isDarkMode ? const Color(0xD9F8FAFF) : AppColors.textPrimaryLight);
+    final resolvedColor =
+        color ??
+        (AppTheme.isDarkMode
+            ? const Color(0xD9F8FAFF)
+            : AppColors.textPrimaryLight);
     return GoogleFonts.inter(
       fontSize: fontSize,
       fontWeight: fontWeight,
@@ -67,14 +77,20 @@ class AppTextStyles {
     Color? color,
     double letterSpacing = 1.2,
   }) {
-    final resolvedColor = color ?? (AppTheme.isDarkMode ? AppColors.textSecondaryDark : AppColors.textSecondaryLight);
+    final resolvedColor =
+        color ??
+        (AppTheme.isDarkMode
+            ? AppColors.textSecondaryDark
+            : AppColors.textSecondaryLight);
     return GoogleFonts.nunito(
       fontSize: fontSize,
       fontWeight: FontWeight.w600,
       color: resolvedColor,
       letterSpacing: letterSpacing,
     ).copyWith(
-      fontFeatures: const [FontFeature.enable('smcp')], // small caps if supported
+      fontFeatures: const [
+        FontFeature.enable('smcp'),
+      ], // small caps if supported
     );
   }
 

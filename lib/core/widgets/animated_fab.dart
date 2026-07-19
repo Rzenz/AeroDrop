@@ -17,7 +17,8 @@ class AnimatedFAB extends StatefulWidget {
   State<AnimatedFAB> createState() => _AnimatedFABState();
 }
 
-class _AnimatedFABState extends State<AnimatedFAB> with SingleTickerProviderStateMixin {
+class _AnimatedFABState extends State<AnimatedFAB>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;
 
@@ -28,9 +29,10 @@ class _AnimatedFABState extends State<AnimatedFAB> with SingleTickerProviderStat
       vsync: this,
       duration: const Duration(milliseconds: 150),
     );
-    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.88).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
+    _scaleAnimation = Tween<double>(
+      begin: 1.0,
+      end: 0.88,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
   }
 
   @override
@@ -68,11 +70,7 @@ class _AnimatedFABState extends State<AnimatedFAB> with SingleTickerProviderStat
               ),
             ],
           ),
-          child: Icon(
-            widget.icon,
-            color: Colors.white,
-            size: 26,
-          ),
+          child: Icon(widget.icon, color: Colors.white, size: 26),
         ),
       ),
     );

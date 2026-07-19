@@ -32,13 +32,21 @@ class AboutPage extends StatelessWidget {
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(color: AppColors.borderDark),
                         ),
-                        child: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 20),
+                        child: const Icon(
+                          Icons.arrow_back_rounded,
+                          color: Colors.white,
+                          size: 20,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 16),
                     Text(
                       'About AeroDrop',
-                      style: AppTextStyles.title(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+                      style: AppTextStyles.title(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
                     ),
                   ],
                 ).animate().fadeIn().slideX(begin: -0.1),
@@ -51,18 +59,33 @@ class AboutPage extends StatelessWidget {
                       children: [
                         // Large icon
                         ShaderMask(
-                          shaderCallback: (b) => AppColors.primaryGradient.createShader(b),
-                          child: const Icon(Icons.flight_takeoff_rounded, size: 72, color: Colors.white),
-                        ).animate().scale(duration: 500.ms, curve: Curves.elasticOut),
+                          shaderCallback: (b) =>
+                              AppColors.primaryGradient.createShader(b),
+                          child: const Icon(
+                            Icons.flight_takeoff_rounded,
+                            size: 72,
+                            color: Colors.white,
+                          ),
+                        ).animate().scale(
+                          duration: 500.ms,
+                          curve: Curves.elasticOut,
+                        ),
                         const SizedBox(height: 16),
                         Text(
                           'AeroDrop Campus Delivery',
-                          style: AppTextStyles.title(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.white),
+                          style: AppTextStyles.title(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                          ),
                           textAlign: TextAlign.center,
                         ),
                         Text(
                           'Version 1.0.0 (Build 2026.06.25)',
-                          style: AppTextStyles.body(fontSize: 12, color: AppColors.textSecondaryDark),
+                          style: AppTextStyles.body(
+                            fontSize: 12,
+                            color: AppColors.textSecondaryDark,
+                          ),
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 28),
@@ -75,12 +98,19 @@ class AboutPage extends StatelessWidget {
                             children: [
                               Text(
                                 'Autonomous Aerial Distribution',
-                                style: AppTextStyles.title(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+                                style: AppTextStyles.title(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
                               ),
                               const SizedBox(height: 10),
                               Text(
                                 'AeroDrop is an official campus initiative designed for fast, contactless delivery of essential academic payloads, document sets, medical resources, and lab equipment across platforms at UCLM.',
-                                style: AppTextStyles.body(fontSize: 13, color: AppColors.textSecondaryDark),
+                                style: AppTextStyles.body(
+                                  fontSize: 13,
+                                  color: AppColors.textSecondaryDark,
+                                ),
                               ),
                             ],
                           ),
@@ -95,13 +125,29 @@ class AboutPage extends StatelessWidget {
                             children: [
                               Text(
                                 'System Hardware Architecture',
-                                style: AppTextStyles.title(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+                                style: AppTextStyles.title(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
                               ),
                               const SizedBox(height: 12),
-                              _buildHardwareRow('Flight Controller', 'Pixhawk 6X Autopilot Core'),
-                              _buildHardwareRow('Telemetry Transceiver', 'UHF RFD900x Dual Antenna'),
-                              _buildHardwareRow('Obstacle Sensing', 'Lidar 360° Laser Scan Grid'),
-                              _buildHardwareRow('Airframe Chassis', 'Carbon Fiber AeroCarrier Quad-V3'),
+                              _buildHardwareRow(
+                                'Flight Controller',
+                                'Pixhawk 6X Autopilot Core',
+                              ),
+                              _buildHardwareRow(
+                                'Telemetry Transceiver',
+                                'UHF RFD900x Dual Antenna',
+                              ),
+                              _buildHardwareRow(
+                                'Obstacle Sensing',
+                                'Lidar 360° Laser Scan Grid',
+                              ),
+                              _buildHardwareRow(
+                                'Airframe Chassis',
+                                'Carbon Fiber AeroCarrier Quad-V3',
+                              ),
                             ],
                           ),
                         ).animate().fadeIn(delay: 250.ms).slideY(begin: 0.05),
@@ -130,7 +176,13 @@ class AboutPage extends StatelessWidget {
               text: TextSpan(
                 style: const TextStyle(fontSize: 12, color: Colors.white),
                 children: [
-                  TextSpan(text: '$label: ', style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.textSecondaryDark)),
+                  TextSpan(
+                    text: '$label: ',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textSecondaryDark,
+                    ),
+                  ),
                   TextSpan(text: value),
                 ],
               ),

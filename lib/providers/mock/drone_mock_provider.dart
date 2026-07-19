@@ -10,7 +10,9 @@ class DroneMockNotifier extends StateNotifier<List<DroneModel>> {
   }
 
   void editDrone(DroneModel updatedDrone) {
-    state = state.map((drone) => drone.id == updatedDrone.id ? updatedDrone : drone).toList();
+    state = state
+        .map((drone) => drone.id == updatedDrone.id ? updatedDrone : drone)
+        .toList();
   }
 
   void deleteDrone(String id) {
@@ -49,6 +51,7 @@ class DroneMockNotifier extends StateNotifier<List<DroneModel>> {
   }
 }
 
-final droneMockProvider = StateNotifierProvider<DroneMockNotifier, List<DroneModel>>((ref) {
-  return DroneMockNotifier();
-});
+final droneMockProvider =
+    StateNotifierProvider<DroneMockNotifier, List<DroneModel>>((ref) {
+      return DroneMockNotifier();
+    });

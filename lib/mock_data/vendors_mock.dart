@@ -42,7 +42,8 @@ final List<MockVendor> mockVendors = [
     email: 'campusbites@gmail.com',
     phone: '09171234567',
     building: 'Old Building – Ground Floor',
-    description: 'Your go-to campus canteen for hot meals, snacks, and refreshments. Fresh food prepared daily for students and faculty.',
+    description:
+        'Your go-to campus canteen for hot meals, snacks, and refreshments. Fresh food prepared daily for students and faculty.',
     logoColor: const Color(0xFFFF6B35),
     logoInitials: 'CB',
     isOpen: true,
@@ -58,7 +59,8 @@ final List<MockVendor> mockVendors = [
     email: 'techzone@gmail.com',
     phone: '09182345678',
     building: 'Annex 1 – Room 102',
-    description: 'Electronic accessories, stationery, and tech gadgets for students. USB cables, earphones, notebooks, and more.',
+    description:
+        'Electronic accessories, stationery, and tech gadgets for students. USB cables, earphones, notebooks, and more.',
     logoColor: const Color(0xFF1976D2),
     logoInitials: 'TZ',
     isOpen: true,
@@ -74,7 +76,8 @@ final List<MockVendor> mockVendors = [
     email: 'booknook@gmail.com',
     phone: '09193456789',
     building: 'Library Building – 1st Floor',
-    description: 'Academic books, reviewers, and school supplies. Serving UCLM students with all their reading and study needs.',
+    description:
+        'Academic books, reviewers, and school supplies. Serving UCLM students with all their reading and study needs.',
     logoColor: const Color(0xFF7B1FA2),
     logoInitials: 'BN',
     isOpen: true,
@@ -90,7 +93,8 @@ final List<MockVendor> mockVendors = [
     email: 'meriendahub@gmail.com',
     phone: '09204567890',
     building: 'Annex 2 – Canteen Area',
-    description: 'Affordable merienda, rice meals, and cold beverages. Quick bites perfect for busy students between classes.',
+    description:
+        'Affordable merienda, rice meals, and cold beverages. Quick bites perfect for busy students between classes.',
     logoColor: const Color(0xFF00897B),
     logoInitials: 'MH',
     isOpen: false,
@@ -106,7 +110,8 @@ final List<MockVendor> mockVendors = [
     email: 'maritimemart@gmail.com',
     phone: '09215678901',
     building: 'Maritime Building – Lobby',
-    description: 'Specialized supplies for maritime students: nautical instruments, safety equipment, and uniforms.',
+    description:
+        'Specialized supplies for maritime students: nautical instruments, safety equipment, and uniforms.',
     logoColor: const Color(0xFF0277BD),
     logoInitials: 'MM',
     isOpen: true,
@@ -122,7 +127,8 @@ final List<MockVendor> mockVendors = [
     email: 'healthycorner@gmail.com',
     phone: '09226789012',
     building: 'Basic Education Building – Canteen',
-    description: 'Healthy food options including fresh juices, salads, and organic snacks. Fuel your studies the right way.',
+    description:
+        'Healthy food options including fresh juices, salads, and organic snacks. Fuel your studies the right way.',
     logoColor: const Color(0xFF388E3C),
     logoInitials: 'HC',
     isOpen: true,

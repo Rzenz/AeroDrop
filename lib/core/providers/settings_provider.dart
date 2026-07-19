@@ -28,7 +28,9 @@ class ThemeModeNotifier extends StateNotifier<ThemeMode> {
   }
 }
 
-final themeModeProvider = StateNotifierProvider<ThemeModeNotifier, ThemeMode>((ref) {
+final themeModeProvider = StateNotifierProvider<ThemeModeNotifier, ThemeMode>((
+  ref,
+) {
   return ThemeModeNotifier();
 });
 
@@ -58,6 +60,7 @@ class LowBatteryAlertNotifier extends StateNotifier<bool> {
   }
 }
 
-final lowBatteryAlertsProvider = StateNotifierProvider<LowBatteryAlertNotifier, bool>((ref) {
-  return LowBatteryAlertNotifier();
-});
+final lowBatteryAlertsProvider =
+    StateNotifierProvider<LowBatteryAlertNotifier, bool>((ref) {
+      return LowBatteryAlertNotifier();
+    });

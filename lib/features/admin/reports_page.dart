@@ -14,28 +14,89 @@ class ReportsPage extends StatefulWidget {
   State<ReportsPage> createState() => _ReportsPageState();
 }
 
-class _ReportsPageState extends State<ReportsPage> with SingleTickerProviderStateMixin {
+class _ReportsPageState extends State<ReportsPage>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
   final List<Map<String, String>> _deliveryLogs = [
-    {'id': '#1004', 'time': '10 Mins Ago', 'target': 'Gymnasium Dome', 'weight': '0.45kg', 'drone': 'DRN-001', 'status': 'Delivered'},
-    {'id': '#1003', 'time': '1 Hour Ago', 'target': 'Canteen Courtyard', 'weight': '0.22kg', 'drone': 'DRN-001', 'status': 'Delivered'},
-    {'id': '#1002', 'time': '3 Hours Ago', 'target': 'Library Wing', 'weight': '0.80kg', 'drone': 'DRN-001', 'status': 'Returned'},
-    {'id': '#1001', 'time': 'Yesterday', 'target': 'Science Lab', 'weight': '0.50kg', 'drone': 'DRN-001', 'status': 'Delivered'},
+    {
+      'id': '#1004',
+      'time': '10 Mins Ago',
+      'target': 'Gymnasium Dome',
+      'weight': '0.45kg',
+      'drone': 'DRN-001',
+      'status': 'Delivered',
+    },
+    {
+      'id': '#1003',
+      'time': '1 Hour Ago',
+      'target': 'Canteen Courtyard',
+      'weight': '0.22kg',
+      'drone': 'DRN-001',
+      'status': 'Delivered',
+    },
+    {
+      'id': '#1002',
+      'time': '3 Hours Ago',
+      'target': 'Library Wing',
+      'weight': '0.80kg',
+      'drone': 'DRN-001',
+      'status': 'Returned',
+    },
+    {
+      'id': '#1001',
+      'time': 'Yesterday',
+      'target': 'Science Lab',
+      'weight': '0.50kg',
+      'drone': 'DRN-001',
+      'status': 'Delivered',
+    },
   ];
 
   final List<Map<String, String>> _droneLogs = [
-    {'event': 'Drone DRN-001 compass & IMU calibration success.', 'time': '5 Mins Ago', 'level': 'INFO'},
-    {'event': 'Recharge queue: DRN-001 battery restored to 100%.', 'time': '20 Mins Ago', 'level': 'SUCCESS'},
-    {'event': 'Low battery alert: DRN-001 capacity dropped to 9%.', 'time': '40 Mins Ago', 'level': 'WARNING'},
-    {'event': 'Takeoff check: cargo clamp safety lock engaged.', 'time': '2 Hours Ago', 'level': 'INFO'},
+    {
+      'event': 'Drone DRN-001 compass & IMU calibration success.',
+      'time': '5 Mins Ago',
+      'level': 'INFO',
+    },
+    {
+      'event': 'Recharge queue: DRN-001 battery restored to 100%.',
+      'time': '20 Mins Ago',
+      'level': 'SUCCESS',
+    },
+    {
+      'event': 'Low battery alert: DRN-001 capacity dropped to 9%.',
+      'time': '40 Mins Ago',
+      'level': 'WARNING',
+    },
+    {
+      'event': 'Takeoff check: cargo clamp safety lock engaged.',
+      'time': '2 Hours Ago',
+      'level': 'INFO',
+    },
   ];
 
   final List<Map<String, String>> _userLogs = [
-    {'action': 'Merchant "Sweet Escape Delights" approved.', 'time': '15 Mins Ago', 'user': 'Admin'},
-    {'action': 'User account "John Doe" suspended (Policy).', 'time': '2 Hours Ago', 'user': 'Admin'},
-    {'action': 'Store onboarding requested: "Quick Byte Canteen".', 'time': '3 Hours Ago', 'user': 'System'},
-    {'action': 'Admin account sign-in verified.', 'time': 'Yesterday', 'user': 'Admin.Portal'},
+    {
+      'action': 'Merchant "Sweet Escape Delights" approved.',
+      'time': '15 Mins Ago',
+      'user': 'Admin',
+    },
+    {
+      'action': 'User account "John Doe" suspended (Policy).',
+      'time': '2 Hours Ago',
+      'user': 'Admin',
+    },
+    {
+      'action': 'Store onboarding requested: "Quick Byte Canteen".',
+      'time': '3 Hours Ago',
+      'user': 'System',
+    },
+    {
+      'action': 'Admin account sign-in verified.',
+      'time': 'Yesterday',
+      'user': 'Admin.Portal',
+    },
   ];
 
   @override
@@ -74,13 +135,21 @@ class _ReportsPageState extends State<ReportsPage> with SingleTickerProviderStat
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(color: AppColors.borderDark),
                         ),
-                        child: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 20),
+                        child: const Icon(
+                          Icons.arrow_back_rounded,
+                          color: Colors.white,
+                          size: 20,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 16),
                     Text(
                       'System Diagnostics & Logs',
-                      style: AppTextStyles.title(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                      style: AppTextStyles.title(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
                     ),
                   ],
                 ).animate().fadeIn().slideX(begin: -0.1),
@@ -151,7 +220,8 @@ class _ReportsPageState extends State<ReportsPage> with SingleTickerProviderStat
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: (isSuccess ? AppColors.success : AppColors.danger).withValues(alpha: 0.1),
+                    color: (isSuccess ? AppColors.success : AppColors.danger)
+                        .withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
                   child: isSuccess
@@ -178,9 +248,22 @@ class _ReportsPageState extends State<ReportsPage> with SingleTickerProviderStat
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Order ${log['id']!} • ${log['weight']!}', style: AppTextStyles.title(fontSize: 14, color: Colors.white, fontWeight: FontWeight.bold)),
+                      Text(
+                        'Order ${log['id']!} • ${log['weight']!}',
+                        style: AppTextStyles.title(
+                          fontSize: 14,
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                       const SizedBox(height: 4),
-                      Text('Target: ${log['target']!} • Drone: ${log['drone']!}', style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 11)),
+                      Text(
+                        'Target: ${log['target']!} • Drone: ${log['drone']!}',
+                        style: TextStyle(
+                          color: AppColors.textSecondaryDark,
+                          fontSize: 11,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -192,7 +275,13 @@ class _ReportsPageState extends State<ReportsPage> with SingleTickerProviderStat
                       color: isSuccess ? AppColors.success : AppColors.danger,
                     ),
                     const SizedBox(height: 4),
-                    Text(log['time']!, style: const TextStyle(color: Colors.white30, fontSize: 9)),
+                    Text(
+                      log['time']!,
+                      style: const TextStyle(
+                        color: Colors.white30,
+                        fontSize: 9,
+                      ),
+                    ),
                   ],
                 ),
               ],
@@ -230,7 +319,11 @@ class _ReportsPageState extends State<ReportsPage> with SingleTickerProviderStat
                   ),
                   child: Text(
                     level,
-                    style: TextStyle(color: levelColor, fontSize: 8, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      color: levelColor,
+                      fontSize: 8,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -238,9 +331,22 @@ class _ReportsPageState extends State<ReportsPage> with SingleTickerProviderStat
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(log['event']!, style: const TextStyle(color: Colors.white, fontSize: 12.5, height: 1.3)),
+                      Text(
+                        log['event']!,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12.5,
+                          height: 1.3,
+                        ),
+                      ),
                       const SizedBox(height: 4),
-                      Text(log['time']!, style: const TextStyle(color: Colors.white30, fontSize: 9)),
+                      Text(
+                        log['time']!,
+                        style: const TextStyle(
+                          color: Colors.white30,
+                          fontSize: 9,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -264,15 +370,32 @@ class _ReportsPageState extends State<ReportsPage> with SingleTickerProviderStat
             padding: const EdgeInsets.all(16),
             child: Row(
               children: [
-                const Icon(Icons.history_toggle_off_rounded, color: AppColors.accent, size: 20),
+                const Icon(
+                  Icons.history_toggle_off_rounded,
+                  color: AppColors.accent,
+                  size: 20,
+                ),
                 const SizedBox(width: 14),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(log['action']!, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+                      Text(
+                        log['action']!,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                       const SizedBox(height: 4),
-                      Text('By: ${log['user']!} • ${log['time']!}', style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 10)),
+                      Text(
+                        'By: ${log['user']!} • ${log['time']!}',
+                        style: TextStyle(
+                          color: AppColors.textSecondaryDark,
+                          fontSize: 10,
+                        ),
+                      ),
                     ],
                   ),
                 ),

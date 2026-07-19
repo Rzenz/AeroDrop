@@ -49,11 +49,15 @@ final List<DeliveryModel> mockDeliveries = [
   // Generating remaining mock data elements up to 50
   ...List.generate(47, (index) {
     final id = 104 + index;
-    final statuses = [DeliveryStatus.delivered, DeliveryStatus.cancelled, DeliveryStatus.pending];
+    final statuses = [
+      DeliveryStatus.delivered,
+      DeliveryStatus.cancelled,
+      DeliveryStatus.pending,
+    ];
     final status = statuses[index % statuses.length];
     final types = ['Document', 'Food', 'Medicine', 'Electronics'];
     final type = types[index % types.length];
-    
+
     return DeliveryModel(
       id: 'ADR-2026-00$id',
       senderName: 'UCLM Dept ${index + 1}',
@@ -69,5 +73,5 @@ final List<DeliveryModel> mockDeliveries = [
       createdAt: DateTime.now().subtract(Duration(hours: index + 3)),
       progress: status == DeliveryStatus.delivered ? 1.0 : 0.0,
     );
-  })
+  }),
 ];

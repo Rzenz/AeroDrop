@@ -27,7 +27,9 @@ class RoleSelectionCard extends StatelessWidget {
         curve: Curves.easeInOut,
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: selected ? AppColors.primary.withValues(alpha: 0.12) : AppColors.cardDark,
+          color: selected
+              ? AppColors.primary.withValues(alpha: 0.12)
+              : AppColors.cardDark,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: selected ? AppColors.accent : AppColors.borderDark,
@@ -57,7 +59,9 @@ class RoleSelectionCard extends StatelessWidget {
               ),
               child: Icon(
                 icon,
-                color: selected ? AppColors.accent : AppColors.textSecondaryDark,
+                color: selected
+                    ? AppColors.accent
+                    : AppColors.textSecondaryDark,
                 size: 20,
               ),
             ),

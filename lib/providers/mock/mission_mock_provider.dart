@@ -5,10 +5,7 @@ class MissionMockState {
   final List<MissionMockModel> missions;
   final Map<String, String> autopilotStates; // MissionId -> Status text
 
-  MissionMockState({
-    required this.missions,
-    required this.autopilotStates,
-  });
+  MissionMockState({required this.missions, required this.autopilotStates});
 
   MissionMockState copyWith({
     List<MissionMockModel>? missions,
@@ -23,10 +20,12 @@ class MissionMockState {
 
 class MissionMockNotifier extends StateNotifier<MissionMockState> {
   MissionMockNotifier()
-      : super(MissionMockState(
+    : super(
+        MissionMockState(
           missions: List.from(mockMissions),
           autopilotStates: {},
-        ));
+        ),
+      );
 
   void updateAutopilotState(String missionId, String stateText) {
     final updatedStates = Map<String, String>.from(state.autopilotStates);
@@ -60,6 +59,7 @@ class MissionMockNotifier extends StateNotifier<MissionMockState> {
   }
 }
 
-final missionMockProvider = StateNotifierProvider<MissionMockNotifier, MissionMockState>((ref) {
-  return MissionMockNotifier();
-});
+final missionMockProvider =
+    StateNotifierProvider<MissionMockNotifier, MissionMockState>((ref) {
+      return MissionMockNotifier();
+    });

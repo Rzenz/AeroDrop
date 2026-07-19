@@ -23,9 +23,7 @@ class AppTheme {
       cardTheme: CardThemeData(
         color: AppColors.cardDark,
         elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(22),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
       ),
       appBarTheme: const AppBarTheme(
         backgroundColor: Colors.transparent,
@@ -35,7 +33,10 @@ class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.cardDark,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 20,
+          vertical: 18,
+        ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
           borderSide: const BorderSide(color: AppColors.borderDark),
@@ -57,7 +58,9 @@ class AppTheme {
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.accent,
           foregroundColor: AppColors.bgDark,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(32)), // 32px pill shape
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(32),
+          ), // 32px pill shape
           elevation: 0,
           minimumSize: const Size.fromHeight(56),
         ),
@@ -72,13 +75,17 @@ class AppTheme {
         selectedColor: AppColors.primary,
         labelStyle: AppTextStyles.label(color: AppColors.textPrimaryDark),
         side: const BorderSide(color: AppColors.borderDark),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)), // 100px full pill shape
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(100),
+        ), // 100px full pill shape
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       ),
       bottomSheetTheme: const BottomSheetThemeData(
         backgroundColor: AppColors.bgDark,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)), // 28px top corners
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(28),
+          ), // 28px top corners
         ),
       ),
       dividerTheme: const DividerThemeData(
@@ -88,11 +95,23 @@ class AppTheme {
       textTheme: TextTheme(
         headlineLarge: AppTextStyles.display(fontSize: 38),
         headlineMedium: AppTextStyles.heading(fontSize: 28),
-        titleLarge: AppTextStyles.subHead(fontSize: 18, color: AppColors.textPrimaryDark),
-        titleMedium: AppTextStyles.subHead(fontSize: 16, color: AppColors.textPrimaryDark),
+        titleLarge: AppTextStyles.subHead(
+          fontSize: 18,
+          color: AppColors.textPrimaryDark,
+        ),
+        titleMedium: AppTextStyles.subHead(
+          fontSize: 16,
+          color: AppColors.textPrimaryDark,
+        ),
         bodyLarge: AppTextStyles.body(fontSize: 16),
-        bodyMedium: AppTextStyles.body(fontSize: 14, color: AppColors.textSecondaryDark),
-        bodySmall: AppTextStyles.body(fontSize: 12, color: AppColors.textSecondaryDark),
+        bodyMedium: AppTextStyles.body(
+          fontSize: 14,
+          color: AppColors.textSecondaryDark,
+        ),
+        bodySmall: AppTextStyles.body(
+          fontSize: 12,
+          color: AppColors.textSecondaryDark,
+        ),
         labelLarge: AppTextStyles.label(fontSize: 12),
       ),
     );
@@ -129,7 +148,10 @@ class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.cardLight,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 20,
+          vertical: 18,
+        ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
           borderSide: const BorderSide(color: AppColors.borderLight),
@@ -151,7 +173,9 @@ class AppTheme {
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.accent,
           foregroundColor: AppColors.bgDark,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(32)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(32),
+          ),
           elevation: 0,
           minimumSize: const Size.fromHeight(56),
         ),
@@ -180,13 +204,34 @@ class AppTheme {
         thickness: 1,
       ),
       textTheme: TextTheme(
-        headlineLarge: AppTextStyles.display(fontSize: 38, color: AppColors.textPrimaryLight),
-        headlineMedium: AppTextStyles.heading(fontSize: 28, color: AppColors.textPrimaryLight),
-        titleLarge: AppTextStyles.subHead(fontSize: 18, color: AppColors.textPrimaryLight),
-        titleMedium: AppTextStyles.subHead(fontSize: 16, color: AppColors.textPrimaryLight),
-        bodyLarge: AppTextStyles.body(fontSize: 16, color: AppColors.textPrimaryLight),
-        bodyMedium: AppTextStyles.body(fontSize: 14, color: AppColors.textSecondaryLight),
-        bodySmall: AppTextStyles.body(fontSize: 12, color: AppColors.textSecondaryLight),
+        headlineLarge: AppTextStyles.display(
+          fontSize: 38,
+          color: AppColors.textPrimaryLight,
+        ),
+        headlineMedium: AppTextStyles.heading(
+          fontSize: 28,
+          color: AppColors.textPrimaryLight,
+        ),
+        titleLarge: AppTextStyles.subHead(
+          fontSize: 18,
+          color: AppColors.textPrimaryLight,
+        ),
+        titleMedium: AppTextStyles.subHead(
+          fontSize: 16,
+          color: AppColors.textPrimaryLight,
+        ),
+        bodyLarge: AppTextStyles.body(
+          fontSize: 16,
+          color: AppColors.textPrimaryLight,
+        ),
+        bodyMedium: AppTextStyles.body(
+          fontSize: 14,
+          color: AppColors.textSecondaryLight,
+        ),
+        bodySmall: AppTextStyles.body(
+          fontSize: 12,
+          color: AppColors.textSecondaryLight,
+        ),
         labelLarge: AppTextStyles.label(fontSize: 12),
       ),
     );

@@ -73,9 +73,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
 
       // Actually update password in Supabase Auth
       await SupabaseService.client.auth.updateUser(
-        UserAttributes(
-          password: newPassword,
-        ),
+        UserAttributes(password: newPassword),
       );
 
       if (!mounted) return;
@@ -153,10 +151,9 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                               prefixIcon: Icons.lock_outline_rounded,
                               controller: _oldPasswordController,
                               obscureText: _obscureText,
-                              validator: (val) =>
-                                  val == null || val.isEmpty
-                                      ? 'Current password is required'
-                                      : null,
+                              validator: (val) => val == null || val.isEmpty
+                                  ? 'Current password is required'
+                                  : null,
                             ),
                             const SizedBox(height: 20),
                             CustomTextField(
@@ -200,8 +197,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                               children: [
                                 Theme(
                                   data: ThemeData(
-                                    unselectedWidgetColor:
-                                        AppColors.borderDark,
+                                    unselectedWidgetColor: AppColors.borderDark,
                                   ),
                                   child: Checkbox(
                                     value: !_obscureText,

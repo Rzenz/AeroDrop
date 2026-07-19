@@ -32,13 +32,21 @@ class TermsConditionsPage extends StatelessWidget {
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(color: AppColors.borderDark),
                         ),
-                        child: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 20),
+                        child: const Icon(
+                          Icons.arrow_back_rounded,
+                          color: Colors.white,
+                          size: 20,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 16),
                     Text(
                       'Terms & Conditions',
-                      style: AppTextStyles.title(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+                      style: AppTextStyles.title(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
                     ),
                   ],
                 ).animate().fadeIn().slideX(begin: -0.1),
@@ -54,17 +62,17 @@ class TermsConditionsPage extends StatelessWidget {
                         children: [
                           _buildSectionTitle('1. Payload Responsibilities'),
                           _buildSectionText(
-                            'Users are solely responsible for verifying that their delivery items do not exceed the 5.0 kg maximum weight threshold and are non-hazardous, dry, and securely sealed before handing them to the drone deck loader.'
+                            'Users are solely responsible for verifying that their delivery items do not exceed the 5.0 kg maximum weight threshold and are non-hazardous, dry, and securely sealed before handing them to the drone deck loader.',
                           ),
                           const SizedBox(height: 20),
                           _buildSectionTitle('2. Automated Flight Paths'),
                           _buildSectionText(
-                            'Flights are controlled by autonomous autopilot firmware following safe campus corridors. Users must not interfere with flight corridors, geofenced areas, or attempt unauthorized remote commands.'
+                            'Flights are controlled by autonomous autopilot firmware following safe campus corridors. Users must not interfere with flight corridors, geofenced areas, or attempt unauthorized remote commands.',
                           ),
                           const SizedBox(height: 20),
                           _buildSectionTitle('3. Liability and Accidents'),
                           _buildSectionText(
-                            'UCLM and the drone fleet logistics team hold final authority for flight overrides. In the event of emergency landing, payload recovery will be handled by the nearest designated fleet support ground crew.'
+                            'UCLM and the drone fleet logistics team hold final authority for flight overrides. In the event of emergency landing, payload recovery will be handled by the nearest designated fleet support ground crew.',
                           ),
                         ],
                       ),
@@ -84,7 +92,11 @@ class TermsConditionsPage extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 6),
       child: Text(
         title,
-        style: AppTextStyles.title(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.secondary),
+        style: AppTextStyles.title(
+          fontSize: 14,
+          fontWeight: FontWeight.bold,
+          color: AppColors.secondary,
+        ),
       ),
     );
   }
@@ -92,7 +104,10 @@ class TermsConditionsPage extends StatelessWidget {
   Widget _buildSectionText(String text) {
     return Text(
       text,
-      style: AppTextStyles.body(fontSize: 12, color: AppColors.textSecondaryDark).copyWith(height: 1.5),
+      style: AppTextStyles.body(
+        fontSize: 12,
+        color: AppColors.textSecondaryDark,
+      ).copyWith(height: 1.5),
     );
   }
 }

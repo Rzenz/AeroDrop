@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
@@ -7,20 +8,21 @@ import '../../core/widgets/custom_app_bar.dart';
 import '../../core/widgets/glass_card.dart';
 import '../../mock_data/products_mock.dart';
 import '../../mock_data/cart_mock.dart';
+import '../../core/providers/product_provider.dart';
 
-class ProductsScreen extends StatefulWidget {
+class ProductsScreen extends ConsumerStatefulWidget {
   const ProductsScreen({super.key});
 
   @override
-  State<ProductsScreen> createState() => _ProductsScreenState();
+  ConsumerState<ProductsScreen> createState() => _ProductsScreenState();
 }
 
-class _ProductsScreenState extends State<ProductsScreen> {
+class _ProductsScreenState extends ConsumerState<ProductsScreen> {
   String _search = '';
   String _category = 'All';
 
-  List<MockProduct> get _filtered {
-    return mockProducts.where((p) {
+  List<MockProduct> _getFiltered(List<MockProduct> products) {
+    return products.where((p) {
       final matchSearch =
           _search.isEmpty ||
           p.name.toLowerCase().contains(_search.toLowerCase()) ||
@@ -32,7 +34,9 @@ class _ProductsScreenState extends State<ProductsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final filtered = _filtered;
+    final productState = ref.watch(productProvider);
+    final filtered = _getFiltered(productState.products);
+
     return Scaffold(
       backgroundColor: AppColors.bgDark,
       appBar: PreferredSize(
@@ -117,10 +121,10 @@ class _ProductsScreenState extends State<ProductsScreen> {
             child: ListView.separated(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               scrollDirection: Axis.horizontal,
-              itemCount: productCategories.length,
+              itemCount: productState.categories.length,
               separatorBuilder: (_, _) => const SizedBox(width: 8),
               itemBuilder: (context, i) {
-                final cat = productCategories[i];
+                final cat = productState.categories[i];
                 final selected = cat == _category;
                 return GestureDetector(
                   onTap: () => setState(() => _category = cat),
@@ -156,25 +160,30 @@ class _ProductsScreenState extends State<ProductsScreen> {
           ),
 
           // Product count
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                Text(
-                  '${filtered.length} product${filtered.length == 1 ? '' : 's'}',
-                  style: AppTextStyles.body(
-                    fontSize: 12,
-                    color: AppColors.textSecondaryDark,
+          if (!productState.isLoading)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  Text(
+                    '${filtered.length} product${filtered.length == 1 ? '' : 's'}',
+                    style: AppTextStyles.body(
+                      fontSize: 12,
+                      color: AppColors.textSecondaryDark,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
           const SizedBox(height: 8),
 
-          // Grid
+          // Grid / Loading / Empty
           Expanded(
-            child: filtered.isEmpty
+            child: productState.isLoading
+                ? const Center(
+                    child: CircularProgressIndicator(color: AppColors.accent),
+                  )
+                : filtered.isEmpty
                 ? Center(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
@@ -186,8 +195,22 @@ class _ProductsScreenState extends State<ProductsScreen> {
                         ),
                         const SizedBox(height: 12),
                         Text(
-                          'No products found',
+                          'No products are currently available.',
                           style: AppTextStyles.subHead(color: Colors.white70),
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton.icon(
+                          onPressed: () =>
+                              ref.read(productProvider.notifier).loadProducts(),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.cardDark,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          icon: const Icon(Icons.refresh_rounded, size: 18),
+                          label: const Text('Retry'),
                         ),
                       ],
                     ),
@@ -236,9 +259,7 @@ class _ProductGridCard extends StatelessWidget {
         children: [
           // Image
           ClipRRect(
-            borderRadius: const BorderRadius.vertical(
-              top: Radius.circular(16),
-            ),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
             child: Stack(
               children: [
                 Image.network(
@@ -329,9 +350,7 @@ class _ProductGridCard extends StatelessWidget {
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: AppColors.primaryLight.withValues(
-                            alpha: 0.15,
-                          ),
+                          color: AppColors.primaryLight.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(

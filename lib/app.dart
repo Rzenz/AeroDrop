@@ -12,7 +12,8 @@ class AeroDropApp extends ConsumerWidget {
     final router = ref.watch(routerProvider);
     final themeMode = ref.watch(themeModeProvider);
 
-    AppTheme.isDarkMode = (themeMode == ThemeMode.dark ||
+    AppTheme.isDarkMode =
+        (themeMode == ThemeMode.dark ||
         (themeMode == ThemeMode.system &&
             MediaQuery.of(context).platformBrightness == Brightness.dark));
 
@@ -26,4 +27,3 @@ class AeroDropApp extends ConsumerWidget {
     );
   }
 }
-

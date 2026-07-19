@@ -19,6 +19,7 @@ class WeatherMockNotifier extends StateNotifier<WeatherMockData> {
   }
 }
 
-final weatherMockProvider = StateNotifierProvider<WeatherMockNotifier, WeatherMockData>((ref) {
-  return WeatherMockNotifier();
-});
+final weatherMockProvider =
+    StateNotifierProvider<WeatherMockNotifier, WeatherMockData>((ref) {
+      return WeatherMockNotifier();
+    });

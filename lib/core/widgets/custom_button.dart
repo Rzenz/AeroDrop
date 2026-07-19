@@ -71,24 +71,26 @@ class _CustomButtonState extends State<CustomButton>
     return switch (widget.variant) {
       ButtonVariant.accent => AppColors.accentGradient,
       ButtonVariant.primary => AppColors.primaryGradient,
-      ButtonVariant.danger =>
-        const LinearGradient(colors: [AppColors.danger, Color(0xFFCC0033)]),
-      ButtonVariant.ghost =>
-        const LinearGradient(colors: [Colors.transparent, Colors.transparent]),
+      ButtonVariant.danger => const LinearGradient(
+        colors: [AppColors.danger, Color(0xFFCC0033)],
+      ),
+      ButtonVariant.ghost => const LinearGradient(
+        colors: [Colors.transparent, Colors.transparent],
+      ),
     };
   }
 
   Color get _textColor => switch (widget.variant) {
-        ButtonVariant.accent => AppColors.bgDark,
-        ButtonVariant.ghost => AppColors.primary,
-        _ => Colors.white,
-      };
+    ButtonVariant.accent => AppColors.bgDark,
+    ButtonVariant.ghost => AppColors.primary,
+    _ => Colors.white,
+  };
 
   Color get _glowColor => switch (widget.variant) {
-        ButtonVariant.accent => AppColors.accent,
-        ButtonVariant.danger => AppColors.danger,
-        _ => AppColors.primary,
-      };
+    ButtonVariant.accent => AppColors.accent,
+    ButtonVariant.danger => AppColors.danger,
+    _ => AppColors.primary,
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -132,9 +134,10 @@ class _CustomButtonState extends State<CustomButton>
                   : [
                       BoxShadow(
                         color: _glowColor.withValues(
-                            alpha: widget.variant == ButtonVariant.accent
-                                ? _pulseAnim.value
-                                : 0.35),
+                          alpha: widget.variant == ButtonVariant.accent
+                              ? _pulseAnim.value
+                              : 0.35,
+                        ),
                         blurRadius: 24,
                         offset: const Offset(0, 8),
                         spreadRadius: -4,

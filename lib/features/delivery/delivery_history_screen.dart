@@ -47,7 +47,10 @@ class _DeliveryHistoryScreenState extends ConsumerState<DeliveryHistoryScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.bgDark,
-      appBar: const CustomAppBar(title: 'Flight Records', showBackButton: false),
+      appBar: const CustomAppBar(
+        title: 'Flight Records',
+        showBackButton: false,
+      ),
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -85,19 +88,19 @@ class _DeliveryHistoryScreenState extends ConsumerState<DeliveryHistoryScreen> {
                   ...DeliveryStatus.values
                       .where((s) => s != DeliveryStatus.assigning)
                       .map((s) {
-                    final label = s == DeliveryStatus.inTransit
-                        ? 'In Transit'
-                        : s.name[0].toUpperCase() + s.name.substring(1);
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 10),
-                      child: _HistoryFilterChip(
-                        label: label,
-                        selected: _filter == s,
-                        onTap: () => setState(() => _filter = s),
-                        color: _statusColor(s),
-                      ),
-                    );
-                  }),
+                        final label = s == DeliveryStatus.inTransit
+                            ? 'In Transit'
+                            : s.name[0].toUpperCase() + s.name.substring(1);
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 10),
+                          child: _HistoryFilterChip(
+                            label: label,
+                            selected: _filter == s,
+                            onTap: () => setState(() => _filter = s),
+                            color: _statusColor(s),
+                          ),
+                        );
+                      }),
                 ],
               ),
             ).animate().fadeIn(delay: 100.ms),
@@ -110,105 +113,116 @@ class _DeliveryHistoryScreenState extends ConsumerState<DeliveryHistoryScreen> {
                 backgroundColor: AppColors.cardDark,
                 strokeWidth: 2.5,
                 child: filtered.isEmpty
-                        ? EmptyStateWidget(
-                            title: 'No Flight Logs Found',
-                            subtitle: 'There are no drone flights matching the selected filter.',
-                            lottiePath: 'assets/lottie/empty_box.json',
-                            actionLabel: 'New Request',
-                            onAction: () => context.push('/user/request'),
-                          )
-                        : ListView.builder(
-                            padding: const EdgeInsets.fromLTRB(24, 0, 24, 110),
-                            physics: const AlwaysScrollableScrollPhysics(
-                              parent: BouncingScrollPhysics(),
-                            ),
-                            itemCount: filtered.length,
-                            itemBuilder: (context, i) {
-                              final item = filtered[i];
-                              final isEven = i % 2 == 0;
+                    ? EmptyStateWidget(
+                        title: 'No Flight Logs Found',
+                        subtitle:
+                            'There are no drone flights matching the selected filter.',
+                        lottiePath: 'assets/lottie/empty_box.json',
+                        actionLabel: 'New Request',
+                        onAction: () => context.push('/user/request'),
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.fromLTRB(24, 0, 24, 110),
+                        physics: const AlwaysScrollableScrollPhysics(
+                          parent: BouncingScrollPhysics(),
+                        ),
+                        itemCount: filtered.length,
+                        itemBuilder: (context, i) {
+                          final item = filtered[i];
+                          final isEven = i % 2 == 0;
 
-                              // Alternate between a standard DeliveryCard (which is an AnimatedCard)
-                              // and a frosted GlassCard container representing the delivery.
-                              // Also apply alternating wide/narrow margins.
-                              Widget card;
-                              if (isEven) {
-                                card = Padding(
-                                  padding: const EdgeInsets.only(right: 16),
-                                  child: DeliveryCard(
-                                    delivery: item,
-                                    onTap: () => context.push('/user/track/details?id=${item.id}'),
-                                  ),
-                                );
-                              } else {
-                                card = Padding(
-                                  padding: const EdgeInsets.only(left: 16),
-                                  child: GlassCard(
-                                    onTap: () => context.push('/user/track/details?id=${item.id}'),
-                                    padding: const EdgeInsets.all(18),
-                                    borderGradient: const LinearGradient(
-                                      colors: [Colors.white24, Colors.white12],
-                                    ),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                          // Alternate between a standard DeliveryCard (which is an AnimatedCard)
+                          // and a frosted GlassCard container representing the delivery.
+                          // Also apply alternating wide/narrow margins.
+                          Widget card;
+                          if (isEven) {
+                            card = Padding(
+                              padding: const EdgeInsets.only(right: 16),
+                              child: DeliveryCard(
+                                delivery: item,
+                                onTap: () => context.push(
+                                  '/user/track/details?id=${item.id}',
+                                ),
+                              ),
+                            );
+                          } else {
+                            card = Padding(
+                              padding: const EdgeInsets.only(left: 16),
+                              child: GlassCard(
+                                onTap: () => context.push(
+                                  '/user/track/details?id=${item.id}',
+                                ),
+                                padding: const EdgeInsets.all(18),
+                                borderGradient: const LinearGradient(
+                                  colors: [Colors.white24, Colors.white12],
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
                                       children: [
-                                        Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            Text(
-                                              item.id,
-                                              style: AppTextStyles.label(
-                                                fontSize: 11,
-                                                color: AppColors.accentLight,
-                                              ),
-                                            ),
-                                            StatusChip.delivery(item.status.name),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 12),
                                         Text(
-                                          item.packageName,
-                                          style: AppTextStyles.title(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.white,
+                                          item.id,
+                                          style: AppTextStyles.label(
+                                            fontSize: 11,
+                                            color: AppColors.accentLight,
                                           ),
                                         ),
-                                        const SizedBox(height: 8),
-                                        Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            Text(
-                                              item.packageType,
-                                              style: AppTextStyles.body(
-                                                fontSize: 12.5,
-                                                color: AppColors.textSecondaryDark,
-                                              ),
-                                            ),
-                                            Text(
-                                              '${item.packageWeight} kg',
-                                              style: AppTextStyles.body(
-                                                fontSize: 12.5,
-                                                fontWeight: FontWeight.bold,
-                                                color: AppColors.textSecondaryDark,
-                                              ),
-                                            ),
-                                          ],
+                                        StatusChip.delivery(item.status.name),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      item.packageName,
+                                      style: AppTextStyles.title(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          item.packageType,
+                                          style: AppTextStyles.body(
+                                            fontSize: 12.5,
+                                            color: AppColors.textSecondaryDark,
+                                          ),
+                                        ),
+                                        Text(
+                                          '${item.packageWeight} kg',
+                                          style: AppTextStyles.body(
+                                            fontSize: 12.5,
+                                            fontWeight: FontWeight.bold,
+                                            color: AppColors.textSecondaryDark,
+                                          ),
                                         ),
                                       ],
                                     ),
-                                  ),
-                                );
-                              }
+                                  ],
+                                ),
+                              ),
+                            );
+                          }
 
-                              return Padding(
+                          return Padding(
                                 padding: const EdgeInsets.only(bottom: 14),
                                 child: card,
                               )
-                                  .animate(delay: (i * 60).ms)
-                                  .fadeIn(duration: 400.ms)
-                                  .slideY(begin: 0.15, end: 0, curve: Curves.easeOut);
-                            },
-                          ),
+                              .animate(delay: (i * 60).ms)
+                              .fadeIn(duration: 400.ms)
+                              .slideY(
+                                begin: 0.15,
+                                end: 0,
+                                curve: Curves.easeOut,
+                              );
+                        },
+                      ),
               ),
             ),
           ],
@@ -218,12 +232,12 @@ class _DeliveryHistoryScreenState extends ConsumerState<DeliveryHistoryScreen> {
   }
 
   Color _statusColor(DeliveryStatus s) => switch (s) {
-        DeliveryStatus.pending => AppColors.warning,
-        DeliveryStatus.assigning => AppColors.accent,
-        DeliveryStatus.inTransit => AppColors.primary,
-        DeliveryStatus.delivered => AppColors.success,
-        DeliveryStatus.cancelled => AppColors.danger,
-      };
+    DeliveryStatus.pending => AppColors.warning,
+    DeliveryStatus.assigning => AppColors.accent,
+    DeliveryStatus.inTransit => AppColors.primary,
+    DeliveryStatus.delivered => AppColors.success,
+    DeliveryStatus.cancelled => AppColors.danger,
+  };
 }
 
 class _HistoryFilterChip extends StatelessWidget {

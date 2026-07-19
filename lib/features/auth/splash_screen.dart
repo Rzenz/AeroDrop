@@ -68,10 +68,7 @@ class _SplashScreenState extends State<SplashScreen>
                 gradient: RadialGradient(
                   center: Alignment(0.0, -0.25),
                   radius: 0.85,
-                  colors: [
-                    Color(0xFF0F2B48),
-                    AppColors.bgDark,
-                  ],
+                  colors: [Color(0xFF0F2B48), AppColors.bgDark],
                 ),
               ),
             ),
@@ -105,81 +102,94 @@ class _SplashScreenState extends State<SplashScreen>
 
                 // Drone graphic with rotating ring
                 SizedBox(
-                  width: graphicSize,
-                  height: graphicSize,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      // Outer rotating dashed ring
-                      AnimatedBuilder(
-                        animation: _rotateController,
-                        builder: (_, _) => Transform.rotate(
-                          angle: _rotateController.value * 2 * math.pi,
-                          child: CustomPaint(
-                            size: Size(graphicSize, graphicSize),
-                            painter: _DashedRingPainter(
-                              color: AppColors.accent.withValues(alpha: 0.45),
-                              radius: graphicSize / 2 - 5,
-                              dashCount: 24,
+                      width: graphicSize,
+                      height: graphicSize,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          // Outer rotating dashed ring
+                          AnimatedBuilder(
+                            animation: _rotateController,
+                            builder: (_, _) => Transform.rotate(
+                              angle: _rotateController.value * 2 * math.pi,
+                              child: CustomPaint(
+                                size: Size(graphicSize, graphicSize),
+                                painter: _DashedRingPainter(
+                                  color: AppColors.accent.withValues(
+                                    alpha: 0.45,
+                                  ),
+                                  radius: graphicSize / 2 - 5,
+                                  dashCount: 24,
+                                ),
+                              ),
                             ),
                           ),
-                        ),
-                      ),
-                      // Inner blue ring
-                      Container(
-                        width: graphicSize * 0.75,
-                        height: graphicSize * 0.75,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: AppColors.primary.withValues(alpha: 0.35),
-                            width: 1.5,
-                          ),
-                        ),
-                      ),
-                      // Scan line sweep
-                      AnimatedBuilder(
-                        animation: _scanController,
-                        builder: (_, _) => Opacity(
-                          opacity: (1 - _scanController.value).clamp(0.0, 0.75),
-                          child: Container(
-                            width: graphicSize * 0.7,
-                            height: graphicSize * 0.7,
+                          // Inner blue ring
+                          Container(
+                            width: graphicSize * 0.75,
+                            height: graphicSize * 0.75,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              gradient: SweepGradient(
-                                startAngle: 0,
-                                endAngle: _scanController.value * 2 * math.pi,
-                                colors: [
-                                  Colors.transparent,
-                                  AppColors.primary.withValues(alpha: 0.35),
-                                ],
+                              border: Border.all(
+                                color: AppColors.primary.withValues(
+                                  alpha: 0.35,
+                                ),
+                                width: 1.5,
                               ),
                             ),
                           ),
-                        ),
-                      ),
-                      // Custom SVG Drone Illustration
-                      AnimatedBuilder(
-                        animation: _scanController,
-                        builder: (context, _) {
-                          return SizedBox(
-                            width: graphicSize * 0.4,
-                            height: graphicSize * 0.4,
-                            child: CustomPaint(
-                              size: Size(graphicSize * 0.4, graphicSize * 0.4),
-                              painter: DroneSvgPainter(
-                                animationValue: _scanController.value,
-                                lineColor: Colors.white.withValues(alpha: 0.9),
-                                accentColor: const Color(0xFF4F46E5),
+                          // Scan line sweep
+                          AnimatedBuilder(
+                            animation: _scanController,
+                            builder: (_, _) => Opacity(
+                              opacity: (1 - _scanController.value).clamp(
+                                0.0,
+                                0.75,
+                              ),
+                              child: Container(
+                                width: graphicSize * 0.7,
+                                height: graphicSize * 0.7,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  gradient: SweepGradient(
+                                    startAngle: 0,
+                                    endAngle:
+                                        _scanController.value * 2 * math.pi,
+                                    colors: [
+                                      Colors.transparent,
+                                      AppColors.primary.withValues(alpha: 0.35),
+                                    ],
+                                  ),
+                                ),
                               ),
                             ),
-                          );
-                        },
+                          ),
+                          // Custom SVG Drone Illustration
+                          AnimatedBuilder(
+                            animation: _scanController,
+                            builder: (context, _) {
+                              return SizedBox(
+                                width: graphicSize * 0.4,
+                                height: graphicSize * 0.4,
+                                child: CustomPaint(
+                                  size: Size(
+                                    graphicSize * 0.4,
+                                    graphicSize * 0.4,
+                                  ),
+                                  painter: DroneSvgPainter(
+                                    animationValue: _scanController.value,
+                                    lineColor: Colors.white.withValues(
+                                      alpha: 0.9,
+                                    ),
+                                    accentColor: const Color(0xFF4F46E5),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                )
+                    )
                     .animate()
                     .scale(
                       duration: 800.ms,

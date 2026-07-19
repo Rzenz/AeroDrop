@@ -1,68 +1,178 @@
-enum UserRole { user, facultyStaff, admin }
-
-class UserModel {
+/// Flat user model matching the simplified public.users table.
+class AeroDropUser {
   final String id;
-  final String name;
+  final String fullName;
   final String email;
-  final UserRole role;
-  final String avatarUrl;
   final String? phoneNumber;
-  final String accountStatus; // 'active', 'suspended', 'deleted'
-  final DateTime? suspendedAt;
-  final String? suspensionReason;
-  final DateTime? deletedAt;
+  final String role; // 'user' | 'vendor' | 'admin'
+  final String accountStatus; // 'active' | 'suspended' | 'deleted'
+  final String? avatarUrl;
+  final String? businessName;
+  final String? businessCategory;
+  final String? businessDescription;
+  final String? campusLocationId;
+  final String?
+  vendorStatus; // null | 'pending' | 'active' | 'suspended' | 'rejected'
+  final String? businessLogoUrl; // business logo URL field
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
 
-  UserModel({
+  const AeroDropUser._internal({
     required this.id,
-    required this.name,
+    required this.fullName,
     required this.email,
-    required this.role,
-    required this.avatarUrl,
     this.phoneNumber,
+    required this.role,
     this.accountStatus = 'active',
-    this.suspendedAt,
-    this.suspensionReason,
-    this.deletedAt,
+    this.avatarUrl,
+    this.businessName,
+    this.businessCategory,
+    this.businessDescription,
+    this.campusLocationId,
+    this.vendorStatus,
+    this.businessLogoUrl,
+    this.createdAt,
+    this.updatedAt,
   });
 
-  UserModel copyWith({
-    String? id,
+  factory AeroDropUser({
+    required String id,
     String? name,
-    String? email,
-    UserRole? role,
-    String? avatarUrl,
+    required String email,
     String? phoneNumber,
-    String? accountStatus,
-    DateTime? suspendedAt,
-    String? suspensionReason,
-    DateTime? deletedAt,
+    dynamic role,
+    String accountStatus = 'active',
+    String? avatarUrl,
+    String? businessName,
+    String? businessCategory,
+    String? businessDescription,
+    String? campusLocationId,
+    String? vendorStatus,
+    String? businessLogoUrl,
+    DateTime? createdAt,
+    DateTime? updatedAt,
   }) {
-    return UserModel(
-      id: id ?? this.id,
-      name: name ?? this.name,
-      email: email ?? this.email,
-      role: role ?? this.role,
-      avatarUrl: avatarUrl ?? this.avatarUrl,
-      phoneNumber: phoneNumber ?? this.phoneNumber,
-      accountStatus: accountStatus ?? this.accountStatus,
-      suspendedAt: suspendedAt ?? this.suspendedAt,
-      suspensionReason: suspensionReason ?? this.suspensionReason,
-      deletedAt: deletedAt ?? this.deletedAt,
+    String roleStr = 'user';
+    if (role is UserRole) {
+      if (role == UserRole.admin) {
+        roleStr = 'admin';
+      } else if (role == UserRole.vendor) {
+        roleStr = 'vendor';
+      } else {
+        roleStr = 'user';
+      }
+    } else if (role is String) {
+      roleStr = role;
+    }
+    return AeroDropUser._internal(
+      id: id,
+      fullName: name ?? '',
+      email: email,
+      phoneNumber: phoneNumber,
+      role: roleStr,
+      accountStatus: accountStatus,
+      avatarUrl: avatarUrl,
+      businessName: businessName,
+      businessCategory: businessCategory,
+      businessDescription: businessDescription,
+      campusLocationId: campusLocationId,
+      vendorStatus: vendorStatus,
+      businessLogoUrl: businessLogoUrl,
+      createdAt: createdAt,
+      updatedAt: updatedAt,
     );
   }
 
-  factory UserModel.fromMap(Map<String, dynamic> map, {required UserRole role}) {
-    return UserModel(
+  @Deprecated('Use fullName instead')
+  String get name => fullName;
+
+  // ── Computed getters ──────────────────────────────────────────────────────
+
+  bool get isUser => role == 'user';
+
+  bool get isVendor =>
+      role == 'vendor' && vendorStatus == 'active' && accountStatus == 'active';
+
+  bool get isPendingVendor => role == 'user' && vendorStatus == 'pending';
+
+  bool get isAdmin => role == 'admin' && accountStatus == 'active';
+
+  bool get isActive => accountStatus == 'active';
+
+  /// Display name: business name for vendors, full name otherwise.
+  String get displayName =>
+      (role == 'vendor' && businessName != null && businessName!.isNotEmpty)
+      ? businessName!
+      : fullName;
+
+  // ── Factory ───────────────────────────────────────────────────────────────
+
+  factory AeroDropUser.fromMap(Map<String, dynamic> map) {
+    return AeroDropUser._internal(
       id: map['id']?.toString() ?? '',
-      name: map['name']?.toString() ?? '',
+      fullName: map['full_name']?.toString() ?? '',
       email: map['email']?.toString() ?? '',
-      role: role,
-      avatarUrl: map['avatar_url']?.toString() ?? 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
       phoneNumber: map['phone_number']?.toString(),
+      role: map['role']?.toString() ?? 'user',
       accountStatus: map['account_status']?.toString() ?? 'active',
-      suspendedAt: map['suspended_at'] != null ? DateTime.tryParse(map['suspended_at'].toString()) : null,
-      suspensionReason: map['suspension_reason']?.toString(),
-      deletedAt: map['deleted_at'] != null ? DateTime.tryParse(map['deleted_at'].toString()) : null,
+      avatarUrl: map['avatar_url']?.toString(),
+      businessName: map['business_name']?.toString(),
+      businessCategory: map['business_category']?.toString(),
+      businessDescription: map['business_description']?.toString(),
+      campusLocationId: map['campus_location_id']?.toString(),
+      vendorStatus: map['vendor_status']?.toString(),
+      businessLogoUrl: map['business_logo_url']?.toString(),
+      createdAt: map['created_at'] != null
+          ? DateTime.tryParse(map['created_at'].toString())
+          : null,
+      updatedAt: map['updated_at'] != null
+          ? DateTime.tryParse(map['updated_at'].toString())
+          : null,
+    );
+  }
+
+  // ── copyWith ──────────────────────────────────────────────────────────────
+
+  AeroDropUser copyWith({
+    String? id,
+    String? fullName,
+    String? email,
+    String? phoneNumber,
+    String? role,
+    String? accountStatus,
+    String? avatarUrl,
+    String? businessName,
+    String? businessCategory,
+    String? businessDescription,
+    String? campusLocationId,
+    String? vendorStatus,
+    String? businessLogoUrl,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) {
+    return AeroDropUser._internal(
+      id: id ?? this.id,
+      fullName: fullName ?? this.fullName,
+      email: email ?? this.email,
+      phoneNumber: phoneNumber ?? this.phoneNumber,
+      role: role ?? this.role,
+      accountStatus: accountStatus ?? this.accountStatus,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
+      businessName: businessName ?? this.businessName,
+      businessCategory: businessCategory ?? this.businessCategory,
+      businessDescription: businessDescription ?? this.businessDescription,
+      campusLocationId: campusLocationId ?? this.campusLocationId,
+      vendorStatus: vendorStatus ?? this.vendorStatus,
+      businessLogoUrl: businessLogoUrl ?? this.businessLogoUrl,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 }
+
+// ponytail: kept for legacy screens that still reference UserRole.
+// Remove once all callers are migrated to AeroDropUser getters.
+@Deprecated('Use AeroDropUser.role string or AeroDropUser getters instead')
+enum UserRole { user, vendor, admin }
+
+typedef UserModel = AeroDropUser;

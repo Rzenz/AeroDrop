@@ -1,43 +1,25 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../models/drone_model.dart';
+
 import '../config/simulation_config.dart';
+import '../models/drone_model.dart';
 import '../../providers/mock/drone_mock_provider.dart';
 import '../services/supabase_service.dart';
 
+// ── Notifier ──────────────────────────────────────────────────────────────────
+
 class DroneNotifier extends StateNotifier<List<DroneModel>> {
   final Ref? ref;
+  String? _resolvedDroneId;
 
-  DroneNotifier([this.ref]) : super([]) {
-    if (kSimulationMode) {
-      state = [
-        DroneModel(
-          id: 'DRN-001',
-          name: 'AeroCarrier Alpha',
-          batteryLevel: 100.0,
-          status: DroneStatus.available,
-          maxPayload: 0.5,
-          modelType: '001',
-          currentCoordinates: '10.3456,123.9478',
-        ),
-      ];
+  DroneNotifier(this.ref) : super([]) {
+    if (kSimulationMode && ref != null) {
+      ref!.listen<List<DroneModel>>(droneMockProvider, (previous, next) {
+        state = next;
+      }, fireImmediately: true);
     } else {
-      if (SupabaseService.isConfigured) {
-        Future.microtask(loadDronesFromSupabase);
-      } else {
-        // Fallback to local hardcoded list if Supabase is not configured
-        state = [
-          DroneModel(
-            id: 'DRN-001',
-            name: 'AeroCarrier Alpha',
-            batteryLevel: 100.0,
-            status: DroneStatus.available,
-            maxPayload: 0.5,
-            modelType: '001',
-            currentCoordinates: '10.3456,123.9478',
-          ),
-        ];
-      }
+      Future.microtask(loadDronesFromSupabase);
     }
   }
 
@@ -47,98 +29,125 @@ class DroneNotifier extends StateNotifier<List<DroneModel>> {
     return double.tryParse(value.toString()) ?? fallback;
   }
 
-  DroneStatus _parseDroneStatus(String? statusStr) {
-    switch (statusStr?.toLowerCase()) {
-      case 'available':
-        return DroneStatus.available;
-      case 'busy':
-        return DroneStatus.busy;
-      case 'maintenance':
-        return DroneStatus.maintenance;
-      case 'offline':
-        return DroneStatus.offline;
-      default:
-        return DroneStatus.available;
+  DroneStatus _parseDroneStatus(String? s) => switch (s?.toLowerCase()) {
+    'available' => DroneStatus.available,
+    'assigned' => DroneStatus.assigned,
+    'busy' => DroneStatus.busy,
+    'charging' => DroneStatus.charging,
+    'maintenance' => DroneStatus.maintenance,
+    'offline' => DroneStatus.offline,
+    _ => DroneStatus.available,
+  };
+
+  Future<String> _resolveDroneId() async {
+    if (_resolvedDroneId != null) return _resolvedDroneId!;
+    final authUser = SupabaseService.client.auth.currentUser;
+    if (authUser == null) return '80000000-0000-0000-0000-000000000001';
+    try {
+      final res = await SupabaseService.client
+          .from('drones')
+          .select('id')
+          .eq('drone_code', 'DRN-001')
+          .maybeSingle();
+      if (res != null) {
+        _resolvedDroneId = res['id'].toString();
+        return _resolvedDroneId!;
+      }
+    } catch (e) {
+      debugPrint('Error resolving drone UUID: $e');
     }
+    return '80000000-0000-0000-0000-000000000001'; // fallback
   }
 
   Future<void> loadDronesFromSupabase() async {
     if (kSimulationMode) return;
     if (!SupabaseService.isConfigured) return;
+    final authUser = SupabaseService.client.auth.currentUser;
+    if (authUser == null) {
+      state = [];
+      return;
+    }
 
     try {
-      // Ensure DRN-001 exists in the database
-      final checkResponse = await SupabaseService.client
-          .from('drones')
-          .select()
-          .eq('id', 'DRN-001')
-          .maybeSingle();
+      final droneId = await _resolveDroneId();
+      if (!mounted) return;
 
-      if (checkResponse == null) {
-        await SupabaseService.client.from('drones').insert({
-          'id': 'DRN-001',
-          'name': 'AeroCarrier Alpha',
-          'battery_level': 100.0,
-          'status': 'available',
-          'max_payload': 0.5,
-          'model_type': '001',
-          'current_coordinates': '10.3456,123.9478',
-        });
-      }
-
-      // Query DRN-001 only to restrict the fleet list
       final response = await SupabaseService.client
           .from('drones')
           .select()
-          .eq('id', 'DRN-001');
+          .eq('id', droneId)
+          .maybeSingle();
 
-      final drones = (response as List).map((item) {
-        final data = Map<String, dynamic>.from(item);
-        return DroneModel(
-          id: data['id'].toString(),
-          name: data['name']?.toString() ?? 'AeroCarrier Alpha',
+      if (!mounted) return;
+      if (response == null) return;
+
+      final data = Map<String, dynamic>.from(response);
+
+      // status is now a text column ('available', 'busy', …)
+      final statusName = data['status']?.toString();
+
+      final telemetryRes = await SupabaseService.client
+          .from('drone_telemetry')
+          .select('latitude, longitude')
+          .eq('drone_id', droneId)
+          .order('recorded_at', ascending: false)
+          .limit(1)
+          .maybeSingle();
+
+      if (!mounted) return;
+
+      String coords = '10.3156,123.9016';
+      if (telemetryRes != null) {
+        coords = '${telemetryRes['latitude']},${telemetryRes['longitude']}';
+      }
+
+      state = [
+        DroneModel(
+          id: 'DRN-001',
+          name: data['drone_name']?.toString() ?? 'AeroCarrier Alpha',
           batteryLevel: _toDouble(data['battery_level'], 100.0),
-          status: _parseDroneStatus(data['status']?.toString()),
-          maxPayload: _toDouble(data['max_payload'], 0.5),
-          modelType: data['model_type']?.toString() ?? '001',
-          currentCoordinates: data['current_coordinates']?.toString() ?? '10.3456,123.9478',
-        );
-      }).toList();
-
-      state = drones;
+          status: _parseDroneStatus(statusName),
+          maxPayload: _toDouble(data['max_payload_kg'], 0.5),
+          modelType: data['model']?.toString() ?? 'AeroCarrier',
+          currentCoordinates: coords,
+        ),
+      ];
     } catch (error) {
       debugPrint('Load drones from Supabase failed: $error');
     }
   }
 
   Future<String?> addDroneToSupabase(DroneModel drone) async {
-    return 'Drone registration is locked. Only one drone (AeroCarrier Alpha) is permitted in this workspace.';
+    return 'Drone registration is locked. Only one drone (AeroCarrier Alpha) is permitted.';
   }
 
   Future<String?> editDroneInSupabase(DroneModel drone) async {
-    if (drone.id != 'DRN-001') {
-      return 'Editing other drones is not permitted.';
-    }
-
+    if (drone.id != 'DRN-001') return 'Editing other drones is not permitted.';
     if (kSimulationMode) {
       state = [drone];
       return null;
     }
-
-    if (!SupabaseService.isConfigured) {
-      return 'Supabase is not configured.';
-    }
+    if (!SupabaseService.isConfigured) return 'Supabase is not configured.';
+    final authUser = SupabaseService.client.auth.currentUser;
+    if (authUser == null) return 'You must be logged in.';
 
     try {
-      await SupabaseService.client.from('drones').update({
-        'name': drone.name,
-        'battery_level': drone.batteryLevel,
-        'status': drone.status.name,
-        'max_payload': drone.maxPayload,
-        'model_type': drone.modelType,
-        'current_coordinates': drone.currentCoordinates,
-      }).eq('id', 'DRN-001');
+      final droneId = await _resolveDroneId();
+      if (!mounted) return 'Notifier disposed';
 
+      await SupabaseService.client
+          .from('drones')
+          .update({
+            'drone_name': drone.name,
+            'battery_level': drone.batteryLevel,
+            'status': drone.status.name, // plain text
+            'max_payload_kg': drone.maxPayload,
+            'model': drone.modelType,
+            'updated_at': DateTime.now().toUtc().toIso8601String(),
+          })
+          .eq('id', droneId);
+
+      if (!mounted) return null;
       state = [drone];
       return null;
     } catch (e) {
@@ -156,61 +165,59 @@ class DroneNotifier extends StateNotifier<List<DroneModel>> {
 
   Future<String?> rechargeDrone(String droneId) async {
     if (kSimulationMode) {
-      state = state.map((d) {
-        if (d.id == droneId) {
-          return d.copyWith(batteryLevel: 100.0, status: DroneStatus.available);
-        }
-        return d;
-      }).toList();
+      state = state
+          .map(
+            (d) => d.id == droneId
+                ? d.copyWith(batteryLevel: 100.0, status: DroneStatus.available)
+                : d,
+          )
+          .toList();
       return null;
     }
-
     if (!SupabaseService.isConfigured) return 'Supabase is not configured.';
+    final authUser = SupabaseService.client.auth.currentUser;
+    if (authUser == null) return 'You must be logged in.';
 
     try {
-      await SupabaseService.client.from('drones').update({
-        'battery_level': 100.0,
-        'status': 'available',
-        'updated_at': DateTime.now().toUtc().toIso8601String(),
-      }).eq('id', droneId);
+      final droneIdDb = await _resolveDroneId();
+      if (!mounted) return 'Notifier disposed';
 
-      state = state.map((d) {
-        if (d.id == droneId) {
-          return d.copyWith(batteryLevel: 100.0, status: DroneStatus.available);
-        }
-        return d;
-      }).toList();
+      await SupabaseService.client
+          .from('drones')
+          .update({
+            'battery_level': 100.0,
+            'status': 'available', // plain text
+            'updated_at': DateTime.now().toUtc().toIso8601String(),
+          })
+          .eq('id', droneIdDb);
 
+      if (!mounted) return null;
+      state = state
+          .map(
+            (d) => d.id == droneId
+                ? d.copyWith(batteryLevel: 100.0, status: DroneStatus.available)
+                : d,
+          )
+          .toList();
       return null;
     } catch (e) {
       debugPrint('Recharge drone failed: $e');
-      return 'Failed to recharge drone: ${e.toString()}';
+      return 'Failed to recharge drone: $e';
     }
   }
 
-  void addDrone(DroneModel drone) {
-    addDroneToSupabase(drone);
-  }
-
-  void editDrone(DroneModel updatedDrone) {
-    editDroneInSupabase(updatedDrone);
-  }
-
-  void deleteDrone(String id) {
-    deleteDroneFromSupabase(id);
-  }
+  void addDrone(DroneModel drone) => addDroneToSupabase(drone);
+  void editDrone(DroneModel updatedDrone) => editDroneInSupabase(updatedDrone);
+  void deleteDrone(String id) => deleteDroneFromSupabase(id);
 
   void updateBattery(String id, double level) {
     if (kSimulationMode && ref != null) {
       ref!.read(droneMockProvider.notifier).updateBattery(id, level);
       return;
     }
-    state = state.map((drone) {
-      if (drone.id == id) {
-        return drone.copyWith(batteryLevel: level);
-      }
-      return drone;
-    }).toList();
+    state = state
+        .map((d) => d.id == id ? d.copyWith(batteryLevel: level) : d)
+        .toList();
   }
 
   void updateStatus(String id, DroneStatus status) {
@@ -218,12 +225,25 @@ class DroneNotifier extends StateNotifier<List<DroneModel>> {
       ref!.read(droneMockProvider.notifier).updateStatus(id, status);
       return;
     }
-    state = state.map((drone) {
-      if (drone.id == id) {
-        return drone.copyWith(status: status);
-      }
-      return drone;
-    }).toList();
+    state = state
+        .map((d) => d.id == id ? d.copyWith(status: status) : d)
+        .toList();
+
+    if (SupabaseService.isConfigured && id == 'DRN-001') {
+      _resolveDroneId().then((droneId) {
+        SupabaseService.client
+            .from('drones')
+            .update({
+              'status': status.name, // plain text, no UUID
+              'updated_at': DateTime.now().toUtc().toIso8601String(),
+            })
+            .eq('id', droneId)
+            .then((_) {})
+            .catchError((e) {
+              debugPrint('Update drone status in Supabase failed: $e');
+            });
+      });
+    }
   }
 
   void updateCoordinates(String id, String coords) {
@@ -231,16 +251,14 @@ class DroneNotifier extends StateNotifier<List<DroneModel>> {
       ref!.read(droneMockProvider.notifier).updateCoordinates(id, coords);
       return;
     }
-    state = state.map((drone) {
-      if (drone.id == id) {
-        return drone.copyWith(currentCoordinates: coords);
-      }
-      return drone;
-    }).toList();
+    state = state
+        .map((d) => d.id == id ? d.copyWith(currentCoordinates: coords) : d)
+        .toList();
   }
 }
 
-final droneProvider = StateNotifierProvider<DroneNotifier, List<DroneModel>>((ref) {
+final droneProvider = StateNotifierProvider<DroneNotifier, List<DroneModel>>((
+  ref,
+) {
   return DroneNotifier(ref);
 });
-

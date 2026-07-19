@@ -1,28 +1,37 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/glass_card.dart';
-import '../../mock_data/orders_mock.dart';
+import '../../core/models/order_model.dart';
+import '../../core/providers/order_provider.dart';
 
-class OrdersScreen extends StatefulWidget {
+class OrdersScreen extends ConsumerStatefulWidget {
   const OrdersScreen({super.key});
 
   @override
-  State<OrdersScreen> createState() => _OrdersScreenState();
+  ConsumerState<OrdersScreen> createState() => _OrdersScreenState();
 }
 
-class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderStateMixin {
+class _OrdersScreenState extends ConsumerState<OrdersScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tab;
 
   static const _tabs = [
-    (label: 'Pending', status: MockOrderStatus.pending),
-    (label: 'Preparing', status: MockOrderStatus.preparing),
-    (label: 'Ready', status: MockOrderStatus.ready),
-    (label: 'Picked Up', status: MockOrderStatus.pickedUp),
-    (label: 'Delivered', status: MockOrderStatus.delivered),
-    (label: 'Cancelled', status: MockOrderStatus.cancelled),
+    (label: 'Pending', statusKeys: ['pending']),
+    (label: 'Preparing', statusKeys: ['preparing']),
+    (
+      label: 'Ready',
+      statusKeys: ['ready', 'ready_for_pickup', 'ready for pickup'],
+    ),
+    (
+      label: 'Picked Up',
+      statusKeys: ['picked_up', 'in_transit', 'picked up', 'in transit'],
+    ),
+    (label: 'Delivered', statusKeys: ['delivered']),
+    (label: 'Cancelled', statusKeys: ['cancelled', 'rejected', 'failed']),
   ];
 
   @override
@@ -37,8 +46,20 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
     super.dispose();
   }
 
+  List<OrderModel> _filterOrders(
+    List<OrderModel> orders,
+    List<String> statusKeys,
+  ) {
+    return orders
+        .where((o) => statusKeys.contains(o.orderStatus.toLowerCase()))
+        .toList();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final orderState = ref.watch(orderProvider);
+    final allOrders = orderState.orders;
+
     return Scaffold(
       backgroundColor: AppColors.bgDark,
       appBar: PreferredSize(
@@ -47,7 +68,10 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
           backgroundColor: AppColors.bgDark,
           elevation: 0,
           automaticallyImplyLeading: false,
-          title: Text('My Orders', style: AppTextStyles.subHead(fontSize: 18, color: Colors.white)),
+          title: Text(
+            'My Orders',
+            style: AppTextStyles.subHead(fontSize: 18, color: Colors.white),
+          ),
           bottom: TabBar(
             controller: _tab,
             isScrollable: true,
@@ -56,10 +80,16 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
             unselectedLabelColor: AppColors.textSecondaryDark,
             tabAlignment: TabAlignment.start,
             padding: const EdgeInsets.symmetric(horizontal: 8),
-            labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-            unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal, fontSize: 13),
+            labelStyle: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+            ),
+            unselectedLabelStyle: const TextStyle(
+              fontWeight: FontWeight.normal,
+              fontSize: 13,
+            ),
             tabs: _tabs.map((t) {
-              final count = mockOrders.where((o) => o.status == t.status).length;
+              final count = _filterOrders(allOrders, t.statusKeys).length;
               return Tab(
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -68,12 +98,22 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
                     if (count > 0) ...[
                       const SizedBox(width: 6),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 1,
+                        ),
                         decoration: BoxDecoration(
                           color: AppColors.accent.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        child: Text('$count', style: const TextStyle(color: AppColors.accent, fontSize: 10, fontWeight: FontWeight.bold)),
+                        child: Text(
+                          '$count',
+                          style: const TextStyle(
+                            color: AppColors.accent,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
                     ],
                   ],
@@ -83,22 +123,37 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
           ),
         ),
       ),
-      body: TabBarView(
-        controller: _tab,
-        children: _tabs.map((t) {
-          final orders = mockOrders.where((o) => o.status == t.status).toList();
-          if (orders.isEmpty) {
-            return _EmptyOrders(label: t.label);
-          }
-          return ListView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-            itemCount: orders.length,
-            itemBuilder: (context, i) => _OrderCard(
-              order: orders[i],
-              onTap: () => context.push('/user/orders/${orders[i].id}'),
-            ).animate().fadeIn(delay: (i * 60).ms).slideY(begin: 0.05),
-          );
-        }).toList(),
+      body: RefreshIndicator(
+        onRefresh: () => ref.read(orderProvider.notifier).loadOrders(),
+        color: AppColors.accent,
+        backgroundColor: AppColors.cardDark,
+        child: TabBarView(
+          controller: _tab,
+          children: _tabs.map((t) {
+            final orders = _filterOrders(allOrders, t.statusKeys);
+
+            if (orderState.isLoading && allOrders.isEmpty) {
+              return const Center(
+                child: CircularProgressIndicator(color: AppColors.accent),
+              );
+            }
+            if (orders.isEmpty) {
+              return _EmptyOrders(
+                label: t.label,
+                onRetry: () => ref.read(orderProvider.notifier).loadOrders(),
+              );
+            }
+            return ListView.builder(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+              itemCount: orders.length,
+              itemBuilder: (context, i) => _OrderCard(
+                order: orders[i],
+                onTap: () => context.push('/user/orders/${orders[i].id}'),
+              ).animate().fadeIn(delay: (i * 60).ms).slideY(begin: 0.05),
+            );
+          }).toList(),
+        ),
       ),
     );
   }
@@ -106,7 +161,8 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
 
 class _EmptyOrders extends StatelessWidget {
   final String label;
-  const _EmptyOrders({required this.label});
+  final VoidCallback onRetry;
+  const _EmptyOrders({required this.label, required this.onRetry});
 
   @override
   Widget build(BuildContext context) {
@@ -114,9 +170,29 @@ class _EmptyOrders extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(_statusIcon(label), color: AppColors.textSecondaryDark, size: 60),
+          Icon(
+            _statusIcon(label),
+            color: AppColors.textSecondaryDark,
+            size: 60,
+          ),
           const SizedBox(height: 14),
-          Text('No $label orders', style: AppTextStyles.subHead(color: Colors.white70)),
+          Text(
+            'You have no $label orders yet.',
+            style: AppTextStyles.subHead(color: Colors.white70),
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton.icon(
+            onPressed: onRetry,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.cardDark,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            icon: const Icon(Icons.refresh_rounded, size: 18),
+            label: const Text('Refresh'),
+          ),
         ],
       ).animate().fadeIn(),
     );
@@ -136,15 +212,15 @@ class _EmptyOrders extends StatelessWidget {
 }
 
 class _OrderCard extends StatelessWidget {
-  final MockOrder order;
+  final OrderModel order;
   final VoidCallback onTap;
 
   const _OrderCard({required this.order, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    final statusColor = _statusColor(order.status);
-    final statusLabel = _statusLabel(order.status);
+    final statusColor = _statusColor(order.orderStatus);
+    final statusLabel = _statusLabel(order.orderStatus);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -162,7 +238,7 @@ class _OrderCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        order.orderNumber,
+                        'AD-${order.id.substring(0, 8).toUpperCase()}',
                         style: const TextStyle(
                           color: AppColors.primaryLight,
                           fontSize: 11,
@@ -173,22 +249,35 @@ class _OrderCard extends StatelessWidget {
                       const SizedBox(height: 2),
                       Text(
                         order.vendorName,
-                        style: AppTextStyles.subHead(fontSize: 15, color: Colors.white),
+                        style: AppTextStyles.subHead(
+                          fontSize: 15,
+                          color: Colors.white,
+                        ),
                       ),
                     ],
                   ),
                 ),
                 // Status chip
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
                   decoration: BoxDecoration(
                     color: statusColor.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: statusColor.withValues(alpha: 0.4), width: 0.8),
+                    border: Border.all(
+                      color: statusColor.withValues(alpha: 0.4),
+                      width: 0.8,
+                    ),
                   ),
                   child: Text(
                     statusLabel,
-                    style: TextStyle(color: statusColor, fontSize: 11, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      color: statusColor,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ],
@@ -196,8 +285,15 @@ class _OrderCard extends StatelessWidget {
             const SizedBox(height: 12),
             // Items preview
             Text(
-              order.items.map((i) => '${i.quantity}x ${i.productName}').join(', '),
-              style: AppTextStyles.body(fontSize: 12, color: AppColors.textSecondaryDark),
+              order.items.isEmpty
+                  ? 'No items'
+                  : order.items
+                        .map((i) => '${i.quantity}x ${i.productName}')
+                        .join(', '),
+              style: AppTextStyles.body(
+                fontSize: 12,
+                color: AppColors.textSecondaryDark,
+              ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -209,18 +305,28 @@ class _OrderCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 // Payment status
-                _PaymentBadge(status: order.paymentStatus, method: order.paymentMethod),
+                _PaymentBadge(
+                  status: order.paymentStatus,
+                  method: order.paymentMethod,
+                ),
                 // Total + date
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
                       '₱${order.totalAmount.toStringAsFixed(2)}',
-                      style: const TextStyle(color: AppColors.accent, fontWeight: FontWeight.bold, fontSize: 16),
+                      style: const TextStyle(
+                        color: AppColors.accent,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
                     ),
                     Text(
                       _formatDate(order.createdAt),
-                      style: AppTextStyles.body(fontSize: 10, color: AppColors.textSecondaryDark),
+                      style: AppTextStyles.body(
+                        fontSize: 10,
+                        color: AppColors.textSecondaryDark,
+                      ),
                     ),
                   ],
                 ),
@@ -232,26 +338,50 @@ class _OrderCard extends StatelessWidget {
     );
   }
 
-  Color _statusColor(MockOrderStatus status) {
-    return switch (status) {
-      MockOrderStatus.pending => AppColors.warning,
-      MockOrderStatus.preparing => AppColors.info,
-      MockOrderStatus.ready => AppColors.primaryLight,
-      MockOrderStatus.pickedUp => AppColors.accent,
-      MockOrderStatus.delivered => AppColors.success,
-      MockOrderStatus.cancelled => AppColors.danger,
-    };
+  Color _statusColor(String status) {
+    final s = status.toLowerCase();
+    if (s == 'pending') {
+      return AppColors.warning;
+    }
+    if (s == 'preparing') {
+      return AppColors.info;
+    }
+    if (s == 'ready' || s == 'ready_for_pickup' || s == 'ready for pickup') {
+      return AppColors.primaryLight;
+    }
+    if (s == 'picked_up' ||
+        s == 'picked up' ||
+        s == 'in_transit' ||
+        s == 'in transit') {
+      return AppColors.accent;
+    }
+    if (s == 'delivered') {
+      return AppColors.success;
+    }
+    return AppColors.danger;
   }
 
-  String _statusLabel(MockOrderStatus status) {
-    return switch (status) {
-      MockOrderStatus.pending => 'Pending',
-      MockOrderStatus.preparing => 'Preparing',
-      MockOrderStatus.ready => 'Ready',
-      MockOrderStatus.pickedUp => 'Picked Up',
-      MockOrderStatus.delivered => 'Delivered',
-      MockOrderStatus.cancelled => 'Cancelled',
-    };
+  String _statusLabel(String status) {
+    final s = status.toLowerCase();
+    if (s == 'pending') {
+      return 'Pending';
+    }
+    if (s == 'preparing') {
+      return 'Preparing';
+    }
+    if (s == 'ready' || s == 'ready_for_pickup' || s == 'ready for pickup') {
+      return 'Ready';
+    }
+    if (s == 'picked_up' ||
+        s == 'picked up' ||
+        s == 'in_transit' ||
+        s == 'in transit') {
+      return 'In Transit';
+    }
+    if (s == 'delivered') {
+      return 'Delivered';
+    }
+    return 'Cancelled';
   }
 
   String _formatDate(DateTime dt) {
@@ -262,23 +392,26 @@ class _OrderCard extends StatelessWidget {
 }
 
 class _PaymentBadge extends StatelessWidget {
-  final MockPaymentStatus status;
-  final MockPaymentMethod method;
+  final String status;
+  final String method;
 
   const _PaymentBadge({required this.status, required this.method});
 
   @override
   Widget build(BuildContext context) {
-    final (label, color) = switch (status) {
-      MockPaymentStatus.paid => ('Paid', AppColors.success),
-      MockPaymentStatus.pending => ('Unpaid', AppColors.warning),
-      MockPaymentStatus.failed => ('Failed', AppColors.danger),
-      MockPaymentStatus.refunded => ('Refunded', AppColors.info),
+    final s = status.toLowerCase();
+    final (label, color) = switch (s) {
+      'paid' => ('Paid', AppColors.success),
+      'pending' => ('Unpaid', AppColors.warning),
+      'failed' => ('Failed', AppColors.danger),
+      'refunded' => ('Refunded', AppColors.info),
+      _ => ('Unpaid', AppColors.warning),
     };
-    final methodLabel = switch (method) {
-      MockPaymentMethod.gcash => 'GCash',
-      MockPaymentMethod.cash => 'Cash',
-      MockPaymentMethod.creditCard => 'Card',
+    final methodLabel = switch (method.toLowerCase()) {
+      'gcash' || 'gcash_simulated' => 'GCash',
+      'cash' || 'cash_on_delivery' => 'Cash',
+      'card' || 'credit_card' => 'Card',
+      _ => method,
     };
 
     return Row(
@@ -290,10 +423,23 @@ class _PaymentBadge extends StatelessWidget {
             borderRadius: BorderRadius.circular(8),
             border: Border.all(color: color.withValues(alpha: 0.3), width: 0.8),
           ),
-          child: Text(label, style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold)),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
         ),
         const SizedBox(width: 6),
-        Text(methodLabel, style: AppTextStyles.body(fontSize: 11, color: AppColors.textSecondaryDark)),
+        Text(
+          methodLabel,
+          style: AppTextStyles.body(
+            fontSize: 11,
+            color: AppColors.textSecondaryDark,
+          ),
+        ),
       ],
     );
   }

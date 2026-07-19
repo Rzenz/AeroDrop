@@ -1,528 +1,516 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:image_picker/image_picker.dart';
 import 'delivery_provider.dart';
 import 'notification_provider.dart';
+import 'drone_provider.dart';
+import 'order_provider.dart';
+import 'product_provider.dart';
+import 'vendor_provider.dart';
+import 'weather_provider.dart';
 
 import '../models/user_model.dart';
-import '../config/simulation_config.dart';
-import '../../providers/mock/auth_mock_provider.dart';
 import '../services/supabase_service.dart';
+
+// ── Email helpers ─────────────────────────────────────────────────────────────
 
 String normalizeEmail(String email) {
   final normalized = email.trim().toLowerCase().replaceAll(
-        RegExp(r'[\s\u00A0\u200B-\u200D\u2060]'),
-        '',
-      );
+    RegExp(r'[\u200B-\u200D\uFEFF]'),
+    '',
+  );
 
-  if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(normalized)) {
-    throw FormatException('Invalid email address');
+  if (!RegExp(
+    r'^[A-Za-z0-9.!#$%&*+/=?^_`{|}~-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+$',
+  ).hasMatch(normalized)) {
+    throw const FormatException('Invalid email address');
   }
 
   return normalized;
 }
 
 String formatAuthErrorMessage(Object error) {
-  final message = error.toString().toLowerCase();
+  if (error is AuthException) {
+    final code = error.code?.toLowerCase() ?? '';
+    final msg = error.message.toLowerCase();
 
-  if (message.contains('faculty/staff')) {
-    return 'Faculty/Staff must use a @uclm.edu email address.';
+    if (code == 'email_address_invalid') {
+      return 'Please enter a valid email address.';
+    }
+    if (code == 'over_email_send_rate_limit' ||
+        code == 'rate_limit_exceeded' ||
+        msg.contains('rate limit')) {
+      return 'Too many attempts. Please wait before trying again.';
+    }
+    if (code == 'email_exists' ||
+        code == 'user_already_exists' ||
+        msg.contains('already registered') ||
+        msg.contains('already exists')) {
+      return 'An account with this email already exists.';
+    }
+    if (code == 'email_provider_disabled' || code == 'signup_disabled') {
+      return 'Registration is currently unavailable.';
+    }
+    if (code == 'weak_password') {
+      return error.message;
+    }
+    if (code == 'invalid_credentials' ||
+        msg.contains('invalid login credentials') ||
+        msg.contains('user not found') ||
+        msg.contains('email not confirmed')) {
+      return 'Incorrect email or password.';
+    }
+    return error.message;
   }
 
-  if (message.contains('rate limit') ||
-      message.contains('over_email_send_rate_limit')) {
-    return 'Too many sign-up attempts. Please wait a few minutes and try again with a different email address.';
-  }
-
-  if (message.contains('invalid_credentials') ||
-      message.contains('invalid login credentials') ||
-      message.contains('email not confirmed') ||
-      message.contains('user not found')) {
-    return 'The email or password is incorrect.';
-  }
-
-  if (message.contains('email address') && message.contains('invalid')) {
+  final msg = error.toString().toLowerCase();
+  if (msg.contains('invalid email address') ||
+      (msg.contains('email') && msg.contains('invalid'))) {
     return 'Please enter a valid email address.';
-  }
-
-  if (message.contains('weak_password')) {
-    return 'Please choose a stronger password.';
   }
 
   return 'Authentication failed. Please try again.';
 }
 
+// ── State ─────────────────────────────────────────────────────────────────────
+
 class AuthState {
-  final UserModel? user;
+  final AeroDropUser? user;
   final bool isLoading;
   final String? errorMessage;
+  final bool requiresVerification;
+  final bool isVerified;
 
-  AuthState({
+  const AuthState({
     this.user,
     this.isLoading = false,
     this.errorMessage,
+    this.requiresVerification = false,
+    this.isVerified = false,
   });
 
   AuthState copyWith({
-    UserModel? user,
+    AeroDropUser? user,
     bool? isLoading,
     String? errorMessage,
+    bool? requiresVerification,
+    bool? isVerified,
   }) {
     return AuthState(
       user: user ?? this.user,
       isLoading: isLoading ?? this.isLoading,
       errorMessage: errorMessage,
+      requiresVerification: requiresVerification ?? this.requiresVerification,
+      isVerified: isVerified ?? this.isVerified,
     );
   }
 }
 
+// ── Notifier ──────────────────────────────────────────────────────────────────
+
 class AuthNotifier extends StateNotifier<AuthState> {
   final Ref? ref;
 
-  static const String _adminEmail = 'admin.portal@gmail.com';
-
-  AuthNotifier([this.ref]) : super(AuthState()) {
-    if (kSimulationMode && ref != null) {
-      ref!.listen<AuthState>(
-        authMockProvider,
-        (previous, next) {
-          state = next;
-        },
-        fireImmediately: true,
-      );
-    }
+  AuthNotifier([this.ref]) : super(const AuthState()) {
+    _initializeSession();
   }
 
-  String _roleToString(UserRole role) {
-    switch (role) {
-      case UserRole.admin:
-        return 'admin';
-      case UserRole.facultyStaff:
-        return 'faculty_staff';
-      case UserRole.user:
-        return 'student';
-    }
-  }
-
-  UserRole _roleFromString(String? role, String email) {
-    final normalizedEmail = normalizeEmail(email);
-    final normalizedRole = (role ?? '').trim().toLowerCase();
-
-    // Admin only if the email is the official admin email
-    // AND the database role is admin.
-    if (normalizedEmail == _adminEmail && normalizedRole == 'admin') {
-      return UserRole.admin;
-    }
-
-    if (normalizedRole == 'faculty_staff' ||
-        normalizedRole == 'faculty' ||
-        normalizedRole == 'staff' ||
-        normalizedRole == 'faculty/staff') {
-      return UserRole.facultyStaff;
-    }
-
-    // Old database mistake: if non-admin account was saved as admin before,
-    // treat it as faculty/staff if it is @uclm.edu.
-    if (normalizedRole == 'admin' &&
-        normalizedEmail != _adminEmail &&
-        normalizedEmail.endsWith('@uclm.edu')) {
-      return UserRole.facultyStaff;
-    }
-
-    return UserRole.user;
-  }
-
-  Future<void> _syncUserProfile({
-    required String userId,
-    required String email,
-    required String name,
-    required UserRole role,
-    String? phoneNumber,
-    String accountStatus = 'active',
-  }) async {
+  Future<void> _initializeSession() async {
     if (!SupabaseService.isConfigured) return;
-
-    try {
-      await SupabaseService.client.from('users').upsert(
-        {
-          'id': userId,
-          'email': email,
-          'name': name.trim(),
-          'role': _roleToString(role),
-          // ignore: use_null_aware_elements
-          if (phoneNumber != null) 'phone_number': phoneNumber,
-          'account_status': accountStatus,
-          'updated_at': DateTime.now().toUtc().toIso8601String(),
-        },
-        onConflict: 'id',
-      );
-    } catch (error) {
-      debugPrint('Supabase user sync failed: $error');
+    final authUser = SupabaseService.client.auth.currentUser;
+    if (authUser != null) {
+      state = state.copyWith(isLoading: true);
+      try {
+        final userRow = await SupabaseService.client
+            .from('users')
+            .select()
+            .eq('id', authUser.id)
+            .maybeSingle();
+        if (userRow != null && mounted) {
+          final aeroUser = AeroDropUser.fromMap(
+            Map<String, dynamic>.from(userRow),
+          );
+          state = state.copyWith(
+            user: aeroUser,
+            requiresVerification:
+                false, // Automatically restored session doesn't require OTP
+            isVerified: true,
+            isLoading: false,
+          );
+          ref?.read(notificationProvider.notifier).loadNotifications();
+          ref?.read(deliveryProvider.notifier).loadDeliveriesFromSupabase();
+        } else {
+          if (mounted) {
+            state = state.copyWith(isLoading: false);
+          }
+        }
+      } catch (e) {
+        debugPrint('Error restoring session: $e');
+        if (mounted) {
+          state = state.copyWith(isLoading: false);
+        }
+      }
     }
   }
+
+  void completeVerification() {
+    state = state.copyWith(requiresVerification: false, isVerified: true);
+  }
+
+  // ── Login ─────────────────────────────────────────────────────────────────
 
   Future<bool> login(String email, String password) async {
-    final normalized = email.trim().toLowerCase();
-    if (normalized == 'admin@gmail.com' && password == 'admin123') {
-      final loggedInUser = UserModel(
-        id: 'usr_admin_bypass',
-        name: 'Admin Commander',
-        email: 'admin@gmail.com',
-        role: UserRole.admin,
-        avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
-        phoneNumber: '09123456787',
-        accountStatus: 'active',
-      );
-      state = state.copyWith(user: loggedInUser, isLoading: false);
-      return true;
-    }
-    if (normalized == 'vendor@gmail.com' && password == 'vendor123') {
-      final loggedInUser = UserModel(
-        id: 'usr_vendor_bypass',
-        name: 'Maria Santos',
-        email: 'vendor@gmail.com',
-        role: UserRole.facultyStaff,
-        avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
-        phoneNumber: '09171234567',
-        accountStatus: 'active',
-      );
-      state = state.copyWith(user: loggedInUser, isLoading: false);
-      return true;
-    }
-    if (normalized == 'user@gmail.com' && password == 'user123') {
-      final loggedInUser = UserModel(
-        id: 'usr_user_bypass',
-        name: 'John Doe',
-        email: 'user@gmail.com',
-        role: UserRole.user,
-        avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
-        phoneNumber: '09170000000',
-        accountStatus: 'active',
-      );
-      state = state.copyWith(user: loggedInUser, isLoading: false);
-      return true;
-    }
-
-    if ((kSimulationMode || !SupabaseService.isConfigured) && ref != null) {
-      return ref!.read(authMockProvider.notifier).login(email, password);
-    }
-
     state = state.copyWith(isLoading: true, errorMessage: null);
 
     try {
-      final normalizedEmail = normalizeEmail(email);
-
+      final normalizedEmail = email.trim().toLowerCase();
       final response = await SupabaseService.client.auth.signInWithPassword(
         email: normalizedEmail,
         password: password,
       );
 
       final authUser = response.user;
-      if (authUser == null) {
-        throw Exception('Login failed');
-      }
+      if (authUser == null) throw Exception('Login failed');
 
-      final authEmail = authUser.email ?? normalizedEmail;
-
-      final profile = await SupabaseService.client
+      final userRow = await SupabaseService.client
           .from('users')
           .select()
           .eq('id', authUser.id)
           .maybeSingle();
 
-      final profileStatus = profile?['account_status']?.toString() ?? 'active';
-
-      if (profileStatus == 'suspended') {
+      if (userRow == null) {
         await SupabaseService.client.auth.signOut();
         state = state.copyWith(
           isLoading: false,
-          errorMessage: 'Your account has been suspended. Please contact the administrator.',
-        );
-        return false;
-      }
-      if (profileStatus == 'deleted' || profile?['deleted_at'] != null) {
-        await SupabaseService.client.auth.signOut();
-        state = state.copyWith(
-          isLoading: false,
-          errorMessage: 'This account has been deleted. Please contact the administrator.',
+          errorMessage:
+              'Your account profile is not synchronized with the database.',
         );
         return false;
       }
 
-      final metadata = authUser.userMetadata ?? {};
+      final aeroUser = AeroDropUser.fromMap(Map<String, dynamic>.from(userRow));
 
-      final profileName = profile?['name']?.toString();
-      final profileRole = profile?['role']?.toString();
-      final profilePhone = profile?['phone_number']?.toString() ?? metadata['phone_number']?.toString();
+      if (aeroUser.accountStatus == 'suspended') {
+        await SupabaseService.client.auth.signOut();
+        state = state.copyWith(
+          isLoading: false,
+          errorMessage:
+              'Your account has been suspended. Please contact the administrator.',
+        );
+        return false;
+      }
 
-      final name = profileName ??
-          metadata['name']?.toString() ??
-          authEmail.split('@').first;
+      if (aeroUser.accountStatus == 'deleted') {
+        await SupabaseService.client.auth.signOut();
+        state = state.copyWith(
+          isLoading: false,
+          errorMessage:
+              'This account is no longer available. Please contact the administrator.',
+        );
+        return false;
+      }
 
-      final role = _roleFromString(
-        profileRole ?? metadata['role']?.toString(),
-        authEmail,
-      );
-
-      // Keep public.users synced with auth email and correct role.
-      await _syncUserProfile(
-        userId: authUser.id,
-        email: authEmail,
-        name: name,
-        role: role,
-        phoneNumber: profilePhone,
-        accountStatus: profileStatus,
-      );
-
-      final loggedInUser = UserModel(
-        id: authUser.id,
-        name: name,
-        email: authEmail,
-        role: role,
-        avatarUrl:
-            'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
-        phoneNumber: profilePhone,
-        accountStatus: profileStatus,
-        suspendedAt: profile?['suspended_at'] != null ? DateTime.tryParse(profile!['suspended_at'].toString()) : null,
-        suspensionReason: profile?['suspension_reason']?.toString(),
-        deletedAt: profile?['deleted_at'] != null ? DateTime.tryParse(profile!['deleted_at'].toString()) : null,
-      );
-
+      // Manual login: set requiresVerification = true, isVerified = false
       state = state.copyWith(
-        user: loggedInUser,
+        user: aeroUser,
+        requiresVerification: true,
+        isVerified: false,
         isLoading: false,
         errorMessage: null,
       );
 
-      if (ref != null) {
-        ref!.read(notificationProvider.notifier).loadNotifications();
-        ref!.read(deliveryProvider.notifier).loadDeliveriesFromSupabase();
-      }
+      ref?.read(notificationProvider.notifier).loadNotifications();
+      ref?.read(deliveryProvider.notifier).loadDeliveriesFromSupabase();
 
       return true;
     } catch (error) {
       debugPrint('Supabase login failed: $error');
-
       state = state.copyWith(
         isLoading: false,
         errorMessage: formatAuthErrorMessage(error),
       );
-
       return false;
     }
   }
+
+  // ── Register ──────────────────────────────────────────────────────────────
 
   Future<bool> register(
     String name,
     String email,
     String password,
-    UserRole role,
-    String phoneNumber,
-  ) async {
-    if ((kSimulationMode || !SupabaseService.isConfigured) && ref != null) {
-      return ref!.read(authMockProvider.notifier).login(email, password);
-    }
-
+    String requestedRole, // 'user' | 'vendor'
+    String phoneNumber, {
+    String? businessName,
+    String? businessCategory,
+    String? businessDescription,
+    String? campusLocationId,
+    XFile? logoFile,
+  }) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
 
     try {
       final normalizedEmail = normalizeEmail(email);
 
-      UserRole effectiveRole = role;
-
-      // Prevent normal users from becoming admin accidentally.
-      if (effectiveRole == UserRole.admin && normalizedEmail != _adminEmail) {
-        effectiveRole = UserRole.facultyStaff;
-      }
-
-
-
       final response = await SupabaseService.client.auth.signUp(
         email: normalizedEmail,
         password: password,
         data: {
-          'name': name.trim(),
-          'role': _roleToString(effectiveRole),
+          'full_name': name.trim(),
           'phone_number': phoneNumber.trim(),
+          'requested_role': requestedRole,
+          if (businessName != null) 'business_name': businessName.trim(),
+          'business_category': ?businessCategory,
+          if (businessDescription != null)
+            'business_description': businessDescription.trim(),
+          'campus_location_id': ?campusLocationId,
         },
       );
 
       final authUser = response.user;
-      if (authUser == null) {
-        throw Exception('Registration failed');
+      if (authUser == null) throw Exception('Registration failed');
+
+      // Trigger handles public.users insertion — no client-side write needed.
+
+      final sessionCreated = response.session != null;
+      if (sessionCreated && logoFile != null) {
+        try {
+          final bytes = await logoFile.readAsBytes();
+          final ext = logoFile.name.split('.').last.toLowerCase();
+          final storagePath = '${authUser.id}/business_logo.$ext';
+
+          await SupabaseService.client.storage
+              .from('vendor-logos')
+              .uploadBinary(
+                storagePath,
+                bytes,
+                fileOptions: const FileOptions(upsert: true),
+              );
+
+          final logoUrl = SupabaseService.client.storage
+              .from('vendor-logos')
+              .getPublicUrl(storagePath);
+
+          await SupabaseService.client
+              .from('users')
+              .update({'business_logo_url': logoUrl})
+              .eq('id', authUser.id);
+        } catch (storageError) {
+          debugPrint(
+            'Error uploading business logo during registration: $storageError',
+          );
+        }
       }
 
-      final authEmail = authUser.email ?? normalizedEmail;
+      if (sessionCreated) {
+        // Read back the newly created public.users row
+        final userRow = await SupabaseService.client
+            .from('users')
+            .select()
+            .eq('id', authUser.id)
+            .maybeSingle();
 
-      await _syncUserProfile(
-        userId: authUser.id,
-        email: authEmail,
-        name: name,
-        role: effectiveRole,
-        phoneNumber: phoneNumber.trim(),
-        accountStatus: 'active',
-      );
-
-      final newUser = UserModel(
-        id: authUser.id,
-        name: name.trim(),
-        email: authEmail,
-        role: effectiveRole,
-        avatarUrl:
-            'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
-        phoneNumber: phoneNumber.trim(),
-        accountStatus: 'active',
-      );
-
-      state = state.copyWith(
-        user: newUser,
-        isLoading: false,
-        errorMessage: null,
-      );
+        if (userRow != null) {
+          state = state.copyWith(
+            user: AeroDropUser.fromMap(Map<String, dynamic>.from(userRow)),
+            isLoading: false,
+            errorMessage: null,
+          );
+        } else {
+          state = state.copyWith(
+            user: null,
+            isLoading: false,
+            errorMessage: null,
+          );
+        }
+      } else {
+        state = state.copyWith(
+          user: null,
+          isLoading: false,
+          errorMessage: null,
+        );
+      }
 
       return true;
     } catch (error) {
       debugPrint('Supabase register failed: $error');
-
       state = state.copyWith(
         isLoading: false,
         errorMessage: formatAuthErrorMessage(error),
       );
-
       return false;
     }
   }
 
-  Future<bool> updateProfile(String name, String email, {String? phoneNumber}) async {
-    final trimmedName = name.trim();
-    final trimmedPhone = phoneNumber?.trim();
+  // ── Update profile ────────────────────────────────────────────────────────
 
-    if ((kSimulationMode || !SupabaseService.isConfigured) && ref != null) {
-      if (state.user != null) {
-        final updated = UserModel(
-          id: state.user!.id,
-          name: trimmedName,
-          email: state.user!.email,
-          role: state.user!.role,
-          avatarUrl: state.user!.avatarUrl,
-          phoneNumber: trimmedPhone ?? state.user!.phoneNumber,
-          accountStatus: state.user!.accountStatus,
-          suspendedAt: state.user!.suspendedAt,
-          suspensionReason: state.user!.suspensionReason,
-          deletedAt: state.user!.deletedAt,
-        );
-
-        state = state.copyWith(user: updated);
-      }
-
-      return true;
-    }
-
+  Future<bool> updateProfile(
+    String name,
+    String email, {
+    String? phoneNumber,
+    String? businessName,
+    String? businessCategory,
+    String? businessDescription,
+    String? campusLocationId,
+  }) async {
     if (state.user == null) {
-      state = state.copyWith(errorMessage: 'No logged in user found.');
+      state = state.copyWith(errorMessage: 'Not logged in.');
       return false;
     }
 
     state = state.copyWith(isLoading: true, errorMessage: null);
 
     try {
-      final currentUser = SupabaseService.client.auth.currentUser;
-      final userId = currentUser?.id ?? state.user!.id;
-      final currentEmail = currentUser?.email ?? state.user!.email;
+      final userId = state.user!.id;
+      final trimmedName = name.trim();
+      final trimmedPhone = phoneNumber?.trim();
+      final currentEmail = state.user!.email;
+      final normalizedEmail = email.trim().toLowerCase();
+      bool emailChangePending = false;
 
-      // Update user metadata in Auth.
-      await SupabaseService.client.auth.updateUser(
-        UserAttributes(
-          data: {
-            'name': trimmedName,
-            'role': _roleToString(state.user!.role),
-            // ignore: use_null_aware_elements
-            if (trimmedPhone != null) 'phone_number': trimmedPhone,
-          },
-        ),
-      );
+      if (normalizedEmail != currentEmail) {
+        if (normalizedEmail.contains(' ') ||
+            !RegExp(
+              r'^[A-Za-z0-9.!#$%&*+/=?^_`{|}~-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+$',
+            ).hasMatch(normalizedEmail)) {
+          state = state.copyWith(
+            isLoading: false,
+            errorMessage: 'Please enter a valid email address.',
+          );
+          return false;
+        }
 
-      // Update public.users table.
-      await SupabaseService.client.from('users').update({
-        'name': trimmedName,
-        'email': currentEmail,
-        'role': _roleToString(state.user!.role),
-        // ignore: use_null_aware_elements
-        if (trimmedPhone != null) 'phone_number': trimmedPhone,
-        'updated_at': DateTime.now().toUtc().toIso8601String(),
-      }).eq('id', userId);
+        final authRes = await SupabaseService.client.auth.updateUser(
+          UserAttributes(email: normalizedEmail),
+        );
 
-      final updated = UserModel(
-        id: userId,
-        name: trimmedName,
-        email: currentEmail,
-        role: state.user!.role,
-        avatarUrl: state.user!.avatarUrl,
-        phoneNumber: trimmedPhone ?? state.user!.phoneNumber,
-        accountStatus: state.user!.accountStatus,
-        suspendedAt: state.user!.suspendedAt,
-        suspensionReason: state.user!.suspensionReason,
-        deletedAt: state.user!.deletedAt,
-      );
+        if (authRes.user != null) {
+          final returnedEmail = authRes.user!.email;
+          if (returnedEmail != null && returnedEmail != normalizedEmail) {
+            emailChangePending = true;
+          }
+        }
+      }
 
-      state = state.copyWith(
-        user: updated,
-        isLoading: false,
-        errorMessage: null,
-      );
+      await SupabaseService.client
+          .from('users')
+          .update({
+            'full_name': trimmedName,
+            'phone_number': ?trimmedPhone,
+            if (businessName != null) 'business_name': businessName.trim(),
+            if (businessCategory != null)
+              'business_category': businessCategory.trim(),
+            if (businessDescription != null)
+              'business_description': businessDescription.trim(),
+            'campus_location_id': ?campusLocationId,
+            'updated_at': DateTime.now().toUtc().toIso8601String(),
+          })
+          .eq('id', userId);
 
+      final userRow = await SupabaseService.client
+          .from('users')
+          .select()
+          .eq('id', userId)
+          .maybeSingle();
+
+      if (userRow != null) {
+        state = state.copyWith(
+          user: AeroDropUser.fromMap(Map<String, dynamic>.from(userRow)),
+          isLoading: false,
+          errorMessage: emailChangePending
+              ? 'Please check your new email address to confirm the change.'
+              : null,
+        );
+      } else {
+        state = state.copyWith(
+          isLoading: false,
+          errorMessage: 'Profile updated, but failed to sync local state.',
+        );
+      }
       return true;
     } catch (error) {
-      debugPrint('Supabase profile update failed: $error');
-
-      state = state.copyWith(
-        isLoading: false,
-        errorMessage: 'Profile update failed. Please try again.',
-      );
-
+      debugPrint('Profile update failed: $error');
+      String msg = 'Profile update failed. Please try again.';
+      if (error is AuthException) {
+        msg = formatAuthErrorMessage(error);
+      } else if (error is PostgrestException) {
+        msg = error.message;
+      }
+      state = state.copyWith(isLoading: false, errorMessage: msg);
       return false;
     }
   }
 
-  void switchRole(UserRole role) {
-    if (kSimulationMode && ref != null) {
-      ref!.read(authMockProvider.notifier).switchRole(role);
-      return;
-    }
-  }
-
-  void logout() {
-    if (kSimulationMode && ref != null) {
-      ref!.read(authMockProvider.notifier).logout();
-      ref!.read(deliveryProvider.notifier).clearDeliveries();
-      return;
+  Future<bool> updateAvatar(XFile? logoFile) async {
+    if (state.user == null) {
+      state = state.copyWith(errorMessage: 'Not logged in.');
+      return false;
     }
 
-    if (SupabaseService.isConfigured) {
-      SupabaseService.client.auth.signOut();
-    }
-
-    if (ref != null) {
-      ref!.read(deliveryProvider.notifier).clearDeliveries();
-      ref!.read(notificationProvider.notifier).clearNotifications();
-    }
-
-    state = AuthState();
-  }
-
-  Future<String?> suspendUser(String userId, {String reason = 'Suspended by admin'}) async {
-    if (!SupabaseService.isConfigured) return 'Supabase is not configured.';
-    final adminId = SupabaseService.client.auth.currentUser?.id;
-    if (adminId == null) return 'Not authenticated.';
+    state = state.copyWith(isLoading: true, errorMessage: null);
 
     try {
-      await SupabaseService.client.from('users').update({
-        'account_status': 'suspended',
-        'suspended_at': DateTime.now().toUtc().toIso8601String(),
-        'suspended_by': adminId,
-        'suspension_reason': reason,
-        'updated_at': DateTime.now().toUtc().toIso8601String(),
-      }).eq('id', userId);
+      final userId = state.user!.id;
+      String? avatarUrl;
+
+      if (logoFile != null) {
+        final bytes = await logoFile.readAsBytes();
+        final ext = logoFile.name.split('.').last.toLowerCase();
+        final storagePath = '$userId/avatar.$ext';
+
+        await SupabaseService.client.storage
+            .from('avatars')
+            .uploadBinary(
+              storagePath,
+              bytes,
+              fileOptions: const FileOptions(upsert: true),
+            );
+
+        avatarUrl = SupabaseService.client.storage
+            .from('avatars')
+            .getPublicUrl(storagePath);
+      }
+
+      await SupabaseService.client
+          .from('users')
+          .update({
+            'avatar_url': avatarUrl,
+            'updated_at': DateTime.now().toUtc().toIso8601String(),
+          })
+          .eq('id', userId);
+
+      state = state.copyWith(
+        user: state.user!.copyWith(avatarUrl: avatarUrl),
+        isLoading: false,
+        errorMessage: null,
+      );
+      return true;
+    } catch (error) {
+      debugPrint('Avatar update failed: $error');
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: 'Avatar update failed. Please try again.',
+      );
+      return false;
+    }
+  }
+
+  // ── Admin user management ─────────────────────────────────────────────────
+
+  Future<String?> suspendUser(
+    String userId, {
+    String reason = 'Suspended by admin',
+  }) async {
+    if (!SupabaseService.isConfigured) return 'Supabase is not configured.';
+    try {
+      await SupabaseService.client
+          .from('users')
+          .update({
+            'account_status': 'suspended',
+            'updated_at': DateTime.now().toUtc().toIso8601String(),
+          })
+          .eq('id', userId);
       return null;
     } catch (e) {
       debugPrint('Suspend user failed: $e');
@@ -532,15 +520,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<String?> activateUser(String userId) async {
     if (!SupabaseService.isConfigured) return 'Supabase is not configured.';
-
     try {
-      await SupabaseService.client.from('users').update({
-        'account_status': 'active',
-        'suspended_at': null,
-        'suspended_by': null,
-        'suspension_reason': null,
-        'updated_at': DateTime.now().toUtc().toIso8601String(),
-      }).eq('id', userId);
+      await SupabaseService.client
+          .from('users')
+          .update({
+            'account_status': 'active',
+            'updated_at': DateTime.now().toUtc().toIso8601String(),
+          })
+          .eq('id', userId);
       return null;
     } catch (e) {
       debugPrint('Activate user failed: $e');
@@ -548,25 +535,55 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  Future<String?> deleteUserAccount(String userId, {String reason = 'Deleted by admin'}) async {
+  Future<String?> deleteUserAccount(
+    String userId, {
+    String reason = 'Deleted by admin',
+  }) async {
     if (!SupabaseService.isConfigured) return 'Supabase is not configured.';
-    final adminId = SupabaseService.client.auth.currentUser?.id;
-    if (adminId == null) return 'Not authenticated.';
-
     try {
-      await SupabaseService.client.from('users').update({
-        'account_status': 'deleted',
-        'deleted_at': DateTime.now().toUtc().toIso8601String(),
-        'deleted_by': adminId,
-        'delete_reason': reason,
-        'updated_at': DateTime.now().toUtc().toIso8601String(),
-      }).eq('id', userId);
+      await SupabaseService.client
+          .from('users')
+          .update({
+            'account_status': 'deleted',
+            'updated_at': DateTime.now().toUtc().toIso8601String(),
+          })
+          .eq('id', userId);
       return null;
     } catch (e) {
       debugPrint('Delete user account failed: $e');
       return e.toString();
     }
   }
+
+  // ── Logout ────────────────────────────────────────────────────────────────
+
+  Future<bool> logout() async {
+    state = state.copyWith(isLoading: true);
+    try {
+      if (SupabaseService.isConfigured) {
+        await SupabaseService.client.auth.signOut();
+      }
+      if (ref != null) {
+        ref!.invalidate(deliveryProvider);
+        ref!.invalidate(notificationProvider);
+        ref!.invalidate(droneProvider);
+        ref!.invalidate(orderProvider);
+        ref!.invalidate(productProvider);
+        ref!.invalidate(vendorProvider);
+        ref!.invalidate(weatherProvider);
+      }
+      state = const AuthState();
+      return true;
+    } catch (e) {
+      debugPrint('Logout failed: $e');
+      state = state.copyWith(isLoading: false);
+      return false;
+    }
+  }
+
+  // ponytail: switchRole kept as no-op stub — simulation mode removed,
+  // but some screens still call it. Safe to delete once callers are cleaned up.
+  void switchRole(dynamic role) {}
 }
 
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {

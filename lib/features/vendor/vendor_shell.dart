@@ -50,7 +50,7 @@ class VendorShell extends StatelessWidget {
       Icons.notifications_rounded,
       Icons.person_rounded,
     ];
-    final labels = ['Home', 'Products', 'Orders', 'Alerts', 'Profile'];
+    final labels = ['Home', 'Products', 'Orders', 'Notifications', 'Profile'];
 
     return Scaffold(
       extendBody: true,
@@ -146,12 +146,15 @@ class VendorShell extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   label,
-                  style: AppTextStyles.label(
-                    fontSize: 9.5,
-                    color: isActive ? activeIconColor : inactiveColor,
-                  ).copyWith(
-                    fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-                  ),
+                  style:
+                      AppTextStyles.label(
+                        fontSize: 9.5,
+                        color: isActive ? activeIconColor : inactiveColor,
+                      ).copyWith(
+                        fontWeight: isActive
+                            ? FontWeight.bold
+                            : FontWeight.normal,
+                      ),
                 ),
               ],
             ),

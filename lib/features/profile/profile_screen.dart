@@ -7,7 +7,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/glass_card.dart';
 import '../../core/providers/auth_provider.dart';
-import '../../core/models/user_model.dart';
+import '../../core/utils/logout_helper.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -17,7 +17,6 @@ class ProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
-
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(authProvider).user;
@@ -62,7 +61,18 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           height: 80,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            gradient: AppColors.accentGradient,
+                            gradient: user?.avatarUrl == null
+                                ? AppColors.accentGradient
+                                : null,
+                            color: user?.avatarUrl != null
+                                ? AppColors.cardDark
+                                : null,
+                            image: user?.avatarUrl != null
+                                ? DecorationImage(
+                                    image: NetworkImage(user!.avatarUrl!),
+                                    fit: BoxFit.cover,
+                                  )
+                                : null,
                             boxShadow: [
                               BoxShadow(
                                 color: AppColors.accent.withValues(alpha: 0.35),
@@ -71,19 +81,24 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                               ),
                             ],
                           ),
-                          child: Center(
-                            child: Text(
-                              name.isNotEmpty ? name[0].toUpperCase() : 'U',
-                              style: AppTextStyles.title(
-                                fontSize: 32,
-                                fontWeight: FontWeight.w900,
-                                color: AppColors.bgDark,
-                              ),
-                            ),
-                          ),
-                        )
-                            .animate()
-                            .scale(curve: Curves.elasticOut, duration: 600.ms),
+                          child: user?.avatarUrl == null
+                              ? Center(
+                                  child: Text(
+                                    name.isNotEmpty
+                                        ? name[0].toUpperCase()
+                                        : 'U',
+                                    style: AppTextStyles.title(
+                                      fontSize: 32,
+                                      fontWeight: FontWeight.w900,
+                                      color: AppColors.bgDark,
+                                    ),
+                                  ),
+                                )
+                              : null,
+                        ).animate().scale(
+                          curve: Curves.elasticOut,
+                          duration: 600.ms,
+                        ),
                         const SizedBox(height: 12),
                         Text(
                           name,
@@ -125,7 +140,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       icon: Icons.lock_outline_rounded,
                       label: 'Change Password',
                       color: AppColors.primaryLight,
-                      onTap: () => context.push('/user/profile/change-password'),
+                      onTap: () =>
+                          context.push('/user/profile/change-password'),
                     ),
                   ],
                 ),
@@ -177,8 +193,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 GestureDetector(
                   onTap: () {
                     HapticFeedback.mediumImpact();
-                    ref.read(authProvider.notifier).logout();
-                    context.go('/login');
+                    showLogoutConfirmation(context, ref);
                   },
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 16),
@@ -219,27 +234,27 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
-  Widget _buildRoleTag(UserRole? role) {
+  Widget _buildRoleTag(String? role) {
     if (role == null) return const SizedBox.shrink();
 
-  final isFaculty = role == UserRole.facultyStaff;
-final isAdmin = role == UserRole.admin;
+    final isAdmin = role == 'admin';
+    final isVendor = role == 'vendor';
 
-final label = isAdmin
-    ? 'ADMIN'
-    : isFaculty
+    final label = isAdmin
+        ? 'ADMIN'
+        : isVendor
         ? 'VENDOR'
         : 'USER';
 
-final color = isAdmin
-    ? AppColors.danger
-    : isFaculty
+    final color = isAdmin
+        ? AppColors.danger
+        : isVendor
         ? AppColors.accent
-        : AppColors.primaryLight;
+        : Colors.teal;
 
-final icon = isAdmin
-    ? Icons.admin_panel_settings_rounded
-    : isFaculty
+    final icon = isAdmin
+        ? Icons.admin_panel_settings_rounded
+        : isVendor
         ? Icons.storefront_rounded
         : Icons.person_rounded;
 
@@ -248,19 +263,12 @@ final icon = isAdmin
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(30),
-        border: Border.all(
-          color: color.withValues(alpha: 0.25),
-          width: 1.5,
-        ),
+        border: Border.all(color: color.withValues(alpha: 0.25), width: 1.5),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            icon,
-            color: color,
-            size: 14,
-          ),
+          Icon(icon, color: color, size: 14),
           const SizedBox(width: 6),
           Text(
             label,
@@ -280,10 +288,7 @@ class _ProfileSection extends StatelessWidget {
   final String title;
   final List<_ProfileMenuItem> items;
 
-  const _ProfileSection({
-    required this.title,
-    required this.items,
-  });
+  const _ProfileSection({required this.title, required this.items});
 
   @override
   Widget build(BuildContext context) {
@@ -362,11 +367,7 @@ class _ProfileMenuItem extends StatelessWidget {
                 color: color.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Icon(
-                icon,
-                color: color,
-                size: 20,
-              ),
+              child: Icon(icon, color: color, size: 20),
             ),
             const SizedBox(width: 14),
             Text(

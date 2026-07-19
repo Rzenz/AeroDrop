@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -11,9 +12,12 @@ import '../../core/widgets/gradient_button.dart';
 import '../../core/widgets/custom_text_field.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/models/user_model.dart';
+import '../../core/providers/location_provider.dart';
 import 'presentation/controllers/register_controller.dart';
 import 'widgets/password_strength_indicator.dart';
 import '../../core/widgets/drone_svg_painter.dart';
+import 'package:image_picker/image_picker.dart';
+import '../../core/constants/vendor_categories.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -48,33 +52,16 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
   // Vendor Step 1: Business Info
   final _businessNameController = TextEditingController();
   final _businessDescController = TextEditingController();
+  final _customCategoryController = TextEditingController();
   String _businessCategory = 'Cafe';
-  String? _mockLogoPath; // null = no logo uploaded, non-null = logo placeholder
-
-  static const _categories = [
-    'Cafe',
-    'School Canteen',
-    'Milk Tea',
-    'Bakery',
-    'Convenience Store',
-    'Restaurant',
-    'Snack Store',
-  ];
+  XFile? _selectedLogoFile;
+  final ImagePicker _picker = ImagePicker();
 
   // Vendor Step 3: Location Info
-  String _campusBuilding = 'Main Building';
+  CampusLocation? _selectedCampusLocation;
   final _latController = TextEditingController(text: '10.354215');
   final _lngController = TextEditingController(text: '123.912844');
   bool _gettingLocation = false;
-
-  static const _buildings = [
-    'Main Building',
-    'Engineering Building',
-    'Library',
-    'Cafeteria Area',
-    'Annex',
-    'Other Campus Buildings',
-  ];
 
   @override
   void initState() {
@@ -83,6 +70,32 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
       vsync: this,
       duration: const Duration(seconds: 18),
     )..repeat();
+  }
+
+  Future<void> _pickLogo() async {
+    try {
+      final XFile? image = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
+      if (image != null) {
+        final bytes = await image.readAsBytes();
+        if (bytes.length > 2 * 1024 * 1024) {
+          _showErrorDialog(
+            'File Too Large',
+            'Please select an image smaller than 2MB.',
+          );
+          return;
+        }
+        setState(() {
+          _selectedLogoFile = image;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error picking logo: $e');
+    }
   }
 
   @override
@@ -95,6 +108,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
     _confirmPasswordController.dispose();
     _businessNameController.dispose();
     _businessDescController.dispose();
+    _customCategoryController.dispose();
     _latController.dispose();
     _lngController.dispose();
     super.dispose();
@@ -108,6 +122,23 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
         'Please enter your store/business name to proceed.',
       );
       return false;
+    }
+    if (_businessCategory == 'Other') {
+      final customCat = _customCategoryController.text.trim();
+      if (customCat.isEmpty) {
+        _showErrorDialog(
+          'Store Category Required',
+          'Please specify your store category.',
+        );
+        return false;
+      }
+      if (customCat.length > 60) {
+        _showErrorDialog(
+          'Store Category Too Long',
+          'Store category must be at most 60 characters.',
+        );
+        return false;
+      }
     }
     return true;
   }
@@ -212,7 +243,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
 
   Future<void> _handleRegister() async {
     if (_isVendorRole) {
-      // Vendor Submit (Multi-step flow)
       if (!_acceptTerms) {
         _showErrorDialog(
           'Terms of Service',
@@ -220,18 +250,77 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
         );
         return;
       }
+
+      final authState = ref.read(authProvider);
+      if (authState.isLoading) return;
+
+      final bizName = _businessNameController.text.trim();
+      final ownerName = _nameController.text.trim();
+      final email = _emailController.text.trim();
+      final phone = _phoneController.text.trim();
+      final password = _passwordController.text.trim();
+      final resolvedBusinessCategory = _businessCategory == 'Other'
+          ? _customCategoryController.text.trim()
+          : _businessCategory;
+
+      if (bizName.isEmpty) {
+        _showErrorDialog('Missing Information', 'Business Name is required.');
+        return;
+      }
+      if (ownerName.isEmpty) {
+        _showErrorDialog('Missing Information', 'Owner Full Name is required.');
+        return;
+      }
+      if (email.isEmpty) {
+        _showErrorDialog('Missing Information', 'Email Address is required.');
+        return;
+      }
+      if (phone.isEmpty) {
+        _showErrorDialog('Missing Information', 'Phone Number is required.');
+        return;
+      }
+      if (password.isEmpty) {
+        _showErrorDialog('Missing Information', 'Password is required.');
+        return;
+      }
+
       HapticFeedback.mediumImpact();
       setState(() => _vendorSubmitted = true);
-      // Simulate onboarding completion
-      await Future.delayed(const Duration(milliseconds: 2000));
+
+      final locationId = _selectedCampusLocation?.id;
+
+      final success = await ref
+          .read(authProvider.notifier)
+          .register(
+            ownerName,
+            email,
+            password,
+            'vendor',
+            phone,
+            businessName: bizName,
+            businessCategory: resolvedBusinessCategory,
+            businessDescription: _businessDescController.text.trim(),
+            campusLocationId: locationId,
+            logoFile: _selectedLogoFile,
+          );
+
       if (mounted) {
-        setState(() {
-          _vendorSubmitted = false;
-          _vendorStep = 5; // Go to success view
-        });
+        setState(() => _vendorSubmitted = false);
+        if (success) {
+          setState(() {
+            _vendorStep = 5; // Go to success view
+          });
+        } else {
+          final errorMsg =
+              ref.read(authProvider).errorMessage ?? 'Registration failed.';
+          _showErrorDialog('Registration Error', errorMsg);
+        }
       }
     } else {
       // User/Student Submit
+      final authState = ref.read(authProvider);
+      if (authState.isLoading) return;
+
       if (!_formKey.currentState!.validate()) return;
       if (!_acceptTerms) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -254,12 +343,55 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
             _nameController.text,
             _emailController.text,
             _passwordController.text,
-            UserRole.user,
+            'user',
             _phoneController.text,
           );
 
-      if (success && mounted) {
-        context.go('/user');
+      if (mounted) {
+        if (success) {
+          final isUserLoggedIn = ref.read(authProvider).user != null;
+          if (isUserLoggedIn) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: const Text('Registration successful.'),
+                backgroundColor: AppColors.success,
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            );
+            context.go('/user');
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: const Text(
+                  'Registration successful. Please check your email to confirm your account.',
+                ),
+                backgroundColor: AppColors.info,
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                duration: const Duration(seconds: 8),
+              ),
+            );
+            context.go('/login');
+          }
+        } else {
+          final errorMsg =
+              ref.read(authProvider).errorMessage ?? 'Registration failed.';
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(errorMsg),
+              backgroundColor: AppColors.danger,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          );
+        }
       }
     }
   }
@@ -398,7 +530,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
                       children: [
                         Expanded(
                           child: _RoleTabBtn(
-                            label: 'User Portal',
+                            label: 'User Registration',
                             icon: Icons.person_rounded,
                             isActive: !_isVendorRole,
                             onTap: () => setState(() => _isVendorRole = false),
@@ -407,7 +539,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
                         const SizedBox(width: 8),
                         Expanded(
                           child: _RoleTabBtn(
-                            label: 'Merchant Partner',
+                            label: 'Vendor Registration',
                             icon: Icons.storefront_rounded,
                             isActive: _isVendorRole,
                             onTap: () => setState(() => _isVendorRole = true),
@@ -497,8 +629,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
             const SizedBox(height: 18),
 
             CustomTextField(
-              labelText: 'Email Address (Gmail)',
-              hintText: 'yourname@gmail.com',
+              labelText: 'Email Address',
+              hintText: 'yourname@domain.com',
               prefixIcon: Icons.email_outlined,
               controller: _emailController,
               keyboardType: TextInputType.emailAddress,
@@ -626,7 +758,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Merchant Setup Steps',
+                    'Vendor Setup Steps',
                     style: AppTextStyles.label(
                       fontSize: 10.5,
                       color: AppColors.textSecondaryDark,
@@ -840,7 +972,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
                 ),
                 child: DropdownButtonHideUnderline(
                   child: DropdownButton<String>(
-                    value: _businessCategory,
+                    value: vendorCategories.contains(_businessCategory)
+                        ? _businessCategory
+                        : 'Other',
                     dropdownColor: AppColors.cardDark2,
                     isExpanded: true,
                     icon: const Icon(
@@ -848,7 +982,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
                       color: AppColors.accent,
                     ),
                     style: const TextStyle(color: Colors.white, fontSize: 14),
-                    items: _categories.map((cat) {
+                    items: vendorCategories.map((cat) {
                       return DropdownMenuItem<String>(
                         value: cat,
                         child: Text(cat),
@@ -864,6 +998,17 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
               ),
             ],
           ),
+          if (_businessCategory == 'Other') ...[
+            const SizedBox(height: 18),
+            CustomTextField(
+              labelText: 'Specify Store Category *',
+              hintText: 'Enter your store category',
+              prefixIcon: Icons.edit_note_rounded,
+              controller: _customCategoryController,
+              textInputAction: TextInputAction.next,
+              inputFormatters: [LengthLimitingTextInputFormatter(60)],
+            ),
+          ],
           const SizedBox(height: 20),
 
           // Custom Business Logo Upload Widget (Placeholder only)
@@ -878,13 +1023,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
                 ),
               ),
               const SizedBox(height: 8),
-              _mockLogoPath == null
+              _selectedLogoFile == null
                   ? GestureDetector(
                       onTap: () {
                         HapticFeedback.lightImpact();
-                        setState(
-                          () => _mockLogoPath = 'assets/mock/logo_upload.png',
-                        );
+                        _pickLogo();
                       },
                       child: Container(
                         height: 110,
@@ -936,36 +1079,41 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
                             decoration: BoxDecoration(
                               color: AppColors.accent,
                               borderRadius: BorderRadius.circular(12),
-                            ),
-                            alignment: Alignment.center,
-                            child: const Text(
-                              'CB',
-                              style: TextStyle(
-                                color: AppColors.primaryDark,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 18,
+                              image: DecorationImage(
+                                image: FileImage(File(_selectedLogoFile!.path)),
+                                fit: BoxFit.cover,
                               ),
                             ),
                           ),
                           const SizedBox(width: 14),
-                          const Expanded(
+                          Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'cb_logo_preview.png',
-                                  style: TextStyle(
+                                  _selectedLogoFile!.name,
+                                  style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 12.5,
                                     fontWeight: FontWeight.bold,
                                   ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                                Text(
-                                  'Size: 340 KB',
-                                  style: TextStyle(
-                                    color: AppColors.textSecondaryDark,
-                                    fontSize: 10,
-                                  ),
+                                FutureBuilder<int>(
+                                  future: File(
+                                    _selectedLogoFile!.path,
+                                  ).length(),
+                                  builder: (context, snapshot) {
+                                    final kb = (snapshot.data ?? 0) / 1024;
+                                    return Text(
+                                      'Size: ${kb.toStringAsFixed(1)} KB',
+                                      style: const TextStyle(
+                                        color: AppColors.textSecondaryDark,
+                                        fontSize: 10,
+                                      ),
+                                    );
+                                  },
                                 ),
                               ],
                             ),
@@ -978,10 +1126,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
                             ),
                             onPressed: () {
                               HapticFeedback.lightImpact();
-                              setState(
-                                () => _mockLogoPath =
-                                    'assets/mock/logo_replaced.png',
-                              );
+                              _pickLogo();
                             },
                           ),
                           IconButton(
@@ -992,7 +1137,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
                             ),
                             onPressed: () {
                               HapticFeedback.lightImpact();
-                              setState(() => _mockLogoPath = null);
+                              setState(() => _selectedLogoFile = null);
                             },
                           ),
                         ],
@@ -1015,7 +1160,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const Text(
-            'Merchant Owner Account',
+            'Vendor Owner Account',
             style: TextStyle(
               color: Colors.white,
               fontSize: 16,
@@ -1034,8 +1179,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
           const SizedBox(height: 18),
 
           CustomTextField(
-            labelText: 'Email Address (Gmail) *',
-            hintText: 'yourname@gmail.com',
+            labelText: 'Email Address *',
+            hintText: 'yourname@domain.com',
             prefixIcon: Icons.email_outlined,
             controller: _emailController,
             keyboardType: TextInputType.emailAddress,
@@ -1108,6 +1253,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
 
   // STEP 3: Business Location
   Widget _buildStep3Location() {
+    final campusLocationsAsync = ref.watch(campusLocationsProvider);
     return GlassCard(
       key: const ValueKey('step_3_location'),
       padding: const EdgeInsets.all(24),
@@ -1147,22 +1293,89 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
                   ),
                 ),
                 child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    value: _campusBuilding,
-                    dropdownColor: AppColors.cardDark2,
-                    isExpanded: true,
-                    icon: const Icon(
-                      Icons.arrow_drop_down,
-                      color: AppColors.accent,
+                  child: campusLocationsAsync.when(
+                    loading: () => const Padding(
+                      padding: EdgeInsets.all(12.0),
+                      child: Center(
+                        child: SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.0,
+                            color: AppColors.accent,
+                          ),
+                        ),
+                      ),
                     ),
-                    style: const TextStyle(color: Colors.white, fontSize: 14),
-                    items: _buildings.map((b) {
-                      return DropdownMenuItem<String>(value: b, child: Text(b));
-                    }).toList(),
-                    onChanged: (val) {
-                      if (val != null) {
-                        setState(() => _campusBuilding = val);
+                    error: (err, stack) => Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Failed to load locations',
+                          style: TextStyle(
+                            color: AppColors.danger,
+                            fontSize: 13,
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(
+                            Icons.refresh,
+                            color: AppColors.accent,
+                            size: 18,
+                          ),
+                          onPressed: () =>
+                              ref.invalidate(campusLocationsProvider),
+                        ),
+                      ],
+                    ),
+                    data: (locations) {
+                      if (locations.isEmpty) {
+                        return const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 12),
+                          child: Text(
+                            'No campus locations found',
+                            style: TextStyle(color: Colors.white60),
+                          ),
+                        );
                       }
+
+                      // Auto-select first location if none is selected
+                      if (_selectedCampusLocation == null) {
+                        _selectedCampusLocation = locations.first;
+                        _latController.text = locations.first.latitude
+                            .toString();
+                        _lngController.text = locations.first.longitude
+                            .toString();
+                      }
+
+                      return DropdownButton<CampusLocation>(
+                        value: _selectedCampusLocation,
+                        dropdownColor: AppColors.cardDark2,
+                        isExpanded: true,
+                        icon: const Icon(
+                          Icons.arrow_drop_down,
+                          color: AppColors.accent,
+                        ),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                        ),
+                        items: locations.map((loc) {
+                          return DropdownMenuItem<CampusLocation>(
+                            value: loc,
+                            child: Text(loc.name),
+                          );
+                        }).toList(),
+                        onChanged: (val) {
+                          if (val != null) {
+                            setState(() {
+                              _selectedCampusLocation = val;
+                              _latController.text = val.latitude.toString();
+                              _lngController.text = val.longitude.toString();
+                            });
+                          }
+                        },
+                      );
                     },
                   ),
                 ),
@@ -1346,7 +1559,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
                 label: 'Store Name',
                 value: _businessNameController.text,
               ),
-              _ReviewItem(label: 'Category', value: _businessCategory),
+              _ReviewItem(
+                label: 'Category',
+                value: _businessCategory == 'Other'
+                    ? _customCategoryController.text.trim()
+                    : _businessCategory,
+              ),
               _ReviewItem(
                 label: 'Description',
                 value: _businessDescController.text.isEmpty
@@ -1374,7 +1592,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
             icon: Icons.pin_drop_outlined,
             title: 'Store Location',
             items: [
-              _ReviewItem(label: 'Campus Building', value: _campusBuilding),
+              _ReviewItem(
+                label: 'Campus Building',
+                value: _selectedCampusLocation?.name ?? 'Not selected',
+              ),
               _ReviewItem(
                 label: 'Drone Coordinates',
                 value: '${_latController.text}, ${_lngController.text}',

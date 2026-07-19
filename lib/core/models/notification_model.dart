@@ -21,8 +21,8 @@ class NotificationModel {
     DateTime? createdAt,
     DateTime? timestamp,
     this.readAt,
-  })  : message = message ?? body ?? '',
-        createdAt = createdAt ?? timestamp ?? DateTime.now();
+  }) : message = message ?? body ?? '',
+       createdAt = createdAt ?? timestamp ?? DateTime.now();
 
   // Getters for backward compatibility with existing views
   String get body => message;

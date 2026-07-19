@@ -14,9 +14,9 @@ class AuthMockNotifier extends StateNotifier<AuthState> {
     UserModel matchedUser;
     final lowerEmail = email.toLowerCase();
     if (lowerEmail.contains('admin') || lowerEmail.startsWith('admin.')) {
-      matchedUser = mockUsers.firstWhere((u) => u.role == UserRole.admin);
+      matchedUser = mockUsers.firstWhere((u) => u.isAdmin);
     } else {
-      matchedUser = mockUsers.firstWhere((u) => u.role == UserRole.user);
+      matchedUser = mockUsers.firstWhere((u) => !u.isAdmin);
     }
 
     // Prefill input email if user typed a specific one
@@ -37,13 +37,17 @@ class AuthMockNotifier extends StateNotifier<AuthState> {
       final updated = UserModel(
         id: state.user!.id,
         name: role == UserRole.admin ? 'Admin Commander' : 'John Doe',
-        email: role == UserRole.admin ? 'admin.portal@gmail.com' : 'john.doe@gmail.com',
+        email: role == UserRole.admin
+            ? 'admin.portal@gmail.com'
+            : 'john.doe@gmail.com',
         role: role,
         avatarUrl: state.user!.avatarUrl,
       );
       state = state.copyWith(user: updated);
     } else {
-      final defaultUser = mockUsers.firstWhere((u) => u.role == role);
+      final defaultUser = mockUsers.firstWhere(
+        (u) => role == UserRole.admin ? u.isAdmin : !u.isAdmin,
+      );
       state = state.copyWith(user: defaultUser);
     }
   }
@@ -53,6 +57,8 @@ class AuthMockNotifier extends StateNotifier<AuthState> {
   }
 }
 
-final authMockProvider = StateNotifierProvider<AuthMockNotifier, AuthState>((ref) {
+final authMockProvider = StateNotifierProvider<AuthMockNotifier, AuthState>((
+  ref,
+) {
   return AuthMockNotifier();
 });

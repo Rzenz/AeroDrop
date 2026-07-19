@@ -9,7 +9,8 @@ class AnimatedCard extends StatefulWidget {
   final String? subtitle;
   final Widget? leading;
   final Widget? trailing;
-  final Widget? child; // If custom child is provided, use it instead of title/subtitle
+  final Widget?
+  child; // If custom child is provided, use it instead of title/subtitle
   final VoidCallback? onTap;
   final double scaleFactor;
   final Gradient? borderGradient;
@@ -43,9 +44,10 @@ class _AnimatedCardState extends State<AnimatedCard>
       vsync: this,
       duration: const Duration(milliseconds: 90),
     );
-    _scaleAnimation = Tween<double>(begin: 1.0, end: widget.scaleFactor).animate(
-      CurvedAnimation(parent: _pressController, curve: Curves.easeInOut),
-    );
+    _scaleAnimation = Tween<double>(begin: 1.0, end: widget.scaleFactor)
+        .animate(
+          CurvedAnimation(parent: _pressController, curve: Curves.easeInOut),
+        );
   }
 
   @override
@@ -57,7 +59,8 @@ class _AnimatedCardState extends State<AnimatedCard>
   @override
   Widget build(BuildContext context) {
     final radius = BorderRadius.circular(22);
-    final borderGrad = widget.borderGradient ??
+    final borderGrad =
+        widget.borderGradient ??
         LinearGradient(
           colors: [
             AppColors.primary.withValues(alpha: 0.35),
@@ -153,10 +156,7 @@ class _AnimatedCardState extends State<AnimatedCard>
           widget.onTap!();
         },
         onTapCancel: () => _pressController.reverse(),
-        child: ScaleTransition(
-          scale: _scaleAnimation,
-          child: card,
-        ),
+        child: ScaleTransition(scale: _scaleAnimation, child: card),
       );
     }
 

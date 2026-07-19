@@ -16,7 +16,8 @@ class OnboardingScreen extends StatefulWidget {
   State<OnboardingScreen> createState() => _OnboardingScreenState();
 }
 
-class _OnboardingScreenState extends State<OnboardingScreen> with TickerProviderStateMixin {
+class _OnboardingScreenState extends State<OnboardingScreen>
+    with TickerProviderStateMixin {
   final _pageController = PageController();
   int _currentPage = 0;
 
@@ -100,7 +101,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> with TickerProvider
               animation: animController,
               builder: (context, child) {
                 // Subtle floating up-and-down effect using the slide animation controller
-                final floatOffset = Offset(0, -8 * math.sin(animController.value * 2 * math.pi));
+                final floatOffset = Offset(
+                  0,
+                  -8 * math.sin(animController.value * 2 * math.pi),
+                );
                 return Transform.translate(
                   offset: floatOffset,
                   child: Transform(
@@ -245,7 +249,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> with TickerProvider
               children: [
                 // Top Skip Button
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 12,
+                  ),
                   child: Align(
                     alignment: Alignment.topRight,
                     child: AnimatedOpacity(
@@ -288,45 +295,62 @@ class _OnboardingScreenState extends State<OnboardingScreen> with TickerProvider
                           // Top 55% space for Illustration
                           Expanded(
                             flex: 11,
-                            child: slide.illustrationBuilder(context, _radarAnimController)
+                            child: slide
+                                .illustrationBuilder(
+                                  context,
+                                  _radarAnimController,
+                                )
                                 .animate(key: ValueKey('illust_$index'))
-                                .scale(duration: 600.ms, curve: Curves.elasticOut)
+                                .scale(
+                                  duration: 600.ms,
+                                  curve: Curves.elasticOut,
+                                )
                                 .fadeIn(duration: 400.ms),
                           ),
                           // Bottom space for Title & Description
                           Expanded(
                             flex: 9,
                             child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 32),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 32,
+                              ),
                               child: SingleChildScrollView(
                                 physics: const BouncingScrollPhysics(),
                                 child: Column(
                                   mainAxisAlignment: MainAxisAlignment.start,
                                   children: [
                                     Text(
-                                      slide.title,
-                                      style: AppTextStyles.display(
-                                        fontSize: isSmallScreen ? 26 : 34,
-                                        letterSpacing: -0.5,
-                                      ),
-                                      textAlign: TextAlign.center,
-                                    )
+                                          slide.title,
+                                          style: AppTextStyles.display(
+                                            fontSize: isSmallScreen ? 26 : 34,
+                                            letterSpacing: -0.5,
+                                          ),
+                                          textAlign: TextAlign.center,
+                                        )
                                         .animate(key: ValueKey('title_$index'))
                                         .fadeIn(duration: 400.ms)
-                                        .slideY(begin: 0.2, end: 0, curve: Curves.easeOutCubic),
+                                        .slideY(
+                                          begin: 0.2,
+                                          end: 0,
+                                          curve: Curves.easeOutCubic,
+                                        ),
                                     const SizedBox(height: 12),
                                     Text(
-                                      slide.description,
-                                      style: AppTextStyles.body(
-                                        fontSize: isSmallScreen ? 13.5 : 15,
-                                        color: AppColors.textSecondaryDark,
-                                        height: 1.5,
-                                      ),
-                                      textAlign: TextAlign.center,
-                                    )
+                                          slide.description,
+                                          style: AppTextStyles.body(
+                                            fontSize: isSmallScreen ? 13.5 : 15,
+                                            color: AppColors.textSecondaryDark,
+                                            height: 1.5,
+                                          ),
+                                          textAlign: TextAlign.center,
+                                        )
                                         .animate(key: ValueKey('desc_$index'))
                                         .fadeIn(delay: 150.ms, duration: 400.ms)
-                                        .slideY(begin: 0.2, end: 0, curve: Curves.easeOutCubic),
+                                        .slideY(
+                                          begin: 0.2,
+                                          end: 0,
+                                          curve: Curves.easeOutCubic,
+                                        ),
                                   ],
                                 ),
                               ),
@@ -340,7 +364,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> with TickerProvider
 
                 // Bottom Controls Area
                 Padding(
-                  padding: EdgeInsets.fromLTRB(24, 8, 24, isSmallScreen ? 16 : 36),
+                  padding: EdgeInsets.fromLTRB(
+                    24,
+                    8,
+                    24,
+                    isSmallScreen ? 16 : 36,
+                  ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -403,10 +432,7 @@ class _RadarIllustration extends StatelessWidget {
   final AnimationController animController;
   final double size;
 
-  const _RadarIllustration({
-    required this.animController,
-    required this.size,
-  });
+  const _RadarIllustration({required this.animController, required this.size});
 
   @override
   Widget build(BuildContext context) {
@@ -531,9 +557,7 @@ class _DashedCirclePainter extends CustomPainter {
 class _PropellerWidget extends StatefulWidget {
   final double size;
 
-  const _PropellerWidget({
-    required this.size,
-  });
+  const _PropellerWidget({required this.size});
 
   @override
   State<_PropellerWidget> createState() => _PropellerWidgetState();
@@ -617,7 +641,10 @@ class _DroneAndTruckIllustration extends StatelessWidget {
         animation: animController,
         builder: (context, child) {
           // Floating hovering animation
-          final floatOffset = Offset(0, -12 * math.sin(animController.value * 2 * math.pi));
+          final floatOffset = Offset(
+            0,
+            -12 * math.sin(animController.value * 2 * math.pi),
+          );
           return Transform.translate(
             offset: floatOffset,
             child: CustomPaint(

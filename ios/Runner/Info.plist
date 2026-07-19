@@ -66,5 +66,9 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>AeroDrop needs access to your photo library to pick and crop profile avatars and vendor logos.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>AeroDrop needs access to your camera to take profile avatars and vendor logos.</string>
 </dict>
 </plist>

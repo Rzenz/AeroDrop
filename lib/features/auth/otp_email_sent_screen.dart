@@ -10,7 +10,6 @@ import '../../core/widgets/glass_card.dart';
 import '../../core/widgets/gradient_button.dart';
 import '../../core/widgets/custom_text_field.dart';
 import '../../core/providers/auth_provider.dart';
-import '../../core/models/user_model.dart';
 
 class OtpEmailSentScreen extends ConsumerStatefulWidget {
   final String email;
@@ -56,7 +55,9 @@ class _OtpEmailSentScreenState extends ConsumerState<OtpEmailSentScreen> {
           content: const Text('Please enter a verification code.'),
           backgroundColor: Colors.redAccent,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
         ),
       );
       return;
@@ -71,9 +72,9 @@ class _OtpEmailSentScreenState extends ConsumerState<OtpEmailSentScreen> {
     if (mounted) {
       setState(() => _verifyingSms = false);
       final user = ref.read(authProvider).user;
-      if (user?.role == UserRole.admin) {
+      if (user?.isAdmin == true) {
         context.go('/admin');
-      } else if (user?.role == UserRole.facultyStaff) {
+      } else if (user?.isVendor == true) {
         context.go('/vendor');
       } else {
         context.go('/user');
@@ -113,7 +114,9 @@ class _OtpEmailSentScreenState extends ConsumerState<OtpEmailSentScreen> {
           ),
           backgroundColor: AppColors.success,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
         ),
       );
     }
@@ -133,7 +136,9 @@ class _OtpEmailSentScreenState extends ConsumerState<OtpEmailSentScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final title = widget.type == 'reset' ? 'Reset Link Dispatched' : 'Verification Dispatched';
+    final title = widget.type == 'reset'
+        ? 'Reset Link Dispatched'
+        : 'Verification Dispatched';
     final desc = widget.type == 'reset'
         ? 'We have sent a secure recovery link to:'
         : 'We have sent an authentication link to:';
@@ -149,10 +154,7 @@ class _OtpEmailSentScreenState extends ConsumerState<OtpEmailSentScreen> {
                 gradient: RadialGradient(
                   center: Alignment(0.3, -0.2),
                   radius: 0.8,
-                  colors: [
-                    Color(0xFF102847),
-                    AppColors.bgDark,
-                  ],
+                  colors: [Color(0xFF102847), AppColors.bgDark],
                 ),
               ),
             ),
@@ -180,7 +182,10 @@ class _OtpEmailSentScreenState extends ConsumerState<OtpEmailSentScreen> {
             child: Center(
               child: SingleChildScrollView(
                 physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 16,
+                ),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -204,7 +209,10 @@ class _OtpEmailSentScreenState extends ConsumerState<OtpEmailSentScreen> {
                           size: 44,
                         ),
                       ),
-                    ).animate().scale(curve: Curves.elasticOut, duration: 600.ms),
+                    ).animate().scale(
+                      curve: Curves.elasticOut,
+                      duration: 600.ms,
+                    ),
                     const SizedBox(height: 28),
 
                     Text(
@@ -255,7 +263,9 @@ class _OtpEmailSentScreenState extends ConsumerState<OtpEmailSentScreen> {
                                   ),
                                   const SizedBox(height: 16),
                                   TextButton(
-                                    onPressed: (_resending || _timerSeconds > 0) ? null : _resendEmail,
+                                    onPressed: (_resending || _timerSeconds > 0)
+                                        ? null
+                                        : _resendEmail,
                                     child: Text(
                                       _timerSeconds > 0
                                           ? 'Resend in ${_timerSeconds}s'
@@ -269,10 +279,18 @@ class _OtpEmailSentScreenState extends ConsumerState<OtpEmailSentScreen> {
                                       ),
                                     ),
                                   ),
-                                  const Divider(height: 32, color: Colors.white10),
+                                  const Divider(
+                                    height: 32,
+                                    color: Colors.white10,
+                                  ),
                                   TextButton.icon(
-                                    onPressed: () => setState(() => _showSmsInput = true),
-                                    icon: const Icon(Icons.phone_android_rounded, size: 16, color: AppColors.accent),
+                                    onPressed: () =>
+                                        setState(() => _showSmsInput = true),
+                                    icon: const Icon(
+                                      Icons.phone_android_rounded,
+                                      size: 16,
+                                      color: AppColors.accent,
+                                    ),
                                     label: const Text(
                                       'Verify via SMS Code instead',
                                       style: TextStyle(
@@ -326,7 +344,8 @@ class _OtpEmailSentScreenState extends ConsumerState<OtpEmailSentScreen> {
                                   ),
                                   const SizedBox(height: 16),
                                   TextButton(
-                                    onPressed: () => setState(() => _showSmsInput = false),
+                                    onPressed: () =>
+                                        setState(() => _showSmsInput = false),
                                     child: const Text(
                                       'Back to Email verification',
                                       style: TextStyle(

@@ -12,7 +12,8 @@ class NotificationsScreen extends ConsumerStatefulWidget {
   const NotificationsScreen({super.key});
 
   @override
-  ConsumerState<NotificationsScreen> createState() => _NotificationsScreenState();
+  ConsumerState<NotificationsScreen> createState() =>
+      _NotificationsScreenState();
 }
 
 class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
@@ -31,13 +32,19 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
         t.contains('system')) {
       return AppColors.warning;
     }
-    if (t.contains('delivered') || t.contains('success') || t.contains('completed')) {
+    if (t.contains('delivered') ||
+        t.contains('success') ||
+        t.contains('completed')) {
       return AppColors.success;
     }
-    if (t.contains('dispatch') || t.contains('transit') || t.contains('accepted')) {
+    if (t.contains('dispatch') ||
+        t.contains('transit') ||
+        t.contains('accepted')) {
       return AppColors.primary;
     }
-    if (t.contains('rejected') || t.contains('cancelled') || t.contains('failed')) {
+    if (t.contains('rejected') ||
+        t.contains('cancelled') ||
+        t.contains('failed')) {
       return AppColors.danger;
     }
     return AppColors.accent;
@@ -50,13 +57,19 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
         t.contains('system')) {
       return Icons.warning_rounded;
     }
-    if (t.contains('delivered') || t.contains('success') || t.contains('completed')) {
+    if (t.contains('delivered') ||
+        t.contains('success') ||
+        t.contains('completed')) {
       return Icons.verified_rounded;
     }
-    if (t.contains('dispatch') || t.contains('transit') || t.contains('accepted')) {
+    if (t.contains('dispatch') ||
+        t.contains('transit') ||
+        t.contains('accepted')) {
       return Icons.flight_takeoff_rounded;
     }
-    if (t.contains('rejected') || t.contains('cancelled') || t.contains('failed')) {
+    if (t.contains('rejected') ||
+        t.contains('cancelled') ||
+        t.contains('failed')) {
       return Icons.cancel_outlined;
     }
     return Icons.notifications_rounded;
@@ -139,17 +152,21 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
             // Notifications timeline
             Expanded(
               child: RefreshIndicator(
-                onRefresh: () => ref.read(notificationProvider.notifier).loadNotifications(),
+                onRefresh: () =>
+                    ref.read(notificationProvider.notifier).loadNotifications(),
                 color: AppColors.accent,
                 backgroundColor: AppColors.cardDark,
                 child: notifications.isEmpty
                     ? ListView(
                         physics: const AlwaysScrollableScrollPhysics(),
                         children: [
-                          SizedBox(height: MediaQuery.of(context).size.height * 0.2),
+                          SizedBox(
+                            height: MediaQuery.of(context).size.height * 0.2,
+                          ),
                           const EmptyStateWidget(
                             title: 'No notifications yet',
-                            subtitle: 'Stay tuned for drone status & alert logs.',
+                            subtitle:
+                                'Stay tuned for drone status & alert logs.',
                           ),
                         ],
                       )
@@ -202,7 +219,8 @@ class _TimelineNotificationTile extends ConsumerStatefulWidget {
       _TimelineNotificationTileState();
 }
 
-class _TimelineNotificationTileState extends ConsumerState<_TimelineNotificationTile>
+class _TimelineNotificationTileState
+    extends ConsumerState<_TimelineNotificationTile>
     with TickerProviderStateMixin {
   AnimationController? _pulseController;
 
@@ -244,145 +262,147 @@ class _TimelineNotificationTileState extends ConsumerState<_TimelineNotification
   Widget build(BuildContext context) {
     final isRead = widget.notification.isRead;
     return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Timeline node & line column
-          SizedBox(
-            width: 36,
-            child: Stack(
-              alignment: Alignment.topCenter,
-              children: [
-                // Connecting line
-                Positioned(
-                  top: widget.isFirst ? 24 : 0,
-                  bottom: widget.isLast ? 0 : 0,
-                  child: Container(
-                    width: 2,
-                    color: AppColors.borderDark,
-                  ),
-                ),
-                // Timeline node dot
-                Positioned(
-                  top: 24,
-                  child: _pulseController != null
-                      ? AnimatedBuilder(
-                          animation: _pulseController!,
-                          builder: (context, child) {
-                            return Container(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Timeline node & line column
+              SizedBox(
+                width: 36,
+                child: Stack(
+                  alignment: Alignment.topCenter,
+                  children: [
+                    // Connecting line
+                    Positioned(
+                      top: widget.isFirst ? 24 : 0,
+                      bottom: widget.isLast ? 0 : 0,
+                      child: Container(width: 2, color: AppColors.borderDark),
+                    ),
+                    // Timeline node dot
+                    Positioned(
+                      top: 24,
+                      child: _pulseController != null
+                          ? AnimatedBuilder(
+                              animation: _pulseController!,
+                              builder: (context, child) {
+                                return Container(
+                                  width: 12,
+                                  height: 12,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: widget.color,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: widget.color.withValues(
+                                          alpha:
+                                              0.3 +
+                                              (_pulseController!.value * 0.4),
+                                        ),
+                                        blurRadius:
+                                            4 + (_pulseController!.value * 8),
+                                        spreadRadius:
+                                            1 + (_pulseController!.value * 2),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            )
+                          : Container(
                               width: 12,
                               height: 12,
-                              decoration: BoxDecoration(
+                              decoration: const BoxDecoration(
                                 shape: BoxShape.circle,
-                                color: widget.color,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: widget.color.withValues(
-                                      alpha: 0.3 +
-                                          (_pulseController!.value * 0.4),
-                                    ),
-                                    blurRadius: 4 +
-                                        (_pulseController!.value * 8),
-                                    spreadRadius: 1 +
-                                        (_pulseController!.value * 2),
-                                  ),
-                                ],
+                                color: AppColors.borderDark,
                               ),
-                            );
-                          },
-                        )
-                      : Container(
-                          width: 12,
-                          height: 12,
-                          decoration: const BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: AppColors.borderDark,
-                          ),
-                        ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          // Content Card
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: GestureDetector(
-                onTap: () {
-                  ref.read(notificationProvider.notifier).markOneAsRead(widget.notification.id);
-                  if (widget.notification.relatedDeliveryId != null &&
-                      widget.notification.relatedDeliveryId!.isNotEmpty) {
-                    context.push('/user/track/details?id=${widget.notification.relatedDeliveryId}');
-                  }
-                },
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: isRead
-                        ? AppColors.cardDark
-                        : widget.color.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: isRead
-                          ? AppColors.borderDark
-                          : widget.color.withValues(alpha: 0.25),
-                      width: 1.5,
+                            ),
                     ),
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: widget.color.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Icon(
-                          widget.icon,
-                          color: widget.color,
-                          size: 18,
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              widget.notification.title,
-                              style: AppTextStyles.title(
-                                fontSize: 14,
-                                fontWeight: isRead
-                                    ? FontWeight.w600
-                                    : FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              widget.notification.body,
-                              style: AppTextStyles.body(
-                                fontSize: 12,
-                                color: AppColors.textSecondaryDark,
-                                height: 1.5,
-                              ),
-                            ),
-                          ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              // Content Card
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: GestureDetector(
+                    onTap: () {
+                      ref
+                          .read(notificationProvider.notifier)
+                          .markOneAsRead(widget.notification.id);
+                      if (widget.notification.relatedDeliveryId != null &&
+                          widget.notification.relatedDeliveryId!.isNotEmpty) {
+                        context.push(
+                          '/user/track/details?id=${widget.notification.relatedDeliveryId}',
+                        );
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: isRead
+                            ? AppColors.cardDark
+                            : widget.color.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: isRead
+                              ? AppColors.borderDark
+                              : widget.color.withValues(alpha: 0.25),
+                          width: 1.5,
                         ),
                       ),
-                    ],
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: widget.color.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Icon(
+                              widget.icon,
+                              color: widget.color,
+                              size: 18,
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  widget.notification.title,
+                                  style: AppTextStyles.title(
+                                    fontSize: 14,
+                                    fontWeight: isRead
+                                        ? FontWeight.w600
+                                        : FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  widget.notification.body,
+                                  style: AppTextStyles.body(
+                                    fontSize: 12,
+                                    color: AppColors.textSecondaryDark,
+                                    height: 1.5,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ),
-            ),
+            ],
           ),
-        ],
-      ),
-    ).animate(delay: Duration(milliseconds: widget.animDelay)).fadeIn().slideX(
-          begin: 0.08,
-          end: 0,
-        );
+        )
+        .animate(delay: Duration(milliseconds: widget.animDelay))
+        .fadeIn()
+        .slideX(begin: 0.08, end: 0);
   }
 }

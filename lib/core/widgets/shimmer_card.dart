@@ -6,11 +6,7 @@ class ShimmerCard extends StatelessWidget {
   final double height;
   final BorderRadius? borderRadius;
 
-  const ShimmerCard({
-    super.key,
-    this.height = 90,
-    this.borderRadius,
-  });
+  const ShimmerCard({super.key, this.height = 90, this.borderRadius});
 
   @override
   Widget build(BuildContext context) {
@@ -26,10 +22,7 @@ class ShimmerCard extends StatelessWidget {
           decoration: BoxDecoration(
             color: AppColors.cardDark,
             borderRadius: radius,
-            border: Border.all(
-              color: AppColors.borderDark,
-              width: 1.5,
-            ),
+            border: Border.all(color: AppColors.borderDark, width: 1.5),
           ),
           child: Padding(
             padding: const EdgeInsets.all(18),
@@ -94,19 +87,12 @@ class ShimmerList extends StatelessWidget {
   final int count;
   final double cardHeight;
 
-  const ShimmerList({
-    super.key,
-    this.count = 4,
-    this.cardHeight = 90,
-  });
+  const ShimmerList({super.key, this.count = 4, this.cardHeight = 90});
 
   @override
   Widget build(BuildContext context) {
     return Column(
-      children: List.generate(
-        count,
-        (_) => ShimmerCard(height: cardHeight),
-      ),
+      children: List.generate(count, (_) => ShimmerCard(height: cardHeight)),
     );
   }
 }

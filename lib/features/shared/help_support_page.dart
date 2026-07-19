@@ -13,15 +13,18 @@ class HelpSupportPage extends StatelessWidget {
     final List<Map<String, String>> faqs = [
       {
         'q': 'How do I request a delivery?',
-        'a': 'Navigate to your Dashboard and tap the "+" FAB button or "Request Delivery". Input the recipient details, select the target building landing pad, pick your payment choice, and review before confirming checkout.'
+        'a':
+            'Navigate to your Dashboard and tap the "+" FAB button or "Request Delivery". Input the recipient details, select the target building landing pad, pick your payment choice, and review before confirming checkout.',
       },
       {
         'q': 'What payloads can be delivered?',
-        'a': 'We support academic documents, books, laboratory samples, medical aid kits, and electronics up to a maximum chassis weight limit of 5.0 kg.'
+        'a':
+            'We support academic documents, books, laboratory samples, medical aid kits, and electronics up to a maximum chassis weight limit of 5.0 kg.',
       },
       {
         'q': 'What happens in severe weather?',
-        'a': 'The fleet system automatically halts and queues dispatches if wind speeds exceed 15 knots or during heavy rain precipitation.'
+        'a':
+            'The fleet system automatically halts and queues dispatches if wind speeds exceed 15 knots or during heavy rain precipitation.',
       },
     ];
 
@@ -47,13 +50,21 @@ class HelpSupportPage extends StatelessWidget {
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(color: AppColors.borderDark),
                         ),
-                        child: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 20),
+                        child: const Icon(
+                          Icons.arrow_back_rounded,
+                          color: Colors.white,
+                          size: 20,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 16),
                     Text(
                       'Help & Campus Support',
-                      style: AppTextStyles.title(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+                      style: AppTextStyles.title(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
                     ),
                   ],
                 ).animate().fadeIn().slideX(begin: -0.1),
@@ -67,46 +78,76 @@ class HelpSupportPage extends StatelessWidget {
                       children: [
                         Text(
                           'Frequently Asked Questions',
-                          style: AppTextStyles.title(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
+                          style: AppTextStyles.title(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
                         ),
                         const SizedBox(height: 12),
                         ...faqs.asMap().entries.map((e) {
                           return Container(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            child: GlassCard(
-                              padding: const EdgeInsets.all(16),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    e.value['q']!,
-                                    style: AppTextStyles.title(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.secondary),
+                                margin: const EdgeInsets.only(bottom: 12),
+                                child: GlassCard(
+                                  padding: const EdgeInsets.all(16),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        e.value['q']!,
+                                        style: AppTextStyles.title(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.bold,
+                                          color: AppColors.secondary,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        e.value['a']!,
+                                        style: AppTextStyles.body(
+                                          fontSize: 12,
+                                          color: AppColors.textSecondaryDark,
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    e.value['a']!,
-                                    style: AppTextStyles.body(fontSize: 12, color: AppColors.textSecondaryDark),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ).animate(delay: Duration(milliseconds: 100 + e.key * 80)).fadeIn().slideY(begin: 0.05);
+                                ),
+                              )
+                              .animate(
+                                delay: Duration(milliseconds: 100 + e.key * 80),
+                              )
+                              .fadeIn()
+                              .slideY(begin: 0.05);
                         }),
                         const SizedBox(height: 24),
 
                         // Contact info
                         Text(
                           'Direct Contacts',
-                          style: AppTextStyles.title(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
+                          style: AppTextStyles.title(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
                         ),
                         const SizedBox(height: 12),
                         GlassCard(
                           padding: const EdgeInsets.all(16),
                           child: Column(
                             children: [
-                              _buildContactRow(Icons.mail_outline_rounded, 'aerodrop.fleet.support@gmail.com'),
-                              const Divider(color: AppColors.borderDark, height: 24),
-                              _buildContactRow(Icons.phone_outlined, 'Local Campus Tel: +63 32 400 9011'),
+                              _buildContactRow(
+                                Icons.mail_outline_rounded,
+                                'aerodrop.fleet.support@gmail.com',
+                              ),
+                              const Divider(
+                                color: AppColors.borderDark,
+                                height: 24,
+                              ),
+                              _buildContactRow(
+                                Icons.phone_outlined,
+                                'Local Campus Tel: +63 32 400 9011',
+                              ),
                             ],
                           ),
                         ).animate(delay: 400.ms).fadeIn(),
@@ -127,10 +168,7 @@ class HelpSupportPage extends StatelessWidget {
       children: [
         Icon(icon, color: AppColors.primary, size: 20),
         const SizedBox(width: 12),
-        Text(
-          text,
-          style: const TextStyle(color: Colors.white, fontSize: 13),
-        ),
+        Text(text, style: const TextStyle(color: Colors.white, fontSize: 13)),
       ],
     );
   }

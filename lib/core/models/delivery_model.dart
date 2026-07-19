@@ -1,4 +1,4 @@
-﻿enum DeliveryStatus { pending, assigning, inTransit, delivered, cancelled }
+enum DeliveryStatus { pending, assigning, inTransit, delivered, cancelled }
 
 class DeliveryModel {
   final String id;
@@ -79,7 +79,8 @@ class DeliveryModel {
       estimatedDistanceKm: estimatedDistanceKm ?? this.estimatedDistanceKm,
       paymentAmount: paymentAmount ?? this.paymentAmount,
       deliveryStartedAt: deliveryStartedAt ?? this.deliveryStartedAt,
-      estimatedDeliverySeconds: estimatedDeliverySeconds ?? this.estimatedDeliverySeconds,
+      estimatedDeliverySeconds:
+          estimatedDeliverySeconds ?? this.estimatedDeliverySeconds,
       deliveredAt: deliveredAt ?? this.deliveredAt,
     );
   }

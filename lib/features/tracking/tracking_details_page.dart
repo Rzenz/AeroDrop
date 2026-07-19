@@ -15,7 +15,8 @@ class TrackingDetailsPage extends ConsumerStatefulWidget {
   const TrackingDetailsPage({super.key, required this.deliveryId});
 
   @override
-  ConsumerState<TrackingDetailsPage> createState() => _TrackingDetailsPageState();
+  ConsumerState<TrackingDetailsPage> createState() =>
+      _TrackingDetailsPageState();
 }
 
 class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
@@ -47,17 +48,18 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
 
       if (delResponse != null) {
         final data = Map<String, dynamic>.from(delResponse);
-        
+
         // Convert map to DeliveryModel status
-        final isComplete = data['status']?.toString().toLowerCase() == 'delivered';
+        final isComplete =
+            data['status']?.toString().toLowerCase() == 'delivered';
         final status = isComplete
             ? DeliveryStatus.delivered
             : (data['status']?.toString().toLowerCase() == 'intransit' ||
-                    data['status']?.toString().toLowerCase() == 'in_transit')
-                ? DeliveryStatus.inTransit
-                : data['status']?.toString().toLowerCase() == 'cancelled'
-                    ? DeliveryStatus.cancelled
-                    : DeliveryStatus.pending;
+                  data['status']?.toString().toLowerCase() == 'in_transit')
+            ? DeliveryStatus.inTransit
+            : data['status']?.toString().toLowerCase() == 'cancelled'
+            ? DeliveryStatus.cancelled
+            : DeliveryStatus.pending;
 
         // Progress helper
         double progress = 0.0;
@@ -68,7 +70,8 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
               ? DateTime.tryParse(data['delivery_started_at'].toString())
               : null;
           if (startedAt != null) {
-            final totalSecs = (data['estimated_delivery_seconds'] as num?)?.toInt() ?? 60;
+            final totalSecs =
+                (data['estimated_delivery_seconds'] as num?)?.toInt() ?? 60;
             final elapsed = DateTime.now().difference(startedAt).inSeconds;
             progress = (elapsed / totalSecs).clamp(0.0, 1.0);
           }
@@ -83,21 +86,23 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
               ? DateTime.tryParse(data['delivery_started_at'].toString())
               : null;
           if (startedAt != null) {
-            final totalSecs = (data['estimated_delivery_seconds'] as num?)?.toInt() ?? 60;
+            final totalSecs =
+                (data['estimated_delivery_seconds'] as num?)?.toInt() ?? 60;
             final elapsed = DateTime.now().difference(startedAt).inSeconds;
             final remaining = (totalSecs - elapsed).clamp(0, totalSecs);
             etaStr = remaining <= 0
                 ? '0 mins'
                 : remaining < 60
-                    ? '$remaining secs'
-                    : '${(remaining / 60).ceil()} mins';
+                ? '$remaining secs'
+                : '${(remaining / 60).ceil()} mins';
           }
         }
 
         final model = DeliveryModel(
           id: data['id'].toString(),
           senderName: data['sender_name']?.toString() ?? 'Unknown Sender',
-          recipientName: data['recipient_name']?.toString() ?? 'Unknown Recipient',
+          recipientName:
+              data['recipient_name']?.toString() ?? 'Unknown Recipient',
           recipientPhone: data['recipient_phone']?.toString() ?? '',
           deliveryAddress: data['delivery_address']?.toString() ?? '',
           packageName: data['package_name']?.toString() ?? 'AeroDrop Package',
@@ -106,13 +111,25 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
           status: status,
           droneId: data['drone_id']?.toString(),
           eta: etaStr,
-          createdAt: data['created_at'] != null ? DateTime.tryParse(data['created_at'].toString()) ?? DateTime.now() : DateTime.now(),
+          createdAt: data['created_at'] != null
+              ? DateTime.tryParse(data['created_at'].toString()) ??
+                    DateTime.now()
+              : DateTime.now(),
           progress: progress,
-          estimatedDistanceKm: data['estimated_distance_km'] != null ? (data['estimated_distance_km'] as num).toDouble() : null,
-          paymentAmount: data['payment_amount'] != null ? (data['payment_amount'] as num).toDouble() : null,
-          deliveryStartedAt: data['delivery_started_at'] != null ? DateTime.tryParse(data['delivery_started_at'].toString()) : null,
-          estimatedDeliverySeconds: (data['estimated_delivery_seconds'] as num?)?.toInt() ?? 60,
-          deliveredAt: data['delivered_at'] != null ? DateTime.tryParse(data['delivered_at'].toString()) : null,
+          estimatedDistanceKm: data['estimated_distance_km'] != null
+              ? (data['estimated_distance_km'] as num).toDouble()
+              : null,
+          paymentAmount: data['payment_amount'] != null
+              ? (data['payment_amount'] as num).toDouble()
+              : null,
+          deliveryStartedAt: data['delivery_started_at'] != null
+              ? DateTime.tryParse(data['delivery_started_at'].toString())
+              : null,
+          estimatedDeliverySeconds:
+              (data['estimated_delivery_seconds'] as num?)?.toInt() ?? 60,
+          deliveredAt: data['delivered_at'] != null
+              ? DateTime.tryParse(data['delivered_at'].toString())
+              : null,
         );
 
         if (mounted) {
@@ -132,7 +149,8 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
               .maybeSingle();
           if (p != null && mounted) {
             setState(() {
-              _pickupName = p['name']?.toString() ?? 'Pickup location unavailable';
+              _pickupName =
+                  p['name']?.toString() ?? 'Pickup location unavailable';
             });
           }
         }
@@ -144,7 +162,8 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
               .maybeSingle();
           if (d != null && mounted) {
             setState(() {
-              _dropoffName = d['name']?.toString() ?? 'Drop-off location unavailable';
+              _dropoffName =
+                  d['name']?.toString() ?? 'Drop-off location unavailable';
             });
           }
         }
@@ -161,7 +180,9 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
             setState(() {
               _droneName = drone['name']?.toString() ?? droneId.toString();
               final lvl = drone['battery_level'];
-              _droneBatteryText = lvl != null ? 'Drone Battery: $lvl%' : 'Drone Battery: Unknown';
+              _droneBatteryText = lvl != null
+                  ? 'Drone Battery: $lvl%'
+                  : 'Drone Battery: Unknown';
             });
           }
 
@@ -178,7 +199,7 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
               final speed = tel['speed'];
               final alt = tel['altitude'];
               final battery = tel['battery_level'];
-              
+
               if (speed != null) {
                 _flightSpeed = '$speed km/h';
               } else {
@@ -215,8 +236,12 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
     ref.listen<List<DeliveryModel>>(deliveryProvider, (previous, next) {
       if (previous != null) {
         for (final nextDel in next) {
-          final prevDel = previous.firstWhere((d) => d.id == nextDel.id, orElse: () => nextDel);
-          if (prevDel.status == DeliveryStatus.inTransit && nextDel.status == DeliveryStatus.delivered) {
+          final prevDel = previous.firstWhere(
+            (d) => d.id == nextDel.id,
+            orElse: () => nextDel,
+          );
+          if (prevDel.status == DeliveryStatus.inTransit &&
+              nextDel.status == DeliveryStatus.delivered) {
             context.go('/user/delivery/completed');
             break;
           }
@@ -284,7 +309,11 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
                               color: AppColors.primary.withValues(alpha: 0.15),
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(Icons.timer_rounded, color: AppColors.primaryLight, size: 28),
+                            child: const Icon(
+                              Icons.timer_rounded,
+                              color: AppColors.primaryLight,
+                              size: 28,
+                            ),
                           ),
                           const SizedBox(width: 16),
                           Expanded(
@@ -293,16 +322,24 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
                               children: [
                                 Text(
                                   'Estimated Arrival Time',
-                                  style: AppTextStyles.body(fontSize: 12, color: AppColors.textSecondaryDark),
+                                  style: AppTextStyles.body(
+                                    fontSize: 12,
+                                    color: AppColors.textSecondaryDark,
+                                  ),
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
                                   delivery.status == DeliveryStatus.delivered
                                       ? 'Delivered'
-                                      : delivery.status == DeliveryStatus.cancelled
-                                          ? 'Cancelled'
-                                          : '${delivery.eta} remaining',
-                                  style: AppTextStyles.title(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                                      : delivery.status ==
+                                            DeliveryStatus.cancelled
+                                      ? 'Cancelled'
+                                      : '${delivery.eta} remaining',
+                                  style: AppTextStyles.title(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
                                 ),
                               ],
                             ),
@@ -323,13 +360,36 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
                         children: [
                           Text(
                             'Assigned Hardware',
-                            style: AppTextStyles.title(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.accent),
+                            style: AppTextStyles.title(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.accent,
+                            ),
                           ),
-                          const Divider(color: AppColors.borderDark, height: 24),
-                          _rowDetail(Icons.airplay_rounded, 'Drone ID', _droneName),
-                          _rowDetail(Icons.battery_charging_full_rounded, 'Drone Battery', _droneBatteryText),
-                          _rowDetail(Icons.speed_rounded, 'Flight Speed', _flightSpeed),
-                          _rowDetail(Icons.height_rounded, 'Flight Altitude', _flightAltitude),
+                          const Divider(
+                            color: AppColors.borderDark,
+                            height: 24,
+                          ),
+                          _rowDetail(
+                            Icons.airplay_rounded,
+                            'Drone ID',
+                            _droneName,
+                          ),
+                          _rowDetail(
+                            Icons.battery_charging_full_rounded,
+                            'Drone Battery',
+                            _droneBatteryText,
+                          ),
+                          _rowDetail(
+                            Icons.speed_rounded,
+                            'Flight Speed',
+                            _flightSpeed,
+                          ),
+                          _rowDetail(
+                            Icons.height_rounded,
+                            'Flight Altitude',
+                            _flightAltitude,
+                          ),
                         ],
                       ),
                     ),
@@ -346,12 +406,31 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
                         children: [
                           Text(
                             'Pilot Telemetry Logs',
-                            style: AppTextStyles.title(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.primaryLight),
+                            style: AppTextStyles.title(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.primaryLight,
+                            ),
                           ),
-                          const Divider(color: AppColors.borderDark, height: 24),
-                          _rowDetail(Icons.shield_rounded, 'System Mode', 'Prototype Telemetry (UCLM Autonomous Autopilot Core)'),
-                          _rowDetail(Icons.wifi_rounded, 'Signal Connection', 'Excellent RSSI (-45dB)'),
-                          _rowDetail(Icons.compass_calibration_rounded, 'Telemetry Lock', '3D GPS Fix Locked'),
+                          const Divider(
+                            color: AppColors.borderDark,
+                            height: 24,
+                          ),
+                          _rowDetail(
+                            Icons.shield_rounded,
+                            'System Mode',
+                            'Prototype Telemetry (UCLM Autonomous Autopilot Core)',
+                          ),
+                          _rowDetail(
+                            Icons.wifi_rounded,
+                            'Signal Connection',
+                            'Excellent RSSI (-45dB)',
+                          ),
+                          _rowDetail(
+                            Icons.compass_calibration_rounded,
+                            'Telemetry Lock',
+                            '3D GPS Fix Locked',
+                          ),
                         ],
                       ),
                     ),
@@ -368,10 +447,21 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
                         children: [
                           Text(
                             'Route Tracking',
-                            style: AppTextStyles.title(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white70),
+                            style: AppTextStyles.title(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white70,
+                            ),
                           ),
-                          const Divider(color: AppColors.borderDark, height: 24),
-                          _rowDetail(Icons.my_location_rounded, 'From', _pickupName),
+                          const Divider(
+                            color: AppColors.borderDark,
+                            height: 24,
+                          ),
+                          _rowDetail(
+                            Icons.my_location_rounded,
+                            'From',
+                            _pickupName,
+                          ),
                           _rowDetail(Icons.flag_rounded, 'To', _dropoffName),
                         ],
                       ),
@@ -404,7 +494,13 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
         children: [
           Icon(icon, color: AppColors.textSecondaryDark, size: 18),
           const SizedBox(width: 12),
-          Text(label, style: AppTextStyles.body(fontSize: 13, color: AppColors.textSecondaryDark)),
+          Text(
+            label,
+            style: AppTextStyles.body(
+              fontSize: 13,
+              color: AppColors.textSecondaryDark,
+            ),
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
@@ -412,7 +508,11 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
               textAlign: TextAlign.end,
               overflow: TextOverflow.ellipsis,
               maxLines: 1,
-              style: AppTextStyles.title(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+              style: AppTextStyles.title(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
             ),
           ),
         ],
@@ -428,17 +528,28 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         title: Row(
           children: [
-            const Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 28),
+            const Icon(
+              Icons.warning_amber_rounded,
+              color: Colors.redAccent,
+              size: 28,
+            ),
             const SizedBox(width: 12),
             Text(
               'Cancel Delivery Request?',
-              style: AppTextStyles.title(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+              style: AppTextStyles.title(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
             ),
           ],
         ),
         content: Text(
           'This request will be marked as cancelled and kept in your history.',
-          style: AppTextStyles.body(fontSize: 14, color: AppColors.textSecondaryDark),
+          style: AppTextStyles.body(
+            fontSize: 14,
+            color: AppColors.textSecondaryDark,
+          ),
         ),
         actionsPadding: const EdgeInsets.only(right: 16, bottom: 16),
         actions: [
@@ -446,19 +557,27 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
             onPressed: () => Navigator.pop(context),
             child: Text(
               'No',
-              style: AppTextStyles.body(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textSecondaryDark),
+              style: AppTextStyles.body(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textSecondaryDark,
+              ),
             ),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.redAccent,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             ),
             onPressed: () async {
               Navigator.pop(context); // Close dialog
-              final error = await ref.read(deliveryProvider.notifier).cancelDeliveryRequest(widget.deliveryId);
-              
+              final error = await ref
+                  .read(deliveryProvider.notifier)
+                  .cancelDeliveryRequest(widget.deliveryId);
+
               if (!context.mounted) return;
 
               if (error == null) {
@@ -482,7 +601,11 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
             },
             child: Text(
               'Yes, Cancel',
-              style: AppTextStyles.body(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+              style: AppTextStyles.body(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
             ),
           ),
         ],

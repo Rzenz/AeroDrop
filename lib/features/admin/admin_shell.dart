@@ -6,6 +6,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/providers/delivery_provider.dart';
+import '../../core/utils/logout_helper.dart';
 
 import '../../core/services/supabase_service.dart';
 
@@ -35,10 +36,15 @@ class _AdminAppBar extends StatelessWidget implements PreferredSizeWidget {
   const _AdminAppBar();
 
   String _titleForRoute(String loc) {
-    if (loc.startsWith('/admin/users')) return 'Users';
+    if (loc.startsWith('/admin/users')) return 'Users & Vendors';
     if (loc.startsWith('/admin/drones')) return 'Drone Fleet';
     if (loc.startsWith('/admin/deliveries')) return 'Deliveries';
     if (loc.startsWith('/admin/analytics')) return 'Analytics';
+    if (loc.startsWith('/admin/routes/no-fly-zones')) {
+      return 'Flight Boundaries';
+    }
+    if (loc.startsWith('/admin/reports')) return 'System Logs';
+    if (loc.startsWith('/admin/weather')) return 'Weather Controls';
     if (loc.startsWith('/admin/settings')) return 'Settings';
     return 'Command Deck';
   }
@@ -46,50 +52,82 @@ class _AdminAppBar extends StatelessWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext ctx) {
     final loc = GoRouterState.of(ctx).uri.toString();
-    return AppBar(
-      backgroundColor: AppColors.bgDark,
-      elevation: 0,
-      centerTitle: false,
-      leading: Builder(
-        builder: (c) => GestureDetector(
-          onTap: () => Scaffold.of(c).openDrawer(),
-          child: Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: AppColors.cardDark,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.borderDark),
+    return PreferredSize(
+      preferredSize: const Size.fromHeight(kToolbarHeight),
+      child: ClipRRect(
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: AppBar(
+            backgroundColor: AppColors.bgDark.withValues(alpha: 0.8),
+            elevation: 0,
+            centerTitle: false,
+            leading: Builder(
+              builder: (c) => GestureDetector(
+                onTap: () => Scaffold.of(c).openDrawer(),
+                child: Container(
+                  margin: const EdgeInsets.only(left: 12, top: 8, bottom: 8),
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.cardDark,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.08),
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.menu_rounded,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
+              ),
             ),
-            child: const Icon(Icons.menu_rounded, color: Colors.white, size: 20),
-          ),
-        ),
-      ),
-      title: Text(
-        _titleForRoute(loc),
-        style: AppTextStyles.title(
-            fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
-      ),
-      actions: [
-        Container(
-          margin: const EdgeInsets.only(right: 16),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-          decoration: BoxDecoration(
-            color: AppColors.accent.withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: AppColors.accent.withValues(alpha: 0.4)),
-          ),
-          child: const Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.shield_rounded, color: AppColors.accent, size: 14),
-              SizedBox(width: 4),
-              Text('ADMIN',
-                  style: TextStyle(
-                      color: AppColors.accent, fontSize: 10, fontWeight: FontWeight.bold)),
+            title: Text(
+              _titleForRoute(loc),
+              style: AppTextStyles.title(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+            actions: [
+              Container(
+                margin: const EdgeInsets.only(right: 16),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.accent.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: AppColors.accent.withValues(alpha: 0.4),
+                  ),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.shield_rounded,
+                      color: AppColors.accent,
+                      size: 14,
+                    ),
+                    SizedBox(width: 4),
+                    Text(
+                      'ADMIN',
+                      style: TextStyle(
+                        color: AppColors.accent,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
-      ],
+      ),
     );
   }
 
@@ -118,99 +156,199 @@ class _AdminDrawer extends StatelessWidget {
           child: Column(
             children: [
               // Header
-              Container(
-                width: double.infinity,
-                padding: EdgeInsets.fromLTRB(
-                    20, MediaQuery.of(context).padding.top + 20, 20, 24),
-                decoration: const BoxDecoration(gradient: AppColors.primaryGradient),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 60, height: 60,
-                      decoration: BoxDecoration(
-                        gradient: AppColors.accentGradient,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: AppColors.bgDark.withValues(alpha: 0.3), width: 2),
-                        boxShadow: [
-                          BoxShadow(
+              GestureDetector(
+                onTap: () {
+                  Navigator.pop(context);
+                  if (user?.id != null) {
+                    context.push('/admin/users/${user.id}');
+                  }
+                },
+                child: Container(
+                  width: double.infinity,
+                  padding: EdgeInsets.fromLTRB(
+                    20,
+                    MediaQuery.of(context).padding.top + 20,
+                    20,
+                    24,
+                  ),
+                  decoration: const BoxDecoration(
+                    gradient: AppColors.primaryGradient,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 60,
+                        height: 60,
+                        decoration: BoxDecoration(
+                          gradient: user?.avatarUrl == null
+                              ? AppColors.accentGradient
+                              : null,
+                          color: user?.avatarUrl != null
+                              ? AppColors.cardDark
+                              : null,
+                          shape: BoxShape.circle,
+                          image: user?.avatarUrl != null
+                              ? DecorationImage(
+                                  image: NetworkImage(user.avatarUrl),
+                                  fit: BoxFit.cover,
+                                )
+                              : null,
+                          border: Border.all(
+                            color: AppColors.bgDark.withValues(alpha: 0.3),
+                            width: 2,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
                               color: AppColors.accent.withValues(alpha: 0.4),
-                              blurRadius: 16)
-                        ],
+                              blurRadius: 16,
+                            ),
+                          ],
+                        ),
+                        child: user?.avatarUrl == null
+                            ? Center(
+                                child: Text(
+                                  name[0].toUpperCase(),
+                                  style: AppTextStyles.title(
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.w900,
+                                    color: AppColors.bgDark,
+                                  ),
+                                ),
+                              )
+                            : null,
                       ),
-                      child: Center(
-                        child: Text(name[0].toUpperCase(),
-                            style: AppTextStyles.title(
-                                fontSize: 24,
-                                fontWeight: FontWeight.w900,
-                                color: AppColors.bgDark)),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(name,
+                      const SizedBox(height: 12),
+                      Text(
+                        name,
                         style: AppTextStyles.title(
-                            fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
-                    Text(email,
-                        style: AppTextStyles.body(
-                            fontSize: 12, color: Colors.white.withValues(alpha: 0.7))),
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(6),
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
                       ),
-                      child: const Text('System Administrator',
+                      Text(
+                        email,
+                        style: AppTextStyles.body(
+                          fontSize: 12,
+                          color: Colors.white.withValues(alpha: 0.7),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Text(
+                          'System Administrator',
                           style: TextStyle(
-                              color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                    ),
-                  ],
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
 
               // Nav items
               Expanded(
                 child: ListView(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 12,
+                  ),
                   children: [
-                    _NavItem(icon: Icons.dashboard_rounded, label: 'Dashboard',
-                        route: '/admin', current: loc, onTap: () => context.go('/admin')),
-                    _NavItem(icon: Icons.people_rounded, label: 'Users',
-                        route: '/admin/users', current: loc, onTap: () => context.go('/admin/users')),
-                    _NavItem(icon: Icons.flight_takeoff_rounded, label: 'Drone Fleet',
-                        route: '/admin/drones', current: loc, onTap: () => context.go('/admin/drones')),
-                    _NavItem(icon: Icons.hub_rounded, label: 'Mission Control',
-                        route: '/admin/missions', current: loc, onTap: () => context.push('/admin/missions')),
-                    _NavItem(icon: Icons.map_rounded, label: 'Route Planner',
-                        route: '/admin/routes/planner', current: loc, onTap: () => context.push('/admin/routes/planner')),
-                    _NavItem(icon: Icons.local_shipping_rounded, label: 'Deliveries',
-                        route: '/admin/deliveries', current: loc,
-                        onTap: () => context.go('/admin/deliveries'),
-                        trailing: pendingCount > 0
-                            ? Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: AppColors.accent,
-                                  borderRadius: BorderRadius.circular(10),
+                    _NavItem(
+                      icon: Icons.dashboard_rounded,
+                      label: 'Dashboard',
+                      route: '/admin',
+                      current: loc,
+                      onTap: () => context.go('/admin'),
+                    ),
+                    _NavItem(
+                      icon: Icons.people_rounded,
+                      label: 'Users',
+                      route: '/admin/users',
+                      current: loc,
+                      onTap: () => context.go('/admin/users'),
+                    ),
+                    _NavItem(
+                      icon: Icons.flight_takeoff_rounded,
+                      label: 'Drone Fleet',
+                      route: '/admin/drones',
+                      current: loc,
+                      onTap: () => context.go('/admin/drones'),
+                    ),
+                    _NavItem(
+                      icon: Icons.map_rounded,
+                      label: 'Flight Boundaries',
+                      route: '/admin/routes/no-fly-zones',
+                      current: loc,
+                      onTap: () => context.go('/admin/routes/no-fly-zones'),
+                    ),
+                    _NavItem(
+                      icon: Icons.local_shipping_rounded,
+                      label: 'Deliveries',
+                      route: '/admin/deliveries',
+                      current: loc,
+                      onTap: () => context.go('/admin/deliveries'),
+                      trailing: pendingCount > 0
+                          ? Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.accent,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                '$pendingCount',
+                                style: const TextStyle(
+                                  color: AppColors.bgDark,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 11,
                                 ),
-                                child: Text(
-                                  '$pendingCount',
-                                  style: const TextStyle(
-                                    color: AppColors.bgDark,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 11,
-                                  ),
-                                ),
-                              )
-                            : null),
-                    _NavItem(icon: Icons.bar_chart_rounded, label: 'Analytics',
-                        route: '/admin/analytics', current: loc,
-                        onTap: () => context.go('/admin/analytics')),
-                    _NavItem(icon: Icons.analytics_outlined, label: 'Analytical Reports',
-                        route: '/admin/reports', current: loc, onTap: () => context.push('/admin/reports')),
-                    _NavItem(icon: Icons.settings_rounded, label: 'Settings',
-                        route: '/admin/settings', current: loc,
-                        onTap: () => context.go('/admin/settings')),
+                              ),
+                            )
+                          : null,
+                    ),
+                    _NavItem(
+                      icon: Icons.bar_chart_rounded,
+                      label: 'Analytics',
+                      route: '/admin/analytics',
+                      current: loc,
+                      onTap: () => context.go('/admin/analytics'),
+                    ),
+                    _NavItem(
+                      icon: Icons.analytics_outlined,
+                      label: 'System Logs',
+                      route: '/admin/reports',
+                      current: loc,
+                      onTap: () => context.go('/admin/reports'),
+                    ),
+                    _NavItem(
+                      icon: Icons.wb_sunny_rounded,
+                      label: 'Weather Controls',
+                      route: '/admin/weather',
+                      current: loc,
+                      onTap: () => context.go('/admin/weather'),
+                    ),
+                    _NavItem(
+                      icon: Icons.settings_rounded,
+                      label: 'Settings',
+                      route: '/admin/settings',
+                      current: loc,
+                      onTap: () => context.go('/admin/settings'),
+                    ),
                   ],
                 ),
               ),
@@ -220,24 +358,35 @@ class _AdminDrawer extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
                 child: GestureDetector(
                   onTap: () {
-                    ref.read(authProvider.notifier).logout();
-                    context.go('/login');
+                    // Close the drawer first
+                    Navigator.of(context).pop();
+                    showLogoutConfirmation(context, ref);
                   },
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     decoration: BoxDecoration(
                       color: AppColors.danger.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: AppColors.danger.withValues(alpha: 0.3)),
+                      border: Border.all(
+                        color: AppColors.danger.withValues(alpha: 0.3),
+                      ),
                     ),
                     child: const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.logout_rounded, color: AppColors.danger, size: 18),
+                        Icon(
+                          Icons.logout_rounded,
+                          color: AppColors.danger,
+                          size: 18,
+                        ),
                         SizedBox(width: 8),
-                        Text('Sign Out',
-                            style: TextStyle(
-                                color: AppColors.danger, fontWeight: FontWeight.bold)),
+                        Text(
+                          'Sign Out',
+                          style: TextStyle(
+                            color: AppColors.danger,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -270,7 +419,8 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isActive = current == route || (route != '/admin' && current.startsWith(route));
+    final isActive =
+        current == route || (route != '/admin' && current.startsWith(route));
     return GestureDetector(
       onTap: () {
         Navigator.of(context).pop();
@@ -287,23 +437,32 @@ class _NavItem extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Icon(icon,
-                color: isActive ? Colors.white : AppColors.textSecondaryDark, size: 20),
+            Icon(
+              icon,
+              color: isActive ? Colors.white : AppColors.textSecondaryDark,
+              size: 20,
+            ),
             const SizedBox(width: 14),
-            Text(label,
-                style: AppTextStyles.body(
-                    fontSize: 15,
-                    fontWeight: isActive ? FontWeight.w700 : FontWeight.normal,
-                    color: isActive ? Colors.white : AppColors.textSecondaryDark)),
+            Text(
+              label,
+              style: AppTextStyles.body(
+                fontSize: 15,
+                fontWeight: isActive ? FontWeight.w700 : FontWeight.normal,
+                color: isActive ? Colors.white : AppColors.textSecondaryDark,
+              ),
+            ),
             if (trailing != null) ...[
               const Spacer(),
               trailing!,
             ] else if (isActive) ...[
               const Spacer(),
               Container(
-                width: 8, height: 8,
+                width: 8,
+                height: 8,
                 decoration: const BoxDecoration(
-                    color: AppColors.accent, shape: BoxShape.circle),
+                  color: AppColors.accent,
+                  shape: BoxShape.circle,
+                ),
               ),
             ],
           ],

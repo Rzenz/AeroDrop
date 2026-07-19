@@ -4,7 +4,16 @@ class AnalyticsMockData {
   static const double activeDroneUtilization = 78.5;
 
   static const List<double> dailyDeliveries = [12, 18, 15, 22, 28, 30, 25];
-  static const List<double> weeklyDeliveries = [85, 92, 110, 95, 105, 120, 115, 130];
+  static const List<double> weeklyDeliveries = [
+    85,
+    92,
+    110,
+    95,
+    105,
+    120,
+    115,
+    130,
+  ];
   static const List<double> monthlyDeliveries = [350, 410, 480, 520, 490, 550];
 
   static const Map<String, double> droneUtilization = {

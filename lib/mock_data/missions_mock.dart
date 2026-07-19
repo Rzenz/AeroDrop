@@ -17,8 +17,22 @@ class MissionMockModel {
 }
 
 final List<MissionMockModel> mockMissions = [
-  const MissionMockModel(id: 'MIS-001', droneId: 'DRN-001', routeName: 'Corridor Alpha-1', currentProgress: 0.45, destination: 'Engineering Hub', payload: 'Microscope Slides'),
-  const MissionMockModel(id: 'MIS-002', droneId: 'DRN-002', routeName: 'Corridor Beta-3', currentProgress: 0.85, destination: 'Library Lobby', payload: 'Document Envelopes'),
+  const MissionMockModel(
+    id: 'MIS-001',
+    droneId: 'DRN-001',
+    routeName: 'Corridor Alpha-1',
+    currentProgress: 0.45,
+    destination: 'Engineering Hub',
+    payload: 'Microscope Slides',
+  ),
+  const MissionMockModel(
+    id: 'MIS-002',
+    droneId: 'DRN-002',
+    routeName: 'Corridor Beta-3',
+    currentProgress: 0.85,
+    destination: 'Library Lobby',
+    payload: 'Document Envelopes',
+  ),
   ...List.generate(18, (index) {
     final id = index + 3;
     return MissionMockModel(
@@ -29,5 +43,5 @@ final List<MissionMockModel> mockMissions = [
       destination: 'Campus Pad $id',
       payload: 'Academic Package #$id',
     );
-  })
+  }),
 ];

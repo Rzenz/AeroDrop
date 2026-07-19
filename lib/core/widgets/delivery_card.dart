@@ -11,11 +11,7 @@ class DeliveryCard extends ConsumerStatefulWidget {
   final DeliveryModel delivery;
   final VoidCallback? onTap;
 
-  const DeliveryCard({
-    super.key,
-    required this.delivery,
-    this.onTap,
-  });
+  const DeliveryCard({super.key, required this.delivery, this.onTap});
 
   @override
   ConsumerState<DeliveryCard> createState() => _DeliveryCardState();

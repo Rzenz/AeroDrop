@@ -30,7 +30,9 @@ class SpringSwitch extends StatelessWidget {
         height: 28,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(100),
-          color: value ? activeColor.withValues(alpha: 0.2) : inactiveColor.withValues(alpha: 0.4),
+          color: value
+              ? activeColor.withValues(alpha: 0.2)
+              : inactiveColor.withValues(alpha: 0.4),
           border: Border.all(
             color: value ? activeColor : inactiveColor,
             width: 1.5,

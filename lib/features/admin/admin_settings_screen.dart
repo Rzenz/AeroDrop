@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
@@ -11,7 +12,8 @@ class AdminSettingsScreen extends ConsumerStatefulWidget {
   const AdminSettingsScreen({super.key});
 
   @override
-  ConsumerState<AdminSettingsScreen> createState() => _AdminSettingsScreenState();
+  ConsumerState<AdminSettingsScreen> createState() =>
+      _AdminSettingsScreenState();
 }
 
 class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
@@ -47,7 +49,9 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
               'Configure global parameters and fleet defaults',
               style: AppTextStyles.body(
                 fontSize: 13,
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondaryLight,
               ),
             ),
             const SizedBox(height: 24),
@@ -61,7 +65,7 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
               Icons.sensors_rounded,
               AppColors.primary,
             ).animate(delay: 100.ms).fadeIn().slideY(begin: 0.05),
-            
+
             _buildSwitchTile(
               'Auto-Assign Drones',
               'Automatically dispatch available drones to pending deliveries.',
@@ -95,7 +99,8 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
               'Low Battery Warnings',
               'Alert when a drone battery drops below 10%.',
               lowBatteryAlerts,
-              (val) => ref.read(lowBatteryAlertsProvider.notifier).setAlerts(val),
+              (val) =>
+                  ref.read(lowBatteryAlertsProvider.notifier).setAlerts(val),
               Icons.battery_alert_rounded,
               AppColors.danger,
             ).animate(delay: 420.ms).fadeIn().slideY(begin: 0.05),
@@ -106,7 +111,9 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
               'Dark Color Theme',
               'Use dark color theme across all screens.',
               themeMode == ThemeMode.dark,
-              (val) => ref.read(themeModeProvider.notifier).setTheme(val ? ThemeMode.dark : ThemeMode.light),
+              (val) => ref
+                  .read(themeModeProvider.notifier)
+                  .setTheme(val ? ThemeMode.dark : ThemeMode.light),
               Icons.dark_mode_outlined,
               AppColors.primaryLight,
             ).animate(delay: 460.ms).fadeIn().slideY(begin: 0.05),
@@ -130,7 +137,11 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
                               color: AppColors.primary.withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(10),
                             ),
-                            child: const Icon(Icons.scale_rounded, color: AppColors.primary, size: 18),
+                            child: const Icon(
+                              Icons.scale_rounded,
+                              color: AppColors.primary,
+                              size: 18,
+                            ),
                           ),
                           const SizedBox(width: 12),
                           Text(
@@ -138,13 +149,18 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
                             style: AppTextStyles.title(
                               fontSize: 14,
                               fontWeight: FontWeight.bold,
-                              color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                              color: isDark
+                                  ? Colors.white
+                                  : AppColors.textPrimaryLight,
                             ),
                           ),
                         ],
                       ),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: AppColors.primary.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(8),
@@ -165,14 +181,18 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
                     'System-wide maximum package weight per delivery.',
                     style: AppTextStyles.body(
                       fontSize: 12,
-                      color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                      color: isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondaryLight,
                     ),
                   ),
                   const SizedBox(height: 8),
                   SliderTheme(
                     data: SliderThemeData(
                       activeTrackColor: AppColors.primary,
-                      inactiveTrackColor: isDark ? AppColors.borderDark : AppColors.borderLight,
+                      inactiveTrackColor: isDark
+                          ? AppColors.borderDark
+                          : AppColors.borderLight,
                       thumbColor: AppColors.secondary,
                       overlayColor: AppColors.secondary.withValues(alpha: 0.12),
                       valueIndicatorColor: AppColors.primary,
@@ -182,7 +202,8 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
                       min: 1,
                       max: 20,
                       divisions: 19,
-                      onChanged: (val) => setState(() => _maxPayloadLimit = val),
+                      onChanged: (val) =>
+                          setState(() => _maxPayloadLimit = val),
                     ),
                   ),
                 ],
@@ -192,6 +213,13 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
             const SizedBox(height: 24),
             _buildSectionHeader('System Actions'),
             _buildActionTile(
+              'Configure Campus Weather',
+              'Update flight safety constraints, temperature, and wind speed.',
+              Icons.wb_sunny_rounded,
+              AppColors.accent,
+              () => context.push('/admin/weather'),
+            ),
+            _buildActionTile(
               'Recalibrate All Drones',
               'Send a calibration sync to all drones in the fleet.',
               Icons.tune_rounded,
@@ -199,10 +227,14 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
               () {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: const Text('Calibration command sent to all drones.'),
+                    content: const Text(
+                      'Calibration command sent to all drones.',
+                    ),
                     backgroundColor: AppColors.secondary,
                     behavior: SnackBarBehavior.floating,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                 );
               },
@@ -216,10 +248,14 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
               () {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: const Text('Sessions cleared. Drones recalled to base.'),
+                    content: const Text(
+                      'Sessions cleared. Drones recalled to base.',
+                    ),
                     backgroundColor: AppColors.danger,
                     behavior: SnackBarBehavior.floating,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                 );
               },
@@ -259,7 +295,9 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
       decoration: BoxDecoration(
         color: isDark ? AppColors.cardDark : AppColors.cardLight,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: isDark ? AppColors.borderDark : AppColors.borderLight),
+        border: Border.all(
+          color: isDark ? AppColors.borderDark : AppColors.borderLight,
+        ),
       ),
       child: Material(
         color: Colors.transparent,
@@ -284,16 +322,24 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
             subtitle,
             style: AppTextStyles.body(
               fontSize: 12,
-              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+              color: isDark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondaryLight,
             ),
           ),
           value: value,
           onChanged: onChanged,
           activeThumbColor: AppColors.primary,
           activeTrackColor: AppColors.primary.withValues(alpha: 0.3),
-          inactiveThumbColor: isDark ? AppColors.textSecondaryDark : Colors.grey[400],
-          inactiveTrackColor: isDark ? AppColors.borderDark : AppColors.borderLight,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          inactiveThumbColor: isDark
+              ? AppColors.textSecondaryDark
+              : Colors.grey[400],
+          inactiveTrackColor: isDark
+              ? AppColors.borderDark
+              : AppColors.borderLight,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
         ),
       ),
     );
@@ -312,7 +358,9 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
       decoration: BoxDecoration(
         color: isDark ? AppColors.cardDark : AppColors.cardLight,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: isDark ? AppColors.borderDark : AppColors.borderLight),
+        border: Border.all(
+          color: isDark ? AppColors.borderDark : AppColors.borderLight,
+        ),
       ),
       child: Material(
         color: Colors.transparent,
@@ -337,13 +385,17 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
             subtitle,
             style: AppTextStyles.body(
               fontSize: 12,
-              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+              color: isDark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondaryLight,
             ),
           ),
           onTap: onTap,
           trailing: Icon(
             Icons.chevron_right_rounded,
-            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+            color: isDark
+                ? AppColors.textSecondaryDark
+                : AppColors.textSecondaryLight,
           ),
         ),
       ),

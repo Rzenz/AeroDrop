@@ -10,7 +10,10 @@ class NotificationNotifier extends StateNotifier<List<NotificationModel>> {
 
   NotificationNotifier([this.ref]) : super([]) {
     if (kSimulationMode && ref != null) {
-      ref!.listen<List<NotificationModel>>(notificationMockProvider, (previous, next) {
+      ref!.listen<List<NotificationModel>>(notificationMockProvider, (
+        previous,
+        next,
+      ) {
         state = next;
       }, fireImmediately: true);
     } else {
@@ -38,9 +41,13 @@ class NotificationNotifier extends StateNotifier<List<NotificationModel>> {
           .order('created_at', ascending: false);
 
       final list = (response as List)
-          .map((item) => NotificationModel.fromMap(Map<String, dynamic>.from(item)))
+          .map(
+            (item) =>
+                NotificationModel.fromMap(Map<String, dynamic>.from(item)),
+          )
           .toList();
 
+      if (!mounted) return;
       state = list;
     } catch (e) {
       debugPrint('Error loading notifications: $e');
@@ -61,14 +68,13 @@ class NotificationNotifier extends StateNotifier<List<NotificationModel>> {
       final nowStr = DateTime.now().toUtc().toIso8601String();
 
       // Update in local state immediately for instant UI feedback
-      state = state.map((n) => n.copyWith(isRead: true, readAt: DateTime.now())).toList();
+      state = state
+          .map((n) => n.copyWith(isRead: true, readAt: DateTime.now()))
+          .toList();
 
       await SupabaseService.client
           .from('notifications')
-          .update({
-            'is_read': true,
-            'read_at': nowStr,
-          })
+          .update({'is_read': true, 'read_at': nowStr})
           .eq('user_id', currentUser.id)
           .eq('is_read', false);
     } catch (e) {
@@ -88,14 +94,17 @@ class NotificationNotifier extends StateNotifier<List<NotificationModel>> {
       final nowStr = DateTime.now().toUtc().toIso8601String();
 
       // Update local state immediately
-      state = state.map((n) => n.id == notificationId ? n.copyWith(isRead: true, readAt: DateTime.now()) : n).toList();
+      state = state
+          .map(
+            (n) => n.id == notificationId
+                ? n.copyWith(isRead: true, readAt: DateTime.now())
+                : n,
+          )
+          .toList();
 
       await SupabaseService.client
           .from('notifications')
-          .update({
-            'is_read': true,
-            'read_at': nowStr,
-          })
+          .update({'is_read': true, 'read_at': nowStr})
           .eq('id', notificationId);
     } catch (e) {
       debugPrint('Error marking notification $notificationId as read: $e');
@@ -125,6 +134,7 @@ class NotificationNotifier extends StateNotifier<List<NotificationModel>> {
   }
 }
 
-final notificationProvider = StateNotifierProvider<NotificationNotifier, List<NotificationModel>>((ref) {
-  return NotificationNotifier(ref);
-});
+final notificationProvider =
+    StateNotifierProvider<NotificationNotifier, List<NotificationModel>>((ref) {
+      return NotificationNotifier(ref);
+    });

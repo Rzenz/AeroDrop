@@ -120,9 +120,7 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
 
       final locations = (response as List)
           .map(
-            (item) => CampusLocation.fromMap(
-              Map<String, dynamic>.from(item),
-            ),
+            (item) => CampusLocation.fromMap(Map<String, dynamic>.from(item)),
           )
           .toList();
 
@@ -140,10 +138,14 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('Campus locations failed to load. Please try again.'),
+            content: const Text(
+              'Campus locations failed to load. Please try again.',
+            ),
             backgroundColor: AppColors.danger,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
           ),
         );
       }
@@ -159,7 +161,10 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
 
     double distance = 0.0;
     try {
-      distance = _getEstimatedDistanceKm(_selectedPickup!.id, _selectedDropoff!.id);
+      distance = _getEstimatedDistanceKm(
+        _selectedPickup!.id,
+        _selectedDropoff!.id,
+      );
     } catch (_) {
       distance = 0.05;
     }
@@ -248,18 +253,30 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
         if (pNorm == dNorm) {
           return 0.0;
         }
-        final normKey = pNorm.compareTo(dNorm) < 0 ? '${pNorm}_$dNorm' : '${dNorm}_$pNorm';
+        final normKey = pNorm.compareTo(dNorm) < 0
+            ? '${pNorm}_$dNorm'
+            : '${dNorm}_$pNorm';
         switch (normKey) {
-          case 'OLD_MAIN_ANNEX_1': return 0.04;
-          case 'OLD_MAIN_ANNEX_2': return 0.075;
-          case 'OLD_MAIN_BASIC_ED': return 0.10;
-          case 'OLD_MAIN_MARITIME': return 0.125;
-          case 'ANNEX_1_ANNEX_2': return 0.035;
-          case 'ANNEX_1_BASIC_ED': return 0.08;
-          case 'ANNEX_1_MARITIME': return 0.105;
-          case 'ANNEX_2_BASIC_ED': return 0.06;
-          case 'ANNEX_2_MARITIME': return 0.085;
-          case 'BASIC_ED_MARITIME': return 0.07;
+          case 'OLD_MAIN_ANNEX_1':
+            return 0.04;
+          case 'OLD_MAIN_ANNEX_2':
+            return 0.075;
+          case 'OLD_MAIN_BASIC_ED':
+            return 0.10;
+          case 'OLD_MAIN_MARITIME':
+            return 0.125;
+          case 'ANNEX_1_ANNEX_2':
+            return 0.035;
+          case 'ANNEX_1_BASIC_ED':
+            return 0.08;
+          case 'ANNEX_1_MARITIME':
+            return 0.105;
+          case 'ANNEX_2_BASIC_ED':
+            return 0.06;
+          case 'ANNEX_2_MARITIME':
+            return 0.085;
+          case 'BASIC_ED_MARITIME':
+            return 0.07;
         }
         return 0.05;
     }
@@ -289,8 +306,8 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
     final hour = value.hour > 12
         ? value.hour - 12
         : value.hour == 0
-            ? 12
-            : value.hour;
+        ? 12
+        : value.hour;
 
     final minute = value.minute.toString().padLeft(2, '0');
     final amPm = value.hour >= 12 ? 'PM' : 'AM';
@@ -307,10 +324,7 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
       firstDate: now,
       lastDate: now.add(const Duration(days: 30)),
       builder: (context, child) {
-        return Theme(
-          data: ThemeData.dark(),
-          child: child!,
-        );
+        return Theme(data: ThemeData.dark(), child: child!);
       },
     );
 
@@ -320,10 +334,7 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
       context: context,
       initialTime: TimeOfDay.now(),
       builder: (context, child) {
-        return Theme(
-          data: ThemeData.dark(),
-          child: child!,
-        );
+        return Theme(data: ThemeData.dark(), child: child!);
       },
     );
 
@@ -355,7 +366,9 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
       }
 
       if (weight > 0.5) {
-        _showValidationError('Package is too heavy. Maximum supported drone payload is 0.5 kg.');
+        _showValidationError(
+          'Package is too heavy. Maximum supported drone payload is 0.5 kg.',
+        );
         return false;
       }
 
@@ -380,7 +393,9 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
       }
 
       if (_selectedPickup!.id == _selectedDropoff!.id) {
-        _showValidationError('Pickup and drop-off location cannot be the same.');
+        _showValidationError(
+          'Pickup and drop-off location cannot be the same.',
+        );
         return false;
       }
 
@@ -391,12 +406,16 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
 
       final recipientPhone = _recipientPhoneController.text.trim();
       if (recipientPhone.isEmpty) {
-        _showValidationError('Recipient phone number must be exactly 11 digits.');
+        _showValidationError(
+          'Recipient phone number must be exactly 11 digits.',
+        );
         return false;
       }
 
       if (recipientPhone.length != 11) {
-        _showValidationError('Recipient phone number must be exactly 11 digits.');
+        _showValidationError(
+          'Recipient phone number must be exactly 11 digits.',
+        );
         return false;
       }
     }
@@ -472,7 +491,10 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
     }
 
     if (weight > 0.5) {
-      _showMessage('Package is too heavy. Maximum supported drone payload is 0.5 kg.', false);
+      _showMessage(
+        'Package is too heavy. Maximum supported drone payload is 0.5 kg.',
+        false,
+      );
       return;
     }
 
@@ -490,7 +512,10 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
     final dropoffName = _selectedDropoff!.name;
     double distance = 0.0;
     try {
-      distance = _getEstimatedDistanceKm(_selectedPickup!.id, _selectedDropoff!.id);
+      distance = _getEstimatedDistanceKm(
+        _selectedPickup!.id,
+        _selectedDropoff!.id,
+      );
     } catch (_) {
       distance = 0.05;
     }
@@ -506,7 +531,11 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
             .maybeSingle();
 
         if (droneResponse != null) {
-          final droneBattery = double.tryParse(droneResponse['battery_level']?.toString() ?? '100') ?? 100.0;
+          final droneBattery =
+              double.tryParse(
+                droneResponse['battery_level']?.toString() ?? '100',
+              ) ??
+              100.0;
           if (droneBattery < 10.0) {
             setState(() => _loading = false);
             _showLowBatteryDialog();
@@ -518,7 +547,9 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
       debugPrint('Drone battery check failed: $e');
     }
 
-    final error = await ref.read(deliveryProvider.notifier).createDelivery(
+    final error = await ref
+        .read(deliveryProvider.notifier)
+        .createDelivery(
           senderName: user.name,
           recipientName: _recipientController.text.trim(),
           recipientPhone: _recipientPhoneController.text.trim(),
@@ -596,23 +627,23 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
   @override
   Widget build(BuildContext context) {
     final pickupText = _selectedPickup?.name ?? _pickupController.text.trim();
-    final dropoffText = _selectedDropoff?.name ?? _dropoffController.text.trim();
+    final dropoffText =
+        _selectedDropoff?.name ?? _dropoffController.text.trim();
     final paymentAmount = _calculatePaymentAmount();
 
     final drones = ref.watch(droneProvider);
     double maxFleetPayload = 0.0;
     if (drones.isNotEmpty) {
-      maxFleetPayload = drones.map((d) => d.maxPayload).reduce((a, b) => a > b ? a : b);
+      maxFleetPayload = drones
+          .map((d) => d.maxPayload)
+          .reduce((a, b) => a > b ? a : b);
     } else {
       maxFleetPayload = 15.0;
     }
 
     return Scaffold(
       backgroundColor: AppColors.bgDark,
-      appBar: CustomAppBar(
-        title: 'Make a Delivery',
-        onBackPressed: _back,
-      ),
+      appBar: CustomAppBar(title: 'Make a Delivery', onBackPressed: _back),
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -643,8 +674,9 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
                               height: 34,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                gradient:
-                                    isActive ? AppColors.accentGradient : null,
+                                gradient: isActive
+                                    ? AppColors.accentGradient
+                                    : null,
                                 color: isActive ? null : AppColors.cardDark,
                                 border: Border.all(
                                   color: isActive
@@ -756,8 +788,9 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
                       },
                     ),
                     _ConfirmPage(
-                      pickup:
-                          pickupText.isEmpty ? 'No pickup selected' : pickupText,
+                      pickup: pickupText.isEmpty
+                          ? 'No pickup selected'
+                          : pickupText,
                       dropoff: dropoffText.isEmpty
                           ? 'No drop-off selected'
                           : dropoffText,
@@ -772,7 +805,8 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
                       scheduledText: _priority == 'Scheduled'
                           ? _formatSchedule(_scheduledAt)
                           : 'Not scheduled',
-                      estimatedDistance: _selectedPickup != null && _selectedDropoff != null
+                      estimatedDistance:
+                          _selectedPickup != null && _selectedDropoff != null
                           ? '${_getEstimatedDistanceKm(_selectedPickup!.id, _selectedDropoff!.id)} km'
                           : 'TBD',
                       onEditPackage: () {
@@ -811,79 +845,87 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
                   ],
                 ),
               ),
-              Builder(builder: (context) {
-                final weatherState = ref.watch(weatherProvider);
-                final isGrounded = weatherState.isGrounded;
-                final isCaution = weatherState.isCaution;
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // Weather warning banner
-                    if (isGrounded || isCaution)
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(24, 0, 24, 0),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 10),
-                          decoration: BoxDecoration(
-                            color: isGrounded
-                                ? AppColors.danger.withValues(alpha: 0.12)
-                                : AppColors.warning.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: isGrounded
-                                  ? AppColors.danger.withValues(alpha: 0.4)
-                                  : AppColors.warning.withValues(alpha: 0.4),
+              Builder(
+                builder: (context) {
+                  final weatherState = ref.watch(weatherProvider);
+                  final isGrounded = weatherState.isGrounded;
+                  final isCaution = weatherState.isCaution;
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Weather warning banner
+                      if (isGrounded || isCaution)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(24, 0, 24, 0),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 10,
                             ),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                isGrounded
-                                    ? Icons.thunderstorm_rounded
-                                    : Icons.air_rounded,
+                            decoration: BoxDecoration(
+                              color: isGrounded
+                                  ? AppColors.danger.withValues(alpha: 0.12)
+                                  : AppColors.warning.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
                                 color: isGrounded
-                                    ? AppColors.danger
-                                    : AppColors.warning,
-                                size: 18,
+                                    ? AppColors.danger.withValues(alpha: 0.4)
+                                    : AppColors.warning.withValues(alpha: 0.4),
                               ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
                                   isGrounded
-                                      ? 'Drone deliveries are grounded due to unsafe weather.'
-                                      : 'Deliveries may be delayed due to weather.',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: isGrounded
-                                        ? AppColors.danger
-                                        : AppColors.warning,
-                                    fontWeight: FontWeight.w600,
+                                      ? Icons.thunderstorm_rounded
+                                      : Icons.air_rounded,
+                                  color: isGrounded
+                                      ? AppColors.danger
+                                      : AppColors.warning,
+                                  size: 18,
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    isGrounded
+                                        ? 'Drone deliveries are grounded due to unsafe weather.'
+                                        : 'Deliveries may be delayed due to weather.',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: isGrounded
+                                          ? AppColors.danger
+                                          : AppColors.warning,
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+                        child: GradientButton(
+                          text: isGrounded && _currentPage == 3
+                              ? 'Delivery Unavailable'
+                              : (_currentPage == 3
+                                    ? 'Confirm Order'
+                                    : 'Continue'),
+                          isLoading: _loading,
+                          onPressed: isGrounded && _currentPage == 3
+                              ? null
+                              : _next,
+                          icon: isGrounded && _currentPage == 3
+                              ? Icons.block_rounded
+                              : (_currentPage == 3
+                                    ? Icons.flight_takeoff_rounded
+                                    : Icons.arrow_forward_rounded),
+                        ),
                       ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
-                      child: GradientButton(
-                        text: isGrounded && _currentPage == 3
-                            ? 'Delivery Unavailable'
-                            : (_currentPage == 3 ? 'Confirm Order' : 'Continue'),
-                        isLoading: _loading,
-                        onPressed: isGrounded && _currentPage == 3 ? null : _next,
-                        icon: isGrounded && _currentPage == 3
-                            ? Icons.block_rounded
-                            : (_currentPage == 3
-                                ? Icons.flight_takeoff_rounded
-                                : Icons.arrow_forward_rounded),
-                      ),
-                    ),
-                  ],
-                );
-              }),
+                    ],
+                  );
+                },
+              ),
             ],
           ),
         ),
@@ -928,10 +970,7 @@ class _PackagePage extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             'Package Details',
-            style: AppTextStyles.subHead(
-              fontSize: 18,
-              color: Colors.white,
-            ),
+            style: AppTextStyles.subHead(fontSize: 18, color: Colors.white),
           ).animate().fadeIn().slideY(begin: 0.1),
           const SizedBox(height: 16),
           DarkCard(
@@ -962,10 +1001,7 @@ class _PackagePage extends StatelessWidget {
                         HapticFeedback.lightImpact();
                         onTypeChanged(type);
                       },
-                      child: _ChoiceChip(
-                        label: type,
-                        selected: selected,
-                      ),
+                      child: _ChoiceChip(label: type, selected: selected),
                     );
                   }).toList(),
                 ),
@@ -1009,10 +1045,7 @@ class _PackagePage extends StatelessWidget {
                         HapticFeedback.lightImpact();
                         onPriorityChanged(priority);
                       },
-                      child: _ChoiceChip(
-                        label: priority,
-                        selected: selected,
-                      ),
+                      child: _ChoiceChip(label: priority, selected: selected),
                     );
                   }).toList(),
                 ),
@@ -1111,10 +1144,7 @@ class _LocationPage extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             'Delivery Locations',
-            style: AppTextStyles.subHead(
-              fontSize: 18,
-              color: Colors.white,
-            ),
+            style: AppTextStyles.subHead(fontSize: 18, color: Colors.white),
           ).animate().fadeIn().slideY(begin: 0.1),
           const SizedBox(height: 16),
           DarkCard(
@@ -1267,19 +1297,19 @@ class _PaymentPage extends StatelessWidget {
         name: 'GCash',
         icon: Icons.account_balance_wallet_rounded,
         subtitle: 'Simulated e-wallet payment',
-        color: AppColors.primaryLight
+        color: AppColors.primaryLight,
       ),
       (
         name: 'Cash',
         icon: Icons.payments_rounded,
         subtitle: 'Pending until package arrival',
-        color: AppColors.success
+        color: AppColors.success,
       ),
       (
         name: 'Credit / Debit Card',
         icon: Icons.credit_card_rounded,
         subtitle: 'Simulated card payment',
-        color: AppColors.accent
+        color: AppColors.accent,
       ),
     ];
 
@@ -1291,10 +1321,7 @@ class _PaymentPage extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             'Payment Method',
-            style: AppTextStyles.subHead(
-              fontSize: 18,
-              color: Colors.white,
-            ),
+            style: AppTextStyles.subHead(fontSize: 18, color: Colors.white),
           ).animate().fadeIn().slideY(begin: 0.1),
           const SizedBox(height: 16),
           Container(
@@ -1363,11 +1390,7 @@ class _PaymentPage extends StatelessWidget {
                         color: option.color.withValues(alpha: 0.15),
                         shape: BoxShape.circle,
                       ),
-                      child: Icon(
-                        option.icon,
-                        color: option.color,
-                        size: 24,
-                      ),
+                      child: Icon(option.icon, color: option.color, size: 24),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
@@ -1449,13 +1472,14 @@ class _ConfirmPage extends StatelessWidget {
       children: [
         Text(
           title.toUpperCase(),
-          style: AppTextStyles.label(
-            fontSize: 11,
-            color: AppColors.accent,
-          ),
+          style: AppTextStyles.label(fontSize: 11, color: AppColors.accent),
         ),
         IconButton(
-          icon: const Icon(Icons.edit_outlined, size: 16, color: AppColors.accent),
+          icon: const Icon(
+            Icons.edit_outlined,
+            size: 16,
+            color: AppColors.accent,
+          ),
           constraints: const BoxConstraints(),
           padding: EdgeInsets.zero,
           onPressed: onEdit,
@@ -1466,8 +1490,9 @@ class _ConfirmPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final paymentStatus =
-        paymentMethod == 'Cash' ? 'Pending on delivery' : 'Simulated paid';
+    final paymentStatus = paymentMethod == 'Cash'
+        ? 'Pending on delivery'
+        : 'Simulated paid';
 
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -1477,10 +1502,7 @@ class _ConfirmPage extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             'Confirm Details',
-            style: AppTextStyles.subHead(
-              fontSize: 18,
-              color: Colors.white,
-            ),
+            style: AppTextStyles.subHead(fontSize: 18, color: Colors.white),
           ).animate().fadeIn(),
           const SizedBox(height: 16),
           GlassCard(
@@ -1603,11 +1625,7 @@ class _ConfirmPage extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            icon,
-            size: 18,
-            color: AppColors.textSecondaryDark,
-          ),
+          Icon(icon, size: 18, color: AppColors.textSecondaryDark),
           const SizedBox(width: 12),
           Expanded(
             flex: 4,
@@ -1644,10 +1662,7 @@ class _ChoiceChip extends StatelessWidget {
   final String label;
   final bool selected;
 
-  const _ChoiceChip({
-    required this.label,
-    required this.selected,
-  });
+  const _ChoiceChip({required this.label, required this.selected});
 
   @override
   Widget build(BuildContext context) {
@@ -1705,11 +1720,7 @@ class _LocationDropdown extends StatelessWidget {
           fontSize: 12,
           color: AppColors.textSecondaryDark,
         ),
-        prefixIcon: Icon(
-          icon,
-          color: AppColors.textSecondaryDark,
-          size: 20,
-        ),
+        prefixIcon: Icon(icon, color: AppColors.textSecondaryDark, size: 20),
         filled: true,
         fillColor: AppColors.bgDark,
         enabledBorder: OutlineInputBorder(
@@ -1720,9 +1731,7 @@ class _LocationDropdown extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           borderSide: const BorderSide(color: AppColors.accent),
         ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
       ),
       hint: Text(
         hint,
@@ -1738,10 +1747,7 @@ class _LocationDropdown extends StatelessWidget {
             location.building == null || location.building!.isEmpty
                 ? location.name
                 : '${location.name} • ${location.building}',
-            style: AppTextStyles.body(
-              fontSize: 13.5,
-              color: Colors.white,
-            ),
+            style: AppTextStyles.body(fontSize: 13.5, color: Colors.white),
             overflow: TextOverflow.ellipsis,
           ),
         );

@@ -1,4 +1,4 @@
-enum DroneStatus { available, busy, maintenance, offline }
+enum DroneStatus { available, assigned, busy, charging, maintenance, offline }
 
 class DroneModel {
   final String id;
@@ -6,7 +6,7 @@ class DroneModel {
   final double batteryLevel; // 0.0 to 100.0
   final DroneStatus status;
   final double maxPayload; // in kg
-  final String modelType; // e.g. AeroCarrier-X, SkyLifter-V2
+  final String modelType;
   final String currentCoordinates;
 
   DroneModel({

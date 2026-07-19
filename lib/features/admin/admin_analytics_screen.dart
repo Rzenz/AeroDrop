@@ -16,7 +16,8 @@ class AdminAnalyticsScreen extends ConsumerStatefulWidget {
   const AdminAnalyticsScreen({super.key});
 
   @override
-  ConsumerState<AdminAnalyticsScreen> createState() => _AdminAnalyticsScreenState();
+  ConsumerState<AdminAnalyticsScreen> createState() =>
+      _AdminAnalyticsScreenState();
 }
 
 class _AdminAnalyticsScreenState extends ConsumerState<AdminAnalyticsScreen> {
@@ -39,18 +40,42 @@ class _AdminAnalyticsScreenState extends ConsumerState<AdminAnalyticsScreen> {
     try {
       if (SupabaseService.isConfigured) {
         // Fetch users standing
-        final usersRes = await SupabaseService.client.from('users').select('account_status');
+        final usersRes = await SupabaseService.client
+            .from('users')
+            .select('account_status');
         final users = List<Map<String, dynamic>>.from(usersRes);
         int totalU = users.length;
-        int activeU = users.where((u) => (u['account_status'] ?? 'active').toString().toLowerCase() == 'active').length;
-        int suspendedU = users.where((u) => u['account_status']?.toString().toLowerCase() == 'suspended').length;
-        int deletedU = users.where((u) => u['account_status']?.toString().toLowerCase() == 'deleted').length;
+        int activeU = users
+            .where(
+              (u) =>
+                  (u['account_status'] ?? 'active').toString().toLowerCase() ==
+                  'active',
+            )
+            .length;
+        int suspendedU = users
+            .where(
+              (u) =>
+                  u['account_status']?.toString().toLowerCase() == 'suspended',
+            )
+            .length;
+        int deletedU = users
+            .where(
+              (u) => u['account_status']?.toString().toLowerCase() == 'deleted',
+            )
+            .length;
 
-        // Fetch payments revenue
-        final paymentsRes = await SupabaseService.client.from('payments').select('amount, status');
-        final payments = List<Map<String, dynamic>>.from(paymentsRes);
-        double revenue = payments
-            .fold(0.0, (sum, p) => sum + (double.tryParse(p['amount']?.toString() ?? '0') ?? 0.0));
+        // Fetch orders revenue
+        final ordersRes = await SupabaseService.client
+            .from('orders')
+            .select('total_amount')
+            .eq('payment_status', 'paid');
+        final orders = List<Map<String, dynamic>>.from(ordersRes);
+        double revenue = orders.fold(
+          0.0,
+          (sum, o) =>
+              sum +
+              (double.tryParse(o['total_amount']?.toString() ?? '0') ?? 0.0),
+        );
 
         if (mounted) {
           setState(() {
@@ -89,9 +114,15 @@ class _AdminAnalyticsScreenState extends ConsumerState<AdminAnalyticsScreen> {
   }
 
   double _calculateAverageFlightTimeMinutes(List<DeliveryModel> list) {
-    final completed = list.where((d) => d.deliveryStartedAt != null && d.deliveredAt != null).toList();
+    final completed = list
+        .where((d) => d.deliveryStartedAt != null && d.deliveredAt != null)
+        .toList();
     if (completed.isEmpty) return 0.0;
-    final totalSecs = completed.fold(0, (sum, d) => sum + d.deliveredAt!.difference(d.deliveryStartedAt!).inSeconds);
+    final totalSecs = completed.fold(
+      0,
+      (sum, d) =>
+          sum + d.deliveredAt!.difference(d.deliveryStartedAt!).inSeconds,
+    );
     return (totalSecs / completed.length) / 60.0;
   }
 
@@ -115,10 +146,16 @@ class _AdminAnalyticsScreenState extends ConsumerState<AdminAnalyticsScreen> {
 
     // Compute delivery counts
     int totalCount = deliveries.length;
-    int inTransitCount = deliveries.where((d) => d.status == DeliveryStatus.inTransit).length;
-    int deliveredCount = deliveries.where((d) => d.status == DeliveryStatus.delivered).length;
-    
-    double successRate = totalCount > 0 ? (deliveredCount / totalCount * 100) : 100.0;
+    int inTransitCount = deliveries
+        .where((d) => d.status == DeliveryStatus.inTransit)
+        .length;
+    int deliveredCount = deliveries
+        .where((d) => d.status == DeliveryStatus.delivered)
+        .length;
+
+    double successRate = totalCount > 0
+        ? (deliveredCount / totalCount * 100)
+        : 100.0;
     double avgFlightTime = _calculateAverageFlightTimeMinutes(deliveries);
 
     // Filter today's deliveries
@@ -130,7 +167,10 @@ class _AdminAnalyticsScreenState extends ConsumerState<AdminAnalyticsScreen> {
     }).length;
 
     // Get last 7 days daily dispatches
-    final last7Days = List.generate(7, (i) => now.subtract(Duration(days: 6 - i)));
+    final last7Days = List.generate(
+      7,
+      (i) => now.subtract(Duration(days: 6 - i)),
+    );
     final barGroups = <BarChartGroupData>[];
     double maxBarValue = 5.0;
     for (int i = 0; i < 7; i++) {
@@ -141,24 +181,34 @@ class _AdminAnalyticsScreenState extends ConsumerState<AdminAnalyticsScreen> {
             d.createdAt.day == day.day;
       }).length;
       if (count > maxBarValue) maxBarValue = count.toDouble();
-      barGroups.add(BarChartGroupData(
-        x: i,
-        barRods: [
-          BarChartRodData(
-            toY: count.toDouble(),
-            gradient: AppColors.primaryGradient,
-            width: 16,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
-          ),
-        ],
-      ));
+      barGroups.add(
+        BarChartGroupData(
+          x: i,
+          barRods: [
+            BarChartRodData(
+              toY: count.toDouble(),
+              gradient: AppColors.primaryGradient,
+              width: 16,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(4),
+              ),
+            ),
+          ],
+        ),
+      );
     }
 
     // Package Type Breakdown percentages
     int totalPackageTypes = deliveries.length;
-    int docCount = deliveries.where((d) => d.packageType.toLowerCase() == 'documents').length;
-    int medCount = deliveries.where((d) => d.packageType.toLowerCase() == 'medicine').length;
-    int elecCount = deliveries.where((d) => d.packageType.toLowerCase() == 'electronics').length;
+    int docCount = deliveries
+        .where((d) => d.packageType.toLowerCase() == 'documents')
+        .length;
+    int medCount = deliveries
+        .where((d) => d.packageType.toLowerCase() == 'medicine')
+        .length;
+    int elecCount = deliveries
+        .where((d) => d.packageType.toLowerCase() == 'electronics')
+        .length;
     int otherCount = totalPackageTypes - (docCount + medCount + elecCount);
 
     int getPct(int count) {
@@ -188,7 +238,10 @@ class _AdminAnalyticsScreenState extends ConsumerState<AdminAnalyticsScreen> {
               ).animate().fadeIn(),
               Text(
                 'Real-time system telemetry and dispatch metrics',
-                style: AppTextStyles.body(fontSize: 13, color: AppColors.textSecondaryDark),
+                style: AppTextStyles.body(
+                  fontSize: 13,
+                  color: AppColors.textSecondaryDark,
+                ),
               ).animate().fadeIn(delay: 100.ms),
 
               const SizedBox(height: 24),
@@ -222,7 +275,9 @@ class _AdminAnalyticsScreenState extends ConsumerState<AdminAnalyticsScreen> {
                   ),
                   AnalyticsCard(
                     title: 'Avg Flight Time',
-                    value: avgFlightTime > 0 ? '${avgFlightTime.toStringAsFixed(1)}m' : 'N/A',
+                    value: avgFlightTime > 0
+                        ? '${avgFlightTime.toStringAsFixed(1)}m'
+                        : 'N/A',
                     change: 'In-transit: $inTransitCount',
                     isPositive: true,
                     icon: Icons.timer_rounded,
@@ -260,7 +315,10 @@ class _AdminAnalyticsScreenState extends ConsumerState<AdminAnalyticsScreen> {
                     const SizedBox(height: 4),
                     Text(
                       'Packages dispatched per day (last 7 days)',
-                      style: AppTextStyles.body(fontSize: 12, color: AppColors.textSecondaryDark),
+                      style: AppTextStyles.body(
+                        fontSize: 12,
+                        color: AppColors.textSecondaryDark,
+                      ),
                     ),
                     const SizedBox(height: 20),
                     SizedBox(
@@ -270,9 +328,15 @@ class _AdminAnalyticsScreenState extends ConsumerState<AdminAnalyticsScreen> {
                           gridData: const FlGridData(show: false),
                           borderData: FlBorderData(show: false),
                           titlesData: FlTitlesData(
-                            leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                            rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                            topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                            leftTitles: const AxisTitles(
+                              sideTitles: SideTitles(showTitles: false),
+                            ),
+                            rightTitles: const AxisTitles(
+                              sideTitles: SideTitles(showTitles: false),
+                            ),
+                            topTitles: const AxisTitles(
+                              sideTitles: SideTitles(showTitles: false),
+                            ),
                             bottomTitles: AxisTitles(
                               sideTitles: SideTitles(
                                 showTitles: true,
@@ -324,9 +388,17 @@ class _AdminAnalyticsScreenState extends ConsumerState<AdminAnalyticsScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    _breakdown('Documents', getPct(docCount), AppColors.primary),
+                    _breakdown(
+                      'Documents',
+                      getPct(docCount),
+                      AppColors.primary,
+                    ),
                     _breakdown('Medicine', getPct(medCount), AppColors.success),
-                    _breakdown('Electronics', getPct(elecCount), AppColors.secondary),
+                    _breakdown(
+                      'Electronics',
+                      getPct(elecCount),
+                      AppColors.secondary,
+                    ),
                     _breakdown('Others', getPct(otherCount), AppColors.warning),
                   ],
                 ),
@@ -349,13 +421,29 @@ class _AdminAnalyticsScreenState extends ConsumerState<AdminAnalyticsScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    _userStandingRow('Total Registered Users', _totalUsers, AppColors.primary),
+                    _userStandingRow(
+                      'Total Registered Users',
+                      _totalUsers,
+                      AppColors.primary,
+                    ),
                     const Divider(color: AppColors.borderDark, height: 16),
-                    _userStandingRow('Active Users', _activeUsers, AppColors.success),
+                    _userStandingRow(
+                      'Active Users',
+                      _activeUsers,
+                      AppColors.success,
+                    ),
                     const Divider(color: AppColors.borderDark, height: 16),
-                    _userStandingRow('Suspended Accounts', _suspendedUsers, AppColors.warning),
+                    _userStandingRow(
+                      'Suspended Accounts',
+                      _suspendedUsers,
+                      AppColors.warning,
+                    ),
                     const Divider(color: AppColors.borderDark, height: 16),
-                    _userStandingRow('Soft Deleted Accounts', _deletedUsers, AppColors.danger),
+                    _userStandingRow(
+                      'Soft Deleted Accounts',
+                      _deletedUsers,
+                      AppColors.danger,
+                    ),
                   ],
                 ),
               ).animate(delay: 480.ms).fadeIn().slideY(begin: 0.1),
@@ -381,7 +469,8 @@ class _AdminAnalyticsScreenState extends ConsumerState<AdminAnalyticsScreen> {
                       rank: '#1',
                       name: drone001.name,
                       trips: '$deliveredCount delivered dispatches',
-                      battery: '${drone001.batteryLevel.toStringAsFixed(0)}% battery',
+                      battery:
+                          '${drone001.batteryLevel.toStringAsFixed(0)}% battery',
                       status: drone001.status.name.toUpperCase(),
                       color: AppColors.primary,
                     ),
@@ -399,10 +488,17 @@ class _AdminAnalyticsScreenState extends ConsumerState<AdminAnalyticsScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: const TextStyle(color: Colors.white70, fontSize: 13)),
+        Text(
+          label,
+          style: const TextStyle(color: Colors.white70, fontSize: 13),
+        ),
         Text(
           '$count',
-          style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 14),
+          style: TextStyle(
+            color: color,
+            fontWeight: FontWeight.bold,
+            fontSize: 14,
+          ),
         ),
       ],
     );
@@ -417,10 +513,17 @@ class _AdminAnalyticsScreenState extends ConsumerState<AdminAnalyticsScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(label, style: const TextStyle(color: Colors.white70, fontSize: 13)),
+              Text(
+                label,
+                style: const TextStyle(color: Colors.white70, fontSize: 13),
+              ),
               Text(
                 '$pct%',
-                style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 13),
+                style: TextStyle(
+                  color: color,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
               ),
             ],
           ),
@@ -459,7 +562,11 @@ class _AdminAnalyticsScreenState extends ConsumerState<AdminAnalyticsScreen> {
           ),
           child: Text(
             rank,
-            style: TextStyle(fontWeight: FontWeight.bold, color: color, fontSize: 11),
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: color,
+              fontSize: 11,
+            ),
           ),
         ),
         const SizedBox(width: 12),
@@ -477,7 +584,10 @@ class _AdminAnalyticsScreenState extends ConsumerState<AdminAnalyticsScreen> {
               ),
               Text(
                 trips,
-                style: AppTextStyles.body(fontSize: 11, color: AppColors.textSecondaryDark),
+                style: AppTextStyles.body(
+                  fontSize: 11,
+                  color: AppColors.textSecondaryDark,
+                ),
               ),
               const SizedBox(height: 2),
               Text(
@@ -504,7 +614,9 @@ class _AdminAnalyticsScreenState extends ConsumerState<AdminAnalyticsScreen> {
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.bold,
-              color: status == 'AVAILABLE' ? AppColors.success : AppColors.warning,
+              color: status == 'AVAILABLE'
+                  ? AppColors.success
+                  : AppColors.warning,
             ),
           ),
         ),
@@ -513,7 +625,17 @@ class _AdminAnalyticsScreenState extends ConsumerState<AdminAnalyticsScreen> {
   }
 
   Color drone001BatteryColor(String text) {
-    if (text.contains('10%') || text.contains('9%') || text.contains('8%') || text.contains('7%') || text.contains('6%') || text.contains('5%') || text.contains('4%') || text.contains('3%') || text.contains('2%') || text.contains('1%') || text.contains('0%')) {
+    if (text.contains('10%') ||
+        text.contains('9%') ||
+        text.contains('8%') ||
+        text.contains('7%') ||
+        text.contains('6%') ||
+        text.contains('5%') ||
+        text.contains('4%') ||
+        text.contains('3%') ||
+        text.contains('2%') ||
+        text.contains('1%') ||
+        text.contains('0%')) {
       return AppColors.danger;
     }
     return AppColors.success;

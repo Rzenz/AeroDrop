@@ -6,7 +6,6 @@ import 'package:go_router/go_router.dart';
 import 'widgets/aerodrop_bottom_navigation.dart';
 import '../../core/services/supabase_service.dart';
 import '../../core/providers/auth_provider.dart';
-import '../../core/models/user_model.dart';
 
 class UserShell extends ConsumerStatefulWidget {
   final Widget child;
@@ -16,7 +15,8 @@ class UserShell extends ConsumerStatefulWidget {
   ConsumerState<UserShell> createState() => _UserShellState();
 }
 
-class _UserShellState extends ConsumerState<UserShell> with TickerProviderStateMixin, WidgetsBindingObserver {
+class _UserShellState extends ConsumerState<UserShell>
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   late AnimationController _springController;
   Timer? _statusCheckTimer;
   bool _accountStatusDialogShowing = false;
@@ -33,7 +33,10 @@ class _UserShellState extends ConsumerState<UserShell> with TickerProviderStateM
     WidgetsBinding.instance.addObserver(this);
 
     // Periodic check every 10 seconds on user side
-    _statusCheckTimer = Timer.periodic(const Duration(seconds: 10), (_) => _checkAccountStatus());
+    _statusCheckTimer = Timer.periodic(
+      const Duration(seconds: 10),
+      (_) => _checkAccountStatus(),
+    );
 
     // Initial check when user dashboard opens
     Future.microtask(_checkAccountStatus);
@@ -61,21 +64,22 @@ class _UserShellState extends ConsumerState<UserShell> with TickerProviderStateM
     final authState = ref.read(authProvider);
     final currentUser = authState.user;
     if (currentUser == null) return;
-    
+
     // Do not check admin account if current user is admin. Admin side should remain usable.
-    if (currentUser.role == UserRole.admin) return;
+    if (currentUser.isAdmin) return;
 
     try {
       final userResponse = await SupabaseService.client
           .from('users')
-          .select('account_status, suspension_reason, delete_reason, deleted_at')
+          .select('account_status')
           .eq('id', currentUser.id)
           .maybeSingle();
 
       if (userResponse == null) return;
 
-      final status = userResponse['account_status']?.toString().toLowerCase() ?? 'active';
-      final isDeleted = status == 'deleted' || userResponse['deleted_at'] != null;
+      final status =
+          userResponse['account_status']?.toString().toLowerCase() ?? 'active';
+      final isDeleted = status == 'deleted';
 
       if (status == 'suspended' || isDeleted) {
         if (!mounted) return;
@@ -89,9 +93,7 @@ class _UserShellState extends ConsumerState<UserShell> with TickerProviderStateM
         final baseMsg = isSusp
             ? 'Your account has been suspended.'
             : 'Your account has been deleted.';
-        final reason = isSusp
-            ? (userResponse['suspension_reason']?.toString() ?? 'No reason provided.')
-            : (userResponse['delete_reason']?.toString() ?? 'No reason provided.');
+        final reason = 'No reason provided.';
 
         if (!mounted) return;
 
@@ -102,14 +104,23 @@ class _UserShellState extends ConsumerState<UserShell> with TickerProviderStateM
             canPop: false,
             child: AlertDialog(
               backgroundColor: const Color(0xFF132031),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+              ),
               title: Row(
                 children: [
-                  const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 28),
+                  const Icon(
+                    Icons.error_outline_rounded,
+                    color: Colors.redAccent,
+                    size: 28,
+                  ),
                   const SizedBox(width: 12),
                   Text(
                     title,
-                    style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
                   ),
                 ],
               ),
@@ -124,7 +135,11 @@ class _UserShellState extends ConsumerState<UserShell> with TickerProviderStateM
                   const SizedBox(height: 12),
                   Text(
                     'Reason: $reason',
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
                   ),
                 ],
               ),
@@ -132,21 +147,26 @@ class _UserShellState extends ConsumerState<UserShell> with TickerProviderStateM
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.redAccent,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                   onPressed: () {
                     // Close dialog
                     Navigator.of(dialogContext).pop();
-                    
+
                     // Sign out and clear auth state
                     ref.read(authProvider.notifier).logout();
-                    
+
                     // Go to login screen safely
                     context.go('/login');
                   },
                   child: const Text(
                     'Log Out',
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ],
@@ -161,9 +181,15 @@ class _UserShellState extends ConsumerState<UserShell> with TickerProviderStateM
 
   int _selectedIndex(BuildContext context) {
     final loc = GoRouterState.of(context).uri.toString();
-    if (loc.startsWith('/user/track')) return 1;
-    if (loc.startsWith('/user/history')) return 2;
-    if (loc.startsWith('/user/profile')) return 3;
+    if (loc.startsWith('/user/shop') || loc.startsWith('/user/vendors')) {
+      return 1;
+    }
+    if (loc.startsWith('/user/orders')) {
+      return 2;
+    }
+    if (loc.startsWith('/user/profile')) {
+      return 3;
+    }
     return 0;
   }
 
@@ -178,10 +204,10 @@ class _UserShellState extends ConsumerState<UserShell> with TickerProviderStateM
         context.go('/user');
         break;
       case 1:
-        context.go('/user/track');
+        context.go('/user/shop');
         break;
       case 2:
-        context.go('/user/history');
+        context.go('/user/orders');
         break;
       case 3:
         context.go('/user/profile');
@@ -204,9 +230,9 @@ class _UserShellState extends ConsumerState<UserShell> with TickerProviderStateM
             selectedIndex: selected,
             onTap: (index) => _onTap(index, context),
             onFabPressed: () {
-              _checkAccountStatus(); // Check on tapping New Request FAB
+              _checkAccountStatus(); // Check account status
               HapticFeedback.mediumImpact();
-              context.push('/user/request');
+              context.push('/user/cart');
             },
           ),
         ),

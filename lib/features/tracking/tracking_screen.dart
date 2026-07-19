@@ -20,28 +20,44 @@ Offset _displayOffset(String locationName, Size size) {
   final n = locationName.toLowerCase();
   double x, y;
   if (n.contains('old') || n.contains('main')) {
-    x = 0.50; y = 0.43;
+    x = 0.50;
+    y = 0.43;
   } else if (n.contains('annex 1') || n.contains('annex1')) {
-    x = 0.43; y = 0.49;
+    x = 0.43;
+    y = 0.49;
   } else if (n.contains('annex 2') || n.contains('annex2')) {
-    x = 0.57; y = 0.49;
+    x = 0.57;
+    y = 0.49;
   } else if (n.contains('basic ed') || n.contains('basic education')) {
-    x = 0.40; y = 0.58;
+    x = 0.40;
+    y = 0.58;
   } else if (n.contains('maritime')) {
-    x = 0.60; y = 0.58;
+    x = 0.60;
+    y = 0.58;
   } else {
-    x = 0.50; y = 0.45;
+    x = 0.50;
+    y = 0.45;
   }
   return Offset(x * size.width, y * size.height);
 }
 
 String _shortLabel(String name) {
   final n = name.toLowerCase();
-  if (n.contains('old') || n.contains('main')) return 'Old';
-  if (n.contains('annex 1') || n.contains('annex1')) return 'Annex 1';
-  if (n.contains('annex 2') || n.contains('annex2')) return 'Annex 2';
-  if (n.contains('basic ed') || n.contains('basic education')) return 'Basic Ed';
-  if (n.contains('maritime')) return 'Maritime';
+  if (n.contains('old') || n.contains('main')) {
+    return 'Old';
+  }
+  if (n.contains('annex 1') || n.contains('annex1')) {
+    return 'Annex 1';
+  }
+  if (n.contains('annex 2') || n.contains('annex2')) {
+    return 'Annex 2';
+  }
+  if (n.contains('basic ed') || n.contains('basic education')) {
+    return 'Basic Ed';
+  }
+  if (n.contains('maritime')) {
+    return 'Maritime';
+  }
   return name;
 }
 
@@ -97,7 +113,9 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
   Future<void> _loadCampusLocations() async {
     if (!SupabaseService.isConfigured) return;
     try {
-      final response = await SupabaseService.client.from('campus_locations').select();
+      final response = await SupabaseService.client
+          .from('campus_locations')
+          .select();
       if (mounted) {
         setState(() {
           _locations = List<Map<String, dynamic>>.from(response);
@@ -114,11 +132,13 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
     if (currentUser == null) return;
 
     try {
+      final activeStatusNames = ['pending', 'assigning', 'in_transit'];
+
       final response = await SupabaseService.client
           .from('deliveries')
-          .select()
-          .eq('user_id', currentUser.id)
-          .inFilter('status', ['pending', 'inTransit', 'in_transit', 'assigning'])
+          .select('*, orders!inner(user_id)')
+          .eq('orders.user_id', currentUser.id)
+          .inFilter('status', activeStatusNames)
           .order('created_at', ascending: false)
           .limit(1)
           .maybeSingle();
@@ -129,6 +149,8 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
         });
         if (response != null) {
           _fetchTelemetryDetails(response['drone_id']?.toString());
+        } else {
+          _fetchTelemetryDetails(null);
         }
       }
     } catch (e) {
@@ -140,7 +162,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
     if (droneId == null) {
       if (mounted) {
         setState(() {
-          _droneBatteryText = 'Drone not assigned yet';
+          _droneBatteryText = 'No telemetry records available.';
           _flightSpeed = '-- km/h';
           _flightAltitude = '-- m';
         });
@@ -156,7 +178,9 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
       if (drone != null && mounted) {
         final lvl = drone['battery_level'];
         setState(() {
-          _droneBatteryText = lvl != null ? 'Drone Battery: $lvl%' : 'Drone Battery: Unknown';
+          _droneBatteryText = lvl != null
+              ? 'Drone Battery: $lvl%'
+              : 'Drone Battery: Unknown';
         });
       }
 
@@ -169,10 +193,22 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
           .maybeSingle();
       if (tel != null && mounted) {
         setState(() {
-          if (tel['speed'] != null) _flightSpeed = '${tel['speed']} km/h';
-          if (tel['altitude'] != null) _flightAltitude = '${tel['altitude']} m';
-          if (tel['battery_level'] != null) _droneBatteryText = 'Drone Battery: ${tel['battery_level']}%';
+          if (tel['speed'] != null) {
+            _flightSpeed = '${tel['speed']} km/h';
+          }
+          if (tel['altitude'] != null) {
+            _flightAltitude = '${tel['altitude']} m';
+          }
+          if (tel['battery_level'] != null) {
+            _droneBatteryText = 'Drone Battery: ${tel['battery_level']}%';
+          }
         });
+      } else {
+        if (mounted) {
+          setState(() {
+            _droneBatteryText = 'No telemetry records available.';
+          });
+        }
       }
     } catch (e) {
       debugPrint('Error loading drone telemetry: $e');
@@ -194,7 +230,10 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
     ref.listen<List<DeliveryModel>>(deliveryProvider, (previous, next) {
       if (previous != null) {
         for (final nextDel in next) {
-          final prev = previous.firstWhere((d) => d.id == nextDel.id, orElse: () => nextDel);
+          final prev = previous.firstWhere(
+            (d) => d.id == nextDel.id,
+            orElse: () => nextDel,
+          );
           if (prev.status == DeliveryStatus.inTransit &&
               nextDel.status == DeliveryStatus.delivered) {
             context.go('/user/delivery/completed');
@@ -206,13 +245,16 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
     });
 
     final deliveries = ref.watch(deliveryProvider);
-    final active = (List<DeliveryModel>.from(deliveries)
-          ..sort((a, b) => b.createdAt.compareTo(a.createdAt)))
-        .where((d) =>
-            d.status == DeliveryStatus.inTransit ||
-            d.status == DeliveryStatus.pending ||
-            d.status == DeliveryStatus.assigning)
-        .toList();
+    final active =
+        (List<DeliveryModel>.from(deliveries)
+              ..sort((a, b) => b.createdAt.compareTo(a.createdAt)))
+            .where(
+              (d) =>
+                  d.status == DeliveryStatus.inTransit ||
+                  d.status == DeliveryStatus.pending ||
+                  d.status == DeliveryStatus.assigning,
+            )
+            .toList();
     final activeDelivery = active.isNotEmpty ? active.first : null;
 
     return Scaffold(
@@ -223,7 +265,9 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
         color: AppColors.accent,
         backgroundColor: AppColors.cardDark,
         onRefresh: () async {
-          await ref.read(deliveryProvider.notifier).loadDeliveriesFromSupabase();
+          await ref
+              .read(deliveryProvider.notifier)
+              .loadDeliveriesFromSupabase();
           await _loadCampusLocations();
           await _fetchActiveDeliveryRow();
         },
@@ -233,73 +277,90 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
               final size = Size(constraints.maxWidth, constraints.maxHeight);
 
               // ---- compute delivery state ----
-              Offset startOffset = Offset(0.50 * size.width, 0.50 * size.height);
-              Offset endOffset   = Offset(0.50 * size.width, 0.50 * size.height);
-              Offset droneOffset = Offset(0.50 * size.width, 0.43 * size.height);
+              Offset startOffset = Offset(
+                0.50 * size.width,
+                0.50 * size.height,
+              );
+              Offset endOffset = Offset(0.50 * size.width, 0.50 * size.height);
+              Offset droneOffset = Offset(
+                0.50 * size.width,
+                0.43 * size.height,
+              );
 
-              double progress       = 0.0;
-              int remainingSeconds  = 0;
-              bool showDrone        = false;
-              bool showActiveRoute  = false;
+              double progress = 0.0;
+              int remainingSeconds = 0;
+              bool showDrone = false;
+              bool showActiveRoute = false;
               bool showPlannedRoute = false;
-              String statusLabel    = 'No Deliveries in Progress';
-              String messageText    = 'Fleet is currently docked at UCLM Hub';
+              String statusLabel = 'No deliveries in progress.';
+              String messageText = 'No active deliveries in progress.';
 
               final row = _activeDeliveryRow;
-              final bool hasRoute = row != null &&
+              final bool hasRoute =
+                  row != null &&
                   row['pickup_location_id'] != null &&
                   row['dropoff_location_id'] != null;
 
               if (activeDelivery != null) {
                 switch (activeDelivery.status) {
                   case DeliveryStatus.pending:
-                    statusLabel     = 'Awaiting Admin Approval';
-                    messageText     = 'Your delivery request is waiting for admin approval.';
-                    progress        = 0.0;
+                    statusLabel = 'Awaiting Admin Approval';
+                    messageText =
+                        'Your delivery request is waiting for admin approval.';
+                    progress = 0.0;
                     showPlannedRoute = hasRoute;
-                    showDrone       = false;
+                    showDrone = false;
                     break;
 
                   case DeliveryStatus.assigning:
-                    statusLabel     = 'Assigning Drone';
-                    messageText     = 'Preparing drone for dispatch.';
-                    progress        = 0.0;
+                    statusLabel = 'Assigning Drone';
+                    messageText = 'Preparing drone for dispatch.';
+                    progress = 0.0;
                     showPlannedRoute = hasRoute;
-                    showDrone       = false;
+                    showDrone = false;
                     break;
 
                   case DeliveryStatus.inTransit:
                     showActiveRoute = hasRoute;
-                    showDrone       = hasRoute;
+                    showDrone = hasRoute;
                     final startedAt = activeDelivery.deliveryStartedAt;
                     if (startedAt != null) {
-                      final total   = activeDelivery.estimatedDeliverySeconds;
-                      final elapsed = DateTime.now().difference(startedAt).inSeconds;
-                      progress         = (elapsed / total).clamp(0.0, 1.0);
+                      final total = activeDelivery.estimatedDeliverySeconds;
+                      final elapsed = DateTime.now()
+                          .difference(startedAt)
+                          .inSeconds;
+                      progress = (elapsed / total).clamp(0.0, 1.0);
                       remainingSeconds = (total - elapsed).clamp(0, total);
                       if (remainingSeconds <= 0) {
-                        statusLabel  = 'Arrived at destination';
-                        messageText  = 'Your package has arrived.';
-                        progress     = 1.0;
+                        statusLabel = 'Arrived at destination';
+                        messageText = 'Your order has arrived! 🎉';
+                        progress = 1.0;
                       } else {
-                        final mm = (remainingSeconds ~/ 60).toString().padLeft(2, '0');
-                        final ss = (remainingSeconds % 60).toString().padLeft(2, '0');
+                        final mm = (remainingSeconds ~/ 60).toString().padLeft(
+                          2,
+                          '0',
+                        );
+                        final ss = (remainingSeconds % 60).toString().padLeft(
+                          2,
+                          '0',
+                        );
                         statusLabel = 'Arriving in $mm:$ss';
-                        messageText = 'Drone is on its way to your destination.';
+                        messageText =
+                            'Drone is on its way to your destination.';
                       }
                     } else {
                       statusLabel = 'Waiting for dispatch';
                       messageText = 'Awaiting dispatch signal.';
-                      showDrone   = false;
+                      showDrone = false;
                     }
                     break;
 
                   case DeliveryStatus.delivered:
-                    statusLabel     = 'Arrived at destination';
-                    messageText     = 'Your package has arrived.';
-                    progress        = 1.0;
+                    statusLabel = 'Arrived at destination';
+                    messageText = 'Your order has arrived! 🎉';
+                    progress = 1.0;
                     showActiveRoute = hasRoute;
-                    showDrone       = hasRoute;
+                    showDrone = hasRoute;
                     break;
 
                   case DeliveryStatus.cancelled:
@@ -309,14 +370,22 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
                 }
 
                 if (hasRoute) {
-                  final pickup  = _offsetForLocationId(row['pickup_location_id']?.toString(), size);
-                  final dropoff = _offsetForLocationId(row['dropoff_location_id']?.toString(), size);
+                  final pickup = _offsetForLocationId(
+                    row['pickup_location_id']?.toString(),
+                    size,
+                  );
+                  final dropoff = _offsetForLocationId(
+                    row['dropoff_location_id']?.toString(),
+                    size,
+                  );
                   if (pickup != null && dropoff != null) {
                     startOffset = pickup;
-                    endOffset   = dropoff;
+                    endOffset = dropoff;
                     droneOffset = Offset(
-                      startOffset.dx + (endOffset.dx - startOffset.dx) * progress,
-                      startOffset.dy + (endOffset.dy - startOffset.dy) * progress,
+                      startOffset.dx +
+                          (endOffset.dx - startOffset.dx) * progress,
+                      startOffset.dy +
+                          (endOffset.dy - startOffset.dy) * progress,
                     );
                   }
                 }
@@ -331,8 +400,8 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
               // ponytail: Position the panel exactly 16px above the bottom navigation bar.
               // MediaQuery.of(context).padding.bottom is set by the parent Scaffold to match the bottom nav height.
               final navOffset = MediaQuery.of(context).padding.bottom + 16.0;
-              final collapsedH  = 100.0;
-              final expandedH   = activeDelivery != null ? 360.0 : 120.0;
+              final collapsedH = 100.0;
+              final expandedH = activeDelivery != null ? 360.0 : 120.0;
               final panelHeight = _panelExpanded ? expandedH : collapsedH;
 
               return Stack(
@@ -360,7 +429,9 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
                           ),
 
                           // route line (drawn under markers)
-                          if (activeDelivery != null && hasRoute && (showActiveRoute || showPlannedRoute))
+                          if (activeDelivery != null &&
+                              hasRoute &&
+                              (showActiveRoute || showPlannedRoute))
                             Positioned.fill(
                               child: CustomPaint(
                                 painter: _RoutePainter(
@@ -375,15 +446,16 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
                             ),
 
                           // building markers
-                          for (final loc in _locations)
-                            _buildMarker(loc, size),
+                          for (final loc in _locations) _buildMarker(loc, size),
 
                           // drone icon (only when flying)
                           if (showDrone)
                             Positioned(
                               left: droneOffset.dx - 28,
-                              top:  droneOffset.dy - 28,
-                              child: _DroneWidget(radar: _radarController.value),
+                              top: droneOffset.dy - 28,
+                              child: _DroneWidget(
+                                radar: _radarController.value,
+                              ),
                             ),
                         ],
                       ),
@@ -392,27 +464,47 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
 
                   // ── TOP HUD (fixed) ────────────────────────────────────
                   Positioned(
-                    top: 0, left: 0, right: 0,
+                    top: 0,
+                    left: 0,
+                    right: 0,
                     child: SafeArea(
                       child: Padding(
                         padding: const EdgeInsets.all(16),
                         child: GlassCard(
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 14,
+                          ),
                           borderRadius: BorderRadius.circular(24),
                           borderGradient: const LinearGradient(
-                            colors: [AppColors.accent, AppColors.primary, Colors.transparent],
+                            colors: [
+                              AppColors.accent,
+                              AppColors.primary,
+                              Colors.transparent,
+                            ],
                             stops: [0.0, 0.5, 1.0],
                           ),
                           child: Row(
                             children: [
                               Container(
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(
-                                  color: AppColors.accent.withValues(alpha: 0.15),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(Icons.radar_rounded, color: AppColors.accent, size: 22),
-                              ).animate(onPlay: (c) => c.repeat()).shimmer(duration: 2000.ms, color: Colors.white24),
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.accent.withValues(
+                                        alpha: 0.15,
+                                      ),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.radar_rounded,
+                                      color: AppColors.accent,
+                                      size: 22,
+                                    ),
+                                  )
+                                  .animate(onPlay: (c) => c.repeat())
+                                  .shimmer(
+                                    duration: 2000.ms,
+                                    color: Colors.white24,
+                                  ),
                               const SizedBox(width: 14),
                               Expanded(
                                 child: Column(
@@ -421,23 +513,46 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
                                   children: [
                                     Text(
                                       'Telemetry Link Active',
-                                      style: AppTextStyles.title(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
+                                      style: AppTextStyles.title(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
                                     ),
                                     Text(
                                       'Prototype Telemetry Active',
-                                      style: AppTextStyles.body(fontSize: 11, color: AppColors.textSecondaryDark, height: 1.0),
+                                      style: AppTextStyles.body(
+                                        fontSize: 11,
+                                        color: AppColors.textSecondaryDark,
+                                        height: 1.0,
+                                      ),
                                     ),
                                   ],
                                 ),
                               ),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                decoration: BoxDecoration(
-                                  color: AppColors.success.withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
                                 ),
-                                child: Text('ONLINE', style: AppTextStyles.label(fontSize: 10, color: AppColors.success)),
+                                decoration: BoxDecoration(
+                                  color: AppColors.success.withValues(
+                                    alpha: 0.15,
+                                  ),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: AppColors.success.withValues(
+                                      alpha: 0.3,
+                                    ),
+                                  ),
+                                ),
+                                child: Text(
+                                  'ONLINE',
+                                  style: AppTextStyles.label(
+                                    fontSize: 10,
+                                    color: AppColors.success,
+                                  ),
+                                ),
                               ),
                             ],
                           ),
@@ -448,7 +563,9 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
 
                   // ── COLLAPSIBLE BOTTOM PANEL (fixed, always above bottom nav) ──
                   Positioned(
-                    bottom: navOffset, left: 0, right: 0,
+                    bottom: navOffset,
+                    left: 0,
+                    right: 0,
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -473,7 +590,9 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
                           height: panelHeight,
                           decoration: BoxDecoration(
                             color: AppColors.cardDark,
-                            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                            borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(24),
+                            ),
                             border: Border.all(
                               color: AppColors.accent.withValues(alpha: 0.25),
                               width: 1,
@@ -491,7 +610,9 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
                             children: [
                               // drag handle / toggle button
                               GestureDetector(
-                                onTap: () => setState(() => _panelExpanded = !_panelExpanded),
+                                onTap: () => setState(
+                                  () => _panelExpanded = !_panelExpanded,
+                                ),
                                 behavior: HitTestBehavior.opaque,
                                 child: SizedBox(
                                   width: double.infinity,
@@ -503,8 +624,12 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
                                         width: 36,
                                         height: 4,
                                         decoration: BoxDecoration(
-                                          color: AppColors.accent.withValues(alpha: 0.5),
-                                          borderRadius: BorderRadius.circular(2),
+                                          color: AppColors.accent.withValues(
+                                            alpha: 0.5,
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            2,
+                                          ),
                                         ),
                                       ),
                                       const SizedBox(height: 4),
@@ -527,26 +652,38 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
                                       ? const ClampingScrollPhysics()
                                       : const NeverScrollableScrollPhysics(),
                                   child: Padding(
-                                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                                    padding: const EdgeInsets.fromLTRB(
+                                      20,
+                                      0,
+                                      20,
+                                      24,
+                                    ),
                                     child: _panelExpanded
                                         ? activeDelivery == null
-                                            ? _DockedCard(
-                                                statusLabel: statusLabel,
-                                                messageText: messageText,
-                                              )
-                                            : _ActiveCard(
-                                                delivery: activeDelivery,
-                                                progress: progress,
-                                                statusLabel: statusLabel,
-                                                droneBatteryText: _droneBatteryText,
-                                                flightSpeed: _flightSpeed,
-                                                flightAltitude: _flightAltitude,
-                                                hasDrone: showDrone,
-                                              )
+                                              ? _DockedCard(
+                                                  statusLabel: statusLabel,
+                                                  messageText: messageText,
+                                                )
+                                              : _ActiveCard(
+                                                  delivery: activeDelivery,
+                                                  progress: progress,
+                                                  statusLabel: statusLabel,
+                                                  droneBatteryText:
+                                                      _droneBatteryText,
+                                                  flightSpeed: _flightSpeed,
+                                                  flightAltitude:
+                                                      _flightAltitude,
+                                                  hasDrone: showDrone,
+                                                )
                                         : _CollapsedSummary(
                                             statusLabel: statusLabel,
-                                            packageName: activeDelivery?.packageName ?? '',
-                                            route: activeDelivery?.deliveryAddress ?? '',
+                                            packageName:
+                                                activeDelivery?.packageName ??
+                                                '',
+                                            route:
+                                                activeDelivery
+                                                    ?.deliveryAddress ??
+                                                '',
                                           ),
                                   ),
                                 ),
@@ -567,16 +704,17 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
   }
 
   Widget _buildMarker(Map<String, dynamic> loc, Size size) {
-    final name    = loc['name']?.toString() ?? '';
-    final offset  = _displayOffset(name, size);
+    final name = loc['name']?.toString() ?? '';
+    final offset = _displayOffset(name, size);
     final isTapped = _tappedBuildingName == name;
 
     return Positioned(
       left: offset.dx - 18,
-      top:  offset.dy - 32,
+      top: offset.dy - 32,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: () => setState(() => _tappedBuildingName = isTapped ? null : name),
+        onTap: () =>
+            setState(() => _tappedBuildingName = isTapped ? null : name),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -591,7 +729,11 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
                 ),
                 child: Text(
                   _shortLabel(name),
-                  style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             Container(
@@ -601,10 +743,18 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
                 shape: BoxShape.circle,
                 border: Border.all(color: AppColors.accent, width: 2),
                 boxShadow: [
-                  BoxShadow(color: AppColors.accent.withValues(alpha: 0.3), blurRadius: 8, spreadRadius: 1),
+                  BoxShadow(
+                    color: AppColors.accent.withValues(alpha: 0.3),
+                    blurRadius: 8,
+                    spreadRadius: 1,
+                  ),
                 ],
               ),
-              child: const Icon(Icons.business_rounded, color: AppColors.accent, size: 15),
+              child: const Icon(
+                Icons.business_rounded,
+                color: AppColors.accent,
+                size: 15,
+              ),
             ),
           ],
         ),
@@ -645,10 +795,18 @@ class _DroneWidget extends StatelessWidget {
               shape: BoxShape.circle,
               gradient: AppColors.accentGradient,
               boxShadow: [
-                BoxShadow(color: AppColors.accent.withValues(alpha: 0.4), blurRadius: 16, spreadRadius: 2),
+                BoxShadow(
+                  color: AppColors.accent.withValues(alpha: 0.4),
+                  blurRadius: 16,
+                  spreadRadius: 2,
+                ),
               ],
             ),
-            child: const Icon(Icons.navigation_rounded, color: AppColors.bgDark, size: 16),
+            child: const Icon(
+              Icons.navigation_rounded,
+              color: AppColors.bgDark,
+              size: 16,
+            ),
           ),
         ],
       ),
@@ -673,7 +831,11 @@ class _DockedCard extends StatelessWidget {
             color: Colors.white.withValues(alpha: 0.05),
             shape: BoxShape.circle,
           ),
-          child: const Icon(Icons.flight_land_rounded, color: AppColors.textSecondaryDark, size: 24),
+          child: const Icon(
+            Icons.flight_land_rounded,
+            color: AppColors.textSecondaryDark,
+            size: 24,
+          ),
         ),
         const SizedBox(width: 16),
         Expanded(
@@ -681,9 +843,22 @@ class _DockedCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(statusLabel, style: AppTextStyles.title(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white)),
+              Text(
+                statusLabel,
+                style: AppTextStyles.title(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
               const SizedBox(height: 2),
-              Text(messageText, style: AppTextStyles.body(fontSize: 12, color: AppColors.textSecondaryDark)),
+              Text(
+                messageText,
+                style: AppTextStyles.body(
+                  fontSize: 12,
+                  color: AppColors.textSecondaryDark,
+                ),
+              ),
             ],
           ),
         ),
@@ -696,7 +871,11 @@ class _CollapsedSummary extends StatelessWidget {
   final String statusLabel;
   final String packageName;
   final String route;
-  const _CollapsedSummary({required this.statusLabel, required this.packageName, required this.route});
+  const _CollapsedSummary({
+    required this.statusLabel,
+    required this.packageName,
+    required this.route,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -710,19 +889,29 @@ class _CollapsedSummary extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                packageName.isNotEmpty ? packageName : 'No active delivery',
-                style: AppTextStyles.title(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+                packageName.isNotEmpty ? packageName : 'No active order',
+                style: AppTextStyles.title(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
                 overflow: TextOverflow.ellipsis,
               ),
               Text(
                 statusLabel,
-                style: AppTextStyles.body(fontSize: 11, color: AppColors.accent),
+                style: AppTextStyles.body(
+                  fontSize: 11,
+                  color: AppColors.accent,
+                ),
                 overflow: TextOverflow.ellipsis,
               ),
               if (route.isNotEmpty)
                 Text(
                   route,
-                  style: AppTextStyles.body(fontSize: 11, color: AppColors.textSecondaryDark),
+                  style: AppTextStyles.body(
+                    fontSize: 11,
+                    color: AppColors.textSecondaryDark,
+                  ),
                   overflow: TextOverflow.ellipsis,
                 ),
             ],
@@ -756,15 +945,27 @@ class _ActiveCard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(children: [
-          Icon(icon, size: 11, color: AppColors.textSecondaryDark),
-          const SizedBox(width: 4),
-          Text(label, style: const TextStyle(fontSize: 10, color: AppColors.textSecondaryDark)),
-        ]),
+        Row(
+          children: [
+            Icon(icon, size: 11, color: AppColors.textSecondaryDark),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 10,
+                color: AppColors.textSecondaryDark,
+              ),
+            ),
+          ],
+        ),
         const SizedBox(height: 2),
         Text(
           value.replaceFirst('Drone Battery: ', ''),
-          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
         ),
       ],
     );
@@ -787,14 +988,21 @@ class _ActiveCard extends StatelessWidget {
               ),
               child: Text(
                 'FLIGHT # ${delivery.id.substring(0, 5).toUpperCase()}',
-                style: AppTextStyles.label(fontSize: 10, color: AppColors.bgDark),
+                style: AppTextStyles.label(
+                  fontSize: 10,
+                  color: AppColors.bgDark,
+                ),
               ),
             ),
             const Spacer(),
             Flexible(
               child: Text(
                 statusLabel,
-                style: AppTextStyles.title(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.accent),
+                style: AppTextStyles.title(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.accent,
+                ),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
@@ -803,13 +1011,20 @@ class _ActiveCard extends StatelessWidget {
         const SizedBox(height: 12),
         Text(
           delivery.packageName,
-          style: AppTextStyles.title(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+          style: AppTextStyles.title(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
           overflow: TextOverflow.ellipsis,
         ),
         const SizedBox(height: 2),
         Text(
           'Route: ${delivery.deliveryAddress}',
-          style: AppTextStyles.body(fontSize: 12, color: AppColors.textSecondaryDark),
+          style: AppTextStyles.body(
+            fontSize: 12,
+            color: AppColors.textSecondaryDark,
+          ),
           overflow: TextOverflow.ellipsis,
         ),
         if (hasDrone) ...[
@@ -817,7 +1032,11 @@ class _ActiveCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _metric(Icons.battery_charging_full_rounded, 'Battery', droneBatteryText),
+              _metric(
+                Icons.battery_charging_full_rounded,
+                'Battery',
+                droneBatteryText,
+              ),
               _metric(Icons.speed_rounded, 'Speed', flightSpeed),
               _metric(Icons.height_rounded, 'Altitude', flightAltitude),
             ],
@@ -826,15 +1045,32 @@ class _ActiveCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             droneBatteryText,
-            style: AppTextStyles.body(fontSize: 12, color: AppColors.textSecondaryDark),
+            style: AppTextStyles.body(
+              fontSize: 12,
+              color: AppColors.textSecondaryDark,
+            ),
           ),
         ],
         const SizedBox(height: 16),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('Transit Progress', style: AppTextStyles.body(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white70)),
-            Text('$pct%', style: AppTextStyles.title(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.accent)),
+            Text(
+              'Transit Progress',
+              style: AppTextStyles.body(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Colors.white70,
+              ),
+            ),
+            Text(
+              '$pct%',
+              style: AppTextStyles.title(
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                color: AppColors.accent,
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 6),
@@ -851,7 +1087,8 @@ class _ActiveCard extends StatelessWidget {
         GradientButton(
           text: 'View Telemetry Logs',
           height: 42,
-          onPressed: () => context.push('/user/track/details?id=${delivery.id}'),
+          onPressed: () =>
+              context.push('/user/track/details?id=${delivery.id}'),
           icon: Icons.analytics_outlined,
         ),
       ],
@@ -882,7 +1119,8 @@ class _RoutePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     if (isPlanned) {
       canvas.drawLine(
-        start, end,
+        start,
+        end,
         Paint()
           ..color = AppColors.primary.withValues(alpha: 0.30)
           ..strokeWidth = 3.0
@@ -893,25 +1131,33 @@ class _RoutePainter extends CustomPainter {
     }
 
     // Blue glow underlay
-    canvas.drawLine(start, end, Paint()
-      ..color = AppColors.primary.withValues(alpha: 0.35)
-      ..strokeWidth = 8.0
-      ..strokeCap = StrokeCap.round
-      ..style = PaintingStyle.stroke);
+    canvas.drawLine(
+      start,
+      end,
+      Paint()
+        ..color = AppColors.primary.withValues(alpha: 0.35)
+        ..strokeWidth = 8.0
+        ..strokeCap = StrokeCap.round
+        ..style = PaintingStyle.stroke,
+    );
 
     // Blue inner line
-    canvas.drawLine(start, end, Paint()
-      ..color = AppColors.primary.withValues(alpha: 0.60)
-      ..strokeWidth = 3.0
-      ..strokeCap = StrokeCap.round
-      ..style = PaintingStyle.stroke);
+    canvas.drawLine(
+      start,
+      end,
+      Paint()
+        ..color = AppColors.primary.withValues(alpha: 0.60)
+        ..strokeWidth = 3.0
+        ..strokeCap = StrokeCap.round
+        ..style = PaintingStyle.stroke,
+    );
 
-    final totalDist  = (end - start).distance;
+    final totalDist = (end - start).distance;
     final activeDist = totalDist * progress;
 
     if (totalDist > 0) {
-      final vec       = (end - start) / totalDist;
-      const dashW     = 6.0;
+      final vec = (end - start) / totalDist;
+      const dashW = 6.0;
       const dashSpace = 6.0;
 
       void drawDashes(Paint paint) {
@@ -925,17 +1171,21 @@ class _RoutePainter extends CustomPainter {
         }
       }
 
-      drawDashes(Paint()
-        ..color = AppColors.accent.withValues(alpha: 0.40)
-        ..strokeWidth = 8.0
-        ..strokeCap = StrokeCap.round
-        ..style = PaintingStyle.stroke);
+      drawDashes(
+        Paint()
+          ..color = AppColors.accent.withValues(alpha: 0.40)
+          ..strokeWidth = 8.0
+          ..strokeCap = StrokeCap.round
+          ..style = PaintingStyle.stroke,
+      );
 
-      drawDashes(Paint()
-        ..color = AppColors.accent
-        ..strokeWidth = 3.0
-        ..strokeCap = StrokeCap.round
-        ..style = PaintingStyle.stroke);
+      drawDashes(
+        Paint()
+          ..color = AppColors.accent
+          ..strokeWidth = 3.0
+          ..strokeCap = StrokeCap.round
+          ..style = PaintingStyle.stroke,
+      );
     }
 
     // Radar sweep around drone
@@ -945,7 +1195,11 @@ class _RoutePainter extends CustomPainter {
       Paint()
         ..shader = SweepGradient(
           center: Alignment.center,
-          colors: [Colors.transparent, AppColors.accent.withValues(alpha: 0.15), Colors.transparent],
+          colors: [
+            Colors.transparent,
+            AppColors.accent.withValues(alpha: 0.15),
+            Colors.transparent,
+          ],
           stops: const [0.0, 0.5, 1.0],
           transform: GradientRotation(radar),
         ).createShader(Rect.fromCircle(center: drone, radius: 140)),
@@ -954,5 +1208,8 @@ class _RoutePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _RoutePainter old) =>
-      old.progress != progress || old.radar != radar || old.drone != drone || old.isPlanned != isPlanned;
+      old.progress != progress ||
+      old.radar != radar ||
+      old.drone != drone ||
+      old.isPlanned != isPlanned;
 }

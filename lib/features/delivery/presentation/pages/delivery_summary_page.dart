@@ -32,13 +32,21 @@ class DeliverySummaryPage extends StatelessWidget {
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(color: AppColors.borderDark),
                         ),
-                        child: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 20),
+                        child: const Icon(
+                          Icons.arrow_back_rounded,
+                          color: Colors.white,
+                          size: 20,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 16),
                     Text(
                       'Delivery Summary',
-                      style: AppTextStyles.title(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+                      style: AppTextStyles.title(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
                     ),
                   ],
                 ).animate().fadeIn().slideX(begin: -0.1),
@@ -52,7 +60,14 @@ class DeliverySummaryPage extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('Sender Details', style: AppTextStyles.body(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.primary)),
+                              Text(
+                                'Sender Details',
+                                style: AppTextStyles.body(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.primary,
+                                ),
+                              ),
                               const SizedBox(height: 12),
                               _rowItem('Sender Name', 'John Doe'),
                               _rowItem('Contact Number', '+63 900 000 0000'),
@@ -66,11 +81,21 @@ class DeliverySummaryPage extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('Recipient Details', style: AppTextStyles.body(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.secondary)),
+                              Text(
+                                'Recipient Details',
+                                style: AppTextStyles.body(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.secondary,
+                                ),
+                              ),
                               const SizedBox(height: 12),
                               _rowItem('Recipient Name', 'Jane Smith'),
                               _rowItem('Contact Number', '+63 901 111 2222'),
-                              _rowItem('Drop-off Location', 'Main Library Lobby'),
+                              _rowItem(
+                                'Drop-off Location',
+                                'Main Library Lobby',
+                              ),
                             ],
                           ),
                         ).animate().fadeIn(delay: 200.ms),
@@ -80,7 +105,14 @@ class DeliverySummaryPage extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('Package Information', style: AppTextStyles.body(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.success)),
+                              Text(
+                                'Package Information',
+                                style: AppTextStyles.body(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.success,
+                                ),
+                              ),
                               const SizedBox(height: 12),
                               _rowItem('Category', 'Documents'),
                               _rowItem('Weight', '0.8 kg'),
@@ -94,16 +126,41 @@ class DeliverySummaryPage extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('Cost Analysis', style: AppTextStyles.body(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.warning)),
+                              Text(
+                                'Cost Analysis',
+                                style: AppTextStyles.body(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.warning,
+                                ),
+                              ),
                               const SizedBox(height: 12),
                               _rowItem('Base Delivery Fee', '₱45.00'),
                               _rowItem('Priority Dispatch', '₱15.00'),
-                              const Divider(color: AppColors.borderDark, height: 24),
+                              const Divider(
+                                color: AppColors.borderDark,
+                                height: 24,
+                              ),
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Text('Total Fee', style: AppTextStyles.title(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
-                                  Text('₱60.00', style: AppTextStyles.title(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.warning)),
+                                  Text(
+                                    'Total Fee',
+                                    style: AppTextStyles.title(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  Text(
+                                    '₱60.00',
+                                    style: AppTextStyles.title(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.warning,
+                                    ),
+                                  ),
                                 ],
                               ),
                             ],
@@ -135,8 +192,21 @@ class DeliverySummaryPage extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: AppTextStyles.body(fontSize: 13, color: AppColors.textSecondaryDark)),
-          Text(value, style: AppTextStyles.title(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
+          Text(
+            label,
+            style: AppTextStyles.body(
+              fontSize: 13,
+              color: AppColors.textSecondaryDark,
+            ),
+          ),
+          Text(
+            value,
+            style: AppTextStyles.title(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
         ],
       ),
     );

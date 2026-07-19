@@ -32,7 +32,8 @@ class AnalyticsState {
     return AnalyticsState(
       successRate: successRate ?? this.successRate,
       totalDeliveries: totalDeliveries ?? this.totalDeliveries,
-      activeDroneUtilization: activeDroneUtilization ?? this.activeDroneUtilization,
+      activeDroneUtilization:
+          activeDroneUtilization ?? this.activeDroneUtilization,
       dailyDeliveries: dailyDeliveries ?? this.dailyDeliveries,
       weeklyDeliveries: weeklyDeliveries ?? this.weeklyDeliveries,
       monthlyDeliveries: monthlyDeliveries ?? this.monthlyDeliveries,
@@ -43,7 +44,8 @@ class AnalyticsState {
 
 class AnalyticsMockNotifier extends StateNotifier<AnalyticsState> {
   AnalyticsMockNotifier()
-      : super(AnalyticsState(
+    : super(
+        AnalyticsState(
           successRate: AnalyticsMockData.successRate,
           totalDeliveries: AnalyticsMockData.totalDeliveries,
           activeDroneUtilization: AnalyticsMockData.activeDroneUtilization,
@@ -51,12 +53,11 @@ class AnalyticsMockNotifier extends StateNotifier<AnalyticsState> {
           weeklyDeliveries: AnalyticsMockData.weeklyDeliveries,
           monthlyDeliveries: AnalyticsMockData.monthlyDeliveries,
           droneUtilization: AnalyticsMockData.droneUtilization,
-        ));
+        ),
+      );
 
   void incrementDeliveries() {
-    state = state.copyWith(
-      totalDeliveries: state.totalDeliveries + 1,
-    );
+    state = state.copyWith(totalDeliveries: state.totalDeliveries + 1);
   }
 
   void reset() {
@@ -72,6 +73,7 @@ class AnalyticsMockNotifier extends StateNotifier<AnalyticsState> {
   }
 }
 
-final analyticsMockProvider = StateNotifierProvider<AnalyticsMockNotifier, AnalyticsState>((ref) {
-  return AnalyticsMockNotifier();
-});
+final analyticsMockProvider =
+    StateNotifierProvider<AnalyticsMockNotifier, AnalyticsState>((ref) {
+      return AnalyticsMockNotifier();
+    });

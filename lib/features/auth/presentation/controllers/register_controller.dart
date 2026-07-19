@@ -12,16 +12,17 @@ class RegisterController {
   }
 
   static String? validateEmail(String? value, UserRole role) {
-    if (value == null || value.isEmpty) {
+    if (value == null || value.trim().isEmpty) {
       return 'Email is required';
     }
+    final trimmed = value.trim();
+    if (trimmed.contains(' ')) {
+      return 'Email must not contain spaces';
+    }
     final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[a-zA-Z]{2,4}$');
-    if (!emailRegex.hasMatch(value)) {
+    if (!emailRegex.hasMatch(trimmed)) {
       return 'Enter a valid email address';
     }
-  if (role == UserRole.facultyStaff && !value.toLowerCase().endsWith('@uclm.edu')) {
-  return 'Faculty/Staff must use a @uclm.edu address';
-}
     return null;
   }
 

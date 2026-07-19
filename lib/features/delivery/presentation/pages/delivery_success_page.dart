@@ -34,24 +34,47 @@ class DeliverySuccessPage extends StatelessWidget {
                 const SizedBox(height: 32),
                 Text(
                   'Order Placed Successfully!',
-                  style: AppTextStyles.title(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
+                  style: AppTextStyles.title(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
                   textAlign: TextAlign.center,
                 ).animate().fadeIn(delay: 100.ms),
                 const SizedBox(height: 12),
                 Text(
                   'Your drone request has been received and scheduled for immediate dispatch.',
-                  style: AppTextStyles.body(fontSize: 14, color: AppColors.textSecondaryDark),
+                  style: AppTextStyles.body(
+                    fontSize: 14,
+                    color: AppColors.textSecondaryDark,
+                  ),
                   textAlign: TextAlign.center,
                 ).animate().fadeIn(delay: 200.ms),
                 const SizedBox(height: 32),
                 GlassCard(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 20,
+                  ),
                   borderRadius: BorderRadius.circular(20),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('Tracking ID', style: AppTextStyles.body(fontSize: 14, color: AppColors.textSecondaryDark)),
-                      Text('DEL-948', style: AppTextStyles.title(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.secondary)),
+                      Text(
+                        'Tracking ID',
+                        style: AppTextStyles.body(
+                          fontSize: 14,
+                          color: AppColors.textSecondaryDark,
+                        ),
+                      ),
+                      Text(
+                        'DEL-948',
+                        style: AppTextStyles.title(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.secondary,
+                        ),
+                      ),
                     ],
                   ),
                 ).animate().fadeIn(delay: 300.ms).slideY(begin: 0.08),
@@ -64,7 +87,9 @@ class DeliverySuccessPage extends StatelessWidget {
                 const SizedBox(height: 16),
                 CustomButton(
                   text: 'Return Home Deck',
-                  gradient: const LinearGradient(colors: [Color(0xFF333333), Color(0xFF222222)]),
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF333333), Color(0xFF222222)],
+                  ),
                   onPressed: () => context.go('/user'),
                   icon: Icons.home_rounded,
                 ).animate().fadeIn(delay: 500.ms),

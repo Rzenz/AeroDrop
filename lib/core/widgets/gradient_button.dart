@@ -94,7 +94,9 @@ class _GradientButtonState extends State<GradientButton>
                 // to prevent Tween from interpolating with infinity and producing NaN.
                 width: widget.isLoading
                     ? widget.height
-                    : (maxWidth.isFinite ? maxWidth : MediaQuery.sizeOf(context).width - 48.0),
+                    : (maxWidth.isFinite
+                          ? maxWidth
+                          : MediaQuery.sizeOf(context).width - 48.0),
                 decoration: BoxDecoration(
                   gradient: isDisabled
                       ? const LinearGradient(
@@ -125,7 +127,9 @@ class _GradientButtonState extends State<GradientButton>
                         height: 24,
                         child: CircularProgressIndicator(
                           strokeWidth: 2.5,
-                          valueColor: AlwaysStoppedAnimation<Color>(AppColors.bgDark),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            AppColors.bgDark,
+                          ),
                         ),
                       )
                     : Row(
@@ -133,7 +137,11 @@ class _GradientButtonState extends State<GradientButton>
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           if (widget.icon != null) ...[
-                            Icon(widget.icon, color: AppColors.bgDark, size: 20),
+                            Icon(
+                              widget.icon,
+                              color: AppColors.bgDark,
+                              size: 20,
+                            ),
                             const SizedBox(width: 8),
                           ],
                           Flexible(

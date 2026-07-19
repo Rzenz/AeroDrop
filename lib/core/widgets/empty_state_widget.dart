@@ -33,22 +33,23 @@ class EmptyStateWidget extends StatelessWidget {
               SizedBox(
                 width: 180,
                 height: 180,
-                child: Lottie.asset(
-                  lottiePath!,
-                  repeat: true,
-                ),
+                child: Lottie.asset(lottiePath!, repeat: true),
               )
             else
               Container(
                 width: 96,
                 height: 96,
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(colors: [
-                    AppColors.primary.withValues(alpha: 0.12),
-                    AppColors.accent.withValues(alpha: 0.06),
-                  ]),
+                  gradient: LinearGradient(
+                    colors: [
+                      AppColors.primary.withValues(alpha: 0.12),
+                      AppColors.accent.withValues(alpha: 0.06),
+                    ],
+                  ),
                   shape: BoxShape.circle,
-                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+                  border: Border.all(
+                    color: AppColors.primary.withValues(alpha: 0.2),
+                  ),
                 ),
                 child: const Icon(
                   Icons.inbox_rounded,
@@ -77,7 +78,10 @@ class EmptyStateWidget extends StatelessWidget {
               GestureDetector(
                 onTap: onAction,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 28,
+                    vertical: 14,
+                  ),
                   decoration: BoxDecoration(
                     gradient: AppColors.accentGradient,
                     borderRadius: BorderRadius.circular(32),

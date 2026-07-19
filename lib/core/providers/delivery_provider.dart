@@ -13,16 +13,13 @@ import 'notification_provider.dart';
 class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
   final Ref ref;
   Timer? _simulationTimer;
+  final Map<String, double> _deliveryStartBatteries = {};
 
   DeliveryNotifier(this.ref) : super([]) {
     if (kSimulationMode) {
-      ref.listen<List<DeliveryModel>>(
-        deliveryMockProvider,
-        (previous, next) {
-          state = next;
-        },
-        fireImmediately: true,
-      );
+      ref.listen<List<DeliveryModel>>(deliveryMockProvider, (previous, next) {
+        state = next;
+      }, fireImmediately: true);
     } else {
       Future.microtask(loadDeliveriesFromSupabase);
       Future.microtask(refreshPendingDeliveriesCount);
@@ -80,7 +77,8 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
         : null;
     if (startedAt == null) return 0.0;
 
-    final totalSecs = (data['estimated_delivery_seconds'] as num?)?.toInt() ?? 60;
+    final totalSecs =
+        (data['estimated_delivery_seconds'] as num?)?.toInt() ?? 60;
     final elapsed = DateTime.now().difference(startedAt).inSeconds;
     return (elapsed / totalSecs).clamp(0.0, 1.0);
   }
@@ -97,7 +95,8 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
         : null;
     if (startedAt == null) return data['eta']?.toString() ?? 'TBD';
 
-    final totalSecs = (data['estimated_delivery_seconds'] as num?)?.toInt() ?? 60;
+    final totalSecs =
+        (data['estimated_delivery_seconds'] as num?)?.toInt() ?? 60;
     final elapsed = DateTime.now().difference(startedAt).inSeconds;
     final remaining = (totalSecs - elapsed).clamp(0, totalSecs);
     if (remaining <= 0) return '0 mins';
@@ -115,23 +114,32 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
         : null;
     if (startedAt == null) return false;
 
-    final totalSecs = (data['estimated_delivery_seconds'] as num?)?.toInt() ?? 60;
+    final totalSecs =
+        (data['estimated_delivery_seconds'] as num?)?.toInt() ?? 60;
     return DateTime.now().difference(startedAt).inSeconds >= totalSecs;
   }
 
   /// Marks a delivery as delivered in Supabase and local state if elapsed time
   /// has reached estimatedDeliverySeconds. Idempotent — checks status first.
-  Future<void> _completeDeliveryIfNeeded(String deliveryId, String? droneId) async {
+  Future<void> _completeDeliveryIfNeeded(
+    String deliveryId,
+    String? droneId,
+  ) async {
     if (!SupabaseService.isConfigured) return;
     try {
       final nowStr = DateTime.now().toUtc().toIso8601String();
 
-      await SupabaseService.client.from('deliveries').update({
-        'status': 'delivered',
-        'eta': '0 mins',
-        'delivery_progress': 1.0,
-        'delivered_at': nowStr,
-      }).eq('id', deliveryId).eq('status', 'inTransit'); // only if still inTransit
+      // Use plain text status — no UUID lookup needed.
+      await SupabaseService.client
+          .from('deliveries')
+          .update({
+            'status': 'delivered',
+            'eta': '0 mins',
+            'delivery_progress': 1.0,
+            'delivered_at': nowStr,
+          })
+          .eq('id', deliveryId)
+          .eq('status', 'in_transit'); // only if still in_transit
 
       await _insertStatusLog(
         deliveryId: deliveryId,
@@ -143,22 +151,27 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
         final drones = ref.read(droneProvider);
         final idx = drones.indexWhere((d) => d.id == droneId);
         final battery = idx != -1 ? drones[idx].batteryLevel : 0.0;
-        ref.read(droneProvider.notifier).updateStatus(droneId, DroneStatus.available);
-        await SupabaseService.client.from('drones').update({
-          'status': 'available',
-          'battery_level': battery,
-        }).eq('id', droneId);
+        ref
+            .read(droneProvider.notifier)
+            .updateStatus(droneId, DroneStatus.available);
+
+        final droneLookup = await SupabaseService.client
+            .from('drones')
+            .select('id')
+            .eq('drone_code', 'DRN-001')
+            .maybeSingle();
+        final droneUuid = droneLookup != null
+            ? droneLookup['id'].toString()
+            : '80000000-0000-0000-0000-000000000001';
+
+        await SupabaseService.client
+            .from('drones')
+            .update({'status': 'available', 'battery_level': battery})
+            .eq('id', droneUuid);
       }
     } catch (e) {
       debugPrint('Auto-complete delivery error: $e');
     }
-  }
-
-  // ── Legacy fallback (used only when no timestamps available) ────────────
-  double _progressFromStatus(dynamic value) {
-    final status = value?.toString() ?? '';
-    if (status == 'delivered') return 1.0;
-    return 0.0;
   }
 
   double _calculatePaymentAmount({
@@ -207,6 +220,98 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
     return 'PAY-$timestamp';
   }
 
+  DeliveryModel _mapToDeliveryModel(Map<String, dynamic> data) {
+    final order = data['orders'] != null
+        ? Map<String, dynamic>.from(data['orders'])
+        : {};
+
+    // Customer/Recipient
+    final customer = order['customer'] != null
+        ? Map<String, dynamic>.from(order['customer'])
+        : {};
+    final recipientName =
+        customer['full_name']?.toString() ?? 'Unknown Recipient';
+    final recipientPhone = customer['phone_number']?.toString() ?? '';
+
+    // Vendor/Sender
+    final vendor = order['vendor'] != null
+        ? Map<String, dynamic>.from(order['vendor'])
+        : {};
+    final senderName =
+        vendor['business_name']?.toString() ??
+        vendor['full_name']?.toString() ??
+        'Unknown Vendor';
+
+    // Dropoff location/Address
+    final location = order['campus_locations'] != null
+        ? Map<String, dynamic>.from(order['campus_locations'])
+        : {};
+    final deliveryAddress =
+        location['name']?.toString() ??
+        data['delivery_address']?.toString() ??
+        'UCLM Campus';
+
+    // Items / Package Details
+    final items = order['order_items'] as List? ?? [];
+    String packageName = 'AeroDrop Package';
+    double packageWeight = 0.0;
+
+    if (items.isNotEmpty) {
+      final names = items
+          .map(
+            (i) =>
+                '${i['product_name']?.toString() ?? ''} (x${i['quantity'] ?? 1})',
+          )
+          .where((n) => n.isNotEmpty)
+          .toList();
+      packageName = names.join(', ');
+      if (packageName.isEmpty) packageName = 'AeroDrop Package';
+
+      int totalWeightGrams = 0;
+      for (final i in items) {
+        final w = (i['weight_grams'] as num?)?.toInt() ?? 0;
+        final q = (i['quantity'] as num?)?.toInt() ?? 1;
+        totalWeightGrams += w * q;
+      }
+      packageWeight = totalWeightGrams / 1000.0;
+    } else {
+      packageName = 'No package items available.';
+    }
+
+    final isComplete = _isDeliveryCompleteFromTimestamps(data);
+    final status = isComplete
+        ? DeliveryStatus.delivered
+        : _parseDeliveryStatus(data['status']);
+
+    return DeliveryModel(
+      id: data['id'].toString(),
+      senderName: senderName,
+      recipientName: recipientName,
+      recipientPhone: recipientPhone,
+      deliveryAddress: deliveryAddress,
+      packageName: packageName,
+      packageWeight: packageWeight,
+      packageType: 'Food', // visual label
+      status: status,
+      droneId: data['drone_id'] != null ? 'DRN-001' : null,
+      eta: _calculateEtaFromTimestamps(data),
+      createdAt: _toDateTime(data['created_at']),
+      progress: _calculateProgressFromTimestamps(data),
+      estimatedDistanceKm: data.containsKey('estimated_distance_km')
+          ? _toDoubleOrNull(data['estimated_distance_km'])
+          : null,
+      paymentAmount: _toDoubleOrNull(order['total_amount']),
+      deliveryStartedAt: data['delivery_started_at'] != null
+          ? DateTime.tryParse(data['delivery_started_at'].toString())
+          : null,
+      estimatedDeliverySeconds:
+          (data['estimated_delivery_seconds'] as num?)?.toInt() ?? 60,
+      deliveredAt: data['delivered_at'] != null
+          ? DateTime.tryParse(data['delivered_at'].toString())
+          : null,
+    );
+  }
+
   Future<void> loadDeliveriesFromSupabase() async {
     if (kSimulationMode) return;
     if (!SupabaseService.isConfigured) return;
@@ -215,40 +320,37 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
 
     if (currentUser == null) {
       debugPrint('Load deliveries skipped: no logged in user.');
+      state = [];
       return;
     }
 
     try {
       final response = await SupabaseService.client
           .from('deliveries')
-          .select()
-          .eq('user_id', currentUser.id)
+          .select('''
+            *,
+            orders!order_id(
+              *,
+              vendor:users!vendor_id(full_name, business_name),
+              customer:users!user_id(full_name, phone_number),
+              campus_locations!delivery_location_id(name),
+              order_items(product_name, quantity, weight_grams)
+            )
+          ''')
           .order('created_at', ascending: false);
 
-      final deliveries = (response as List).map((item) {
-        final data = Map<String, dynamic>.from(item);
-        final isComplete = _isDeliveryCompleteFromTimestamps(data);
-        return DeliveryModel(
-          id: data['id'].toString(),
-          senderName: data['sender_name']?.toString() ?? 'Unknown Sender',
-          recipientName: data['recipient_name']?.toString() ?? 'Unknown Recipient',
-          recipientPhone: data['recipient_phone']?.toString() ?? '',
-          deliveryAddress: data['delivery_address']?.toString() ?? '',
-          packageName: data['package_name']?.toString() ?? 'AeroDrop Package',
-          packageWeight: _toDouble(data['package_weight'], 0.0),
-          packageType: data['package_type']?.toString() ?? 'Other',
-          status: isComplete ? DeliveryStatus.delivered : _parseDeliveryStatus(data['status']),
-          droneId: data['drone_id']?.toString(),
-          eta: _calculateEtaFromTimestamps(data),
-          createdAt: _toDateTime(data['created_at']),
-          progress: _calculateProgressFromTimestamps(data),
-          estimatedDistanceKm: data.containsKey('estimated_distance_km') ? _toDoubleOrNull(data['estimated_distance_km']) : null,
-          paymentAmount: data.containsKey('payment_amount') ? _toDoubleOrNull(data['payment_amount']) : null,
-          deliveryStartedAt: data['delivery_started_at'] != null ? DateTime.tryParse(data['delivery_started_at'].toString()) : null,
-          estimatedDeliverySeconds: (data['estimated_delivery_seconds'] as num?)?.toInt() ?? 60,
-          deliveredAt: data['delivered_at'] != null ? DateTime.tryParse(data['delivered_at'].toString()) : null,
-        );
-      }).toList();
+      if (!mounted) return;
+
+      final deliveries = (response as List)
+          .where((item) {
+            final userId = item['orders']?['user_id']?.toString();
+            return userId == currentUser.id;
+          })
+          .map<DeliveryModel>((item) {
+            final data = Map<String, dynamic>.from(item);
+            return _mapToDeliveryModel(data);
+          })
+          .toList();
 
       state = deliveries;
 
@@ -256,7 +358,8 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
       for (final d in deliveries) {
         if (d.status == DeliveryStatus.inTransit &&
             d.deliveryStartedAt != null &&
-            DateTime.now().difference(d.deliveryStartedAt!).inSeconds >= d.estimatedDeliverySeconds) {
+            DateTime.now().difference(d.deliveryStartedAt!).inSeconds >=
+                d.estimatedDeliverySeconds) {
           _completeDeliveryIfNeeded(d.id, d.droneId);
         }
       }
@@ -272,27 +375,25 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
       final weather = await SupabaseService.client
           .from('weather_safety')
           .select()
-          .eq('id', 1)
+          .order('updated_at', ascending: false)
+          .limit(1)
           .maybeSingle();
 
-      final weatherData = weather ?? {
-        'dispatch_enabled': true,
-        'wind_speed_kph': 10.0,
-        'temperature_c': 30.0,
-        'max_safe_wind_kph': 35.0,
-        'max_safe_temperature_c': 38.0,
-        'advisory_message': 'Weather conditions are safe for campus drone dispatch.',
-      };
+      if (weather == null) {
+        return 'No weather record configured. Drone dispatch blocked.';
+      }
 
-      final dispatchEnabled = weatherData['dispatch_enabled'] == true;
-      final windSpeed = _toDouble(weatherData['wind_speed_kph']);
-      final temp = _toDouble(weatherData['temperature_c']);
-      final maxWind = _toDouble(weatherData['max_safe_wind_kph'], 35);
-      final maxTemp = _toDouble(weatherData['max_safe_temperature_c'], 38);
-      final advisory = weatherData['advisory_message']?.toString() ??
+      final weatherStatus = weather['safety_status']?.toString();
+      final dispatchEnabled = weather['dispatch_enabled'] == true;
+      final windSpeed = _toDouble(weather['wind_speed_kph']);
+      final temp = _toDouble(weather['temperature_c']);
+      final maxWind = _toDouble(weather['max_safe_wind_kph'], 35);
+      final maxTemp = _toDouble(weather['max_safe_temperature_c'], 38);
+      final advisory =
+          weather['advisory_message']?.toString() ??
           'Weather conditions are unsafe for dispatch.';
 
-      if (!dispatchEnabled) {
+      if (weatherStatus == 'grounded' || !dispatchEnabled) {
         return advisory;
       }
 
@@ -307,31 +408,32 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
       return null;
     } catch (error) {
       debugPrint('Weather safety check failed: $error');
-      return null;
+      return 'Weather check failed: $error';
     }
   }
 
-
-
   Future<void> _insertFirstTelemetry({
-    required String droneId,
+    required String deliveryId,
     required double batteryLevel,
   }) async {
     if (!SupabaseService.isConfigured) return;
 
     try {
-      await SupabaseService.client.from('drone_telemetry').insert({
-        'drone_id': droneId,
-        'latitude': 10.32800,
-        'longitude': 123.95000,
-        'altitude': 0,
-        'speed': 0,
-        'battery_level': batteryLevel,
-        'signal_strength': 100,
-        'heading': 0,
-      });
+      await SupabaseService.client.rpc(
+        'record_simulated_telemetry',
+        params: {
+          'p_delivery_id': deliveryId,
+          'p_latitude': 10.32800,
+          'p_longitude': 123.95000,
+          'p_altitude': 0.0,
+          'p_speed': 0.0,
+          'p_battery_level': batteryLevel,
+          'p_signal_strength': 100,
+          'p_heading': 0.0,
+        },
+      );
     } catch (error) {
-      debugPrint('Telemetry placeholder insert failed: $error');
+      debugPrint('First telemetry RPC failed: $error');
     }
   }
 
@@ -343,6 +445,7 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
     if (!SupabaseService.isConfigured) return;
 
     try {
+      // Plain text status column — no UUID lookup needed.
       await SupabaseService.client.from('delivery_status_logs').insert({
         'delivery_id': deliveryId,
         'status': status,
@@ -374,44 +477,43 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
     }
   }
 
-  Future<void> _insertPayment({
-    required String deliveryId,
-    required String userId,
-    required String paymentMethod,
-    required double amount,
-    required String status,
-    required String referenceNumber,
-  }) async {
-    if (!SupabaseService.isConfigured) return;
-
-    try {
-      await SupabaseService.client
-          .from('payments')
-          .insert({
-            'delivery_id': deliveryId,
-            'user_id': userId,
-            'payment_method': paymentMethod,
-            'amount': amount,
-            'status': status,
-            'reference_number': referenceNumber,
-            'is_simulated': true,
-            'notes': 'Simulated payment for AeroDrop delivery.',
-          });
-    } catch (error) {
-      debugPrint('Payment insert failed: $error');
-    }
-  }
-
   void _startSimulation() {
-    // ponytail: 5-second tick is a reasonable balance between responsiveness
-    // and Supabase write pressure. Progress is read from timestamps so any
-    // number of ticks doesn't accumulate error.
-    _simulationTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
+    _simulationTimer?.cancel();
+    _simulationTimer = Timer.periodic(const Duration(seconds: 5), (
+      timer,
+    ) async {
+      final currentUser = SupabaseService.client.auth.currentUser;
+      if (currentUser == null) {
+        timer.cancel();
+        _simulationTimer?.cancel();
+        _simulationTimer = null;
+        return;
+      }
       if (!state.any((d) => d.status == DeliveryStatus.inTransit)) return;
 
-      final now = DateTime.now();
+      // 1. Dynamically obtain drone UUID by drone_code = DRN-001
+      String droneUuid = '80000000-0000-0000-0000-000000000001';
+      if (SupabaseService.isConfigured) {
+        try {
+          final res = await SupabaseService.client
+              .from('drones')
+              .select('id')
+              .eq('drone_code', 'DRN-001')
+              .maybeSingle();
+          if (res != null) {
+            droneUuid = res['id'].toString();
+          }
+        } catch (e) {
+          debugPrint('Error getting drone UUID: $e');
+        }
+      }
 
-      // Track deliveries we need to auto-complete to avoid concurrent calls
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+
+      final now = DateTime.now();
       final toComplete = <String, String?>{}; // deliveryId -> droneId
 
       state = state.map((delivery) {
@@ -424,8 +526,80 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
         final elapsed = now.difference(startedAt).inSeconds;
         final progress = (elapsed / totalSecs).clamp(0.0, 1.0);
 
+        final address = delivery.deliveryAddress;
+        String pickup = 'Old Building';
+        String dropoff = 'Old Building';
+        if (address.startsWith('From ') && address.contains(' to ')) {
+          pickup = address.substring(5, address.indexOf(' to '));
+          dropoff = address.substring(address.indexOf(' to ') + 4);
+        }
+
+        final coords = {
+          'old building': (10.3156, 123.9016),
+          'annex 1 building': (10.3159, 123.9019),
+          'annex 2 building': (10.3154, 123.9021),
+          'basic education building': (10.3148, 123.9014),
+          'maritime building': (10.3163, 123.9025),
+        };
+
+        final hub = (10.3168, 123.9010);
+        final vendorLoc = coords[pickup.toLowerCase()] ?? (10.3156, 123.9016);
+        final customerLoc =
+            coords[dropoff.toLowerCase()] ?? (10.3156, 123.9016);
+
+        double lat;
+        double lng;
+        double altitude = 15.0;
+
+        if (progress < 0.5) {
+          // Leg 1: Hub to Vendor (0.0 to 0.5 progress)
+          final legProgress = progress / 0.5;
+          lat = hub.$1 + (vendorLoc.$1 - hub.$1) * legProgress;
+          lng = hub.$2 + (vendorLoc.$2 - hub.$2) * legProgress;
+          // Hover near the vendor pickup area at the end of leg 1
+          if (legProgress > 0.9) altitude = 2.0;
+        } else {
+          // Leg 2: Vendor to Customer (0.5 to 1.0 progress)
+          final legProgress = (progress - 0.5) / 0.5;
+          lat = vendorLoc.$1 + (customerLoc.$1 - vendorLoc.$1) * legProgress;
+          lng = vendorLoc.$2 + (customerLoc.$2 - vendorLoc.$2) * legProgress;
+          // Descend to drop off package at the end of leg 2
+          if (legProgress > 0.9) altitude = 0.5;
+        }
+
+        final startBattery = _deliveryStartBatteries[delivery.id] ?? 95.0;
+        final double tripConsumption = 12.0; // 12% total drain per trip
+        final newBattery = (startBattery - (tripConsumption * progress)).clamp(
+          0.0,
+          100.0,
+        );
+
         if (progress >= 1.0) {
           toComplete[delivery.id] = delivery.droneId;
+
+          if (SupabaseService.isConfigured) {
+            SupabaseService.client
+                .rpc(
+                  'record_simulated_telemetry',
+                  params: {
+                    'p_delivery_id': delivery.id,
+                    'p_latitude': customerLoc.$1,
+                    'p_longitude': customerLoc.$2,
+                    'p_altitude': 0.0,
+                    'p_speed': 0.0,
+                    'p_battery_level': newBattery,
+                    'p_signal_strength': 100,
+                    'p_heading': 0.0,
+                  },
+                )
+                .then((_) {})
+                .catchError((e) {
+                  debugPrint('Final telemetry RPC failed: $e');
+                });
+          }
+
+          _deliveryStartBatteries.remove(delivery.id);
+
           return delivery.copyWith(
             status: DeliveryStatus.delivered,
             progress: 1.0,
@@ -433,15 +607,37 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
           );
         }
 
-        // Drain battery while in transit
         if (delivery.droneId != null) {
-          final drones = ref.read(droneProvider);
-          final idx = drones.indexWhere((d) => d.id == delivery.droneId);
-          if (idx != -1) {
-            ref.read(droneProvider.notifier).updateBattery(
-              delivery.droneId!,
-              (drones[idx].batteryLevel - 1.5).clamp(0.0, 100.0),
-            );
+          ref.read(droneProvider.notifier).updateBattery('DRN-001', newBattery);
+
+          if (SupabaseService.isConfigured) {
+            SupabaseService.client
+                .rpc(
+                  'record_simulated_telemetry',
+                  params: {
+                    'p_delivery_id': delivery.id,
+                    'p_latitude': lat,
+                    'p_longitude': lng,
+                    'p_altitude': altitude,
+                    'p_speed': 5.0,
+                    'p_battery_level': newBattery,
+                    'p_signal_strength': 95,
+                    'p_heading': 90.0,
+                  },
+                )
+                .then((_) {})
+                .catchError((e) {
+                  debugPrint('Active telemetry RPC failed: $e');
+                });
+
+            SupabaseService.client
+                .from('drones')
+                .update({'battery_level': newBattery})
+                .eq('id', droneUuid)
+                .then((_) {})
+                .catchError((e) {
+                  debugPrint('Update drone battery failed: $e');
+                });
           }
         }
 
@@ -449,13 +645,12 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
         final etaStr = remaining <= 0
             ? '0 mins'
             : remaining < 60
-                ? '$remaining secs'
-                : '${(remaining / 60).ceil()} mins';
+            ? '$remaining secs'
+            : '${(remaining / 60).ceil()} mins';
 
         return delivery.copyWith(progress: progress, eta: etaStr);
       }).toList();
 
-      // Fire-and-forget auto-completion for each completed delivery
       for (final entry in toComplete.entries) {
         _completeDeliveryIfNeeded(entry.key, entry.value);
       }
@@ -482,7 +677,9 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
     double estimatedDistanceKm = 0.0,
   }) async {
     if (kSimulationMode) {
-      ref.read(deliveryMockProvider.notifier).createDelivery(
+      ref
+          .read(deliveryMockProvider.notifier)
+          .createDelivery(
             senderName: senderName,
             recipientName: recipientName,
             recipientPhone: recipientPhone,
@@ -502,7 +699,9 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
       return 'Package is too heavy. Maximum supported drone payload is 0.5 kg.';
     }
 
-    if (pickupLocationId != null && dropoffLocationId != null && pickupLocationId == dropoffLocationId) {
+    if (pickupLocationId != null &&
+        dropoffLocationId != null &&
+        pickupLocationId == dropoffLocationId) {
       return 'Pickup and drop-off location cannot be the same.';
     }
 
@@ -521,7 +720,7 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
       final droneResponse = await SupabaseService.client
           .from('drones')
           .select('battery_level')
-          .eq('id', 'DRN-001')
+          .eq('drone_code', 'DRN-001')
           .maybeSingle();
 
       if (droneResponse != null) {
@@ -531,24 +730,24 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
         }
       }
 
-      // 2. Check Weather Safety — use weather_status column as source of truth
+      // 2. Check Weather Safety
       final weatherResponse = await SupabaseService.client
           .from('weather_safety')
           .select()
-          .eq('id', 1)
+          .order('updated_at', ascending: false)
+          .limit(1)
           .maybeSingle();
 
-      String safetyStatus = 'Safe';
-      String safetyMessage =
-          'Weather conditions are safe for campus drone dispatch.';
+      if (weatherResponse == null) {
+        return 'No weather record configured. Drone dispatch blocked.';
+      }
 
       final weatherStatus =
-          weatherResponse?['weather_status']?.toString() ?? 'safe';
-      final dispatchEnabled = weatherResponse?['dispatch_enabled'] != false;
+          weatherResponse['safety_status']?.toString() ?? 'grounded';
+      final dispatchEnabled = weatherResponse['dispatch_enabled'] != false;
 
       // Grounded check — insert a cancelled record for audit trail then block
       if (weatherStatus == 'grounded' || !dispatchEnabled) {
-        // ponytail: fire-and-forget insert; failure just means no audit row, delivery is still blocked
         try {
           final paymentAmountGrounded = _calculatePaymentAmount(
             packageWeight: packageWeight,
@@ -557,51 +756,62 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
             estimatedDistanceKm: estimatedDistanceKm,
           );
           final nowStr = DateTime.now().toUtc().toIso8601String();
-          final groundedPayload = <String, dynamic>{
-            'user_id': currentUser.id,
-            'sender_name': senderName,
-            'recipient_name': recipientName,
-            'recipient_phone': recipientPhone,
-            'delivery_address': deliveryAddress,
-            'package_name': packageName,
-            'package_weight': packageWeight,
-            'package_type': packageType,
-            'status': 'cancelled',
-            'eta': 'Cancelled',
-            'priority': priority,
-            'pickup_location_id': pickupLocationId,
-            'dropoff_location_id': dropoffLocationId,
-            'pickup_latitude': pickupLatitude,
-            'pickup_longitude': pickupLongitude,
-            'dropoff_latitude': dropoffLatitude,
-            'dropoff_longitude': dropoffLongitude,
-            'safety_status': 'Grounded',
-            'safety_message': 'Weather is currently unsafe for drone delivery.',
-            'payment_method': paymentMethod,
-            'payment_status': 'unpaid',
-            'payment_amount': paymentAmountGrounded,
-            'payment_reference': _generatePaymentReference(),
-            'cancellation_reason': 'Cancelled due to unsafe weather.',
-            'cancelled_at': nowStr,
-            'cancelled_by': currentUser.id,
-            'estimated_distance_km': estimatedDistanceKm,
-          };
-          groundedPayload.removeWhere((key, value) => value == null);
-          await SupabaseService.client.from('deliveries').insert(groundedPayload);
+
+          // 1. Insert order (cancelled)
+          final orderRes = await SupabaseService.client
+              .from('orders')
+              .insert({
+                'user_id': currentUser.id,
+                'order_status': 'cancelled',
+                'delivery_location_id':
+                    dropoffLocationId ?? '10000000-0000-0000-0000-000000000001',
+                'total_amount': paymentAmountGrounded,
+                'created_at': nowStr,
+                'updated_at': nowStr,
+              })
+              .select()
+              .single();
+          final orderId = orderRes['id'].toString();
+
+          // 2. Insert delivery (cancelled)
+          await SupabaseService.client
+              .from('deliveries')
+              .insert({
+                'order_id': orderId,
+                'status': 'cancelled',
+                'priority': priority,
+                'pickup_location_id':
+                    pickupLocationId ?? '10000000-0000-0000-0000-000000000001',
+                'dropoff_location_id':
+                    dropoffLocationId ?? '10000000-0000-0000-0000-000000000001',
+                'delivery_progress': 0.0,
+                'eta': 'Cancelled',
+                'estimated_distance_km': estimatedDistanceKm,
+                'created_at': nowStr,
+                'updated_at': nowStr,
+                'delivered_at': nowStr,
+              })
+              .select()
+              .single();
+
+          // 3. Insert package as order item
+          await SupabaseService.client.from('order_items').insert({
+            'order_id': orderId,
+            'product_name': packageName,
+            'quantity': 1,
+            'unit_price': paymentAmountGrounded,
+            'weight_grams': (packageWeight * 1000).toInt(),
+            'subtotal': paymentAmountGrounded,
+            'created_at': nowStr,
+          });
         } catch (e) {
           debugPrint('Grounded delivery audit insert failed (non-fatal): $e');
         }
-        return 'Delivery cancelled due to unsafe weather.'; // sentinel for UI to show grounded popup
+        return 'Delivery cancelled due to unsafe weather.';
       }
 
       // Caution check
-      if (weatherStatus == 'caution') {
-        safetyStatus = 'Caution';
-        safetyMessage =
-            'Delivery may be delayed due to caution-level weather conditions.';
-      }
 
-      final status = DeliveryStatus.pending;
       const eta = 'Waiting for admin approval';
 
       final paymentAmount = _calculatePaymentAmount(
@@ -613,97 +823,80 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
       const paymentStatus = 'paid';
       final paymentReference = _generatePaymentReference();
 
-      final deliveryPayload = <String, dynamic>{
-        'user_id': currentUser.id,
-        'sender_name': senderName,
-        'recipient_name': recipientName,
-        'recipient_phone': recipientPhone,
-        'delivery_address': deliveryAddress,
-        'package_name': packageName,
-        'package_weight': packageWeight,
-        'package_type': packageType,
-        'status': status.name,
-        'drone_id': null,
-        'eta': eta,
-        'priority': priority,
-        'pickup_location_id': pickupLocationId,
-        'dropoff_location_id': dropoffLocationId,
-        'scheduled_at': scheduledAt?.toIso8601String(),
-        'pickup_latitude': pickupLatitude,
-        'pickup_longitude': pickupLongitude,
-        'dropoff_latitude': dropoffLatitude,
-        'dropoff_longitude': dropoffLongitude,
-        'safety_status': safetyStatus,
-        'safety_message': safetyMessage,
-        'payment_method': paymentMethod,
-        'payment_status': paymentStatus,
-        'payment_amount': paymentAmount,
-        'payment_reference': paymentReference,
-        'estimated_distance_km': estimatedDistanceKm,
-      };
+      final nowStr = DateTime.now().toUtc().toIso8601String();
 
-      deliveryPayload.removeWhere((key, value) => value == null);
+      // 1. Insert order
+      final orderRes = await SupabaseService.client
+          .from('orders')
+          .insert({
+            'user_id': currentUser.id,
+            'order_status': 'pending',
+            'delivery_location_id':
+                dropoffLocationId ?? '10000000-0000-0000-0000-000000000001',
+            'total_amount': paymentAmount,
+            'payment_method': paymentMethod,
+            'payment_status': paymentStatus,
+            'payment_reference': paymentReference,
+            'created_at': nowStr,
+            'updated_at': nowStr,
+          })
+          .select()
+          .single();
+      final orderId = orderRes['id'].toString();
 
-      dynamic response;
-      try {
-        response = await SupabaseService.client
-            .from('deliveries')
-            .insert(deliveryPayload)
-            .select()
-            .single();
-      } catch (error) {
-        final errStr = error.toString();
-        if (errStr.contains('estimated_distance_km') || errStr.contains('column') || errStr.contains('42703')) {
-          debugPrint('estimated_distance_km column does not exist, retrying without it...');
-          deliveryPayload.remove('estimated_distance_km');
-          response = await SupabaseService.client
-              .from('deliveries')
-              .insert(deliveryPayload)
-              .select()
-              .single();
-        } else {
-          rethrow;
-        }
-      }
+      // 2. Insert delivery
+      final deliveryRes = await SupabaseService.client
+          .from('deliveries')
+          .insert({
+            'order_id': orderId,
+            'status': 'pending',
+            'priority': priority,
+            'pickup_location_id':
+                pickupLocationId ?? '10000000-0000-0000-0000-000000000001',
+            'dropoff_location_id':
+                dropoffLocationId ?? '10000000-0000-0000-0000-000000000001',
+            'delivery_progress': 0.0,
+            'eta': eta,
+            'estimated_distance_km': estimatedDistanceKm,
+            'created_at': nowStr,
+            'updated_at': nowStr,
+          })
+          .select()
+          .single();
+      final deliveryId = deliveryRes['id'].toString();
 
-      await _insertStatusLog(
-        deliveryId: response['id'].toString(),
-        status: status.name,
-        message: 'Delivery request submitted and waiting for admin approval.',
-      );
+      // 3. Insert package as order item
+      await SupabaseService.client.from('order_items').insert({
+        'order_id': orderId,
+        'product_name': packageName,
+        'quantity': 1,
+        'unit_price': paymentAmount,
+        'weight_grams': (packageWeight * 1000).toInt(),
+        'subtotal': paymentAmount,
+        'created_at': nowStr,
+      });
 
-      await _insertPayment(
-        deliveryId: response['id'].toString(),
-        userId: currentUser.id,
-        paymentMethod: paymentMethod,
-        amount: paymentAmount,
-        status: paymentStatus,
-        referenceNumber: paymentReference,
-      );
+      // Fetch the full delivery data with all joins to map it correctly
+      final fullDeliveryRes = await SupabaseService.client
+          .from('deliveries')
+          .select('''
+            *,
+            orders!order_id(
+              *,
+              vendor:users!vendor_id(full_name, business_name),
+              customer:users!user_id(full_name, phone_number),
+              campus_locations!delivery_location_id(name),
+              order_items(product_name, quantity, weight_grams)
+            )
+          ''')
+          .eq('id', deliveryId)
+          .single();
 
-      final createdDelivery = DeliveryModel(
-        id: response['id'].toString(),
-        senderName: response['sender_name'] ?? senderName,
-        recipientName: response['recipient_name'] ?? recipientName,
-        recipientPhone: response['recipient_phone'] ?? recipientPhone,
-        deliveryAddress: response['delivery_address'] ?? deliveryAddress,
-        packageName: response['package_name'] ?? packageName,
-        packageWeight: _toDouble(
-          response['package_weight'],
-          packageWeight,
-        ),
-        packageType: response['package_type'] ?? packageType,
-        status: _parseDeliveryStatus(response['status']),
-        droneId: response['drone_id']?.toString(),
-        eta: response['eta'] ?? eta,
-        createdAt: _toDateTime(response['created_at']),
-        progress: _progressFromStatus(response['status']),
-        estimatedDistanceKm: response.containsKey('estimated_distance_km') ? _toDoubleOrNull(response['estimated_distance_km']) : null,
-        paymentAmount: response.containsKey('payment_amount') ? _toDoubleOrNull(response['payment_amount']) : null,
+      final createdDelivery = _mapToDeliveryModel(
+        Map<String, dynamic>.from(fullDeliveryRes),
       );
 
       state = [createdDelivery, ...state];
-
       return null;
     } catch (error) {
       debugPrint('Create delivery failed: $error');
@@ -717,11 +910,9 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
     String? droneId,
   }) {
     if (kSimulationMode) {
-      ref.read(deliveryMockProvider.notifier).updateDeliveryStatus(
-            id,
-            status,
-            droneId: droneId,
-          );
+      ref
+          .read(deliveryMockProvider.notifier)
+          .updateDeliveryStatus(id, status, droneId: droneId);
       return;
     }
 
@@ -745,10 +936,7 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
     if (SupabaseService.isConfigured) {
       SupabaseService.client
           .from('deliveries')
-          .update({
-            'status': status.name,
-            'drone_id': droneId,
-          })
+          .update({'status': status.name, 'drone_id': droneId})
           .eq('id', id)
           .then((_) async {
             await _insertStatusLog(
@@ -772,7 +960,7 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
     try {
       final deliveryData = await SupabaseService.client
           .from('deliveries')
-          .select()
+          .select('*, orders!order_id(*, order_items(weight_grams, quantity))')
           .eq('id', deliveryId)
           .maybeSingle();
 
@@ -780,12 +968,22 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
         return 'Delivery request not found.';
       }
 
-      final statusStr = deliveryData['status']?.toString().toLowerCase();
+      // Plain text status column
+      final statusStr = deliveryData['status']?.toString();
       if (statusStr == 'cancelled') {
         return 'This delivery request has already been cancelled.';
       }
 
-      final packageWeight = _toDouble(deliveryData['package_weight'], 0.0);
+      final orderMap = deliveryData['orders'] as Map<String, dynamic>?;
+      final orderItems = orderMap?['order_items'] as List? ?? [];
+
+      int totalWeightGrams = 0;
+      for (final item in orderItems) {
+        final w = (item['weight_grams'] as num?)?.toInt() ?? 0;
+        final q = (item['quantity'] as num?)?.toInt() ?? 1;
+        totalWeightGrams += w * q;
+      }
+      final packageWeight = totalWeightGrams / 1000.0;
 
       if (packageWeight > 0.5) {
         return 'Package is too heavy. Maximum supported drone payload is 0.5 kg.';
@@ -796,61 +994,69 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
         return 'Weather check failed: $weatherError';
       }
 
-      // Query DRN-001 (AeroCarrier Alpha) only
-      final dronesResponse = await SupabaseService.client
+      // Query DRN-001 drone UUID dynamically
+      final droneLookup = await SupabaseService.client
           .from('drones')
           .select()
-          .eq('id', 'DRN-001')
+          .eq('drone_code', 'DRN-001')
           .maybeSingle();
 
-      if (dronesResponse == null) {
-        return 'AeroCarrier Alpha drone configuration not found in database.';
+      if (droneLookup == null) {
+        return 'AeroCarrier Alpha drone configuration (DRN-001) not found in database.';
       }
 
-      final droneStatus = dronesResponse['status']?.toString().toLowerCase();
+      final droneUuid = droneLookup['id'].toString();
+      // status is now a plain text column
+      final droneStatus = droneLookup['status']?.toString().toLowerCase();
       if (droneStatus != 'available') {
         return 'The drone is currently busy. Please wait until it becomes available.';
       }
 
       const minimumBatteryForDelivery = 10.0;
-      final selectedDrone = dronesResponse;
-      final droneId = 'DRN-001';
-      final droneBattery = _toDouble(selectedDrone['battery_level'], 100.0);
+      final droneBattery = _toDouble(droneLookup['battery_level'], 100.0);
 
       if (droneBattery < minimumBatteryForDelivery) {
         return 'Drone battery is too low. Please recharge the drone before accepting deliveries.';
       }
+
+      // Record battery level at start for progress-based drain simulation
+      _deliveryStartBatteries[deliveryId] = droneBattery;
 
       final nowStr = DateTime.now().toUtc().toIso8601String();
 
       final updatedResponse = await SupabaseService.client
           .from('deliveries')
           .update({
-            'status': 'inTransit',
-            'drone_id': droneId,
+            'status': 'in_transit',
+            'drone_id': droneUuid,
             'eta': '1 min',
             'admin_decision_by': currentUser.id,
             'admin_decision_at': nowStr,
             'accepted_at': nowStr,
-            'safety_status': 'Safe',
-            'safety_message': 'Accepted by admin. Drone assigned successfully.',
             'delivery_started_at': nowStr,
             'estimated_delivery_seconds': 60,
             'delivery_progress': 0,
           })
           .eq('id', deliveryId)
-          .select()
+          .select('''
+            *,
+            orders!order_id(
+              *,
+              vendor:users!vendor_id(full_name, business_name),
+              customer:users!user_id(full_name, phone_number),
+              campus_locations!delivery_location_id(name),
+              order_items(product_name, quantity, weight_grams)
+            )
+          ''')
           .single();
 
       await SupabaseService.client
           .from('drones')
-          .update({
-            'status': 'busy',
-          })
-          .eq('id', droneId);
+          .update({'status': 'busy'})
+          .eq('id', droneUuid);
 
       await _insertFirstTelemetry(
-        droneId: droneId,
+        deliveryId: deliveryId,
         batteryLevel: droneBattery,
       );
 
@@ -862,34 +1068,21 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
 
       await _insertStatusLog(
         deliveryId: deliveryId,
-        status: 'inTransit',
+        status: 'in_transit',
         message: 'Delivery is now in transit.',
       );
 
-      ref.read(droneProvider.notifier).updateStatus(droneId, DroneStatus.busy);
+      ref
+          .read(droneProvider.notifier)
+          .updateStatus('DRN-001', DroneStatus.busy);
 
-      final startedAt = DateTime.now().toUtc();
-      final updatedDelivery = DeliveryModel(
-        id: updatedResponse['id'].toString(),
-        senderName: updatedResponse['sender_name']?.toString() ?? '',
-        recipientName: updatedResponse['recipient_name']?.toString() ?? '',
-        recipientPhone: updatedResponse['recipient_phone']?.toString() ?? '',
-        deliveryAddress: updatedResponse['delivery_address']?.toString() ?? '',
-        packageName: updatedResponse['package_name']?.toString() ?? '',
-        packageWeight: _toDouble(updatedResponse['package_weight']),
-        packageType: updatedResponse['package_type']?.toString() ?? '',
-        status: DeliveryStatus.inTransit,
-        droneId: updatedResponse['drone_id']?.toString(),
-        eta: '1 min',
-        createdAt: _toDateTime(updatedResponse['created_at']),
-        progress: 0.0,
-        estimatedDistanceKm: updatedResponse.containsKey('estimated_distance_km') ? _toDoubleOrNull(updatedResponse['estimated_distance_km']) : null,
-        paymentAmount: updatedResponse.containsKey('payment_amount') ? _toDoubleOrNull(updatedResponse['payment_amount']) : null,
-        deliveryStartedAt: startedAt,
-        estimatedDeliverySeconds: 60,
+      final updatedDelivery = _mapToDeliveryModel(
+        Map<String, dynamic>.from(updatedResponse),
       );
 
-      state = state.map((d) => d.id == deliveryId ? updatedDelivery : d).toList();
+      state = state
+          .map((d) => d.id == deliveryId ? updatedDelivery : d)
+          .toList();
 
       await refreshPendingDeliveriesCount();
 
@@ -900,7 +1093,18 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
     }
   }
 
-  Future<String?> rejectDelivery(String deliveryId, {String reason = 'Rejected by admin'}) async {
+  Future<bool> verifyPackage({
+    required String deliveryId,
+    required String remarks,
+    String photoUrl = '',
+  }) async {
+    return true;
+  }
+
+  Future<String?> rejectDelivery(
+    String deliveryId, {
+    String reason = 'Rejected by admin',
+  }) async {
     if (!SupabaseService.isConfigured) return 'Supabase is not configured';
 
     final currentUser = SupabaseService.client.auth.currentUser;
@@ -914,7 +1118,7 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
           .maybeSingle();
 
       if (deliveryData != null) {
-        final statusStr = deliveryData['status']?.toString().toLowerCase();
+        final statusStr = deliveryData['status']?.toString();
         if (statusStr == 'cancelled') {
           return 'This delivery request has already been cancelled.';
         }
@@ -928,13 +1132,19 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
             'status': 'cancelled',
             'admin_decision_by': currentUser.id,
             'admin_decision_at': nowStr,
-            'rejected_at': nowStr,
-            'rejection_reason': reason,
-            'safety_status': 'Rejected',
-            'safety_message': reason,
+            'delivered_at': nowStr, // mark end time
           })
           .eq('id', deliveryId)
-          .select()
+          .select('''
+            *,
+            orders!order_id(
+              *,
+              vendor:users!vendor_id(full_name, business_name),
+              customer:users!user_id(full_name, phone_number),
+              campus_locations!delivery_location_id(name),
+              order_items(product_name, quantity, weight_grams)
+            )
+          ''')
           .single();
 
       await _insertStatusLog(
@@ -943,25 +1153,13 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
         message: 'Delivery request rejected: $reason',
       );
 
-      final updatedDelivery = DeliveryModel(
-        id: updatedResponse['id'].toString(),
-        senderName: updatedResponse['sender_name']?.toString() ?? '',
-        recipientName: updatedResponse['recipient_name']?.toString() ?? '',
-        recipientPhone: updatedResponse['recipient_phone']?.toString() ?? '',
-        deliveryAddress: updatedResponse['delivery_address']?.toString() ?? '',
-        packageName: updatedResponse['package_name']?.toString() ?? '',
-        packageWeight: _toDouble(updatedResponse['package_weight']),
-        packageType: updatedResponse['package_type']?.toString() ?? '',
-        status: _parseDeliveryStatus(updatedResponse['status']),
-        droneId: updatedResponse['drone_id']?.toString(),
-        eta: updatedResponse['eta']?.toString() ?? 'TBD',
-        createdAt: _toDateTime(updatedResponse['created_at']),
-        progress: _progressFromStatus(updatedResponse['status']),
-        estimatedDistanceKm: updatedResponse.containsKey('estimated_distance_km') ? _toDoubleOrNull(updatedResponse['estimated_distance_km']) : null,
-        paymentAmount: updatedResponse.containsKey('payment_amount') ? _toDoubleOrNull(updatedResponse['payment_amount']) : null,
+      final updatedDelivery = _mapToDeliveryModel(
+        Map<String, dynamic>.from(updatedResponse),
       );
 
-      state = state.map((d) => d.id == deliveryId ? updatedDelivery : d).toList();
+      state = state
+          .map((d) => d.id == deliveryId ? updatedDelivery : d)
+          .toList();
 
       await refreshPendingDeliveriesCount();
 
@@ -972,7 +1170,10 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
     }
   }
 
-  Future<String?> cancelDeliveryRequest(String deliveryId, {String reason = 'Cancelled by user'}) async {
+  Future<String?> cancelDeliveryRequest(
+    String deliveryId, {
+    String reason = 'Cancelled by user',
+  }) async {
     if (kSimulationMode) {
       state = state.map((d) {
         if (d.id == deliveryId) {
@@ -991,7 +1192,7 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
     try {
       final deliveryData = await SupabaseService.client
           .from('deliveries')
-          .select()
+          .select('*, orders(user_id)')
           .eq('id', deliveryId)
           .maybeSingle();
 
@@ -999,12 +1200,12 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
         return 'Delivery request not found.';
       }
 
-      final userId = deliveryData['user_id']?.toString();
+      final userId = deliveryData['orders']?['user_id']?.toString();
       if (userId != currentUser.id) {
         return 'You do not have permission to cancel this delivery request.';
       }
 
-      final statusStr = deliveryData['status']?.toString().toLowerCase();
+      final statusStr = deliveryData['status']?.toString();
       if (statusStr != 'pending') {
         return 'Only pending delivery requests can be cancelled.';
       }
@@ -1013,17 +1214,18 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
 
       final updatedResponse = await SupabaseService.client
           .from('deliveries')
-          .update({
-            'status': 'cancelled',
-            'cancelled_at': nowStr,
-            'cancelled_by': currentUser.id,
-            'cancellation_reason': reason,
-            'safety_status': 'Cancelled',
-            'safety_message': reason,
-            'eta': 'Cancelled',
-          })
+          .update({'status': 'cancelled', 'delivered_at': nowStr})
           .eq('id', deliveryId)
-          .select()
+          .select('''
+            *,
+            orders!order_id(
+              *,
+              vendor:users!vendor_id(full_name, business_name),
+              customer:users!user_id(full_name, phone_number),
+              campus_locations!delivery_location_id(name),
+              order_items(product_name, quantity, weight_grams)
+            )
+          ''')
           .single();
 
       await _insertStatusLog(
@@ -1035,25 +1237,13 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
       // Correct the trigger-generated notification to user-cancel copy
       await _fixCancelNotification(deliveryId, currentUser.id);
 
-      final updatedDelivery = DeliveryModel(
-        id: updatedResponse['id'].toString(),
-        senderName: updatedResponse['sender_name']?.toString() ?? '',
-        recipientName: updatedResponse['recipient_name']?.toString() ?? '',
-        recipientPhone: updatedResponse['recipient_phone']?.toString() ?? '',
-        deliveryAddress: updatedResponse['delivery_address']?.toString() ?? '',
-        packageName: updatedResponse['package_name']?.toString() ?? '',
-        packageWeight: _toDouble(updatedResponse['package_weight']),
-        packageType: updatedResponse['package_type']?.toString() ?? '',
-        status: _parseDeliveryStatus(updatedResponse['status']),
-        droneId: updatedResponse['drone_id']?.toString(),
-        eta: updatedResponse['eta']?.toString() ?? 'Cancelled',
-        createdAt: _toDateTime(updatedResponse['created_at']),
-        progress: _progressFromStatus(updatedResponse['status']),
-        estimatedDistanceKm: updatedResponse.containsKey('estimated_distance_km') ? _toDoubleOrNull(updatedResponse['estimated_distance_km']) : null,
-        paymentAmount: updatedResponse.containsKey('payment_amount') ? _toDoubleOrNull(updatedResponse['payment_amount']) : null,
+      final updatedDelivery = _mapToDeliveryModel(
+        Map<String, dynamic>.from(updatedResponse),
       );
 
-      state = state.map((d) => d.id == deliveryId ? updatedDelivery : d).toList();
+      state = state
+          .map((d) => d.id == deliveryId ? updatedDelivery : d)
+          .toList();
 
       await refreshPendingDeliveriesCount();
 
@@ -1070,36 +1260,33 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
   Future<void> loadAdminDeliveriesFromSupabase() async {
     if (kSimulationMode) return;
     if (!SupabaseService.isConfigured) return;
+    final currentUser = SupabaseService.client.auth.currentUser;
+    if (currentUser == null) {
+      debugPrint('Load admin deliveries skipped: no logged in user.');
+      state = [];
+      return;
+    }
 
     try {
       final response = await SupabaseService.client
           .from('deliveries')
-          .select()
+          .select('''
+            *,
+            orders!order_id(
+              *,
+              vendor:users!vendor_id(full_name, business_name),
+              customer:users!user_id(full_name, phone_number),
+              campus_locations!delivery_location_id(name),
+              order_items(product_name, quantity, weight_grams)
+            )
+          ''')
           .order('created_at', ascending: false);
 
-      final deliveries = (response as List).map((item) {
+      if (!mounted) return;
+
+      final deliveries = (response as List).map<DeliveryModel>((item) {
         final data = Map<String, dynamic>.from(item);
-        final isComplete = _isDeliveryCompleteFromTimestamps(data);
-        return DeliveryModel(
-          id: data['id'].toString(),
-          senderName: data['sender_name']?.toString() ?? 'Unknown Sender',
-          recipientName: data['recipient_name']?.toString() ?? 'Unknown Recipient',
-          recipientPhone: data['recipient_phone']?.toString() ?? '',
-          deliveryAddress: data['delivery_address']?.toString() ?? '',
-          packageName: data['package_name']?.toString() ?? 'AeroDrop Package',
-          packageWeight: _toDouble(data['package_weight'], 0.0),
-          packageType: data['package_type']?.toString() ?? 'Other',
-          status: isComplete ? DeliveryStatus.delivered : _parseDeliveryStatus(data['status']),
-          droneId: data['drone_id']?.toString(),
-          eta: _calculateEtaFromTimestamps(data),
-          createdAt: _toDateTime(data['created_at']),
-          progress: _calculateProgressFromTimestamps(data),
-          estimatedDistanceKm: data.containsKey('estimated_distance_km') ? _toDoubleOrNull(data['estimated_distance_km']) : null,
-          paymentAmount: data.containsKey('payment_amount') ? _toDoubleOrNull(data['payment_amount']) : null,
-          deliveryStartedAt: data['delivery_started_at'] != null ? DateTime.tryParse(data['delivery_started_at'].toString()) : null,
-          estimatedDeliverySeconds: (data['estimated_delivery_seconds'] as num?)?.toInt() ?? 60,
-          deliveredAt: data['delivered_at'] != null ? DateTime.tryParse(data['delivered_at'].toString()) : null,
-        );
+        return _mapToDeliveryModel(data);
       }).toList();
 
       state = deliveries;
@@ -1109,7 +1296,8 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
       for (final d in deliveries) {
         if (d.status == DeliveryStatus.inTransit &&
             d.deliveryStartedAt != null &&
-            DateTime.now().difference(d.deliveryStartedAt!).inSeconds >= d.estimatedDeliverySeconds) {
+            DateTime.now().difference(d.deliveryStartedAt!).inSeconds >=
+                d.estimatedDeliverySeconds) {
           _completeDeliveryIfNeeded(d.id, d.droneId);
         }
       }
@@ -1120,18 +1308,27 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
 
   Future<void> refreshPendingDeliveriesCount() async {
     if (kSimulationMode) {
-      final count = state.where((d) => d.status == DeliveryStatus.pending).length;
+      final count = state
+          .where((d) => d.status == DeliveryStatus.pending)
+          .length;
       ref.read(pendingDeliveriesCountProvider.notifier).state = count;
       return;
     }
     if (!SupabaseService.isConfigured) return;
+    final currentUser = SupabaseService.client.auth.currentUser;
+    if (currentUser == null) {
+      debugPrint('Refresh pending count skipped: no logged in user.');
+      ref.read(pendingDeliveriesCountProvider.notifier).state = 0;
+      return;
+    }
 
     try {
       final response = await SupabaseService.client
           .from('deliveries')
           .select('id')
           .eq('status', 'pending');
-      
+
+      if (!mounted) return;
       final count = (response as List).length;
       ref.read(pendingDeliveriesCountProvider.notifier).state = count;
     } catch (e) {
@@ -1154,5 +1351,5 @@ final pendingDeliveriesCountProvider = StateProvider<int>((ref) => 0);
 
 final deliveryProvider =
     StateNotifierProvider<DeliveryNotifier, List<DeliveryModel>>((ref) {
-  return DeliveryNotifier(ref);
-});
+      return DeliveryNotifier(ref);
+    });

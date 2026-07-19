@@ -17,7 +17,9 @@ class NotificationMockNotifier extends StateNotifier<List<NotificationModel>> {
   }
 
   void markAsRead(String id) {
-    state = state.map((n) => n.id == id ? n.copyWith(isRead: true) : n).toList();
+    state = state
+        .map((n) => n.id == id ? n.copyWith(isRead: true) : n)
+        .toList();
   }
 
   void markAllAsRead() {
@@ -33,6 +35,9 @@ class NotificationMockNotifier extends StateNotifier<List<NotificationModel>> {
   }
 }
 
-final notificationMockProvider = StateNotifierProvider<NotificationMockNotifier, List<NotificationModel>>((ref) {
-  return NotificationMockNotifier();
-});
+final notificationMockProvider =
+    StateNotifierProvider<NotificationMockNotifier, List<NotificationModel>>((
+      ref,
+    ) {
+      return NotificationMockNotifier();
+    });

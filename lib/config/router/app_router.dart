@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/providers/auth_provider.dart';
-import '../../core/models/user_model.dart';
+import '../../core/theme/app_colors.dart';
 
 import 'auth_guard.dart';
 
@@ -12,6 +12,7 @@ import '../../features/auth/onboarding_screen.dart';
 import '../../features/auth/login_screen.dart';
 import '../../features/auth/register_screen.dart';
 import '../../features/auth/forgot_password_screen.dart';
+import '../../features/auth/otp_email_sent_screen.dart';
 import '../../features/auth/verification_page.dart';
 import '../../features/auth/presentation/pages/account_pending_page.dart';
 
@@ -19,11 +20,8 @@ import '../../features/dashboard/user_shell.dart';
 import '../../features/dashboard/user_dashboard_screen.dart';
 import '../../features/tracking/tracking_screen.dart';
 import '../../features/tracking/tracking_details_page.dart';
-import '../../features/delivery/delivery_history_screen.dart';
-import '../../features/delivery/delivery_request_screen.dart';
-import '../../features/delivery/presentation/pages/delivery_summary_page.dart';
-import '../../features/delivery/presentation/pages/delivery_success_page.dart';
-import '../../features/delivery/presentation/pages/delivery_completed_page.dart';
+// delivery_history_screen.dart removed — replaced by orders_screen
+// delivery_summary/success/completed pages removed — replaced by payment_screen
 import '../../features/notifications/notifications_screen.dart';
 import '../../features/notifications/notification_details_page.dart';
 import '../../features/profile/profile_screen.dart';
@@ -34,32 +32,40 @@ import '../../features/profile/settings_page.dart';
 import '../../features/admin/admin_shell.dart';
 import '../../features/admin/admin_dashboard_screen.dart';
 import '../../features/admin/admin_users_screen.dart';
-import '../../features/admin/user_details_page.dart';
-import '../../features/admin/edit_user_page.dart';
-import '../../features/admin/user_activity_page.dart';
+import '../../features/admin/admin_user_details_screen.dart';
 import '../../features/admin/admin_drones_screen.dart';
-import '../../features/admin/add_edit_drone_screen.dart';
-import '../../features/admin/drone_details_page.dart';
-import '../../features/admin/drone_monitoring_page.dart';
 import '../../features/admin/admin_deliveries_screen.dart';
 import '../../features/admin/delivery_details_screen.dart';
 import '../../features/admin/admin_analytics_screen.dart';
 import '../../features/admin/admin_settings_screen.dart';
-import '../../features/admin/mission_list_page.dart';
-import '../../features/admin/mission_details_page.dart';
-import '../../features/admin/route_planner_page.dart';
+import '../../features/admin/admin_weather_screen.dart';
 import '../../features/admin/no_fly_zone_page.dart';
-import '../../features/admin/create_no_fly_zone_page.dart';
-import '../../features/admin/edit_no_fly_zone_page.dart';
 import '../../features/admin/reports_page.dart';
-import '../../features/admin/delivery_reports_page.dart';
-import '../../features/admin/drone_reports_page.dart';
-import '../../features/admin/user_reports_page.dart';
 
 import '../../features/shared/about_page.dart';
 import '../../features/shared/help_support_page.dart';
 import '../../features/shared/privacy_policy_page.dart';
 import '../../features/shared/terms_conditions_page.dart';
+
+// Marketplace
+import '../../features/vendors/vendors_screen.dart';
+import '../../features/vendors/vendor_details_screen.dart';
+import '../../features/products/products_screen.dart';
+import '../../features/products/product_details_screen.dart';
+import '../../features/cart/cart_screen.dart';
+import '../../features/cart/checkout_screen.dart';
+import '../../features/orders/orders_screen.dart';
+import '../../features/orders/order_details_screen.dart';
+import '../../features/payment/payment_screen.dart';
+
+// Vendor
+import '../../features/vendor/vendor_shell.dart';
+import '../../features/vendor/vendor_dashboard_screen.dart';
+import '../../features/vendor/vendor_orders_screen.dart';
+import '../../features/vendor/vendor_products_screen.dart';
+import '../../features/vendor/add_edit_product_screen.dart';
+import '../../features/vendor/vendor_profile_screen.dart';
+import '../../features/vendor/vendor_notifications_screen.dart';
 
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -67,12 +73,15 @@ final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     navigatorKey: rootNavigatorKey,
     initialLocation: '/splash',
-    refreshListenable: GoRouterRefreshStream(ref.watch(authProvider.notifier).stream),
+    refreshListenable: GoRouterRefreshStream(
+      ref.watch(authProvider.notifier).stream,
+    ),
     redirect: (context, state) {
       final authState = ref.read(authProvider);
       final user = authState.user;
       final isLoggedIn = user != null;
-      final isLoggingIn = state.uri.path == '/login' ||
+      final isLoggingIn =
+          state.uri.path == '/login' ||
           state.uri.path == '/register' ||
           state.uri.path == '/forgot-password' ||
           state.uri.path == '/onboarding' ||
@@ -85,19 +94,44 @@ final routerProvider = Provider<GoRouter>((ref) {
         return null;
       }
 
-      if (isLoggingIn) {
-        return user.role == UserRole.admin ? '/admin' : '/user';
+      // Prioritize phone verification check
+      if (authState.requiresVerification && !authState.isVerified) {
+        if (state.uri.path != '/verification') {
+          return '/verification';
+        }
+        return null;
+      }
+
+      // Handle vendor pending state redirection
+      final isPending = user.vendorStatus == 'pending';
+      if (isPending) {
+        if (state.uri.path != '/account-pending') {
+          return '/account-pending';
+        }
+        return null;
+      }
+
+      if (isLoggingIn ||
+          state.uri.path == '/account-pending' ||
+          state.uri.path == '/verification') {
+        if (user.isAdmin) return '/admin';
+        if (user.isVendor) return '/vendor';
+        return '/user';
       }
 
       final isAdminPath = state.uri.path.startsWith('/admin');
       final isUserPath = state.uri.path.startsWith('/user');
+      final isVendorPath = state.uri.path.startsWith('/vendor');
 
-      if (isAdminPath && user.role != UserRole.admin) {
-        return '/user';
+      if (isAdminPath && !user.isAdmin) {
+        return user.isVendor ? '/vendor' : '/user';
       }
-     if (isUserPath && user.role == UserRole.admin) {
-  return '/admin';
-}
+      if (isUserPath && (user.isAdmin || user.isVendor)) {
+        return user.isAdmin ? '/admin' : '/vendor';
+      }
+      if (isVendorPath && !user.isVendor) {
+        return user.isAdmin ? '/admin' : '/user';
+      }
 
       return null;
     },
@@ -121,7 +155,17 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/forgot-password',
-        pageBuilder: (context, state) => _slide(state, const ForgotPasswordScreen()),
+        pageBuilder: (context, state) =>
+            _slide(state, const ForgotPasswordScreen()),
+      ),
+      GoRoute(
+        path: '/email-sent',
+        pageBuilder: (context, state) {
+          final extra = state.extra as Map<String, String>? ?? {};
+          final email = extra['email'] ?? '';
+          final type = extra['type'] ?? 'verification';
+          return _fade(state, OtpEmailSentScreen(email: email, type: type));
+        },
       ),
       GoRoute(
         path: '/verification',
@@ -129,7 +173,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/account-pending',
-        pageBuilder: (context, state) => _fade(state, const AccountPendingPage()),
+        pageBuilder: (context, state) =>
+            _fade(state, const AccountPendingPage()),
       ),
 
       // ─── User Shell (Bottom Nav) ──────────────────────────────────────────
@@ -138,56 +183,97 @@ final routerProvider = Provider<GoRouter>((ref) {
         routes: [
           GoRoute(
             path: '/user',
-            pageBuilder: (context, state) => _fade(state, const UserDashboardScreen()),
+            pageBuilder: (context, state) =>
+                _fade(state, const UserDashboardScreen()),
+          ),
+          GoRoute(
+            path: '/user/shop',
+            pageBuilder: (context, state) =>
+                _fade(state, const ProductsScreen()),
+          ),
+          GoRoute(
+            path: '/user/vendors',
+            pageBuilder: (context, state) =>
+                _fade(state, const VendorsScreen()),
           ),
           GoRoute(
             path: '/user/track',
-            pageBuilder: (context, state) => _fade(state, const TrackingScreen()),
+            pageBuilder: (context, state) =>
+                _fade(state, const TrackingScreen()),
           ),
           GoRoute(
-            path: '/user/history',
-            pageBuilder: (context, state) => _fade(state, const DeliveryHistoryScreen()),
+            path: '/user/orders',
+            pageBuilder: (context, state) => _fade(state, const OrdersScreen()),
           ),
           GoRoute(
             path: '/user/notifications',
-            pageBuilder: (context, state) => _fade(state, const NotificationsScreen()),
+            pageBuilder: (context, state) =>
+                _fade(state, const NotificationsScreen()),
           ),
           GoRoute(
             path: '/user/profile',
-            pageBuilder: (context, state) => _fade(state, const ProfileScreen()),
+            pageBuilder: (context, state) =>
+                _fade(state, const ProfileScreen()),
           ),
         ],
       ),
 
-      // ─── User Full-Screen Pushes ─────────────────────────────────────────
+      // /user/request → redirect to shop (old concept removed)
+      GoRoute(path: '/user/request', redirect: (_, _) => '/user/shop'),
+      // /user/history → redirect to orders (old concept removed)
+      GoRoute(path: '/user/history', redirect: (_, _) => '/user/orders'),
+      // Marketplace push routes
       GoRoute(
-        path: '/user/request',
-        pageBuilder: (context, state) => _slide(state, const DeliveryRequestScreen()),
+        path: '/user/vendors/:id',
+        pageBuilder: (context, state) {
+          final id = state.pathParameters['id'] ?? '';
+          return _slide(state, VendorDetailsScreen(vendorId: id));
+        },
+      ),
+      GoRoute(
+        path: '/user/products/:id',
+        pageBuilder: (context, state) {
+          final id = state.pathParameters['id'] ?? '';
+          return _slide(state, ProductDetailsScreen(productId: id));
+        },
+      ),
+      GoRoute(
+        path: '/user/cart',
+        pageBuilder: (context, state) => _slide(state, const CartScreen()),
+      ),
+      GoRoute(
+        path: '/user/checkout',
+        pageBuilder: (context, state) => _slide(state, const CheckoutScreen()),
+      ),
+      GoRoute(
+        path: '/user/orders/:id',
+        pageBuilder: (context, state) {
+          final id = state.pathParameters['id'] ?? '';
+          return _slide(state, OrderDetailsScreen(orderId: id));
+        },
+      ),
+      GoRoute(
+        path: '/user/payment',
+        pageBuilder: (context, state) {
+          final orderId = state.uri.queryParameters['orderId'];
+          return _slide(state, PaymentScreen(orderId: orderId));
+        },
       ),
       GoRoute(
         path: '/user/profile/edit',
-        pageBuilder: (context, state) => _slide(state, const EditProfileScreen()),
+        pageBuilder: (context, state) =>
+            _slide(state, const EditProfileScreen()),
       ),
       GoRoute(
         path: '/user/profile/change-password',
-        pageBuilder: (context, state) => _slide(state, const ChangePasswordPage()),
+        pageBuilder: (context, state) =>
+            _slide(state, const ChangePasswordPage()),
       ),
       GoRoute(
         path: '/user/settings',
         pageBuilder: (context, state) => _slide(state, const SettingsPage()),
       ),
-      GoRoute(
-        path: '/user/delivery/summary',
-        pageBuilder: (context, state) => _slide(state, const DeliverySummaryPage()),
-      ),
-      GoRoute(
-        path: '/user/delivery/success',
-        pageBuilder: (context, state) => _slide(state, const DeliverySuccessPage()),
-      ),
-      GoRoute(
-        path: '/user/delivery/completed',
-        pageBuilder: (context, state) => _slide(state, const DeliveryCompletedPage()),
-      ),
+      // Delivery summary/success/completed routes removed — replaced by /user/payment
       GoRoute(
         path: '/user/track/details',
         pageBuilder: (context, state) {
@@ -203,33 +289,93 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
 
+      // ─── Vendor Shell ────────────────────────────────────────────────────
+      ShellRoute(
+        builder: (context, state, child) => VendorShell(child: child),
+        routes: [
+          GoRoute(
+            path: '/vendor',
+            pageBuilder: (context, state) =>
+                _fade(state, const VendorDashboardScreen()),
+          ),
+          GoRoute(
+            path: '/vendor/orders',
+            pageBuilder: (context, state) =>
+                _fade(state, const VendorOrdersScreen()),
+          ),
+          GoRoute(
+            path: '/vendor/products',
+            pageBuilder: (context, state) =>
+                _fade(state, const VendorProductsScreen()),
+          ),
+          GoRoute(
+            path: '/vendor/profile',
+            pageBuilder: (context, state) =>
+                _fade(state, const VendorProfileScreen()),
+          ),
+          GoRoute(
+            path: '/vendor/notifications',
+            pageBuilder: (context, state) =>
+                _fade(state, const VendorNotificationsScreen()),
+          ),
+        ],
+      ),
+      GoRoute(
+        path: '/vendor/products/add',
+        pageBuilder: (context, state) =>
+            _slide(state, const AddEditProductScreen()),
+      ),
+      GoRoute(
+        path: '/vendor/products/edit',
+        pageBuilder: (context, state) {
+          final id = state.uri.queryParameters['id'] ?? '';
+          return _slide(state, AddEditProductScreen(productId: id));
+        },
+      ),
+      GoRoute(
+        path: '/vendor/profile/edit',
+        pageBuilder: (context, state) =>
+            _slide(state, const EditProfileScreen()),
+      ),
+
       // ─── Admin Shell (Drawer) ─────────────────────────────────────────────
       ShellRoute(
         builder: (context, state, child) => AdminShell(child: child),
         routes: [
           GoRoute(
             path: '/admin',
-            pageBuilder: (context, state) => _fade(state, const AdminDashboardScreen()),
+            pageBuilder: (context, state) =>
+                _fade(state, const AdminDashboardScreen()),
           ),
           GoRoute(
             path: '/admin/users',
-            pageBuilder: (context, state) => _fade(state, const AdminUsersScreen()),
+            pageBuilder: (context, state) =>
+                _fade(state, const AdminUsersScreen()),
           ),
           GoRoute(
             path: '/admin/drones',
-            pageBuilder: (context, state) => _fade(state, const AdminDronesScreen()),
+            pageBuilder: (context, state) =>
+                _fade(state, const AdminDronesScreen()),
           ),
           GoRoute(
             path: '/admin/deliveries',
-            pageBuilder: (context, state) => _fade(state, const AdminDeliveriesScreen()),
+            pageBuilder: (context, state) =>
+                _fade(state, const AdminDeliveriesScreen()),
           ),
           GoRoute(
             path: '/admin/analytics',
-            pageBuilder: (context, state) => _fade(state, const AdminAnalyticsScreen()),
+            pageBuilder: (context, state) =>
+                _fade(state, const AdminAnalyticsScreen()),
           ),
           GoRoute(
             path: '/admin/settings',
-            pageBuilder: (context, state) => _fade(state, const AdminSettingsScreen()),
+            pageBuilder: (context, state) =>
+                _fade(state, const AdminSettingsScreen()),
+          ),
+          GoRoute(
+            path: '/admin/weather',
+            pageBuilder: (context, state) =>
+                _fade(state, const AdminWeatherScreen()),
           ),
         ],
       ),
@@ -237,28 +383,23 @@ final routerProvider = Provider<GoRouter>((ref) {
       // ─── Admin Full-Screen Pushes ────────────────────────────────────────
       GoRoute(
         path: '/admin/drones/add',
-        pageBuilder: (context, state) => _slide(state, const AddEditDroneScreen()),
+        pageBuilder: (context, state) =>
+            _slide(state, const AdminDronesScreen()),
       ),
       GoRoute(
         path: '/admin/drones/edit',
-        pageBuilder: (context, state) {
-          final droneId = state.uri.queryParameters['id'] ?? '';
-          return _slide(state, AddEditDroneScreen(droneId: droneId));
-        },
+        pageBuilder: (context, state) =>
+            _slide(state, const AdminDronesScreen()),
       ),
       GoRoute(
         path: '/admin/drones/details',
-        pageBuilder: (context, state) {
-          final droneId = state.uri.queryParameters['id'] ?? '';
-          return _slide(state, DroneDetailsPage(droneId: droneId));
-        },
+        pageBuilder: (context, state) =>
+            _slide(state, const AdminDronesScreen()),
       ),
       GoRoute(
         path: '/admin/drones/monitor',
-        pageBuilder: (context, state) {
-          final droneId = state.uri.queryParameters['id'] ?? '';
-          return _slide(state, DroneMonitoringPage(droneId: droneId));
-        },
+        pageBuilder: (context, state) =>
+            _slide(state, const AdminDronesScreen()),
       ),
       GoRoute(
         path: '/admin/deliveries/details',
@@ -268,40 +409,56 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
       GoRoute(
-        path: '/admin/users/details',
+        path: '/admin/users/:id',
+        name: 'admin-user-details',
         pageBuilder: (context, state) {
-          final email = state.uri.queryParameters['email'] ?? '';
-          return _slide(state, UserDetailsPage(email: email));
-        },
-      ),
-      GoRoute(
-        path: '/admin/users/edit',
-        pageBuilder: (context, state) {
-          final email = state.uri.queryParameters['email'] ?? '';
-          return _slide(state, EditUserPage(email: email));
-        },
-      ),
-      GoRoute(
-        path: '/admin/users/activity',
-        pageBuilder: (context, state) {
-          final email = state.uri.queryParameters['email'] ?? '';
-          return _slide(state, UserActivityPage(email: email));
+          final userId = state.pathParameters['id'];
+          if (userId == null || userId.isEmpty) {
+            return CustomTransitionPage<void>(
+              key: state.pageKey,
+              child: const Scaffold(
+                backgroundColor: AppColors.bgDark,
+                body: Center(
+                  child: Text(
+                    'Account not found.',
+                    style: TextStyle(color: Colors.white, fontSize: 16),
+                  ),
+                ),
+              ),
+              transitionsBuilder:
+                  (context, animation, secondaryAnimation, child) => child,
+            );
+          }
+          return CustomTransitionPage<void>(
+            key: ValueKey('admin-user-details-$userId'),
+            child: AdminUserDetailsScreen(userId: userId),
+            transitionsBuilder:
+                (context, animation, secondaryAnimation, child) {
+                  final tween = Tween(
+                    begin: const Offset(1.0, 0.0),
+                    end: Offset.zero,
+                  ).chain(CurveTween(curve: Curves.easeOutCubic));
+                  return SlideTransition(
+                    position: animation.drive(tween),
+                    child: child,
+                  );
+                },
+          );
         },
       ),
       GoRoute(
         path: '/admin/missions',
-        pageBuilder: (context, state) => _slide(state, const MissionListPage()),
+        pageBuilder: (context, state) =>
+            _slide(state, const AdminDronesScreen()),
       ),
       GoRoute(
         path: '/admin/missions/details',
-        pageBuilder: (context, state) {
-          final id = state.uri.queryParameters['id'] ?? '';
-          return _slide(state, MissionDetailsPage(missionId: id));
-        },
+        pageBuilder: (context, state) =>
+            _slide(state, const AdminDronesScreen()),
       ),
       GoRoute(
         path: '/admin/routes/planner',
-        pageBuilder: (context, state) => _slide(state, const RoutePlannerPage()),
+        pageBuilder: (context, state) => _slide(state, const NoFlyZonePage()),
       ),
       GoRoute(
         path: '/admin/routes/no-fly-zones',
@@ -309,23 +466,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/admin/routes/no-fly-zones/create',
-        pageBuilder: (context, state) => _slide(state, const CreateNoFlyZonePage()),
+        pageBuilder: (context, state) => _slide(state, const NoFlyZonePage()),
       ),
       GoRoute(
         path: '/admin/routes/no-fly-zones/edit',
-        pageBuilder: (context, state) {
-          final id = state.uri.queryParameters['id'] ?? '';
-          final name = state.uri.queryParameters['name'] ?? '';
-          final reason = state.uri.queryParameters['reason'] ?? '';
-          return _slide(
-            state,
-            EditNoFlyZonePage(
-              zoneId: id,
-              name: name,
-              reason: reason,
-            ),
-          );
-        },
+        pageBuilder: (context, state) => _slide(state, const NoFlyZonePage()),
       ),
       GoRoute(
         path: '/admin/reports',
@@ -333,15 +478,15 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/admin/reports/deliveries',
-        pageBuilder: (context, state) => _slide(state, const DeliveryReportsPage()),
+        pageBuilder: (context, state) => _slide(state, const ReportsPage()),
       ),
       GoRoute(
         path: '/admin/reports/drones',
-        pageBuilder: (context, state) => _slide(state, const DroneReportsPage()),
+        pageBuilder: (context, state) => _slide(state, const ReportsPage()),
       ),
       GoRoute(
         path: '/admin/reports/users',
-        pageBuilder: (context, state) => _slide(state, const UserReportsPage()),
+        pageBuilder: (context, state) => _slide(state, const ReportsPage()),
       ),
 
       // ─── Shared ──────────────────────────────────────────────────────────
@@ -355,11 +500,13 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/shared/privacy-policy',
-        pageBuilder: (context, state) => _slide(state, const PrivacyPolicyPage()),
+        pageBuilder: (context, state) =>
+            _slide(state, const PrivacyPolicyPage()),
       ),
       GoRoute(
         path: '/shared/terms-conditions',
-        pageBuilder: (context, state) => _slide(state, const TermsConditionsPage()),
+        pageBuilder: (context, state) =>
+            _slide(state, const TermsConditionsPage()),
       ),
     ],
   );
@@ -391,10 +538,7 @@ CustomTransitionPage<void> _slide(GoRouterState state, Widget child) {
         begin: const Offset(1.0, 0.0),
         end: Offset.zero,
       ).chain(CurveTween(curve: Curves.easeOutCubic));
-      return SlideTransition(
-        position: animation.drive(tween),
-        child: child,
-      );
+      return SlideTransition(position: animation.drive(tween), child: child);
     },
   );
 }

@@ -54,14 +54,23 @@ class ProductNotifier extends StateNotifier<ProductState> {
         return;
       }
 
-      // Only show products from active vendors.
-      // products.vendor_id → public.users.id (vendor role)
-      final productsRes = await _client
-          .from('products')
-          .select(
-            '*, users!vendor_id(full_name, business_name, role, vendor_status, account_status)',
-          )
-          .eq('is_active', true);
+      List<dynamic> productsRes;
+      try {
+        productsRes = await _client
+            .from('products')
+            .select(
+              '*, users!vendor_id(full_name, business_name, role, vendor_status, account_status)',
+            )
+            .eq('is_active', true)
+            .order('created_at', ascending: false);
+      } catch (err) {
+        debugPrint('Fallback select on products without relation hint: $err');
+        productsRes = await _client
+            .from('products')
+            .select()
+            .eq('is_active', true)
+            .order('created_at', ascending: false);
+      }
 
       if (!mounted) return;
 
@@ -69,38 +78,46 @@ class ProductNotifier extends StateNotifier<ProductState> {
       final Set<String> catSet = {};
       for (final p in productsRes) {
         final vendorMap = p['users'] as Map<String, dynamic>?;
-        if (vendorMap == null) continue;
+        if (vendorMap != null) {
+          final role = vendorMap['role']?.toString().toLowerCase();
+          final vendorStatus =
+              vendorMap['vendor_status']?.toString().toLowerCase();
+          final accountStatus =
+              vendorMap['account_status']?.toString().toLowerCase();
 
-        final role = vendorMap['role']?.toString();
-        final vendorStatus = vendorMap['vendor_status']?.toString();
-        final accountStatus = vendorMap['account_status']?.toString();
-
-        if (role != 'vendor' ||
-            vendorStatus != 'active' ||
-            accountStatus != 'active') {
-          continue;
+          if (accountStatus == 'suspended' ||
+              accountStatus == 'deleted' ||
+              vendorStatus == 'rejected' ||
+              vendorStatus == 'suspended') {
+            continue;
+          }
+          if (role != null && role != 'vendor') {
+            continue;
+          }
         }
 
         final vendorName =
-            vendorMap['business_name']?.toString() ??
-            vendorMap['full_name']?.toString() ??
-            'Unknown Vendor';
+            vendorMap?['business_name']?.toString() ??
+            vendorMap?['full_name']?.toString() ??
+            p['vendor_name']?.toString() ??
+            'Campus Vendor';
         final cat = p['category']?.toString() ?? 'Other';
         catSet.add(cat);
         loaded.add(
           MockProduct(
             id: p['id'].toString(),
-            vendorId: p['vendor_id'].toString(),
+            vendorId: p['vendor_id']?.toString() ?? '',
             vendorName: vendorName,
-            name: p['name'].toString(),
+            name: p['name']?.toString() ?? 'Item',
             description: p['description']?.toString() ?? '',
-            price: (p['price'] as num).toDouble(),
+            price: (p['price'] as num?)?.toDouble() ?? 0.0,
             stock: (p['stock_quantity'] as num?)?.toInt() ?? 0,
             category: cat,
             weightKg: (((p['weight_grams'] as num?) ?? 0) / 1000.0),
             imageUrl:
-                p['image_url']?.toString() ??
-                'https://images.unsplash.com/photo-1569050467447-ce54b3bbc37d?w=400',
+                p['image_url']?.toString().isNotEmpty == true
+                    ? p['image_url'].toString()
+                    : 'https://images.unsplash.com/photo-1569050467447-ce54b3bbc37d?w=400',
             isAvailable: p['is_active'] as bool? ?? true,
           ),
         );

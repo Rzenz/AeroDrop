@@ -356,42 +356,32 @@ class _CartSummary extends ConsumerWidget {
           FilledButton(
             onPressed: () {
               HapticFeedback.mediumImpact();
-              // Revalidate items against current database products list
               final dbProducts = ref.read(productProvider).products;
               List<String> removedOrFlagged = [];
 
-              for (int i = cart.length - 1; i >= 0; i--) {
-                final item = cart[i];
-                final match = dbProducts
-                    .where((p) => p.id == item.productId)
-                    .firstOrNull;
-                if (match == null || !match.isAvailable || match.stock <= 0) {
-                  cartNotifier.removeItem(item.productId);
-                  removedOrFlagged.add(item.productName);
-                } else {
-                  // Update price if changed
-                  if (item.unitPrice != match.price) {
-                    // Update price locally
-                    cartNotifier.removeItem(item.productId);
-                    cartNotifier.addItem(
-                      CartItem(
-                        productId: item.productId,
-                        productName: item.productName,
-                        vendorId: item.vendorId,
-                        vendorName: item.vendorName,
-                        imageUrl: item.imageUrl,
-                        unitPrice: match.price,
-                        weightKg: item.weightKg,
-                        quantity: item.quantity,
-                      ),
-                    );
-                  }
-                  // Cap quantity at available stock
-                  if (item.quantity > match.stock) {
-                    item.quantity = match.stock;
-                    removedOrFlagged.add(
-                      '${item.productName} (limited to ${match.stock} available)',
-                    );
+              if (dbProducts.isNotEmpty) {
+                for (int i = cart.length - 1; i >= 0; i--) {
+                  final item = cart[i];
+                  final match = dbProducts
+                      .where((p) => p.id == item.productId)
+                      .firstOrNull;
+                  if (match != null) {
+                    if (!match.isAvailable || match.stock <= 0) {
+                      cartNotifier.removeItem(item.productId);
+                      removedOrFlagged.add('${item.productName} (out of stock)');
+                    } else {
+                      // Update price if changed
+                      if (item.unitPrice != match.price) {
+                        item.unitPrice = match.price;
+                      }
+                      // Cap quantity at available stock
+                      if (item.quantity > match.stock) {
+                        item.quantity = match.stock;
+                        removedOrFlagged.add(
+                          '${item.productName} (limited to ${match.stock} available)',
+                        );
+                      }
+                    }
                   }
                 }
               }
@@ -407,6 +397,17 @@ class _CartSummary extends ConsumerWidget {
                   ),
                 );
                 return; // Let user review changes before proceeding
+              }
+
+              if (cart.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Your cart is empty.'),
+                    backgroundColor: AppColors.warning,
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+                return;
               }
 
               context.push('/user/checkout');

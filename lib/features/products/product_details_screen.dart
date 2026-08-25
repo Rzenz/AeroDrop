@@ -1,22 +1,167 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../mock_data/products_mock.dart';
 import '../../mock_data/cart_mock.dart';
+import '../../core/providers/product_provider.dart';
+import '../../core/services/supabase_service.dart';
 
-class ProductDetailsScreen extends StatelessWidget {
+class ProductDetailsScreen extends ConsumerStatefulWidget {
   final String productId;
   const ProductDetailsScreen({super.key, required this.productId});
 
   @override
+  ConsumerState<ProductDetailsScreen> createState() =>
+      _ProductDetailsScreenState();
+}
+
+class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
+  MockProduct? _directProduct;
+  bool _fetching = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchIfMissing();
+  }
+
+  Future<void> _fetchIfMissing() async {
+    final cached = ref
+        .read(productProvider)
+        .products
+        .where((p) => p.id == widget.productId)
+        .firstOrNull;
+
+    if (cached != null) {
+      setState(() => _directProduct = cached);
+      return;
+    }
+
+    if (!SupabaseService.isConfigured) return;
+
+    setState(() => _fetching = true);
+    try {
+      Map<String, dynamic>? res;
+      try {
+        res = await SupabaseService.client
+            .from('products')
+            .select(
+              '*, users!vendor_id(full_name, business_name, role, vendor_status, account_status)',
+            )
+            .eq('id', widget.productId)
+            .maybeSingle();
+      } catch (_) {
+        res = await SupabaseService.client
+            .from('products')
+            .select()
+            .eq('id', widget.productId)
+            .maybeSingle();
+      }
+
+      if (res != null && mounted) {
+        final vendorMap = res['users'] as Map<String, dynamic>?;
+        final vendorName =
+            vendorMap?['business_name']?.toString() ??
+            vendorMap?['full_name']?.toString() ??
+            res['vendor_name']?.toString() ??
+            'Campus Vendor';
+        final cat = res['category']?.toString() ?? 'Other';
+        setState(() {
+          _directProduct = MockProduct(
+            id: res!['id'].toString(),
+            vendorId: res['vendor_id']?.toString() ?? '',
+            vendorName: vendorName,
+            name: res['name']?.toString() ?? 'Item',
+            description: res['description']?.toString() ?? '',
+            price: (res['price'] as num?)?.toDouble() ?? 0.0,
+            stock: (res['stock_quantity'] as num?)?.toInt() ?? 0,
+            category: cat,
+            weightKg: (((res['weight_grams'] as num?) ?? 0) / 1000.0),
+            imageUrl:
+                res['image_url']?.toString().isNotEmpty == true
+                    ? res['image_url'].toString()
+                    : 'https://images.unsplash.com/photo-1569050467447-ce54b3bbc37d?w=400',
+            isAvailable: res['is_active'] as bool? ?? true,
+          );
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching product: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _fetching = false);
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final product = mockProducts.firstWhere(
-      (p) => p.id == productId,
-      orElse: () => mockProducts.first,
-    );
+    final productState = ref.watch(productProvider);
+    final product =
+        productState.products
+            .where((p) => p.id == widget.productId)
+            .firstOrNull ??
+        _directProduct;
+
+    if (product == null) {
+      if (_fetching || productState.isLoading) {
+        return const Scaffold(
+          backgroundColor: AppColors.bgDark,
+          body: Center(
+            child: CircularProgressIndicator(color: AppColors.accent),
+          ),
+        );
+      }
+
+      return Scaffold(
+        backgroundColor: AppColors.bgDark,
+        appBar: AppBar(
+          backgroundColor: AppColors.bgDark,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+            onPressed: () => context.pop(),
+          ),
+          title: const Text(
+            'Product Details',
+            style: TextStyle(color: Colors.white),
+          ),
+        ),
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.inventory_2_outlined,
+                color: AppColors.textSecondaryDark,
+                size: 64,
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Product not found or unavailable.',
+                style: TextStyle(color: Colors.white70, fontSize: 16),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () => context.pop(),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.accent,
+                ),
+                child: const Text(
+                  'Go Back',
+                  style: TextStyle(color: Colors.black),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     final bool available = product.isAvailable && product.stock > 0;
 
     return Scaffold(
@@ -144,8 +289,11 @@ class ProductDetailsScreen extends StatelessWidget {
                   // Vendor
                   const SizedBox(height: 6),
                   GestureDetector(
-                    onTap: () =>
-                        context.push('/user/vendors/${product.vendorId}'),
+                    onTap: () {
+                      if (product.vendorId.isNotEmpty) {
+                        context.push('/user/vendors/${product.vendorId}');
+                      }
+                    },
                     child: Row(
                       children: [
                         const Icon(
@@ -244,7 +392,9 @@ class ProductDetailsScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    product.description,
+                    product.description.isEmpty
+                        ? 'No description provided.'
+                        : product.description,
                     style: AppTextStyles.body(
                       fontSize: 14,
                       color: Colors.white70,

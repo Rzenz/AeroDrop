@@ -412,56 +412,68 @@ class VendorProductCard extends StatelessWidget {
                   ),
                   const Spacer(),
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(
-                        children: [
-                          Icon(
-                            isLowStock
-                                ? Icons.warning_amber_rounded
-                                : Icons.inventory_2_outlined,
-                            size: 13,
-                            color: isLowStock
-                                ? AppColors.warning
-                                : AppColors.textSecondaryDark,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Stock: ${product.stock}',
-                            style: TextStyle(
+                      Expanded(
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              isLowStock
+                                  ? Icons.warning_amber_rounded
+                                  : Icons.inventory_2_outlined,
+                              size: 13,
                               color: isLowStock
                                   ? AppColors.warning
                                   : AppColors.textSecondaryDark,
-                              fontSize: 11,
-                              fontWeight: isLowStock
-                                  ? FontWeight.bold
-                                  : FontWeight.normal,
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                'Stock: ${product.stock}',
+                                style: TextStyle(
+                                  color: isLowStock
+                                      ? AppColors.warning
+                                      : AppColors.textSecondaryDark,
+                                  fontSize: 11,
+                                  fontWeight: isLowStock
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
+                      const SizedBox(width: 4),
                       Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          IconButton(
-                            icon: const Icon(
-                              Icons.edit_rounded,
-                              size: 16,
-                              color: AppColors.primaryLight,
+                          InkWell(
+                            onTap: onEdit,
+                            borderRadius: BorderRadius.circular(6),
+                            child: const Padding(
+                              padding: EdgeInsets.all(4.0),
+                              child: Icon(
+                                Icons.edit_rounded,
+                                size: 16,
+                                color: AppColors.primaryLight,
+                              ),
                             ),
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
-                            onPressed: onEdit,
                           ),
-                          const SizedBox(width: 10),
-                          IconButton(
-                            icon: const Icon(
-                              Icons.delete_outline_rounded,
-                              size: 16,
-                              color: AppColors.danger,
+                          const SizedBox(width: 4),
+                          InkWell(
+                            onTap: onDelete,
+                            borderRadius: BorderRadius.circular(6),
+                            child: const Padding(
+                              padding: EdgeInsets.all(4.0),
+                              child: Icon(
+                                Icons.delete_outline_rounded,
+                                size: 16,
+                                color: AppColors.danger,
+                              ),
                             ),
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
-                            onPressed: onDelete,
                           ),
                         ],
                       ),

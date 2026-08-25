@@ -8,7 +8,7 @@ class CartItem {
   final String vendorId;
   final String vendorName;
   final String imageUrl;
-  final double unitPrice;
+  double unitPrice;
   final double weightKg;
   int quantity;
 

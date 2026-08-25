@@ -7,6 +7,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../mock_data/products_mock.dart';
 import '../../core/providers/product_provider.dart';
+import '../../core/services/supabase_service.dart';
 
 class AddEditProductScreen extends ConsumerStatefulWidget {
   final String? productId; // null = add, non-null = edit
@@ -50,24 +51,51 @@ class _AddEditProductScreenState extends ConsumerState<AddEditProductScreen> {
 
     // In edit mode, load state after first build when ref is available
     if (_isEdit) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        final product = ref
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        var product = ref
             .read(vendorProductsProvider)
             .products
-            .firstWhere(
-              (p) => p.id == widget.productId,
-              orElse: () => mockProducts.first,
-            );
-        setState(() {
-          _name.text = product.name;
-          _description.text = product.description;
-          _price.text = product.price.toString();
-          _stock.text = product.stock.toString();
-          _weight.text = (product.weightKg * 1000).toStringAsFixed(0);
-          _category = product.category;
-          _available = product.isAvailable;
-          _imageUrl = product.imageUrl;
-        });
+            .where((p) => p.id == widget.productId)
+            .firstOrNull;
+
+        if (product == null && SupabaseService.isConfigured) {
+          try {
+            final res = await SupabaseService.client
+                .from('products')
+                .select()
+                .eq('id', widget.productId!)
+                .maybeSingle();
+            if (res != null) {
+              final cat = res['category']?.toString() ?? 'Food';
+              product = MockProduct(
+                id: res['id'].toString(),
+                vendorId: res['vendor_id'].toString(),
+                vendorName: '',
+                name: res['name'].toString(),
+                description: res['description']?.toString() ?? '',
+                price: (res['price'] as num?)?.toDouble() ?? 0.0,
+                stock: (res['stock_quantity'] as num?)?.toInt() ?? 0,
+                category: cat,
+                weightKg: (((res['weight_grams'] as num?) ?? 0) / 1000.0),
+                imageUrl: res['image_url']?.toString() ?? '',
+                isAvailable: res['is_active'] as bool? ?? true,
+              );
+            }
+          } catch (_) {}
+        }
+
+        if (product != null && mounted) {
+          setState(() {
+            _name.text = product!.name;
+            _description.text = product.description;
+            _price.text = product.price.toString();
+            _stock.text = product.stock.toString();
+            _weight.text = (product.weightKg * 1000).toStringAsFixed(0);
+            _category = product.category;
+            _available = product.isAvailable;
+            _imageUrl = product.imageUrl;
+          });
+        }
       });
     }
   }

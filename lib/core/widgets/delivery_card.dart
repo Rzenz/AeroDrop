@@ -91,16 +91,8 @@ class _DeliveryCardState extends ConsumerState<DeliveryCard> {
 
     return AnimatedCard(
       onTap: widget.onTap,
-      borderGradient: LinearGradient(
-        colors: isInTransit
-            ? [AppColors.accent, AppColors.primary]
-            : [
-                AppColors.borderDark,
-                AppColors.borderDark.withValues(alpha: 0.4),
-              ],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ),
+      // Only an active delivery earns a rim; a finished one is just a row.
+      accent: isInTransit ? AppColors.accent : null,
       child: Stack(
         children: [
           if (isInTransit)

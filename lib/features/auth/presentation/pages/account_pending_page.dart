@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/neu_feedback.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
-import '../../../../core/widgets/custom_button.dart';
-import '../../../../core/widgets/glass_card.dart';
+import '../../../../core/widgets/neu_button.dart';
+import '../../../../core/widgets/neu_card.dart';
 import '../../../../core/providers/auth_provider.dart';
 import '../../../../core/utils/logout_helper.dart';
 
@@ -20,7 +21,7 @@ class AccountPendingPage extends ConsumerWidget {
         : 'Unknown';
 
     return Scaffold(
-      backgroundColor: AppColors.bgDark,
+      backgroundColor: AppColors.base,
       body: Container(
         decoration: const BoxDecoration(gradient: AppColors.bgGradientDark),
         child: SafeArea(
@@ -53,7 +54,7 @@ class AccountPendingPage extends ConsumerWidget {
                   style: AppTextStyles.title(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                    color: AppColors.textPrimary,
                   ),
                   textAlign: TextAlign.center,
                 ).animate().fadeIn(delay: 100.ms),
@@ -62,14 +63,14 @@ class AccountPendingPage extends ConsumerWidget {
                   'Your vendor application is currently being reviewed by the campus flight team. You\'ll receive access once approved.',
                   style: AppTextStyles.body(
                     fontSize: 14,
-                    color: AppColors.textSecondaryDark,
+                    color: AppColors.textSecondary,
                   ),
                   textAlign: TextAlign.center,
                 ).animate().fadeIn(delay: 200.ms),
                 const SizedBox(height: 28),
 
                 // Application summary card
-                GlassCard(
+                NeuCard(
                   padding: const EdgeInsets.all(20),
                   borderRadius: BorderRadius.circular(20),
                   child: Column(
@@ -87,7 +88,7 @@ class AccountPendingPage extends ConsumerWidget {
                             'Application Details',
                             style: AppTextStyles.subHead(
                               fontSize: 14,
-                              color: Colors.white,
+                              color: AppColors.textPrimary,
                             ),
                           ),
                         ],
@@ -105,33 +106,26 @@ class AccountPendingPage extends ConsumerWidget {
                 ).animate().fadeIn(delay: 250.ms),
                 const SizedBox(height: 24),
 
-                GlassCard(
+                NeuCard(
                   padding: const EdgeInsets.all(20),
                   borderRadius: BorderRadius.circular(24),
                   child: Column(
                     children: [
-                      CustomButton(
+                      NeuButton(
                         text: 'Contact Administrator',
                         onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: const Text('Support request sent!'),
-                              backgroundColor: AppColors.success,
-                              behavior: SnackBarBehavior.floating,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
+                          showNeuSnack(
+                            context,
+                            'Support request sent!',
+                            tone: NeuToneKind.success,
                           );
                         },
                         icon: Icons.support_agent_rounded,
                       ),
                       const SizedBox(height: 12),
-                      CustomButton(
+                      NeuButton(
                         text: 'Log Out',
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF333333), Color(0xFF222222)],
-                        ),
+                        variant: NeuButtonVariant.neutral,
                         onPressed: () => showLogoutConfirmation(context, ref),
                         icon: Icons.logout_rounded,
                       ),
@@ -166,9 +160,9 @@ class _Row extends StatelessWidget {
             width: 80,
             child: Text(
               label,
-              style: const TextStyle(
-                color: AppColors.textSecondaryDark,
+              style: AppTextStyles.caption(
                 fontSize: 12,
+                color: AppColors.textSecondary,
               ),
             ),
           ),
@@ -176,12 +170,9 @@ class _Row extends StatelessWidget {
           Expanded(
             child: Text(
               value,
-              style: TextStyle(
-                color: valueColor ?? Colors.white,
+              style: AppTextStyles.body(
                 fontSize: 13,
-                fontWeight: valueColor != null
-                    ? FontWeight.bold
-                    : FontWeight.normal,
+                color: valueColor ?? Colors.white,
               ),
             ),
           ),

@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../core/widgets/neu_feedback.dart';
+import '../../core/widgets/custom_app_bar.dart';
+import '../../core/widgets/spring_switch.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -113,18 +116,9 @@ class _AddEditProductScreenState extends ConsumerState<AddEditProductScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.bgDark,
-      appBar: AppBar(
-        backgroundColor: AppColors.bgDark,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-          onPressed: () => context.pop(),
-        ),
-        title: Text(
-          _isEdit ? 'Modify Listing' : 'New Product Listing',
-          style: AppTextStyles.subHead(fontSize: 18, color: Colors.white),
-        ),
+      backgroundColor: AppColors.base,
+      appBar: CustomAppBar(
+        title: _isEdit ? 'Modify Listing' : 'New Product Listing',
       ),
       body: Form(
         key: _formKey,
@@ -136,10 +130,10 @@ class _AddEditProductScreenState extends ConsumerState<AddEditProductScreen> {
             Container(
               height: 160,
               decoration: BoxDecoration(
-                color: AppColors.cardDark,
+                color: AppColors.base,
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.08),
+                  color: AppColors.border,
                   style: BorderStyle.solid,
                   width: 1.5,
                 ),
@@ -174,20 +168,20 @@ class _AddEditProductScreenState extends ConsumerState<AddEditProductScreen> {
                           ),
                         ),
                         const SizedBox(height: 12),
-                        const Text(
+                        Text(
                           'Upload Product Showcase Image',
-                          style: TextStyle(
-                            color: Colors.white,
+                          style: AppTextStyles.subHead(
                             fontSize: 13,
+                            color: AppColors.textPrimary,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         const SizedBox(height: 4),
-                        const Text(
+                        Text(
                           'Supports PNG, JPG up to 5MB',
-                          style: TextStyle(
-                            color: AppColors.textSecondaryDark,
+                          style: AppTextStyles.caption(
                             fontSize: 11,
+                            color: AppColors.textSecondary,
                           ),
                         ),
                       ],
@@ -256,7 +250,7 @@ class _AddEditProductScreenState extends ConsumerState<AddEditProductScreen> {
                   'Category Segment',
                   style: AppTextStyles.body(
                     fontSize: 12,
-                    color: AppColors.textSecondaryDark,
+                    color: AppColors.textSecondary,
                   ),
                 ),
                 const SizedBox(height: 10),
@@ -274,27 +268,22 @@ class _AddEditProductScreenState extends ConsumerState<AddEditProductScreen> {
                           vertical: 8,
                         ),
                         decoration: BoxDecoration(
-                          color: isSelected
-                              ? AppColors.accent
-                              : AppColors.cardDark,
+                          color: isSelected ? AppColors.accent : AppColors.base,
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
                             color: isSelected
                                 ? AppColors.accent
-                                : Colors.white.withValues(alpha: 0.08),
+                                : AppColors.border,
                             width: 1.2,
                           ),
                         ),
                         child: Text(
                           c,
-                          style: TextStyle(
+                          style: AppTextStyles.caption(
+                            fontSize: 11.5,
                             color: isSelected
                                 ? AppColors.primaryDark
                                 : Colors.white,
-                            fontSize: 11.5,
-                            fontWeight: isSelected
-                                ? FontWeight.bold
-                                : FontWeight.normal,
                           ),
                         ),
                       ),
@@ -309,9 +298,9 @@ class _AddEditProductScreenState extends ConsumerState<AddEditProductScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                color: AppColors.cardDark,
+                color: AppColors.base,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                border: Border.all(color: AppColors.border),
               ),
               child: Row(
                 children: [
@@ -325,11 +314,11 @@ class _AddEditProductScreenState extends ConsumerState<AddEditProductScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'Available for Orders',
-                          style: TextStyle(
-                            color: Colors.white,
+                          style: AppTextStyles.subHead(
                             fontSize: 13,
+                            color: AppColors.textPrimary,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -337,20 +326,17 @@ class _AddEditProductScreenState extends ConsumerState<AddEditProductScreen> {
                           _available
                               ? 'Visible to students on campus'
                               : 'Hidden from campus store catalog',
-                          style: const TextStyle(
-                            color: AppColors.textSecondaryDark,
+                          style: AppTextStyles.caption(
                             fontSize: 11,
+                            color: AppColors.textSecondary,
                           ),
                         ),
                       ],
                     ),
                   ),
-                  Switch(
+                  SpringSwitch(
                     value: _available,
-                    activeThumbColor: AppColors.accent,
-                    activeTrackColor: AppColors.accent.withValues(alpha: 0.3),
-                    inactiveThumbColor: AppColors.textSecondaryDark,
-                    inactiveTrackColor: Colors.white10,
+                    semanticLabel: 'Product available for ordering',
                     onChanged: (value) => setState(() => _available = value),
                   ),
                 ],
@@ -443,32 +429,18 @@ class _AddEditProductScreenState extends ConsumerState<AddEditProductScreen> {
 
     if (success) {
       context.pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            _isEdit
-                ? 'Product updated successfully.'
-                : 'Product added successfully.',
-          ),
-          backgroundColor: AppColors.success,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
+      showNeuSnack(
+        context,
+        _isEdit
+            ? 'Product updated successfully.'
+            : 'Product added successfully.',
+        tone: NeuToneKind.success,
       );
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            _isEdit ? 'Failed to update product.' : 'Failed to add product.',
-          ),
-          backgroundColor: AppColors.danger,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
+      showNeuSnack(
+        context,
+        _isEdit ? 'Failed to update product.' : 'Failed to add product.',
+        tone: NeuToneKind.error,
       );
     }
   }
@@ -500,7 +472,7 @@ class _Field extends StatelessWidget {
           label,
           style: AppTextStyles.body(
             fontSize: 12,
-            color: AppColors.textSecondaryDark,
+            color: AppColors.textSecondary,
           ),
         ),
         const SizedBox(height: 8),
@@ -508,16 +480,16 @@ class _Field extends StatelessWidget {
           controller: controller,
           maxLines: maxLines,
           keyboardType: keyboardType,
-          style: const TextStyle(color: Colors.white, fontSize: 14),
+          style: AppTextStyles.body(fontSize: 14, color: AppColors.textPrimary),
           validator: validator,
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: TextStyle(
-              color: AppColors.textSecondaryDark.withValues(alpha: 0.5),
+            hintStyle: AppTextStyles.body(
               fontSize: 13,
+              color: AppColors.textSecondary.withValues(alpha: 0.5),
             ),
             filled: true,
-            fillColor: AppColors.cardDark,
+            fillColor: AppColors.base,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
               borderSide: BorderSide(

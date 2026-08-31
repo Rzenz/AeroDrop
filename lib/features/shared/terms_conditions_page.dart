@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
-import '../../core/widgets/glass_card.dart';
+import '../../core/widgets/neu_card.dart';
+import '../../core/widgets/neu_back_button.dart';
 
 class TermsConditionsPage extends StatelessWidget {
   const TermsConditionsPage({super.key});
@@ -11,7 +11,7 @@ class TermsConditionsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.bgDark,
+      backgroundColor: AppColors.base,
       body: Container(
         decoration: const BoxDecoration(gradient: AppColors.bgGradientDark),
         child: SafeArea(
@@ -23,29 +23,14 @@ class TermsConditionsPage extends StatelessWidget {
                 // Header
                 Row(
                   children: [
-                    GestureDetector(
-                      onTap: () => context.pop(),
-                      child: Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: AppColors.cardDark,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.borderDark),
-                        ),
-                        child: const Icon(
-                          Icons.arrow_back_rounded,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                      ),
-                    ),
+                    const NeuBackButton(),
                     const SizedBox(width: 16),
                     Text(
                       'Terms & Conditions',
                       style: AppTextStyles.title(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                        color: AppColors.textPrimary,
                       ),
                     ),
                   ],
@@ -55,7 +40,7 @@ class TermsConditionsPage extends StatelessWidget {
                 // Content
                 Expanded(
                   child: SingleChildScrollView(
-                    child: GlassCard(
+                    child: NeuCard(
                       padding: const EdgeInsets.all(20),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -106,7 +91,7 @@ class TermsConditionsPage extends StatelessWidget {
       text,
       style: AppTextStyles.body(
         fontSize: 12,
-        color: AppColors.textSecondaryDark,
+        color: AppColors.textSecondary,
       ).copyWith(height: 1.5),
     );
   }

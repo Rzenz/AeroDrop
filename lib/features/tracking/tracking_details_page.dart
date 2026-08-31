@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import '../../core/widgets/neu_feedback.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
-import '../../core/widgets/glass_card.dart';
+import '../../core/widgets/neu_card.dart';
 import '../../core/widgets/custom_app_bar.dart';
 import '../../core/widgets/staggered_list.dart';
 import '../../core/providers/delivery_provider.dart';
@@ -271,20 +272,14 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
     final delivery = _fetchedDelivery ?? providerDelivery;
 
     return Scaffold(
-      backgroundColor: AppColors.bgDark,
+      backgroundColor: AppColors.base,
       appBar: const CustomAppBar(title: 'Tracking Telemetry'),
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFF0F243A), AppColors.bgDark],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-          ),
-        ),
+        decoration: BoxDecoration(color: AppColors.base),
         child: SafeArea(
           child: RefreshIndicator(
             color: AppColors.accent,
-            backgroundColor: AppColors.cardDark,
+            backgroundColor: AppColors.base,
             onRefresh: _fetchDetails,
             child: SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
@@ -296,11 +291,9 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
                     const SizedBox(height: 12),
 
                     // ETA Card
-                    GlassCard(
+                    NeuCard(
                       padding: const EdgeInsets.all(20),
-                      borderGradient: const LinearGradient(
-                        colors: [AppColors.primary, Colors.transparent],
-                      ),
+                      accent: AppColors.primary,
                       child: Row(
                         children: [
                           Container(
@@ -324,7 +317,7 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
                                   'Estimated Arrival Time',
                                   style: AppTextStyles.body(
                                     fontSize: 12,
-                                    color: AppColors.textSecondaryDark,
+                                    color: AppColors.textSecondary,
                                   ),
                                 ),
                                 const SizedBox(height: 4),
@@ -338,7 +331,7 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
                                   style: AppTextStyles.title(
                                     fontSize: 18,
                                     fontWeight: FontWeight.bold,
-                                    color: Colors.white,
+                                    color: AppColors.textPrimary,
                                   ),
                                 ),
                               ],
@@ -350,11 +343,9 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
                     const SizedBox(height: 16),
 
                     // Drone info
-                    GlassCard(
+                    NeuCard(
                       padding: const EdgeInsets.all(20),
-                      borderGradient: const LinearGradient(
-                        colors: [AppColors.accent, Colors.transparent],
-                      ),
+                      accent: AppColors.accent,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -366,10 +357,7 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
                               color: AppColors.accent,
                             ),
                           ),
-                          const Divider(
-                            color: AppColors.borderDark,
-                            height: 24,
-                          ),
+                          Divider(color: AppColors.border, height: 24),
                           _rowDetail(
                             Icons.airplay_rounded,
                             'Drone ID',
@@ -396,11 +384,9 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
                     const SizedBox(height: 16),
 
                     // Pilot info
-                    GlassCard(
+                    NeuCard(
                       padding: const EdgeInsets.all(20),
-                      borderGradient: const LinearGradient(
-                        colors: [AppColors.primary, Colors.transparent],
-                      ),
+                      accent: AppColors.primary,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -412,10 +398,7 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
                               color: AppColors.primaryLight,
                             ),
                           ),
-                          const Divider(
-                            color: AppColors.borderDark,
-                            height: 24,
-                          ),
+                          Divider(color: AppColors.border, height: 24),
                           _rowDetail(
                             Icons.shield_rounded,
                             'System Mode',
@@ -437,11 +420,8 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
                     const SizedBox(height: 16),
 
                     // Route details
-                    GlassCard(
+                    NeuCard(
                       padding: const EdgeInsets.all(20),
-                      borderGradient: const LinearGradient(
-                        colors: [Colors.white12, Colors.transparent],
-                      ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -450,13 +430,10 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
                             style: AppTextStyles.title(
                               fontSize: 15,
                               fontWeight: FontWeight.bold,
-                              color: Colors.white70,
+                              color: AppColors.textSecondary,
                             ),
                           ),
-                          const Divider(
-                            color: AppColors.borderDark,
-                            height: 24,
-                          ),
+                          Divider(color: AppColors.border, height: 24),
                           _rowDetail(
                             Icons.my_location_rounded,
                             'From',
@@ -492,13 +469,13 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
-          Icon(icon, color: AppColors.textSecondaryDark, size: 18),
+          Icon(icon, color: AppColors.textSecondary, size: 18),
           const SizedBox(width: 12),
           Text(
             label,
             style: AppTextStyles.body(
               fontSize: 13,
-              color: AppColors.textSecondaryDark,
+              color: AppColors.textSecondary,
             ),
           ),
           const SizedBox(width: 12),
@@ -511,7 +488,7 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
               style: AppTextStyles.title(
                 fontSize: 13,
                 fontWeight: FontWeight.bold,
-                color: Colors.white,
+                color: AppColors.textPrimary,
               ),
             ),
           ),
@@ -539,7 +516,7 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
               style: AppTextStyles.title(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: Colors.white,
+                color: AppColors.textPrimary,
               ),
             ),
           ],
@@ -548,7 +525,7 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
           'This request will be marked as cancelled and kept in your history.',
           style: AppTextStyles.body(
             fontSize: 14,
-            color: AppColors.textSecondaryDark,
+            color: AppColors.textSecondary,
           ),
         ),
         actionsPadding: const EdgeInsets.only(right: 16, bottom: 16),
@@ -560,7 +537,7 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
               style: AppTextStyles.body(
                 fontSize: 14,
                 fontWeight: FontWeight.bold,
-                color: AppColors.textSecondaryDark,
+                color: AppColors.textSecondary,
               ),
             ),
           ),
@@ -581,22 +558,14 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
               if (!context.mounted) return;
 
               if (error == null) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Delivery request cancelled.'),
-                    backgroundColor: AppColors.success,
-                    behavior: SnackBarBehavior.floating,
-                  ),
+                showNeuSnack(
+                  context,
+                  'Delivery request cancelled.',
+                  tone: NeuToneKind.success,
                 );
                 context.pop(); // Go back from tracking details
               } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(error),
-                    backgroundColor: AppColors.danger,
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
+                showNeuSnack(context, error, tone: NeuToneKind.error);
               }
             },
             child: Text(
@@ -604,7 +573,7 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
               style: AppTextStyles.body(
                 fontSize: 14,
                 fontWeight: FontWeight.bold,
-                color: Colors.white,
+                color: AppColors.textPrimary,
               ),
             ),
           ),

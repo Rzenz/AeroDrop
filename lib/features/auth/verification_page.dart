@@ -1,12 +1,13 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../../core/widgets/neu_feedback.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
-import '../../core/widgets/custom_button.dart';
-import '../../core/widgets/glass_card.dart';
+import '../../core/widgets/neu_button.dart';
+import '../../core/widgets/neu_card.dart';
 import '../../core/providers/auth_provider.dart';
 
 enum VerificationMethod { email, sms }
@@ -78,15 +79,10 @@ class _VerificationPageState extends ConsumerState<VerificationPage> {
       final destination = _method == VerificationMethod.email
           ? 'email'
           : 'phone number';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Verification code resent to your $destination!'),
-          backgroundColor: AppColors.success,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
+      showNeuSnack(
+        context,
+        'Verification code resent to your $destination!',
+        tone: NeuToneKind.success,
       );
     }
   }
@@ -94,15 +90,10 @@ class _VerificationPageState extends ConsumerState<VerificationPage> {
   void _verifyCode() async {
     final code = _controllers.map((c) => c.text).join();
     if (code.length < 6) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Please enter the complete 6-digit code.'),
-          backgroundColor: Colors.redAccent,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
+      showNeuSnack(
+        context,
+        'Please enter the complete 6-digit code.',
+        tone: NeuToneKind.error,
       );
       return;
     }
@@ -124,15 +115,10 @@ class _VerificationPageState extends ConsumerState<VerificationPage> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Unable to verify the code. Please try again.'),
-            backgroundColor: Colors.redAccent,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
+        showNeuSnack(
+          context,
+          'Unable to verify the code. Please try again.',
+          tone: NeuToneKind.error,
         );
       }
     }
@@ -163,7 +149,7 @@ class _VerificationPageState extends ConsumerState<VerificationPage> {
     final userPhone = _maskPhoneNumber(user?.phoneNumber);
 
     return Scaffold(
-      backgroundColor: AppColors.bgDark,
+      backgroundColor: AppColors.base,
       body: Container(
         width: double.infinity,
         height: double.infinity,
@@ -203,7 +189,7 @@ class _VerificationPageState extends ConsumerState<VerificationPage> {
                     style: AppTextStyles.title(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                      color: AppColors.textPrimary,
                     ),
                   ).animate().fadeIn(delay: 100.ms),
 
@@ -221,7 +207,7 @@ class _VerificationPageState extends ConsumerState<VerificationPage> {
                       key: ValueKey(_method),
                       style: AppTextStyles.body(
                         fontSize: 14,
-                        color: AppColors.textSecondaryDark,
+                        color: AppColors.textSecondary,
                       ),
                       textAlign: TextAlign.center,
                     ),
@@ -242,10 +228,9 @@ class _VerificationPageState extends ConsumerState<VerificationPage> {
                           keyboardType: TextInputType.number,
                           textAlign: TextAlign.center,
                           maxLength: 1,
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: AppTextStyles.heading(
                             fontSize: 20,
-                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
                           ),
                           inputFormatters: [
                             FilteringTextInputFormatter.digitsOnly,
@@ -290,12 +275,12 @@ class _VerificationPageState extends ConsumerState<VerificationPage> {
 
                   const SizedBox(height: 36),
 
-                  GlassCard(
+                  NeuCard(
                     padding: const EdgeInsets.all(24),
                     borderRadius: BorderRadius.circular(24),
                     child: Column(
                       children: [
-                        CustomButton(
+                        NeuButton(
                           text: 'Verify & Proceed',
                           isLoading: _isLoading,
                           onPressed: _verifyCode,
@@ -310,7 +295,7 @@ class _VerificationPageState extends ConsumerState<VerificationPage> {
                               "Didn't receive the code? ",
                               style: AppTextStyles.body(
                                 fontSize: 13,
-                                color: AppColors.textSecondaryDark,
+                                color: AppColors.textSecondary,
                               ),
                             ),
                             _timerSeconds > 0

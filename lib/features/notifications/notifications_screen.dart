@@ -7,6 +7,7 @@ import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/empty_state_widget.dart';
 import '../../core/providers/notification_provider.dart';
 import '../../core/models/notification_model.dart';
+import '../../core/widgets/neu_back_button.dart';
 
 class NotificationsScreen extends ConsumerStatefulWidget {
   const NotificationsScreen({super.key});
@@ -80,7 +81,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     final notifications = ref.watch(notificationProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.bgDark,
+      backgroundColor: AppColors.base,
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -90,24 +91,10 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
               padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
               child: Row(
                 children: [
-                  // Back Button to go to home
-                  GestureDetector(
-                    onTap: () => context.go('/user'),
-                    child: Container(
-                      padding: const EdgeInsets.all(10),
-                      margin: const EdgeInsets.only(right: 16),
-                      decoration: BoxDecoration(
-                        color: AppColors.cardDark,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: AppColors.borderDark),
-                      ),
-                      child: const Icon(
-                        Icons.arrow_back_ios_new_rounded,
-                        color: Colors.white,
-                        size: 16,
-                      ),
-                    ),
-                  ),
+                  // Lands on the home tab rather than unwinding the stack —
+                  // notifications are reachable from anywhere.
+                  NeuBackButton(onPressed: () => context.go('/user')),
+                  const SizedBox(width: 16),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -117,7 +104,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                           style: AppTextStyles.title(
                             fontSize: 24,
                             fontWeight: FontWeight.w900,
-                            color: Colors.white,
+                            color: AppColors.textPrimary,
                           ),
                         ),
                         const SizedBox(height: 4),
@@ -125,7 +112,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                           'Stay updated on drone status & alerts',
                           style: AppTextStyles.body(
                             fontSize: 14,
-                            color: AppColors.textSecondaryDark,
+                            color: AppColors.textSecondary,
                           ),
                         ),
                       ],
@@ -155,7 +142,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                 onRefresh: () =>
                     ref.read(notificationProvider.notifier).loadNotifications(),
                 color: AppColors.accent,
-                backgroundColor: AppColors.cardDark,
+                backgroundColor: AppColors.base,
                 child: notifications.isEmpty
                     ? ListView(
                         physics: const AlwaysScrollableScrollPhysics(),
@@ -275,7 +262,7 @@ class _TimelineNotificationTileState
                     Positioned(
                       top: widget.isFirst ? 24 : 0,
                       bottom: widget.isLast ? 0 : 0,
-                      child: Container(width: 2, color: AppColors.borderDark),
+                      child: Container(width: 2, color: AppColors.border),
                     ),
                     // Timeline node dot
                     Positioned(
@@ -310,9 +297,9 @@ class _TimelineNotificationTileState
                           : Container(
                               width: 12,
                               height: 12,
-                              decoration: const BoxDecoration(
+                              decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                color: AppColors.borderDark,
+                                color: AppColors.border,
                               ),
                             ),
                     ),
@@ -340,12 +327,12 @@ class _TimelineNotificationTileState
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
                         color: isRead
-                            ? AppColors.cardDark
+                            ? AppColors.base
                             : widget.color.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
                           color: isRead
-                              ? AppColors.borderDark
+                              ? AppColors.border
                               : widget.color.withValues(alpha: 0.25),
                           width: 1.5,
                         ),
@@ -377,7 +364,7 @@ class _TimelineNotificationTileState
                                     fontWeight: isRead
                                         ? FontWeight.w600
                                         : FontWeight.bold,
-                                    color: Colors.white,
+                                    color: AppColors.textPrimary,
                                   ),
                                 ),
                                 const SizedBox(height: 4),
@@ -385,7 +372,7 @@ class _TimelineNotificationTileState
                                   widget.notification.body,
                                   style: AppTextStyles.body(
                                     fontSize: 12,
-                                    color: AppColors.textSecondaryDark,
+                                    color: AppColors.textSecondary,
                                     height: 1.5,
                                   ),
                                 ),

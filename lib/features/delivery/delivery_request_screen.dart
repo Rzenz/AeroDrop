@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../core/widgets/neu_input.dart';
+import '../../core/widgets/neu_feedback.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -6,9 +8,9 @@ import 'package:flutter_animate/flutter_animate.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
-import '../../core/widgets/gradient_button.dart';
-import '../../core/widgets/custom_text_field.dart';
-import '../../core/widgets/glass_card.dart';
+import '../../core/widgets/neu_button.dart';
+import '../../core/widgets/neu_text_field.dart';
+import '../../core/widgets/neu_card.dart';
 import '../../core/widgets/custom_app_bar.dart';
 import '../../core/providers/delivery_provider.dart';
 import '../../core/providers/auth_provider.dart';
@@ -136,17 +138,10 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
     } catch (error) {
       debugPrint('Campus locations load failed: $error');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text(
-              'Campus locations failed to load. Please try again.',
-            ),
-            backgroundColor: AppColors.danger,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
+        showNeuSnack(
+          context,
+          'Campus locations failed to load. Please try again.',
+          tone: NeuToneKind.error,
         );
       }
     } finally {
@@ -424,25 +419,11 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
   }
 
   void _showValidationError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: AppColors.danger,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-    );
+    showNeuSnack(context, message, tone: NeuToneKind.error);
   }
 
   void _showMessage(String message, bool success) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: success ? AppColors.success : AppColors.danger,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-    );
+    showNeuSnack(context, message, tone: NeuToneKind.success);
   }
 
   void _next() {
@@ -642,16 +623,10 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
     }
 
     return Scaffold(
-      backgroundColor: AppColors.bgDark,
+      backgroundColor: AppColors.base,
       appBar: CustomAppBar(title: 'Make a Delivery', onBackPressed: _back),
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFF0F243A), AppColors.bgDark],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-          ),
-        ),
+        decoration: BoxDecoration(color: AppColors.base),
         child: SafeArea(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -677,11 +652,11 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
                                 gradient: isActive
                                     ? AppColors.accentGradient
                                     : null,
-                                color: isActive ? null : AppColors.cardDark,
+                                color: isActive ? null : AppColors.base,
                                 border: Border.all(
                                   color: isActive
                                       ? AppColors.accent
-                                      : AppColors.borderDark,
+                                      : AppColors.border,
                                   width: 1.5,
                                 ),
                                 boxShadow: isCurrent
@@ -703,7 +678,7 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
                                   fontWeight: FontWeight.bold,
                                   color: isActive
                                       ? AppColors.bgDark
-                                      : AppColors.textSecondaryDark,
+                                      : AppColors.textSecondary,
                                 ),
                               ),
                             ),
@@ -714,7 +689,7 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
                                 fontSize: 9,
                                 color: isCurrent
                                     ? Colors.white
-                                    : AppColors.textSecondaryDark,
+                                    : AppColors.textSecondary,
                               ),
                             ),
                           ],
@@ -726,7 +701,7 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
                       borderRadius: BorderRadius.circular(4),
                       child: LinearProgressIndicator(
                         value: (_currentPage + 1) / _steps.length,
-                        backgroundColor: AppColors.borderDark,
+                        backgroundColor: AppColors.border,
                         valueColor: const AlwaysStoppedAnimation<Color>(
                           AppColors.accent,
                         ),
@@ -890,12 +865,12 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
                                     isGrounded
                                         ? 'Drone deliveries are grounded due to unsafe weather.'
                                         : 'Deliveries may be delayed due to weather.',
-                                    style: TextStyle(
+                                    style: AppTextStyles.label(
                                       fontSize: 12,
                                       color: isGrounded
                                           ? AppColors.danger
                                           : AppColors.warning,
-                                      fontWeight: FontWeight.w600,
+                                      letterSpacing: 0,
                                     ),
                                   ),
                                 ),
@@ -905,7 +880,7 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
                         ),
                       Padding(
                         padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
-                        child: GradientButton(
+                        child: NeuButton(
                           text: isGrounded && _currentPage == 3
                               ? 'Delivery Unavailable'
                               : (_currentPage == 3
@@ -970,15 +945,15 @@ class _PackagePage extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             'Package Details',
-            style: AppTextStyles.subHead(fontSize: 18, color: Colors.white),
+            style: AppTextStyles.subHead(
+              fontSize: 18,
+              color: AppColors.textPrimary,
+            ),
           ).animate().fadeIn().slideY(begin: 0.1),
           const SizedBox(height: 16),
-          DarkCard(
+          NeuPanel(
             padding: const EdgeInsets.all(20),
             borderRadius: BorderRadius.circular(24),
-            borderGradient: const LinearGradient(
-              colors: [Colors.white12, Colors.transparent],
-            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -986,7 +961,7 @@ class _PackagePage extends StatelessWidget {
                   'SELECT ITEM TYPE',
                   style: AppTextStyles.label(
                     fontSize: 11,
-                    color: AppColors.textSecondaryDark,
+                    color: AppColors.textSecondary,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -1006,7 +981,7 @@ class _PackagePage extends StatelessWidget {
                   }).toList(),
                 ),
                 const SizedBox(height: 24),
-                CustomTextField(
+                NeuTextField(
                   labelText: 'Weight (kg)',
                   hintText: '1.0',
                   prefixIcon: Icons.scale_rounded,
@@ -1018,9 +993,9 @@ class _PackagePage extends StatelessWidget {
                   padding: const EdgeInsets.only(left: 4),
                   child: Text(
                     'Maximum supported fleet capacity: ${maxFleetPayload.toStringAsFixed(1)} kg',
-                    style: TextStyle(
-                      color: AppColors.accent.withValues(alpha: 0.7),
+                    style: AppTextStyles.caption(
                       fontSize: 11,
+                      color: AppColors.accent.withValues(alpha: 0.7),
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -1030,7 +1005,7 @@ class _PackagePage extends StatelessWidget {
                   'DELIVERY PRIORITY',
                   style: AppTextStyles.label(
                     fontSize: 11,
-                    color: AppColors.textSecondaryDark,
+                    color: AppColors.textSecondary,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -1058,7 +1033,7 @@ class _PackagePage extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: AppColors.bgDark,
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: AppColors.borderDark),
+                        border: Border.all(color: AppColors.border),
                       ),
                       child: Row(
                         children: [
@@ -1073,13 +1048,13 @@ class _PackagePage extends StatelessWidget {
                               scheduledText,
                               style: AppTextStyles.body(
                                 fontSize: 13.5,
-                                color: Colors.white,
+                                color: AppColors.textPrimary,
                               ),
                             ),
                           ),
-                          const Icon(
+                          Icon(
                             Icons.edit_calendar_rounded,
-                            color: AppColors.textSecondaryDark,
+                            color: AppColors.textSecondary,
                             size: 18,
                           ),
                         ],
@@ -1088,7 +1063,7 @@ class _PackagePage extends StatelessWidget {
                   ),
                 ],
                 const SizedBox(height: 20),
-                CustomTextField(
+                NeuTextField(
                   labelText: 'Special Instructions',
                   hintText: 'e.g. Fragile, keep upright...',
                   prefixIcon: Icons.notes_rounded,
@@ -1144,15 +1119,15 @@ class _LocationPage extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             'Delivery Locations',
-            style: AppTextStyles.subHead(fontSize: 18, color: Colors.white),
+            style: AppTextStyles.subHead(
+              fontSize: 18,
+              color: AppColors.textPrimary,
+            ),
           ).animate().fadeIn().slideY(begin: 0.1),
           const SizedBox(height: 16),
-          DarkCard(
+          NeuPanel(
             padding: const EdgeInsets.all(20),
             borderRadius: BorderRadius.circular(24),
-            borderGradient: const LinearGradient(
-              colors: [Colors.white12, Colors.transparent],
-            ),
             child: Column(
               children: [
                 if (loadingLocations)
@@ -1173,7 +1148,7 @@ class _LocationPage extends StatelessWidget {
                           'Loading campus locations...',
                           style: AppTextStyles.body(
                             fontSize: 13,
-                            color: AppColors.textSecondaryDark,
+                            color: AppColors.textSecondary,
                           ),
                         ),
                       ],
@@ -1191,11 +1166,7 @@ class _LocationPage extends StatelessWidget {
                   Row(
                     children: [
                       const SizedBox(width: 24),
-                      Container(
-                        width: 2,
-                        height: 28,
-                        color: AppColors.borderDark,
-                      ),
+                      Container(width: 2, height: 28, color: AppColors.border),
                     ],
                   ),
                   _LocationDropdown(
@@ -1208,12 +1179,12 @@ class _LocationPage extends StatelessWidget {
                   ),
                 ] else ...[
                   const SizedBox(height: 20),
-                  const Center(
+                  Center(
                     child: Padding(
                       padding: EdgeInsets.all(16.0),
                       child: Text(
                         'Campus locations failed to load. Please try again.',
-                        style: TextStyle(
+                        style: AppTextStyles.subHead(
                           color: AppColors.danger,
                           fontWeight: FontWeight.bold,
                         ),
@@ -1223,14 +1194,14 @@ class _LocationPage extends StatelessWidget {
                   ),
                 ],
                 const SizedBox(height: 20),
-                CustomTextField(
+                NeuTextField(
                   labelText: 'Recipient Name',
                   hintText: 'Name of person receiving',
                   prefixIcon: Icons.person_rounded,
                   controller: recipientController,
                 ),
                 const SizedBox(height: 14),
-                CustomTextField(
+                NeuTextField(
                   labelText: 'Recipient Phone Number',
                   hintText: 'e.g. 09XXXXXXXXX',
                   prefixIcon: Icons.phone_rounded,
@@ -1247,7 +1218,7 @@ class _LocationPage extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: AppColors.bgDark.withValues(alpha: 0.7),
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppColors.borderDark),
+                    border: Border.all(color: AppColors.border),
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1263,7 +1234,7 @@ class _LocationPage extends StatelessWidget {
                           'Route safety, drone capacity, and weather checks will run before dispatch.',
                           style: AppTextStyles.body(
                             fontSize: 12,
-                            color: AppColors.textSecondaryDark,
+                            color: AppColors.textSecondary,
                           ),
                         ),
                       ),
@@ -1321,16 +1292,19 @@ class _PaymentPage extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             'Payment Method',
-            style: AppTextStyles.subHead(fontSize: 18, color: Colors.white),
+            style: AppTextStyles.subHead(
+              fontSize: 18,
+              color: AppColors.textPrimary,
+            ),
           ).animate().fadeIn().slideY(begin: 0.1),
           const SizedBox(height: 16),
           Container(
             margin: const EdgeInsets.only(bottom: 16),
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: AppColors.cardDark,
+              color: AppColors.base,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: AppColors.borderDark),
+              border: Border.all(color: AppColors.border),
             ),
             child: Row(
               children: [
@@ -1345,7 +1319,7 @@ class _PaymentPage extends StatelessWidget {
                     'Estimated Delivery Fee',
                     style: AppTextStyles.body(
                       fontSize: 13,
-                      color: AppColors.textSecondaryDark,
+                      color: AppColors.textSecondary,
                     ),
                   ),
                 ),
@@ -1375,10 +1349,10 @@ class _PaymentPage extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: isSelected
                       ? option.color.withValues(alpha: 0.1)
-                      : AppColors.cardDark,
+                      : AppColors.base,
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                    color: isSelected ? option.color : AppColors.borderDark,
+                    color: isSelected ? option.color : AppColors.border,
                     width: 1.5,
                   ),
                 ),
@@ -1402,7 +1376,7 @@ class _PaymentPage extends StatelessWidget {
                             style: AppTextStyles.title(
                               fontSize: 15,
                               fontWeight: FontWeight.bold,
-                              color: Colors.white,
+                              color: AppColors.textPrimary,
                             ),
                           ),
                           const SizedBox(height: 4),
@@ -1410,7 +1384,7 @@ class _PaymentPage extends StatelessWidget {
                             option.subtitle,
                             style: AppTextStyles.body(
                               fontSize: 11.5,
-                              color: AppColors.textSecondaryDark,
+                              color: AppColors.textSecondary,
                             ),
                           ),
                         ],
@@ -1502,16 +1476,16 @@ class _ConfirmPage extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             'Confirm Details',
-            style: AppTextStyles.subHead(fontSize: 18, color: Colors.white),
+            style: AppTextStyles.subHead(
+              fontSize: 18,
+              color: AppColors.textPrimary,
+            ),
           ).animate().fadeIn(),
           const SizedBox(height: 16),
-          GlassCard(
+          NeuCard(
             padding: const EdgeInsets.all(24),
             borderRadius: BorderRadius.circular(24),
-            borderGradient: const LinearGradient(
-              colors: [AppColors.accent, AppColors.primary, Colors.transparent],
-              stops: [0.0, 0.5, 1.0],
-            ),
+            accent: AppColors.accent,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1527,7 +1501,7 @@ class _ConfirmPage extends StatelessWidget {
                   label: 'Weight',
                   value: '$weight kg',
                 ),
-                const Divider(color: AppColors.borderDark, height: 24),
+                Divider(color: AppColors.border, height: 24),
                 _sectionHeader('Priority & Schedule', onEditPrioritySchedule),
                 const SizedBox(height: 8),
                 _confirmItem(
@@ -1543,7 +1517,7 @@ class _ConfirmPage extends StatelessWidget {
                     value: scheduledText,
                     color: AppColors.accent,
                   ),
-                const Divider(color: AppColors.borderDark, height: 24),
+                Divider(color: AppColors.border, height: 24),
                 _sectionHeader('Location Details', onEditLocation),
                 const SizedBox(height: 8),
                 _confirmItem(
@@ -1567,7 +1541,7 @@ class _ConfirmPage extends StatelessWidget {
                   label: 'Recipient',
                   value: recipient,
                 ),
-                const Divider(color: AppColors.borderDark, height: 24),
+                Divider(color: AppColors.border, height: 24),
                 _sectionHeader('Payment Details', onEditPayment),
                 const SizedBox(height: 8),
                 _confirmItem(
@@ -1590,9 +1564,9 @@ class _ConfirmPage extends StatelessWidget {
                       ? AppColors.success
                       : AppColors.accent,
                 ),
-                const Padding(
+                Padding(
                   padding: EdgeInsets.symmetric(vertical: 12),
-                  child: Divider(color: AppColors.borderDark, height: 1),
+                  child: Divider(color: AppColors.border, height: 1),
                 ),
                 _confirmItem(
                   icon: Icons.verified_user_outlined,
@@ -1625,7 +1599,7 @@ class _ConfirmPage extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 18, color: AppColors.textSecondaryDark),
+          Icon(icon, size: 18, color: AppColors.textSecondary),
           const SizedBox(width: 12),
           Expanded(
             flex: 4,
@@ -1633,7 +1607,7 @@ class _ConfirmPage extends StatelessWidget {
               label,
               style: AppTextStyles.body(
                 fontSize: 13.5,
-                color: AppColors.textSecondaryDark,
+                color: AppColors.textSecondary,
               ),
             ),
           ),
@@ -1659,35 +1633,16 @@ class _ConfirmPage extends StatelessWidget {
 }
 
 class _ChoiceChip extends StatelessWidget {
+  const _ChoiceChip({required this.label, required this.selected});
+
   final String label;
   final bool selected;
 
-  const _ChoiceChip({required this.label, required this.selected});
-
+  // Selection is handled by the GestureDetector this sits inside, so the
+  // shared chip gets a no-op tap and only renders the state.
   @override
-  Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: BoxDecoration(
-        gradient: selected ? AppColors.accentGradient : null,
-        color: selected ? null : AppColors.bgDark,
-        borderRadius: BorderRadius.circular(100),
-        border: Border.all(
-          color: selected ? AppColors.accent : AppColors.borderDark,
-          width: 1.5,
-        ),
-      ),
-      child: Text(
-        label,
-        style: AppTextStyles.title(
-          fontSize: 13,
-          fontWeight: selected ? FontWeight.bold : FontWeight.normal,
-          color: selected ? AppColors.bgDark : AppColors.textSecondaryDark,
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) =>
+      NeuFilterChip(label: label, selected: selected, onTap: () {});
 }
 
 class _LocationDropdown extends StatelessWidget {
@@ -1712,20 +1667,20 @@ class _LocationDropdown extends StatelessWidget {
     return DropdownButtonFormField<CampusLocation>(
       initialValue: value,
       isExpanded: true,
-      dropdownColor: AppColors.cardDark,
-      iconEnabledColor: AppColors.textSecondaryDark,
+      dropdownColor: AppColors.base,
+      iconEnabledColor: AppColors.textSecondary,
       decoration: InputDecoration(
         labelText: label,
         labelStyle: AppTextStyles.label(
           fontSize: 12,
-          color: AppColors.textSecondaryDark,
+          color: AppColors.textSecondary,
         ),
-        prefixIcon: Icon(icon, color: AppColors.textSecondaryDark, size: 20),
+        prefixIcon: Icon(icon, color: AppColors.textSecondary, size: 20),
         filled: true,
         fillColor: AppColors.bgDark,
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: AppColors.borderDark),
+          borderSide: BorderSide(color: AppColors.border),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
@@ -1735,10 +1690,7 @@ class _LocationDropdown extends StatelessWidget {
       ),
       hint: Text(
         hint,
-        style: AppTextStyles.body(
-          fontSize: 13,
-          color: AppColors.textSecondaryDark,
-        ),
+        style: AppTextStyles.body(fontSize: 13, color: AppColors.textSecondary),
       ),
       items: items.map((location) {
         return DropdownMenuItem<CampusLocation>(
@@ -1747,7 +1699,10 @@ class _LocationDropdown extends StatelessWidget {
             location.building == null || location.building!.isEmpty
                 ? location.name
                 : '${location.name} • ${location.building}',
-            style: AppTextStyles.body(fontSize: 13.5, color: Colors.white),
+            style: AppTextStyles.body(
+              fontSize: 13.5,
+              color: AppColors.textPrimary,
+            ),
             overflow: TextOverflow.ellipsis,
           ),
         );

@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import '../../core/widgets/neu_feedback.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_text_styles.dart';
-import '../../core/widgets/glass_card.dart';
+import '../../core/widgets/neu_card.dart';
+import '../../core/widgets/neu_surface.dart';
 import '../../core/widgets/delivery_card.dart';
 import '../../core/widgets/section_header.dart';
 import '../../core/widgets/staggered_list.dart';
@@ -52,10 +55,10 @@ class UserDashboardScreen extends ConsumerWidget {
     final firstName = user?.name.split(' ').first ?? 'Pilot';
 
     return Scaffold(
-      backgroundColor: AppColors.bgDark,
+      backgroundColor: AppColors.base,
       body: RefreshIndicator(
         color: AppColors.accent,
-        backgroundColor: AppColors.cardDark,
+        backgroundColor: AppColors.base,
         onRefresh: () async {
           await ref
               .read(deliveryProvider.notifier)
@@ -66,110 +69,68 @@ class UserDashboardScreen extends ConsumerWidget {
         child: CustomScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
-            // Sticky SliverAppBar
+            // Header — greeting, alerts, profile. Flat on the canvas so the
+            // only things carrying depth are the two controls on the right.
             SliverAppBar(
-              expandedHeight: 110,
-              floating: false,
               pinned: true,
-              stretch: true,
-              backgroundColor: AppColors.bgDark,
+              toolbarHeight: 74,
+              backgroundColor: AppColors.base,
+              surfaceTintColor: Colors.transparent,
+              scrolledUnderElevation: 0,
               elevation: 0,
-              flexibleSpace: FlexibleSpaceBar(
-                collapseMode: CollapseMode.parallax,
-                background: Container(
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Color(0xFF1565C0), AppColors.bgDark],
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                    ),
-                  ),
+              automaticallyImplyLeading: false,
+              titleSpacing: 0,
+              title: Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: AppSpacing.pageGutter(context),
                 ),
-                titlePadding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 10,
-                ),
-                title: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                child: Row(
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          greeting,
-                          style: AppTextStyles.label(
-                            fontSize: 10,
-                            color: Colors.white70,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            greeting,
+                            style: AppTextStyles.caption(fontSize: 12),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                        ),
-                        Text(
-                          firstName,
-                          style: AppTextStyles.title(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.white,
+                          const SizedBox(height: 1),
+                          Text(
+                            firstName,
+                            style: AppTextStyles.heading(fontSize: 22),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                    Row(
-                      children: [
-                        IconButton(
-                          onPressed: () => context.push('/user/notifications'),
-                          icon: Stack(
-                            clipBehavior: Clip.none,
-                            children: [
-                              const Icon(
-                                Icons.notifications_none_rounded,
-                                color: Colors.white,
-                                size: 24,
-                              ),
-                              if (unreadCount > 0)
-                                Positioned(
-                                  right: -4,
-                                  top: -4,
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 5,
-                                      vertical: 2,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.accent,
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    constraints: const BoxConstraints(
-                                      minWidth: 14,
-                                      minHeight: 14,
-                                    ),
-                                    child: Text(
-                                      unreadCount > 99 ? '99+' : '$unreadCount',
-                                      style: const TextStyle(
-                                        color: AppColors.bgDark,
-                                        fontSize: 8.5,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                      textAlign: TextAlign.center,
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
+                    const SizedBox(width: AppSpacing.xs),
+                    NeuIconButton(
+                      icon: Icons.notifications_none_rounded,
+                      tooltip: 'Notifications',
+                      badgeCount: unreadCount,
+                      onPressed: () => context.push('/user/notifications'),
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                    NeuPressable(
+                      width: 44,
+                      height: 44,
+                      borderRadius: BorderRadius.circular(22),
+                      color: AppColors.accent,
+                      alignment: Alignment.center,
+                      semanticLabel: 'Your profile',
+                      onTap: () => context.go('/user/profile'),
+                      child: Text(
+                        firstName.isNotEmpty ? firstName[0].toUpperCase() : 'P',
+                        style: AppTextStyles.title(
+                          fontSize: 16,
+                          color: AppColors.bgDark,
+                          fontWeight: FontWeight.w800,
                         ),
-                        const SizedBox(width: 4),
-                        CircleAvatar(
-                          radius: 16,
-                          backgroundColor: AppColors.accent,
-                          child: Text(
-                            firstName.isNotEmpty ? firstName[0] : 'P',
-                            style: AppTextStyles.title(
-                              fontSize: 12,
-                              color: AppColors.bgDark,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ],
                 ),
@@ -178,14 +139,19 @@ class UserDashboardScreen extends ConsumerWidget {
 
             // Scrollable Body
             SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 120),
+              padding: EdgeInsets.fromLTRB(
+                AppSpacing.pageGutter(context),
+                AppSpacing.xs,
+                AppSpacing.pageGutter(context),
+                AppSpacing.dockClearance(context),
+              ),
               sliver: SliverList(
                 delegate: SliverChildListDelegate([
                   StaggeredColumn(
                     delayMs: 50,
                     children: [
                       // Quick Actions Grid (Moved to top)
-                      _QuickActions(),
+                      const _QuickActions(),
 
                       const SizedBox(height: 28),
 
@@ -217,9 +183,9 @@ class UserDashboardScreen extends ConsumerWidget {
                                   children: [
                                     Text(
                                       'Unable to load vendors.',
-                                      style: TextStyle(
-                                        color: AppColors.danger,
+                                      style: AppTextStyles.caption(
                                         fontSize: 12,
+                                        color: AppColors.danger,
                                       ),
                                     ),
                                     const SizedBox(height: 6),
@@ -227,11 +193,11 @@ class UserDashboardScreen extends ConsumerWidget {
                                       onPressed: () => ref
                                           .read(vendorProvider.notifier)
                                           .loadVendors(),
-                                      child: const Text(
+                                      child: Text(
                                         'Retry',
-                                        style: TextStyle(
-                                          color: AppColors.accent,
+                                        style: AppTextStyles.caption(
                                           fontSize: 12,
+                                          color: AppColors.accent,
                                         ),
                                       ),
                                     ),
@@ -242,9 +208,9 @@ class UserDashboardScreen extends ConsumerWidget {
                             ? Center(
                                 child: Text(
                                   'No vendors are currently available.',
-                                  style: TextStyle(
-                                    color: AppColors.textSecondaryDark,
+                                  style: AppTextStyles.caption(
                                     fontSize: 12,
+                                    color: AppColors.textSecondary,
                                   ),
                                 ),
                               )
@@ -257,18 +223,13 @@ class UserDashboardScreen extends ConsumerWidget {
                                   return Container(
                                     width: 240,
                                     margin: const EdgeInsets.only(right: 14),
-                                    child: GlassCard(
+                                    child: NeuCard(
                                       onTap: () => context.push(
                                         '/user/vendors/${vendor.id}',
                                       ),
                                       padding: const EdgeInsets.all(12),
-                                      borderGradient: LinearGradient(
-                                        colors: [
-                                          vendor.logoColor.withValues(
-                                            alpha: 0.4,
-                                          ),
-                                          Colors.white12,
-                                        ],
+                                      accent: vendor.logoColor.withValues(
+                                        alpha: 0.4,
                                       ),
                                       child: Row(
                                         children: [
@@ -283,10 +244,10 @@ class UserDashboardScreen extends ConsumerWidget {
                                             alignment: Alignment.center,
                                             child: Text(
                                               vendor.logoInitials,
-                                              style: const TextStyle(
-                                                color: Colors.white,
-                                                fontWeight: FontWeight.bold,
+                                              style: AppTextStyles.subHead(
                                                 fontSize: 15,
+                                                color: AppColors.textPrimary,
+                                                fontWeight: FontWeight.bold,
                                               ),
                                             ),
                                           ),
@@ -303,7 +264,8 @@ class UserDashboardScreen extends ConsumerWidget {
                                                   style: AppTextStyles.title(
                                                     fontSize: 14,
                                                     fontWeight: FontWeight.bold,
-                                                    color: Colors.white,
+                                                    color:
+                                                        AppColors.textPrimary,
                                                   ),
                                                   maxLines: 1,
                                                   overflow:
@@ -335,12 +297,15 @@ class UserDashboardScreen extends ConsumerWidget {
                                                     const SizedBox(width: 4),
                                                     Text(
                                                       '${vendor.rating}',
-                                                      style: const TextStyle(
-                                                        color: Colors.white70,
-                                                        fontSize: 11,
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                      ),
+                                                      style:
+                                                          AppTextStyles.label(
+                                                            fontSize: 11,
+                                                            color: AppColors
+                                                                .textSecondary,
+                                                            fontWeight:
+                                                                FontWeight.bold,
+                                                            letterSpacing: 0,
+                                                          ),
                                                     ),
                                                   ],
                                                 ),
@@ -374,7 +339,7 @@ class UserDashboardScreen extends ConsumerWidget {
                               return Container(
                                 width: 140,
                                 margin: const EdgeInsets.only(right: 14),
-                                child: GlassCard(
+                                child: NeuCard(
                                   onTap: () => context.push(
                                     '/user/products/${product.id}',
                                   ),
@@ -410,7 +375,7 @@ class UserDashboardScreen extends ConsumerWidget {
                                               style: AppTextStyles.title(
                                                 fontSize: 12,
                                                 fontWeight: FontWeight.bold,
-                                                color: Colors.white,
+                                                color: AppColors.textPrimary,
                                               ),
                                               maxLines: 1,
                                               overflow: TextOverflow.ellipsis,
@@ -420,7 +385,7 @@ class UserDashboardScreen extends ConsumerWidget {
                                               product.vendorName,
                                               style: AppTextStyles.label(
                                                 fontSize: 9,
-                                                color: Colors.white54,
+                                                color: AppColors.textSecondary,
                                               ),
                                               maxLines: 1,
                                               overflow: TextOverflow.ellipsis,
@@ -428,10 +393,11 @@ class UserDashboardScreen extends ConsumerWidget {
                                             const SizedBox(height: 4),
                                             Text(
                                               '₱${product.price.toStringAsFixed(2)}',
-                                              style: const TextStyle(
-                                                color: AppColors.accent,
+                                              style: AppTextStyles.label(
                                                 fontSize: 11,
+                                                color: AppColors.accent,
                                                 fontWeight: FontWeight.bold,
+                                                letterSpacing: 0,
                                               ),
                                             ),
                                           ],
@@ -472,16 +438,16 @@ class UserDashboardScreen extends ConsumerWidget {
                       const SizedBox(height: 12),
 
                       if (deliveries.isEmpty)
-                        GlassCard(
+                        NeuCard(
                           padding: const EdgeInsets.symmetric(
                             vertical: 36,
                             horizontal: 24,
                           ),
                           child: Column(
                             children: [
-                              const Icon(
+                              Icon(
                                 Icons.shopping_bag_outlined,
-                                color: AppColors.textSecondaryDark,
+                                color: AppColors.textSecondary,
                                 size: 48,
                               ),
                               const SizedBox(height: 16),
@@ -489,7 +455,7 @@ class UserDashboardScreen extends ConsumerWidget {
                                 'You have no orders yet.',
                                 style: AppTextStyles.subHead(
                                   fontSize: 16,
-                                  color: Colors.white,
+                                  color: AppColors.textPrimary,
                                 ),
                               ),
                               const SizedBox(height: 6),
@@ -497,7 +463,7 @@ class UserDashboardScreen extends ConsumerWidget {
                                 'Order delicious food & drinks above!',
                                 style: AppTextStyles.body(
                                   fontSize: 13,
-                                  color: AppColors.textSecondaryDark,
+                                  color: AppColors.textSecondary,
                                 ),
                               ),
                             ],
@@ -511,7 +477,7 @@ class UserDashboardScreen extends ConsumerWidget {
                             final delivery = deliveries[index];
 
                             // Alternate between gradient-rimmed AnimatedCard (via DeliveryCard)
-                            // and a frosted GlassCard containing the delivery details.
+                            // and a frosted NeuCard containing the delivery details.
                             if (index % 2 == 0) {
                               return Padding(
                                 padding: const EdgeInsets.only(bottom: 12),
@@ -525,14 +491,11 @@ class UserDashboardScreen extends ConsumerWidget {
                             } else {
                               return Padding(
                                 padding: const EdgeInsets.only(bottom: 12),
-                                child: GlassCard(
+                                child: NeuCard(
                                   onTap: () => context.push(
                                     '/user/track/details?id=${delivery.id}',
                                   ),
                                   padding: const EdgeInsets.all(18),
-                                  borderGradient: const LinearGradient(
-                                    colors: [Colors.white24, Colors.white12],
-                                  ),
                                   child: Column(
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
@@ -564,7 +527,7 @@ class UserDashboardScreen extends ConsumerWidget {
                                         style: AppTextStyles.title(
                                           fontSize: 16,
                                           fontWeight: FontWeight.bold,
-                                          color: Colors.white,
+                                          color: AppColors.textPrimary,
                                         ),
                                       ),
                                       const SizedBox(height: 8),
@@ -576,8 +539,7 @@ class UserDashboardScreen extends ConsumerWidget {
                                             delivery.packageType,
                                             style: AppTextStyles.body(
                                               fontSize: 12.5,
-                                              color:
-                                                  AppColors.textSecondaryDark,
+                                              color: AppColors.textSecondary,
                                             ),
                                           ),
                                           Text(
@@ -610,29 +572,45 @@ class UserDashboardScreen extends ConsumerWidget {
 }
 
 class _QuickActions extends StatelessWidget {
+  const _QuickActions();
+
+  /// One action tile: a tinted inset icon well over a label.
+  ///
+  /// No accent rim here — four rimmed tiles side by side read as noise, and
+  /// the icon colour already distinguishes them.
   Widget _buildActionCard(_QuickActionData a, {double margin = 0}) {
     return Expanded(
       child: Padding(
         padding: EdgeInsets.symmetric(horizontal: margin),
-        child: GlassCard(
+        child: NeuCard(
           onTap: a.onTap,
+          semanticLabel: a.label,
           padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 6),
-          borderGradient: LinearGradient(
-            colors: [a.color.withValues(alpha: 0.3), Colors.transparent],
-          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (a.customIcon != null)
-                SizedBox(height: 22, width: 22, child: a.customIcon!)
-              else if (a.icon != null)
-                Icon(a.icon, color: a.color, size: 22),
-              const SizedBox(height: 6),
+              NeuSurface(
+                style: NeuStyle.inset,
+                depth: NeuDepth.flat,
+                width: 38,
+                height: 38,
+                alignment: Alignment.center,
+                borderRadius: BorderRadius.circular(19),
+                color: Color.alphaBlend(
+                  a.color.withValues(alpha: 0.14),
+                  AppColors.surfaceSunken,
+                ),
+                child: a.customIcon != null
+                    ? SizedBox(height: 21, width: 21, child: a.customIcon!)
+                    : Icon(a.icon, color: a.color, size: 20),
+              ),
+              const SizedBox(height: AppSpacing.xs),
               Text(
                 a.label,
                 style: AppTextStyles.label(
-                  fontSize: 9.5,
-                  color: AppColors.textSecondaryDark,
+                  fontSize: 10.5,
+                  color: AppColors.textSecondary,
+                  letterSpacing: 0,
                 ),
                 textAlign: TextAlign.center,
                 maxLines: 1,
@@ -654,7 +632,7 @@ class _QuickActions extends StatelessWidget {
           painter: DroneSvgPainter(
             animationValue: 0.0,
             lineColor: AppColors.accent,
-            accentColor: const Color(0xFF4F46E5),
+            accentColor: AppColors.accent,
           ),
         ),
         label: 'Order Food',
@@ -749,15 +727,8 @@ class AeroDropWeatherWidget extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final weather = ref.watch(weatherProvider);
 
-    return GlassCard(
-      borderGradient: LinearGradient(
-        colors: [
-          const Color(0xFF1A2B45).withValues(alpha: 0.85),
-          const Color(0xFF0F243A).withValues(alpha: 0.9),
-        ],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ),
+    return NeuCard(
+      accent: const Color(0xFF1A2B45).withValues(alpha: 0.85),
       child: weather.isLoading && weather.id == null
           ? const SizedBox(
               height: 120,
@@ -772,11 +743,11 @@ class AeroDropWeatherWidget extends ConsumerWidget {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text(
+                    Text(
                       'Unable to load campus weather.',
-                      style: TextStyle(
-                        color: AppColors.danger,
+                      style: AppTextStyles.subHead(
                         fontSize: 13,
+                        color: AppColors.danger,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -790,9 +761,12 @@ class AeroDropWeatherWidget extends ConsumerWidget {
                         color: AppColors.accent,
                         size: 16,
                       ),
-                      label: const Text(
+                      label: Text(
                         'Retry',
-                        style: TextStyle(color: AppColors.accent, fontSize: 13),
+                        style: AppTextStyles.body(
+                          fontSize: 13,
+                          color: AppColors.accent,
+                        ),
                       ),
                     ),
                   ],
@@ -860,7 +834,7 @@ class AeroDropWeatherWidget extends ConsumerWidget {
                         'UCLM Campus Weather',
                         style: AppTextStyles.subHead(
                           fontSize: 15,
-                          color: Colors.white,
+                          color: AppColors.textPrimary,
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -886,7 +860,7 @@ class AeroDropWeatherWidget extends ConsumerWidget {
                     'Drone dispatch environment conditions',
                     style: AppTextStyles.label(
                       fontSize: 10,
-                      color: AppColors.textSecondaryDark,
+                      color: AppColors.textSecondary,
                     ),
                     overflow: TextOverflow.ellipsis,
                     maxLines: 1,
@@ -935,14 +909,14 @@ class AeroDropWeatherWidget extends ConsumerWidget {
                           tempStr,
                           style: AppTextStyles.display(
                             fontSize: 24,
-                            color: Colors.white,
+                            color: AppColors.textPrimary,
                           ),
                         ),
                         Text(
                           condition,
                           style: AppTextStyles.body(
                             fontSize: 12,
-                            color: AppColors.textSecondaryDark,
+                            color: AppColors.textSecondary,
                           ),
                           overflow: TextOverflow.ellipsis,
                           maxLines: 1,
@@ -954,7 +928,7 @@ class AeroDropWeatherWidget extends ConsumerWidget {
               ),
             ),
             const SizedBox(width: 16),
-            Container(height: 40, width: 1.5, color: AppColors.borderDark),
+            Container(height: 40, width: 1.5, color: AppColors.border),
             const SizedBox(width: 16),
             _WeatherMetric(
               icon: Icons.air_rounded,
@@ -975,9 +949,9 @@ class AeroDropWeatherWidget extends ConsumerWidget {
             ),
             child: Text(
               weather.message!,
-              style: const TextStyle(
-                color: AppColors.textSecondaryDark,
+              style: AppTextStyles.caption(
                 fontSize: 11,
+                color: AppColors.textSecondary,
               ),
             ),
           ),
@@ -1017,15 +991,10 @@ class AeroDropWeatherWidget extends ConsumerWidget {
                   final statusDisplay = status == 'safe'
                       ? 'Safe'
                       : (status == 'caution' ? 'Caution' : 'Grounded');
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Weather updated to $statusDisplay.'),
-                      backgroundColor: AppColors.success,
-                      behavior: SnackBarBehavior.floating,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
+                  showNeuSnack(
+                    context,
+                    'Weather updated to $statusDisplay.',
+                    tone: NeuToneKind.success,
                   );
                 }
               } on PostgrestException catch (pe) {
@@ -1044,15 +1013,15 @@ class AeroDropWeatherWidget extends ConsumerWidget {
             }
 
             return AlertDialog(
-              backgroundColor: AppColors.cardDark,
+              backgroundColor: AppColors.base,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20),
               ),
-              title: const Text(
+              title: Text(
                 'Change Campus Weather Simulation',
-                style: TextStyle(
-                  color: Colors.white,
+                style: AppTextStyles.subHead(
                   fontSize: 16,
+                  color: AppColors.textPrimary,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -1060,20 +1029,20 @@ class AeroDropWeatherWidget extends ConsumerWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text(
+                  Text(
                     'This is an intentional prototype simulation feature.',
-                    style: TextStyle(
-                      color: AppColors.textSecondaryDark,
+                    style: AppTextStyles.caption(
                       fontSize: 12,
+                      color: AppColors.textSecondary,
                     ),
                   ),
                   const SizedBox(height: 16),
                   if (error != null) ...[
                     Text(
                       error!,
-                      style: const TextStyle(
-                        color: AppColors.danger,
+                      style: AppTextStyles.caption(
                         fontSize: 12,
+                        color: AppColors.danger,
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -1116,9 +1085,9 @@ class AeroDropWeatherWidget extends ConsumerWidget {
                   onPressed: isLoading
                       ? null
                       : () => Navigator.of(dialogContext).pop(),
-                  child: const Text(
+                  child: Text(
                     'Cancel',
-                    style: TextStyle(color: Colors.grey),
+                    style: AppTextStyles.body(color: Colors.grey),
                   ),
                 ),
               ],
@@ -1152,10 +1121,10 @@ class AeroDropWeatherWidget extends ConsumerWidget {
             Expanded(
               child: Text(
                 title,
-                style: TextStyle(
+                style: AppTextStyles.subHead(
+                  fontSize: 13,
                   color: color,
                   fontWeight: FontWeight.bold,
-                  fontSize: 13,
                 ),
               ),
             ),
@@ -1193,7 +1162,7 @@ class _WeatherMetric extends StatelessWidget {
               style: AppTextStyles.title(
                 fontSize: 13,
                 fontWeight: FontWeight.bold,
-                color: Colors.white,
+                color: AppColors.textPrimary,
               ),
             ),
           ],
@@ -1203,7 +1172,7 @@ class _WeatherMetric extends StatelessWidget {
           label,
           style: AppTextStyles.label(
             fontSize: 9,
-            color: AppColors.textSecondaryDark,
+            color: AppColors.textSecondary,
           ),
         ),
       ],

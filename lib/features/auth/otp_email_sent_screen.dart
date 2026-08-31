@@ -1,14 +1,15 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../../core/widgets/neu_feedback.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
-import '../../core/widgets/glass_card.dart';
-import '../../core/widgets/gradient_button.dart';
-import '../../core/widgets/custom_text_field.dart';
+import '../../core/widgets/neu_card.dart';
+import '../../core/widgets/neu_button.dart';
+import '../../core/widgets/neu_text_field.dart';
 import '../../core/providers/auth_provider.dart';
 
 class OtpEmailSentScreen extends ConsumerStatefulWidget {
@@ -50,15 +51,10 @@ class _OtpEmailSentScreenState extends ConsumerState<OtpEmailSentScreen> {
   void _verifySmsCode() async {
     final code = _smsController.text.trim();
     if (code.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Please enter a verification code.'),
-          backgroundColor: Colors.redAccent,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
+      showNeuSnack(
+        context,
+        'Please enter a verification code.',
+        tone: NeuToneKind.error,
       );
       return;
     }
@@ -105,32 +101,22 @@ class _OtpEmailSentScreenState extends ConsumerState<OtpEmailSentScreen> {
     if (mounted) {
       setState(() => _resending = false);
       _startTimer();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            widget.type == 'reset'
-                ? 'Password reset link resent!'
-                : 'Verification email resent!',
-          ),
-          backgroundColor: AppColors.success,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
+      showNeuSnack(
+        context,
+        widget.type == 'reset'
+            ? 'Password reset link resent!'
+            : 'Verification email resent!',
+        tone: NeuToneKind.success,
       );
     }
   }
 
   void _openEmailApp() {
     HapticFeedback.lightImpact();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Directing to your email client...'),
-        backgroundColor: AppColors.primary,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
+    showNeuSnack(
+      context,
+      'Directing to your email client...',
+      tone: NeuToneKind.info,
     );
   }
 
@@ -144,40 +130,9 @@ class _OtpEmailSentScreenState extends ConsumerState<OtpEmailSentScreen> {
         : 'We have sent an authentication link to:';
 
     return Scaffold(
-      backgroundColor: AppColors.bgDark,
+      backgroundColor: AppColors.base,
       body: Stack(
         children: [
-          // Background Gradient
-          Positioned.fill(
-            child: Container(
-              decoration: const BoxDecoration(
-                gradient: RadialGradient(
-                  center: Alignment(0.3, -0.2),
-                  radius: 0.8,
-                  colors: [Color(0xFF102847), AppColors.bgDark],
-                ),
-              ),
-            ),
-          ),
-          // Ambient Glow
-          Positioned(
-            top: -60,
-            left: -60,
-            child: Container(
-              width: 260,
-              height: 260,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    AppColors.accent.withValues(alpha: 0.08),
-                    Colors.transparent,
-                  ],
-                ),
-              ),
-            ),
-          ),
-
           SafeArea(
             child: Center(
               child: SingleChildScrollView(
@@ -219,7 +174,7 @@ class _OtpEmailSentScreenState extends ConsumerState<OtpEmailSentScreen> {
                       title,
                       style: AppTextStyles.display(
                         fontSize: 26,
-                        color: Colors.white,
+                        color: AppColors.textPrimary,
                       ),
                       textAlign: TextAlign.center,
                     ).animate().fadeIn(delay: 100.ms),
@@ -229,7 +184,7 @@ class _OtpEmailSentScreenState extends ConsumerState<OtpEmailSentScreen> {
                       desc,
                       style: AppTextStyles.body(
                         fontSize: 14.5,
-                        color: AppColors.textSecondaryDark,
+                        color: AppColors.textSecondary,
                         height: 1.5,
                       ),
                       textAlign: TextAlign.center,
@@ -238,16 +193,16 @@ class _OtpEmailSentScreenState extends ConsumerState<OtpEmailSentScreen> {
 
                     Text(
                       widget.email,
-                      style: const TextStyle(
+                      style: AppTextStyles.subHead(
+                        fontSize: 16,
                         color: AppColors.accentLight,
                         fontWeight: FontWeight.bold,
-                        fontSize: 16,
                       ),
                       textAlign: TextAlign.center,
                     ).animate().fadeIn(delay: 240.ms),
                     const SizedBox(height: 36),
 
-                    GlassCard(
+                    NeuCard(
                       padding: const EdgeInsets.all(24),
                       borderRadius: BorderRadius.circular(24),
                       child: AnimatedSwitcher(
@@ -256,7 +211,7 @@ class _OtpEmailSentScreenState extends ConsumerState<OtpEmailSentScreen> {
                             ? Column(
                                 key: const ValueKey('email_form'),
                                 children: [
-                                  GradientButton(
+                                  NeuButton(
                                     text: 'Open Email App',
                                     onPressed: _openEmailApp,
                                     icon: Icons.mail_outline_rounded,
@@ -270,18 +225,18 @@ class _OtpEmailSentScreenState extends ConsumerState<OtpEmailSentScreen> {
                                       _timerSeconds > 0
                                           ? 'Resend in ${_timerSeconds}s'
                                           : 'Resend Email',
-                                      style: TextStyle(
+                                      style: AppTextStyles.subHead(
+                                        fontSize: 13,
                                         color: _timerSeconds > 0
-                                            ? AppColors.textSecondaryDark
+                                            ? AppColors.textSecondary
                                             : AppColors.accentLight,
                                         fontWeight: FontWeight.bold,
-                                        fontSize: 13,
                                       ),
                                     ),
                                   ),
-                                  const Divider(
+                                  Divider(
                                     height: 32,
-                                    color: Colors.white10,
+                                    color: AppColors.surfaceSunken,
                                   ),
                                   TextButton.icon(
                                     onPressed: () =>
@@ -291,12 +246,12 @@ class _OtpEmailSentScreenState extends ConsumerState<OtpEmailSentScreen> {
                                       size: 16,
                                       color: AppColors.accent,
                                     ),
-                                    label: const Text(
+                                    label: Text(
                                       'Verify via SMS Code instead',
-                                      style: TextStyle(
+                                      style: AppTextStyles.subHead(
+                                        fontSize: 13,
                                         color: AppColors.accent,
                                         fontWeight: FontWeight.bold,
-                                        fontSize: 13,
                                       ),
                                     ),
                                   ),
@@ -306,26 +261,26 @@ class _OtpEmailSentScreenState extends ConsumerState<OtpEmailSentScreen> {
                                 key: const ValueKey('sms_form'),
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
-                                  const Text(
+                                  Text(
                                     'Enter SMS Code',
-                                    style: TextStyle(
-                                      color: Colors.white,
+                                    style: AppTextStyles.subHead(
                                       fontSize: 16,
+                                      color: AppColors.textPrimary,
                                       fontWeight: FontWeight.bold,
                                     ),
                                     textAlign: TextAlign.center,
                                   ),
                                   const SizedBox(height: 8),
-                                  const Text(
+                                  Text(
                                     'Type the numeric code sent to your phone',
-                                    style: TextStyle(
-                                      color: AppColors.textSecondaryDark,
+                                    style: AppTextStyles.body(
                                       fontSize: 12.5,
+                                      color: AppColors.textSecondary,
                                     ),
                                     textAlign: TextAlign.center,
                                   ),
                                   const SizedBox(height: 20),
-                                  CustomTextField(
+                                  NeuTextField(
                                     labelText: 'SMS Code',
                                     hintText: 'e.g. 123456',
                                     prefixIcon: Icons.pin_rounded,
@@ -336,7 +291,7 @@ class _OtpEmailSentScreenState extends ConsumerState<OtpEmailSentScreen> {
                                     ],
                                   ),
                                   const SizedBox(height: 20),
-                                  GradientButton(
+                                  NeuButton(
                                     text: 'Verify & Proceed',
                                     isLoading: _verifyingSms,
                                     onPressed: _verifySmsCode,
@@ -346,12 +301,12 @@ class _OtpEmailSentScreenState extends ConsumerState<OtpEmailSentScreen> {
                                   TextButton(
                                     onPressed: () =>
                                         setState(() => _showSmsInput = false),
-                                    child: const Text(
+                                    child: Text(
                                       'Back to Email verification',
-                                      style: TextStyle(
-                                        color: AppColors.textSecondaryDark,
-                                        fontWeight: FontWeight.bold,
+                                      style: AppTextStyles.subHead(
                                         fontSize: 13,
+                                        color: AppColors.textSecondary,
+                                        fontWeight: FontWeight.bold,
                                       ),
                                     ),
                                   ),
@@ -369,7 +324,7 @@ class _OtpEmailSentScreenState extends ConsumerState<OtpEmailSentScreen> {
                       icon: const Icon(Icons.arrow_back_rounded, size: 16),
                       label: const Text('Back to Login'),
                       style: TextButton.styleFrom(
-                        foregroundColor: AppColors.textSecondaryDark,
+                        foregroundColor: AppColors.textSecondary,
                       ),
                     ).animate().fadeIn(delay: 380.ms),
                   ],

@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
+import '../../core/widgets/neu_feedback.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
-import '../../core/widgets/glass_card.dart';
+import '../../core/widgets/neu_card.dart';
 import '../../mock_data/products_mock.dart';
 import '../../core/providers/product_provider.dart';
 
@@ -41,7 +42,7 @@ class _VendorProductsScreenState extends ConsumerState<VendorProductsScreen> {
     ];
 
     return Scaffold(
-      backgroundColor: AppColors.bgDark,
+      backgroundColor: AppColors.base,
       body: SafeArea(
         child: Column(
           children: [
@@ -58,14 +59,14 @@ class _VendorProductsScreenState extends ConsumerState<VendorProductsScreen> {
                           'Inventory Catalog',
                           style: AppTextStyles.label(
                             fontSize: 10,
-                            color: AppColors.textSecondaryDark,
+                            color: AppColors.textSecondary,
                           ),
                         ),
                         Text(
                           'My Products',
                           style: AppTextStyles.heading(
                             fontSize: 20,
-                            color: Colors.white,
+                            color: AppColors.textPrimary,
                           ),
                         ),
                       ],
@@ -91,7 +92,7 @@ class _VendorProductsScreenState extends ConsumerState<VendorProductsScreen> {
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
-                        children: const [
+                        children: [
                           Icon(
                             Icons.add_rounded,
                             color: AppColors.primaryDark,
@@ -100,10 +101,11 @@ class _VendorProductsScreenState extends ConsumerState<VendorProductsScreen> {
                           SizedBox(width: 6),
                           Text(
                             'Add Item',
-                            style: TextStyle(
-                              color: AppColors.primaryDark,
+                            style: AppTextStyles.label(
                               fontSize: 12.5,
+                              color: AppColors.primaryDark,
                               fontWeight: FontWeight.bold,
+                              letterSpacing: 0,
                             ),
                           ),
                         ],
@@ -119,18 +121,16 @@ class _VendorProductsScreenState extends ConsumerState<VendorProductsScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: TextField(
                 onChanged: (value) => setState(() => _search = value),
-                style: const TextStyle(color: Colors.white),
+                style: AppTextStyles.body(color: AppColors.textPrimary),
                 decoration: InputDecoration(
                   hintText: 'Search stock catalog…',
-                  hintStyle: const TextStyle(
-                    color: AppColors.textSecondaryDark,
-                  ),
-                  prefixIcon: const Icon(
+                  hintStyle: AppTextStyles.body(color: AppColors.textSecondary),
+                  prefixIcon: Icon(
                     Icons.search_rounded,
-                    color: AppColors.textSecondaryDark,
+                    color: AppColors.textSecondary,
                   ),
                   filled: true,
-                  fillColor: AppColors.cardDark,
+                  fillColor: AppColors.base,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
                     borderSide: BorderSide.none,
@@ -163,25 +163,20 @@ class _VendorProductsScreenState extends ConsumerState<VendorProductsScreen> {
                         vertical: 6,
                       ),
                       decoration: BoxDecoration(
-                        color: selected ? AppColors.accent : AppColors.cardDark,
+                        color: selected ? AppColors.accent : AppColors.base,
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: selected
-                              ? AppColors.accent
-                              : AppColors.borderDark,
+                          color: selected ? AppColors.accent : AppColors.border,
                         ),
                       ),
                       child: Center(
                         child: Text(
                           cat,
-                          style: TextStyle(
+                          style: AppTextStyles.caption(
+                            fontSize: 12,
                             color: selected
                                 ? AppColors.primaryDark
                                 : Colors.white,
-                            fontSize: 12,
-                            fontWeight: selected
-                                ? FontWeight.bold
-                                : FontWeight.normal,
                           ),
                         ),
                       ),
@@ -202,15 +197,17 @@ class _VendorProductsScreenState extends ConsumerState<VendorProductsScreen> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(
+                          Icon(
                             Icons.inventory_2_outlined,
-                            color: AppColors.textSecondaryDark,
+                            color: AppColors.textSecondary,
                             size: 56,
                           ),
                           const SizedBox(height: 12),
                           Text(
                             'No items found in this category.',
-                            style: AppTextStyles.subHead(color: Colors.white70),
+                            style: AppTextStyles.subHead(
+                              color: AppColors.textSecondary,
+                            ),
                           ),
                         ],
                       ).animate().fadeIn(),
@@ -254,22 +251,25 @@ class _VendorProductsScreenState extends ConsumerState<VendorProductsScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.cardDark,
+        backgroundColor: AppColors.base,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text(
+        title: Text(
           'Delete Product?',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          style: AppTextStyles.subHead(
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         content: Text(
           'Remove "${product.name}" from your listings?',
-          style: TextStyle(color: AppColors.textSecondaryDark),
+          style: AppTextStyles.body(color: AppColors.textSecondary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text(
+            child: Text(
               'Cancel',
-              style: TextStyle(color: AppColors.textSecondaryDark),
+              style: AppTextStyles.body(color: AppColors.textSecondary),
             ),
           ),
           FilledButton(
@@ -280,21 +280,12 @@ class _VendorProductsScreenState extends ConsumerState<VendorProductsScreen> {
                   .read(vendorProductsProvider.notifier)
                   .deleteProduct(product.id);
               if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      success
-                          ? '"${product.name}" deleted successfully.'
-                          : 'Failed to delete "${product.name}".',
-                    ),
-                    backgroundColor: success
-                        ? AppColors.success
-                        : AppColors.danger,
-                    behavior: SnackBarBehavior.floating,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
+                showNeuSnack(
+                  context,
+                  success
+                      ? '"${product.name}" deleted successfully.'
+                      : 'Failed to delete "${product.name}".',
+                  tone: NeuToneKind.success,
                 );
               }
             },
@@ -322,7 +313,7 @@ class VendorProductCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isLowStock = product.stock <= 5;
-    return GlassCard(
+    return NeuCard(
       padding: EdgeInsets.zero,
       borderRadius: BorderRadius.circular(18),
       child: Column(
@@ -342,10 +333,10 @@ class VendorProductCard extends StatelessWidget {
                   fit: BoxFit.cover,
                   errorBuilder: (_, _, _) => Container(
                     height: 110,
-                    color: AppColors.cardDark2,
-                    child: const Icon(
+                    color: AppColors.surfaceRaised,
+                    child: Icon(
                       Icons.image_outlined,
-                      color: AppColors.textSecondaryDark,
+                      color: AppColors.textSecondary,
                       size: 30,
                     ),
                   ),
@@ -370,12 +361,13 @@ class VendorProductCard extends StatelessWidget {
                         color: AppColors.danger,
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Text(
+                      child: Text(
                         'Grounded',
-                        style: TextStyle(
-                          color: Colors.white,
+                        style: AppTextStyles.label(
                           fontSize: 10,
+                          color: AppColors.textPrimary,
                           fontWeight: FontWeight.bold,
+                          letterSpacing: 0,
                         ),
                       ),
                     ),
@@ -396,7 +388,7 @@ class VendorProductCard extends StatelessWidget {
                     style: AppTextStyles.body(
                       fontSize: 12.5,
                       fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                      color: AppColors.textPrimary,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -404,10 +396,10 @@ class VendorProductCard extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(
                     '₱${product.price.toStringAsFixed(2)}',
-                    style: const TextStyle(
+                    style: AppTextStyles.subHead(
+                      fontSize: 14,
                       color: AppColors.accent,
                       fontWeight: FontWeight.bold,
-                      fontSize: 14,
                     ),
                   ),
                   const Spacer(),
@@ -424,20 +416,17 @@ class VendorProductCard extends StatelessWidget {
                               size: 13,
                               color: isLowStock
                                   ? AppColors.warning
-                                  : AppColors.textSecondaryDark,
+                                  : AppColors.textSecondary,
                             ),
                             const SizedBox(width: 4),
                             Flexible(
                               child: Text(
                                 'Stock: ${product.stock}',
-                                style: TextStyle(
+                                style: AppTextStyles.caption(
+                                  fontSize: 11,
                                   color: isLowStock
                                       ? AppColors.warning
-                                      : AppColors.textSecondaryDark,
-                                  fontSize: 11,
-                                  fontWeight: isLowStock
-                                      ? FontWeight.bold
-                                      : FontWeight.normal,
+                                      : AppColors.textSecondary,
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,

@@ -12,6 +12,7 @@ import '../../core/providers/drone_provider.dart';
 import '../../core/providers/weather_provider.dart';
 import '../../core/models/drone_model.dart';
 import '../../core/models/delivery_model.dart';
+import '../../core/widgets/neu_back_button.dart';
 
 class DeliveryDetailsScreen extends ConsumerWidget {
   final String deliveryId;
@@ -96,21 +97,10 @@ class DeliveryDetailsScreen extends ConsumerWidget {
                   // Header
                   Row(
                     children: [
-                      GestureDetector(
-                        onTap: () => context.pop(),
-                        child: Container(
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: AppColors.cardDark,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: AppColors.borderDark),
-                          ),
-                          child: const Icon(
-                            Icons.arrow_back_rounded,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                        ),
+                      const NeuBackButton(
+                        fallbackRoute: '/admin/deliveries',
+                        color: AppColors.cardDark,
+                        iconColor: Colors.white,
                       ),
                       const SizedBox(width: 16),
                       Expanded(

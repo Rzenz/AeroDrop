@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import '../../core/widgets/neu_feedback.dart';
+import '../orders/receipt_screen.dart';
+import '../../core/widgets/custom_app_bar.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
-import '../../core/widgets/glass_card.dart';
+import '../../core/widgets/neu_card.dart';
 import '../../core/providers/order_provider.dart';
 import '../../mock_data/cart_mock.dart';
 import '../../core/providers/location_provider.dart';
@@ -29,24 +32,13 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     final locationsAsync = ref.watch(campusLocationsProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.bgDark,
-      appBar: AppBar(
-        backgroundColor: AppColors.bgDark,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-          onPressed: () => context.pop(),
-        ),
-        title: Text(
-          'Checkout',
-          style: AppTextStyles.subHead(fontSize: 18, color: Colors.white),
-        ),
-      ),
+      backgroundColor: AppColors.base,
+      appBar: CustomAppBar(title: 'Checkout'),
       body: cart.isEmpty
           ? Center(
               child: Text(
                 'No items to check out.',
-                style: AppTextStyles.body(color: Colors.white),
+                style: AppTextStyles.body(color: AppColors.textPrimary),
               ),
             )
           : SingleChildScrollView(
@@ -69,11 +61,11 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                     child: locationsAsync.when(
                       data: (locations) {
                         if (locations.isEmpty) {
-                          return const Text(
+                          return Text(
                             'No campus locations available.',
-                            style: TextStyle(
-                              color: AppColors.danger,
+                            style: AppTextStyles.body(
                               fontSize: 13,
+                              color: AppColors.danger,
                             ),
                           );
                         }
@@ -92,25 +84,21 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                         return DropdownButtonFormField<String>(
                           initialValue:
                               _selectedLocationId ?? locations.first.id,
-                          dropdownColor: AppColors.cardDark2,
-                          style: const TextStyle(
-                            color: Colors.white,
+                          dropdownColor: AppColors.surfaceRaised,
+                          style: AppTextStyles.body(
                             fontSize: 13,
+                            color: AppColors.textPrimary,
                           ),
                           decoration: InputDecoration(
                             filled: true,
                             fillColor: AppColors.bgDark,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(
-                                color: AppColors.borderDark,
-                              ),
+                              borderSide: BorderSide(color: AppColors.border),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(
-                                color: AppColors.borderDark,
-                              ),
+                              borderSide: BorderSide(color: AppColors.border),
                             ),
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 14,
@@ -123,7 +111,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                                   value: loc.id,
                                   child: Text(
                                     loc.name,
-                                    style: const TextStyle(fontSize: 13),
+                                    style: AppTextStyles.body(fontSize: 13),
                                   ),
                                 ),
                               )
@@ -143,9 +131,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                       ),
                       error: (err, _) => Text(
                         'Failed to load locations: $err',
-                        style: const TextStyle(
-                          color: AppColors.danger,
+                        style: AppTextStyles.body(
                           fontSize: 13,
+                          color: AppColors.danger,
                         ),
                       ),
                     ),
@@ -204,7 +192,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                           value: '₱20.00',
                         ),
                         const SizedBox(height: 10),
-                        const Divider(color: AppColors.borderDark),
+                        Divider(color: AppColors.border),
                         const SizedBox(height: 10),
                         _SummaryRow(
                           label: 'Total',
@@ -237,11 +225,11 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                               color: AppColors.bgDark,
                             ),
                           )
-                        : const Text(
+                        : Text(
                             'Confirm Order',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
+                            style: AppTextStyles.subHead(
                               fontSize: 17,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
                   ).animate().fadeIn(delay: 250.ms),
@@ -263,12 +251,10 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
 
     if (_selectedLocationId == null) {
       setState(() => _placing = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Please select a drop-off location.'),
-          backgroundColor: AppColors.danger,
-          behavior: SnackBarBehavior.floating,
-        ),
+      showNeuSnack(
+        context,
+        'Please select a drop-off location.',
+        tone: NeuToneKind.error,
       );
       return;
     }
@@ -294,32 +280,64 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     setState(() => _placing = false);
 
     if (success) {
+      // Snapshot the receipt before clearing the cart — the lines are read
+      // from it, and an empty cart prints an empty receipt.
+      final receipt = _receiptFor(cart, totalAmount);
       cartNotifier.clear();
-      context.go('/user/orders');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Order placed successfully! 🎉'),
-          backgroundColor: AppColors.success,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-      );
+      context.go('/user/receipt', extra: receipt);
     } else {
       final errorMsg =
           ref.read(orderProvider).errorMessage ?? 'Order placement failed.';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(errorMsg),
-          backgroundColor: AppColors.danger,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-      );
+      showNeuSnack(context, errorMsg, tone: NeuToneKind.error);
     }
+  }
+
+  /// Name of the selected drop-off, read from the same provider that feeds
+  /// the picker so the printed location always matches what was chosen.
+  ///
+  /// Written as a loop rather than `firstOrNull`: that extension arrives here
+  /// through a transitive export, not a declared dependency, and would break
+  /// the build the day that package stops re-exporting it.
+  String? _dropoffName() {
+    final locations = ref.read(campusLocationsProvider).value;
+    if (locations == null) return null;
+    for (final l in locations) {
+      if (l.id == _selectedLocationId) return l.name;
+    }
+    return null;
+  }
+
+  /// Builds the printed record from the order just placed.
+  ///
+  /// The reference comes from the order the provider reloaded, which is sorted
+  /// newest first — so the first entry is this one. When Supabase is not
+  /// configured there is no row to read, and the receipt falls back to the
+  /// payment reference format the server would have used.
+  ReceiptData _receiptFor(List<CartItem> cart, double totalAmount) {
+    final placed = ref.read(orderProvider).orders;
+    final now = DateTime.now();
+    final ref0 = placed.isNotEmpty
+        ? 'ORD-${placed.first.id.replaceAll('-', '').substring(0, 8).toUpperCase()}'
+        : 'ORD-${now.millisecondsSinceEpoch.toString().substring(6)}';
+
+    return ReceiptData(
+      orderRef: ref0,
+      vendorName: cart.first.vendorName,
+      lines: [
+        for (final item in cart)
+          ReceiptLine(
+            name: item.productName,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+          ),
+      ],
+      subtotal: cartNotifier.totalAmount,
+      deliveryFee: 20.0,
+      total: totalAmount,
+      paymentLabel: _paymentMethod == 'gcash' ? 'GCash' : 'Cash on delivery',
+      placedAt: now,
+      dropoffName: _dropoffName(),
+    );
   }
 }
 
@@ -336,7 +354,7 @@ class _SectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GlassCard(
+    return NeuCard(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -349,7 +367,7 @@ class _SectionCard extends StatelessWidget {
                 title,
                 style: AppTextStyles.subHead(
                   fontSize: 14,
-                  color: Colors.white,
+                  color: AppColors.textPrimary,
                 ).copyWith(fontWeight: FontWeight.bold),
               ),
             ],
@@ -391,7 +409,7 @@ class _PaymentOption extends StatelessWidget {
           color: selected ? color.withValues(alpha: 0.1) : AppColors.bgDark,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: selected ? color : AppColors.borderDark,
+            color: selected ? color : AppColors.border,
             width: selected ? 1.5 : 1.0,
           ),
         ),
@@ -399,17 +417,16 @@ class _PaymentOption extends StatelessWidget {
           children: [
             Icon(
               icon,
-              color: selected ? color : AppColors.textSecondaryDark,
+              color: selected ? color : AppColors.textSecondary,
               size: 20,
             ),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
                 label,
-                style: TextStyle(
-                  color: selected ? Colors.white : AppColors.textSecondaryDark,
+                style: AppTextStyles.body(
                   fontSize: 13,
-                  fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+                  color: selected ? Colors.white : AppColors.textSecondary,
                 ),
               ),
             ),
@@ -419,7 +436,7 @@ class _PaymentOption extends StatelessWidget {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: selected ? color : AppColors.textSecondaryDark,
+                  color: selected ? color : AppColors.textSecondary,
                   width: 1.5,
                 ),
               ),
@@ -463,7 +480,7 @@ class _SummaryRow extends StatelessWidget {
         Text(
           label,
           style: TextStyle(
-            color: AppColors.textSecondaryDark,
+            color: AppColors.textSecondary,
             fontSize: bold ? 14 : 12,
             fontWeight: bold ? FontWeight.bold : FontWeight.normal,
           ),

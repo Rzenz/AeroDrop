@@ -3,7 +3,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
-import '../../../../core/widgets/glass_card.dart';
+import '../../../../core/widgets/neu_card.dart';
 
 class DeliveryCompletedPage extends StatefulWidget {
   const DeliveryCompletedPage({super.key});
@@ -18,16 +18,9 @@ class _DeliveryCompletedPageState extends State<DeliveryCompletedPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.bgDark,
+      backgroundColor: AppColors.base,
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFF0F2B48), AppColors.bgDark, Color(0xFF070D14)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            stops: [0.0, 0.5, 1.0],
-          ),
-        ),
+        decoration: BoxDecoration(color: AppColors.base),
         child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -68,7 +61,7 @@ class _DeliveryCompletedPageState extends State<DeliveryCompletedPage> {
                     .shimmer(
                       delay: 800.ms,
                       duration: 1500.ms,
-                      color: Colors.white24,
+                      color: AppColors.surfaceSunken,
                     ),
 
                 const SizedBox(height: 40),
@@ -89,7 +82,7 @@ class _DeliveryCompletedPageState extends State<DeliveryCompletedPage> {
                   'Your drone has safely landed and released the payload at the designated platform.',
                   style: AppTextStyles.body(
                     fontSize: 14,
-                    color: AppColors.textSecondaryDark,
+                    color: AppColors.textSecondary,
                   ),
                   textAlign: TextAlign.center,
                 ).animate().fadeIn(delay: 350.ms).slideY(begin: 0.1, end: 0),
@@ -97,22 +90,20 @@ class _DeliveryCompletedPageState extends State<DeliveryCompletedPage> {
                 const SizedBox(height: 48),
 
                 // Rating Card
-                GlassCard(
+                NeuCard(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 24,
                         vertical: 24,
                       ),
                       borderRadius: BorderRadius.circular(24),
-                      borderGradient: const LinearGradient(
-                        colors: [AppColors.success, Colors.transparent],
-                      ),
+                      accent: AppColors.success,
                       child: Column(
                         children: [
                           Text(
                             'RATE YOUR EXPERIENCE',
                             style: AppTextStyles.label(
                               fontSize: 11,
-                              color: AppColors.textSecondaryDark,
+                              color: AppColors.textSecondary,
                               letterSpacing: 1.5,
                             ),
                           ),
@@ -129,7 +120,7 @@ class _DeliveryCompletedPageState extends State<DeliveryCompletedPage> {
                                       : Icons.star_outline_rounded,
                                   color: isSelected
                                       ? const Color(0xFFFFC107)
-                                      : AppColors.textSecondaryDark,
+                                      : AppColors.textSecondary,
                                   size: 36,
                                 ),
                                 onPressed: () {

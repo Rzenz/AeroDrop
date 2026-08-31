@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/widgets/neu_feedback.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -6,9 +7,9 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
-import '../../core/widgets/gradient_button.dart';
-import '../../core/widgets/custom_text_field.dart';
-import '../../core/widgets/glass_card.dart';
+import '../../core/widgets/neu_button.dart';
+import '../../core/widgets/neu_text_field.dart';
+import '../../core/widgets/neu_card.dart';
 import '../../core/widgets/custom_app_bar.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/providers/location_provider.dart';
@@ -46,11 +47,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         final bytes = await image.readAsBytes();
         if (bytes.length > 2 * 1024 * 1024) {
           if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Avatar file size must be less than 2MB'),
-              backgroundColor: AppColors.danger,
-            ),
+          showNeuSnack(
+            context,
+            'Avatar file size must be less than 2MB',
+            tone: NeuToneKind.error,
           );
           return;
         }
@@ -62,15 +62,12 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         setState(() => _uploadingAvatar = false);
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                success
-                    ? 'Profile picture updated!'
-                    : 'Failed to upload profile picture.',
-              ),
-              backgroundColor: success ? AppColors.success : AppColors.danger,
-            ),
+          showNeuSnack(
+            context,
+            success
+                ? 'Profile picture updated!'
+                : 'Failed to upload profile picture.',
+            tone: NeuToneKind.success,
           );
         }
       }
@@ -84,25 +81,28 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.cardDark,
-        title: const Text(
+        backgroundColor: AppColors.base,
+        title: Text(
           'Remove Avatar',
-          style: TextStyle(color: Colors.white),
+          style: AppTextStyles.body(color: AppColors.textPrimary),
         ),
-        content: const Text(
+        content: Text(
           'Are you sure you want to remove your profile picture?',
-          style: TextStyle(color: Colors.white70),
+          style: AppTextStyles.body(color: AppColors.textSecondary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+            child: Text(
+              'Cancel',
+              style: AppTextStyles.body(color: Colors.grey),
+            ),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text(
+            child: Text(
               'Remove',
-              style: TextStyle(color: AppColors.danger),
+              style: AppTextStyles.body(color: AppColors.danger),
             ),
           ),
         ],
@@ -115,15 +115,12 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       setState(() => _uploadingAvatar = false);
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              success
-                  ? 'Profile picture removed.'
-                  : 'Failed to remove profile picture.',
-            ),
-            backgroundColor: success ? AppColors.success : AppColors.danger,
-          ),
+        showNeuSnack(
+          context,
+          success
+              ? 'Profile picture removed.'
+              : 'Failed to remove profile picture.',
+          tone: NeuToneKind.success,
         );
       }
     }
@@ -133,7 +130,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     HapticFeedback.lightImpact();
     showModalBottomSheet(
       context: context,
-      backgroundColor: AppColors.cardDark2,
+      backgroundColor: AppColors.surfaceRaised,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -142,13 +139,13 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(
+              leading: Icon(
                 Icons.photo_library_outlined,
-                color: Colors.white,
+                color: AppColors.textPrimary,
               ),
-              title: const Text(
+              title: Text(
                 'Upload Photo',
-                style: TextStyle(color: Colors.white),
+                style: AppTextStyles.body(color: AppColors.textPrimary),
               ),
               onTap: () {
                 Navigator.pop(context);
@@ -161,9 +158,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                   Icons.delete_outline_rounded,
                   color: AppColors.danger,
                 ),
-                title: const Text(
+                title: Text(
                   'Remove Current Photo',
-                  style: TextStyle(color: AppColors.danger),
+                  style: AppTextStyles.body(color: AppColors.danger),
                 ),
                 onTap: () {
                   Navigator.pop(context);
@@ -172,7 +169,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
               ),
             ListTile(
               leading: const Icon(Icons.close_rounded, color: Colors.grey),
-              title: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+              title: Text(
+                'Cancel',
+                style: AppTextStyles.body(color: Colors.grey),
+              ),
               onTap: () => Navigator.pop(context),
             ),
           ],
@@ -228,30 +228,18 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       if (isVendor && _selectedCategory == 'Other') {
         final customCat = _customCategoryController.text.trim();
         if (customCat.isEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('Please specify your store category.'),
-              backgroundColor: AppColors.danger,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
+          showNeuSnack(
+            context,
+            'Please specify your store category.',
+            tone: NeuToneKind.error,
           );
           return;
         }
         if (customCat.length > 60) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text(
-                'Store category must be at most 60 characters.',
-              ),
-              backgroundColor: AppColors.danger,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
+          showNeuSnack(
+            context,
+            'Store category must be at most 60 characters.',
+            tone: NeuToneKind.error,
           );
           return;
         }
@@ -277,23 +265,16 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
       final errorMessage = ref.read(authProvider).errorMessage;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            success
-                ? (isVendor
-                      ? 'Vendor details updated successfully.'
-                      : 'Profile updated successfully!')
-                : (isVendor
-                      ? 'Unable to update vendor details.'
-                      : (errorMessage ?? 'Profile update failed.')),
-          ),
-          backgroundColor: success ? AppColors.success : AppColors.danger,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
+      showNeuSnack(
+        context,
+        success
+            ? (isVendor
+                  ? 'Vendor details updated successfully.'
+                  : 'Profile updated successfully!')
+            : (isVendor
+                  ? 'Unable to update vendor details.'
+                  : (errorMessage ?? 'Profile update failed.')),
+        tone: NeuToneKind.success,
       );
 
       if (success) {
@@ -312,16 +293,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     final locationsAsync = ref.watch(campusLocationsProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.bgDark,
+      backgroundColor: AppColors.base,
       appBar: const CustomAppBar(title: 'Edit Profile'),
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFF0F243A), AppColors.bgDark],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-          ),
-        ),
+        decoration: BoxDecoration(color: AppColors.base),
         child: SafeArea(
           child: SingleChildScrollView(
             physics: const BouncingScrollPhysics(),
@@ -350,11 +325,11 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                                   ? AppColors.primaryGradient
                                   : null,
                               color: user?.avatarUrl != null
-                                  ? AppColors.cardDark
+                                  ? AppColors.base
                                   : null,
                               shape: BoxShape.circle,
                               border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.15),
+                                color: AppColors.border,
                                 width: 3,
                               ),
                               image: user?.avatarUrl != null
@@ -430,17 +405,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                   const SizedBox(height: 40),
 
                   // Personal info
-                  GlassCard(
+                  NeuCard(
                     padding: const EdgeInsets.all(24),
                     borderRadius: BorderRadius.circular(24),
-                    borderGradient: const LinearGradient(
-                      colors: [
-                        AppColors.accent,
-                        AppColors.primary,
-                        Colors.transparent,
-                      ],
-                      stops: [0.0, 0.5, 1.0],
-                    ),
+                    accent: AppColors.accent,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -449,12 +417,12 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                             'Personal Info',
                             style: AppTextStyles.subHead(
                               fontSize: 13,
-                              color: AppColors.textSecondaryDark,
+                              color: AppColors.textSecondary,
                             ),
                           ),
                           const SizedBox(height: 14),
                         ],
-                        CustomTextField(
+                        NeuTextField(
                           labelText: 'Full Name',
                           hintText: 'John Doe',
                           prefixIcon: Icons.person_outline_rounded,
@@ -464,7 +432,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                               val == null || val.isEmpty ? 'Enter name' : null,
                         ),
                         const SizedBox(height: 20),
-                        CustomTextField(
+                        NeuTextField(
                           labelText: 'Email Address',
                           hintText: 'yourname@email.com',
                           prefixIcon: Icons.email_outlined,
@@ -475,7 +443,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                               val == null || val.isEmpty ? 'Enter email' : null,
                         ),
                         const SizedBox(height: 20),
-                        CustomTextField(
+                        NeuTextField(
                           labelText: 'Phone Number',
                           hintText: 'e.g. 09XXXXXXXXX',
                           prefixIcon: Icons.phone_android_rounded,
@@ -495,15 +463,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                   // Vendor-only section
                   if (isVendor) ...[
                     const SizedBox(height: 16),
-                    GlassCard(
+                    NeuCard(
                       padding: const EdgeInsets.all(24),
                       borderRadius: BorderRadius.circular(24),
-                      borderGradient: LinearGradient(
-                        colors: [
-                          AppColors.accent.withValues(alpha: 0.6),
-                          Colors.transparent,
-                        ],
-                      ),
+                      accent: AppColors.accent.withValues(alpha: 0.6),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -519,13 +482,13 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                                 'Business Info',
                                 style: AppTextStyles.subHead(
                                   fontSize: 13,
-                                  color: AppColors.textSecondaryDark,
+                                  color: AppColors.textSecondary,
                                 ),
                               ),
                             ],
                           ),
                           const SizedBox(height: 16),
-                          CustomTextField(
+                          NeuTextField(
                             labelText: 'Business Name',
                             hintText: 'e.g. UCLM Canteen Express',
                             prefixIcon: Icons.storefront_outlined,
@@ -543,18 +506,18 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                                 vendorCategories.contains(_selectedCategory)
                                 ? _selectedCategory
                                 : (_selectedCategory == null ? null : 'Other'),
-                            dropdownColor: AppColors.cardDark,
+                            dropdownColor: AppColors.base,
                             decoration: InputDecoration(
                               labelText: 'Category',
-                              labelStyle: const TextStyle(
-                                color: AppColors.textSecondaryDark,
+                              labelStyle: AppTextStyles.body(
+                                color: AppColors.textSecondary,
                               ),
-                              prefixIcon: const Icon(
+                              prefixIcon: Icon(
                                 Icons.category_outlined,
-                                color: AppColors.textSecondaryDark,
+                                color: AppColors.textSecondary,
                               ),
                               filled: true,
-                              fillColor: AppColors.cardDark2,
+                              fillColor: AppColors.surfaceRaised,
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(14),
                                 borderSide: BorderSide.none,
@@ -578,9 +541,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                                     value: c,
                                     child: Text(
                                       c,
-                                      style: const TextStyle(
-                                        color: Colors.white,
+                                      style: AppTextStyles.body(
                                         fontSize: 14,
+                                        color: AppColors.textPrimary,
                                       ),
                                     ),
                                   ),
@@ -588,17 +551,19 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                                 .toList(),
                             onChanged: (v) =>
                                 setState(() => _selectedCategory = v),
-                            style: const TextStyle(color: Colors.white),
-                            hint: const Text(
+                            style: AppTextStyles.body(
+                              color: AppColors.textPrimary,
+                            ),
+                            hint: Text(
                               'Select category',
-                              style: TextStyle(
-                                color: AppColors.textSecondaryDark,
+                              style: AppTextStyles.body(
+                                color: AppColors.textSecondary,
                               ),
                             ),
                           ),
                           if (_selectedCategory == 'Other') ...[
                             const SizedBox(height: 20),
-                            CustomTextField(
+                            NeuTextField(
                               labelText: 'Specify Store Category',
                               hintText: 'Enter your store category',
                               prefixIcon: Icons.edit_note_rounded,
@@ -616,18 +581,18 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                             data: (locations) =>
                                 DropdownButtonFormField<String>(
                                   initialValue: _selectedLocationId,
-                                  dropdownColor: AppColors.cardDark,
+                                  dropdownColor: AppColors.base,
                                   decoration: InputDecoration(
                                     labelText: 'Campus Location',
-                                    labelStyle: const TextStyle(
-                                      color: AppColors.textSecondaryDark,
+                                    labelStyle: AppTextStyles.body(
+                                      color: AppColors.textSecondary,
                                     ),
-                                    prefixIcon: const Icon(
+                                    prefixIcon: Icon(
                                       Icons.location_on_outlined,
-                                      color: AppColors.textSecondaryDark,
+                                      color: AppColors.textSecondary,
                                     ),
                                     filled: true,
-                                    fillColor: AppColors.cardDark2,
+                                    fillColor: AppColors.surfaceRaised,
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(14),
                                       borderSide: BorderSide.none,
@@ -653,9 +618,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                                           value: l.id,
                                           child: Text(
                                             l.name,
-                                            style: const TextStyle(
-                                              color: Colors.white,
+                                            style: AppTextStyles.body(
                                               fontSize: 14,
+                                              color: AppColors.textPrimary,
                                             ),
                                           ),
                                         ),
@@ -663,25 +628,29 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                                       .toList(),
                                   onChanged: (v) =>
                                       setState(() => _selectedLocationId = v),
-                                  style: const TextStyle(color: Colors.white),
-                                  hint: const Text(
+                                  style: AppTextStyles.body(
+                                    color: AppColors.textPrimary,
+                                  ),
+                                  hint: Text(
                                     'Select location',
-                                    style: TextStyle(
-                                      color: AppColors.textSecondaryDark,
+                                    style: AppTextStyles.body(
+                                      color: AppColors.textSecondary,
                                     ),
                                   ),
                                 ),
                             loading: () => const LinearProgressIndicator(
                               color: AppColors.primary,
                             ),
-                            error: (err, stack) => const Text(
+                            error: (err, stack) => Text(
                               'Could not load locations',
-                              style: TextStyle(color: AppColors.danger),
+                              style: AppTextStyles.body(
+                                color: AppColors.danger,
+                              ),
                             ),
                           ),
                           const SizedBox(height: 20),
 
-                          CustomTextField(
+                          NeuTextField(
                             labelText: 'Description (optional)',
                             hintText: 'Brief description of your business',
                             prefixIcon: Icons.description_outlined,
@@ -695,7 +664,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
                   if (user?.isAdmin != true) ...[
                     const SizedBox(height: 24),
-                    GradientButton(
+                    NeuButton(
                       text: 'Save Changes',
                       onPressed: _handleSave,
                       icon: Icons.check_circle_outline_rounded,

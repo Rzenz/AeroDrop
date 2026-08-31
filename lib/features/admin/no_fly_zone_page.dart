@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
@@ -9,6 +8,7 @@ import '../../core/widgets/status_chip.dart';
 import '../../core/widgets/animated_fab.dart';
 import '../../core/widgets/custom_text_field.dart';
 import '../../core/services/supabase_service.dart';
+import '../../core/widgets/neu_back_button.dart';
 
 class NoFlyZonePage extends ConsumerStatefulWidget {
   const NoFlyZonePage({super.key});
@@ -447,21 +447,10 @@ class _NoFlyZonePageState extends ConsumerState<NoFlyZonePage> {
               children: [
                 Row(
                   children: [
-                    GestureDetector(
-                      onTap: () => context.pop(),
-                      child: Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: AppColors.cardDark,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.borderDark),
-                        ),
-                        child: const Icon(
-                          Icons.arrow_back_rounded,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                      ),
+                    const NeuBackButton(
+                      fallbackRoute: '/admin',
+                      color: AppColors.cardDark,
+                      iconColor: Colors.white,
                     ),
                     const SizedBox(width: 16),
                     Text(

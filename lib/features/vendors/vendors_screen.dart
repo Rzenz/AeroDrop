@@ -3,9 +3,11 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/widgets/neu_input.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/custom_app_bar.dart';
-import '../../core/widgets/glass_card.dart';
+import '../../core/widgets/neu_card.dart';
 import '../../core/providers/vendor_provider.dart';
 
 class VendorsScreen extends ConsumerStatefulWidget {
@@ -49,75 +51,35 @@ class _VendorsScreenState extends ConsumerState<VendorsScreen> {
     final filtered = _getFiltered(vendorState.vendors);
 
     return Scaffold(
-      backgroundColor: AppColors.bgDark,
+      backgroundColor: AppColors.base,
       appBar: const CustomAppBar(title: 'Vendors', showBackButton: false),
       body: Column(
         children: [
-          // Search bar
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-            child: TextField(
+            padding: EdgeInsets.fromLTRB(
+              AppSpacing.pageGutter(context),
+              AppSpacing.xs,
+              AppSpacing.pageGutter(context),
+              0,
+            ),
+            child: NeuSearchField(
+              hintText: 'Search vendors or buildings',
               onChanged: (v) => setState(() => _search = v),
-              style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(
-                hintText: 'Search vendors or buildings…',
-                hintStyle: TextStyle(color: AppColors.textSecondaryDark),
-                prefixIcon: const Icon(
-                  Icons.search_rounded,
-                  color: AppColors.textSecondaryDark,
-                ),
-                filled: true,
-                fillColor: AppColors.cardDark,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide.none,
-                ),
-                contentPadding: const EdgeInsets.symmetric(vertical: 12),
-              ),
             ),
           ),
 
           // Category chips
           SizedBox(
-            height: 52,
-            child: ListView.separated(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              scrollDirection: Axis.horizontal,
-              itemCount: _allCategories.length,
-              separatorBuilder: (_, _) => const SizedBox(width: 8),
-              itemBuilder: (context, i) {
-                final cat = _allCategories[i];
-                final selected = cat == _categoryFilter;
-                return GestureDetector(
-                  onTap: () => setState(() => _categoryFilter = cat),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: selected ? AppColors.accent : AppColors.cardDark,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: selected
-                            ? AppColors.accent
-                            : AppColors.borderDark,
-                      ),
-                    ),
-                    child: Text(
-                      cat,
-                      style: TextStyle(
-                        color: selected ? AppColors.bgDark : Colors.white,
-                        fontWeight: selected
-                            ? FontWeight.bold
-                            : FontWeight.normal,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                );
-              },
+            height: 56,
+            child: NeuFilterBar(
+              padding: EdgeInsets.symmetric(
+                horizontal: AppSpacing.pageGutter(context),
+                vertical: AppSpacing.xs,
+              ),
+              options: _allCategories,
+              selectedIndex: _allCategories.indexOf(_categoryFilter),
+              onSelected: (i) =>
+                  setState(() => _categoryFilter = _allCategories[i]),
             ),
           ),
 
@@ -132,22 +94,24 @@ class _VendorsScreenState extends ConsumerState<VendorsScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.storefront_outlined,
-                          color: AppColors.textSecondaryDark,
+                          color: AppColors.textSecondary,
                           size: 56,
                         ),
                         const SizedBox(height: 12),
                         Text(
                           'No vendors are currently available.',
-                          style: AppTextStyles.subHead(color: Colors.white70),
+                          style: AppTextStyles.subHead(
+                            color: AppColors.textSecondary,
+                          ),
                         ),
                         const SizedBox(height: 16),
                         ElevatedButton.icon(
                           onPressed: () =>
                               ref.read(vendorProvider.notifier).loadVendors(),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.cardDark,
+                            backgroundColor: AppColors.base,
                             foregroundColor: Colors.white,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
@@ -185,12 +149,10 @@ class _VendorCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
-      child: GlassCard(
+      child: NeuCard(
         onTap: onTap,
         padding: const EdgeInsets.all(16),
-        borderGradient: LinearGradient(
-          colors: [vendor.logoColor.withValues(alpha: 0.3), Colors.white12],
-        ),
+        accent: vendor.logoColor.withValues(alpha: 0.3),
         child: Row(
           children: [
             // Logo
@@ -204,10 +166,9 @@ class _VendorCard extends StatelessWidget {
               alignment: Alignment.center,
               child: Text(
                 vendor.logoInitials,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
+                style: AppTextStyles.heading(
                   fontSize: 20,
+                  color: AppColors.textPrimary,
                 ),
               ),
             ),
@@ -225,7 +186,7 @@ class _VendorCard extends StatelessWidget {
                           vendor.businessName,
                           style: AppTextStyles.subHead(
                             fontSize: 15,
-                            color: Colors.white,
+                            color: AppColors.textPrimary,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -252,12 +213,13 @@ class _VendorCard extends StatelessWidget {
                         ),
                         child: Text(
                           vendor.isOpen ? 'Open' : 'Closed',
-                          style: TextStyle(
+                          style: AppTextStyles.label(
+                            fontSize: 10,
                             color: vendor.isOpen
                                 ? AppColors.success
                                 : AppColors.danger,
-                            fontSize: 10,
                             fontWeight: FontWeight.bold,
+                            letterSpacing: 0,
                           ),
                         ),
                       ),
@@ -266,10 +228,10 @@ class _VendorCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.location_on_outlined,
                         size: 12,
-                        color: AppColors.textSecondaryDark,
+                        color: AppColors.textSecondary,
                       ),
                       const SizedBox(width: 4),
                       Expanded(
@@ -277,7 +239,7 @@ class _VendorCard extends StatelessWidget {
                           vendor.building,
                           style: AppTextStyles.body(
                             fontSize: 12,
-                            color: AppColors.textSecondaryDark,
+                            color: AppColors.textSecondary,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -302,9 +264,9 @@ class _VendorCard extends StatelessWidget {
                             ),
                             child: Text(
                               cat,
-                              style: const TextStyle(
-                                color: AppColors.primaryLight,
+                              style: AppTextStyles.caption(
                                 fontSize: 9.5,
+                                color: AppColors.primaryLight,
                               ),
                             ),
                           ),
@@ -315,10 +277,7 @@ class _VendorCard extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            const Icon(
-              Icons.chevron_right_rounded,
-              color: AppColors.textSecondaryDark,
-            ),
+            Icon(Icons.chevron_right_rounded, color: AppColors.textSecondary),
           ],
         ),
       ),

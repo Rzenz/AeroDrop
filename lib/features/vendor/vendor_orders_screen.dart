@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import '../../core/widgets/neu_feedback.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
-import '../../core/widgets/glass_card.dart';
+import '../../core/widgets/neu_card.dart';
 import '../../core/models/order_model.dart';
 import '../../core/providers/order_provider.dart';
 
@@ -57,7 +58,7 @@ class _VendorOrdersScreenState extends ConsumerState<VendorOrdersScreen>
     final allOrders = ordersState.orders;
 
     return Scaffold(
-      backgroundColor: AppColors.bgDark,
+      backgroundColor: AppColors.base,
       body: SafeArea(
         child: Column(
           children: [
@@ -73,14 +74,14 @@ class _VendorOrdersScreenState extends ConsumerState<VendorOrdersScreen>
                         'Customer Requests',
                         style: AppTextStyles.label(
                           fontSize: 10,
-                          color: AppColors.textSecondaryDark,
+                          color: AppColors.textSecondary,
                         ),
                       ),
                       Text(
                         'Order Dispatch',
                         style: AppTextStyles.heading(
                           fontSize: 20,
-                          color: Colors.white,
+                          color: AppColors.textPrimary,
                         ),
                       ),
                     ],
@@ -96,13 +97,13 @@ class _VendorOrdersScreenState extends ConsumerState<VendorOrdersScreen>
               tabAlignment: TabAlignment.start,
               indicatorColor: AppColors.accent,
               labelColor: AppColors.accent,
-              unselectedLabelColor: AppColors.textSecondaryDark,
-              labelStyle: const TextStyle(
-                fontWeight: FontWeight.bold,
+              unselectedLabelColor: AppColors.textSecondary,
+              labelStyle: AppTextStyles.subHead(
                 fontSize: 13,
+                fontWeight: FontWeight.bold,
               ),
               indicatorSize: TabBarIndicatorSize.label,
-              dividerColor: Colors.white.withValues(alpha: 0.05),
+              dividerColor: AppColors.border.withValues(alpha: 0.05),
               tabs: _statusTabs.map((t) {
                 final count = _filterOrders(allOrders, t.statusKeys).length;
                 return Tab(
@@ -127,10 +128,11 @@ class _VendorOrdersScreenState extends ConsumerState<VendorOrdersScreen>
                           ),
                           child: Text(
                             '$count',
-                            style: const TextStyle(
-                              color: AppColors.accent,
+                            style: AppTextStyles.label(
                               fontSize: 9.5,
+                              color: AppColors.accent,
                               fontWeight: FontWeight.bold,
+                              letterSpacing: 0,
                             ),
                           ),
                         ),
@@ -171,16 +173,16 @@ class _VendorOrdersScreenState extends ConsumerState<VendorOrdersScreen>
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Icon(
+                                Icon(
                                   Icons.assignment_outlined,
-                                  color: AppColors.textSecondaryDark,
+                                  color: AppColors.textSecondary,
                                   size: 56,
                                 ),
                                 const SizedBox(height: 12),
                                 Text(
                                   'No ${t.label} orders received.',
                                   style: AppTextStyles.subHead(
-                                    color: Colors.white70,
+                                    color: AppColors.textSecondary,
                                   ),
                                 ),
                               ],
@@ -239,19 +241,12 @@ class _VendorOrdersScreenState extends ConsumerState<VendorOrdersScreen>
         .read(vendorOrdersProvider.notifier)
         .updateOrderStatus(orderId, nextStatus);
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            success
-                ? 'Order updated to $nextStatus.'
-                : 'Failed to update order status.',
-          ),
-          backgroundColor: success ? AppColors.success : AppColors.danger,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
+      showNeuSnack(
+        context,
+        success
+            ? 'Order updated to $nextStatus.'
+            : 'Failed to update order status.',
+        tone: NeuToneKind.success,
       );
     }
   }
@@ -276,7 +271,7 @@ class _DispatchCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
-      child: GlassCard(
+      child: NeuCard(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -290,9 +285,9 @@ class _DispatchCard extends StatelessWidget {
                   children: [
                     Text(
                       'AD-${order.id.substring(0, 8).toUpperCase()}',
-                      style: const TextStyle(
-                        color: AppColors.primaryLight,
+                      style: AppTextStyles.caption(
                         fontSize: 11,
+                        color: AppColors.primaryLight,
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -300,17 +295,17 @@ class _DispatchCard extends StatelessWidget {
                       order.userId.substring(0, 8),
                       style: AppTextStyles.subHead(
                         fontSize: 14.5,
-                        color: Colors.white,
+                        color: AppColors.textPrimary,
                       ).copyWith(fontWeight: FontWeight.bold),
                     ),
                   ],
                 ),
                 Text(
                   '₱${order.totalAmount.toStringAsFixed(2)}',
-                  style: const TextStyle(
+                  style: AppTextStyles.subHead(
+                    fontSize: 16,
                     color: AppColors.accent,
                     fontWeight: FontWeight.bold,
-                    fontSize: 16,
                   ),
                 ),
               ],
@@ -329,15 +324,16 @@ class _DispatchCard extends StatelessWidget {
                         vertical: 2,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.white12,
+                        color: AppColors.surfaceSunken,
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
                         '${i.quantity}x',
-                        style: const TextStyle(
-                          color: Colors.white70,
+                        style: AppTextStyles.label(
                           fontSize: 11,
+                          color: AppColors.textSecondary,
                           fontWeight: FontWeight.bold,
+                          letterSpacing: 0,
                         ),
                       ),
                     ),
@@ -347,7 +343,7 @@ class _DispatchCard extends StatelessWidget {
                         i.productName,
                         style: AppTextStyles.body(
                           fontSize: 12.5,
-                          color: Colors.white.withValues(alpha: 0.9),
+                          color: AppColors.textPrimary.withValues(alpha: 0.9),
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -359,24 +355,24 @@ class _DispatchCard extends StatelessWidget {
             ),
 
             const SizedBox(height: 12),
-            const Divider(color: AppColors.borderDark, height: 1),
+            Divider(color: AppColors.border, height: 1),
             const SizedBox(height: 12),
 
             // Drop-off Location info
             Row(
               children: [
-                const Icon(
+                Icon(
                   Icons.location_on_outlined,
-                  color: AppColors.textSecondaryDark,
+                  color: AppColors.textSecondary,
                   size: 14,
                 ),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
                     order.dropoffLocationName ?? 'Unknown Location',
-                    style: const TextStyle(
-                      color: AppColors.textSecondaryDark,
+                    style: AppTextStyles.caption(
                       fontSize: 11.5,
+                      color: AppColors.textSecondary,
                     ),
                   ),
                 ),
@@ -489,10 +485,11 @@ class _ActionBtn extends StatelessWidget {
             const SizedBox(width: 6),
             Text(
               label,
-              style: TextStyle(
-                color: isAccent ? AppColors.primaryDark : color,
+              style: AppTextStyles.label(
                 fontSize: 12,
+                color: isAccent ? AppColors.primaryDark : color,
                 fontWeight: FontWeight.bold,
+                letterSpacing: 0,
               ),
             ),
           ],

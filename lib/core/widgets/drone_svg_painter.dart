@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
+import '../theme/app_colors.dart';
+
 class DroneSvgPainter extends CustomPainter {
   final double animationValue;
   final Color lineColor;
@@ -9,7 +11,9 @@ class DroneSvgPainter extends CustomPainter {
   DroneSvgPainter({
     required this.animationValue,
     this.lineColor = Colors.white,
-    this.accentColor = const Color(0xFF4F46E5),
+    // Defaults to the brand blue. The previous default was an indigo-purple
+    // belonging to a palette the app no longer uses.
+    this.accentColor = AppColors.primary,
   });
 
   @override

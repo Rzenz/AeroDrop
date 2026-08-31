@@ -9,30 +9,225 @@ import '../../core/providers/delivery_provider.dart';
 import '../../core/utils/logout_helper.dart';
 
 import '../../core/services/supabase_service.dart';
+import '../../core/widgets/neu_action_fan.dart';
+import '../../core/widgets/neu_nav_dock.dart';
 
-class AdminShell extends ConsumerWidget {
+/// One admin destination.
+class _Dest {
+  const _Dest(this.icon, this.label, this.route);
+
+  final IconData icon;
+  final String label;
+  final String route;
+}
+
+/// The four an admin lives in day to day. These get the dock.
+const _primary = <_Dest>[
+  _Dest(Icons.dashboard_rounded, 'Dashboard', '/admin'),
+  _Dest(Icons.local_shipping_rounded, 'Deliveries', '/admin/deliveries'),
+  _Dest(Icons.flight_takeoff_rounded, 'Fleet', '/admin/drones'),
+  _Dest(Icons.people_rounded, 'Users', '/admin/users'),
+];
+
+/// The rest, plus sign out. These fan out of the centre button.
+const _extra = <_Dest>[
+  _Dest(Icons.bar_chart_rounded, 'Analytics', '/admin/analytics'),
+  _Dest(Icons.map_rounded, 'Flight\nBoundaries', '/admin/routes/no-fly-zones'),
+  _Dest(Icons.wb_sunny_rounded, 'Weather', '/admin/weather'),
+  _Dest(Icons.analytics_outlined, 'System\nLogs', '/admin/reports'),
+  _Dest(Icons.settings_rounded, 'Settings', '/admin/settings'),
+];
+
+/// The admin pages paint themselves dark whatever the app theme says, so the
+/// dock has to be told the same rather than resolving its own. Without this it
+/// renders in the light palette on a dark page the moment the user switches
+/// the theme, which reads as a bright bar pasted over the screen.
+final List<BoxShadow> _adminDockShadows = [
+  BoxShadow(
+    color: AppColors.neuDarkShadowDark.withValues(alpha: 0.7),
+    offset: const Offset(0, 12),
+    blurRadius: 28,
+    spreadRadius: -6,
+  ),
+  BoxShadow(
+    color: AppColors.neuLightShadowDark.withValues(alpha: 0.35),
+    offset: const Offset(-4, -4),
+    blurRadius: 12,
+  ),
+];
+
+bool _isActive(String route, String current) =>
+    current == route || (route != '/admin' && current.startsWith(route));
+
+/// Navigation shell for the admin role.
+///
+/// The drawer is gone. Nine destinations behind a hamburger meant every one of
+/// them cost two taps and none were visible; the dock puts the four that
+/// matter one tap away on every screen and matches the customer shell, and the
+/// remaining five fan out of the same centre button the customer shell uses
+/// for its cart.
+class AdminShell extends ConsumerStatefulWidget {
   final Widget child;
   const AdminShell({super.key, required this.child});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final user = ref.watch(authProvider).user;
+  ConsumerState<AdminShell> createState() => _AdminShellState();
+}
+
+class _AdminShellState extends ConsumerState<AdminShell>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _fan;
+
+  @override
+  void initState() {
+    super.initState();
+    _fan = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 460),
+      // Opening is a flourish; closing is getting out of the way. The skills
+      // are explicit that these should not take the same time.
+      reverseDuration: const Duration(milliseconds: 260),
+    );
+  }
+
+  @override
+  void dispose() {
+    _fan.dispose();
+    super.dispose();
+  }
+
+  bool get _open =>
+      _fan.status == AnimationStatus.forward ||
+      _fan.status == AnimationStatus.completed;
+
+  void _toggle() {
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _fan.value = _open ? 0 : 1;
+      setState(() {});
+      return;
+    }
+    _open ? _fan.reverse() : _fan.forward();
+    setState(() {});
+  }
+
+  void _close() {
+    if (!_open) return;
+    MediaQuery.disableAnimationsOf(context) ? _fan.value = 0 : _fan.reverse();
+    setState(() {});
+  }
+
+  /// Height the dock occupies at the bottom of the body. The centre action
+  /// overhangs above this, but that band is transparent, so content passing
+  /// under it reads as scrolling behind a floating control.
+  double _dockSpace(BuildContext context) =>
+      70 + 12 + MediaQuery.paddingOf(context).bottom;
+
+  void _goto(String route) {
+    _close();
+    context.go(route);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     if (SupabaseService.isConfigured) {
       Future.microtask(() {
         ref.read(deliveryProvider.notifier).loadAdminDeliveriesFromSupabase();
       });
     }
-    return Scaffold(
-      backgroundColor: AppColors.bgDark,
-      drawer: _AdminDrawer(user: user, ref: ref),
-      appBar: const _AdminAppBar(),
-      body: child,
+
+    final loc = GoRouterState.of(context).uri.toString();
+    final pending = ref.watch(pendingDeliveriesCountProvider);
+    final selected = _primary.indexWhere((d) => _isActive(d.route, loc));
+
+    return PopScope(
+      // An open fan is a layer over the page; back should shut it rather than
+      // leave the screen with it still hanging there.
+      canPop: !_open,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _close();
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.bgDark,
+        appBar: const _AdminAppBar(),
+        // The dock lives in the body rather than in bottomNavigationBar so the
+        // fan's scrim can pass behind it. In the bar slot the scrim stopped at
+        // the dock's edge, which left it lit like a panel while everything
+        // around it dimmed.
+        body: Stack(
+          children: [
+            // Room reserved for the dock, so the admin screens underneath —
+            // none of which know about it — keep their last row visible.
+            Padding(
+              padding: EdgeInsets.only(bottom: _dockSpace(context)),
+              child: widget.child,
+            ),
+            NeuActionFan(
+              progress: _fan,
+              onDismiss: _close,
+              bottomInset: _dockSpace(context),
+              actions: [
+                for (final d in _extra)
+                  NeuFanAction(
+                    icon: d.icon,
+                    label: d.label,
+                    active: _isActive(d.route, loc),
+                    onTap: () => _goto(d.route),
+                  ),
+                NeuFanAction(
+                  icon: Icons.logout_rounded,
+                  label: 'Sign Out',
+                  destructive: true,
+                  onTap: () {
+                    _close();
+                    showLogoutConfirmation(context, ref);
+                  },
+                ),
+              ],
+            ),
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: SafeArea(
+                top: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                  child: NeuNavDock(
+                    items: [
+                      for (final d in _primary)
+                        NeuNavItem(
+                          icon: d.icon,
+                          label: d.label,
+                          badge: d.route == '/admin/deliveries'
+                              ? pending
+                              : null,
+                        ),
+                    ],
+                    selectedIndex: selected < 0 ? 0 : selected,
+                    onTap: (i) => _goto(_primary[i].route),
+                    surfaceColor: AppColors.bgDark,
+                    borderColor: AppColors.borderDark,
+                    shadows: _adminDockShadows,
+                    selectedColor: AppColors.accent,
+                    unselectedColor: AppColors.textTertiaryDark,
+                    centerAction: NeuFanToggle(
+                      progress: _fan,
+                      onPressed: _toggle,
+                      semanticLabel: _open ? 'Close menu' : 'More destinations',
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
 
 // ponytail: removed stale BuildContext field — use the build()'s own context.
-class _AdminAppBar extends StatelessWidget implements PreferredSizeWidget {
+class _AdminAppBar extends ConsumerWidget implements PreferredSizeWidget {
   const _AdminAppBar();
 
   String _titleForRoute(String loc) {
@@ -50,8 +245,9 @@ class _AdminAppBar extends StatelessWidget implements PreferredSizeWidget {
   }
 
   @override
-  Widget build(BuildContext ctx) {
+  Widget build(BuildContext ctx, WidgetRef ref) {
     final loc = GoRouterState.of(ctx).uri.toString();
+    final user = ref.watch(authProvider).user;
     return PreferredSize(
       preferredSize: const Size.fromHeight(kToolbarHeight),
       child: ClipRRect(
@@ -61,27 +257,7 @@ class _AdminAppBar extends StatelessWidget implements PreferredSizeWidget {
             backgroundColor: AppColors.bgDark.withValues(alpha: 0.8),
             elevation: 0,
             centerTitle: false,
-            leading: Builder(
-              builder: (c) => GestureDetector(
-                onTap: () => Scaffold.of(c).openDrawer(),
-                child: Container(
-                  margin: const EdgeInsets.only(left: 12, top: 8, bottom: 8),
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppColors.cardDark,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.08),
-                    ),
-                  ),
-                  child: const Icon(
-                    Icons.menu_rounded,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                ),
-              ),
-            ),
+            titleSpacing: 20,
             title: Text(
               _titleForRoute(loc),
               style: AppTextStyles.title(
@@ -91,6 +267,7 @@ class _AdminAppBar extends StatelessWidget implements PreferredSizeWidget {
               ),
             ),
             actions: [
+              _ProfileButton(user: user),
               Container(
                 margin: const EdgeInsets.only(right: 16),
                 padding: const EdgeInsets.symmetric(
@@ -135,337 +312,51 @@ class _AdminAppBar extends StatelessWidget implements PreferredSizeWidget {
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
 }
 
-class _AdminDrawer extends StatelessWidget {
+/// The admin's own avatar, and the way into their profile.
+///
+/// It replaces the drawer header, which was where that link used to live.
+class _ProfileButton extends StatelessWidget {
+  const _ProfileButton({required this.user});
+
   final dynamic user;
-  final WidgetRef ref;
-  const _AdminDrawer({this.user, required this.ref});
 
   @override
   Widget build(BuildContext context) {
-    final name = user?.name ?? 'Admin';
-    final email = user?.email ?? '';
-    final loc = GoRouterState.of(context).uri.toString();
-    final pendingCount = ref.watch(pendingDeliveriesCountProvider);
+    final name = (user?.name as String?) ?? 'Admin';
+    final avatar = user?.avatarUrl as String?;
 
-    return ClipRRect(
-      borderRadius: const BorderRadius.horizontal(right: Radius.circular(24)),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-        child: Drawer(
-          backgroundColor: AppColors.bgDark.withValues(alpha: 0.95),
-          child: Column(
-            children: [
-              // Header
-              GestureDetector(
-                onTap: () {
-                  Navigator.pop(context);
-                  if (user?.id != null) {
-                    context.push('/admin/users/${user.id}');
-                  }
-                },
-                child: Container(
-                  width: double.infinity,
-                  padding: EdgeInsets.fromLTRB(
-                    20,
-                    MediaQuery.of(context).padding.top + 20,
-                    20,
-                    24,
+    return Semantics(
+      button: true,
+      label: 'Your admin profile',
+      child: GestureDetector(
+        onTap: user?.id == null
+            ? null
+            : () => context.push('/admin/users/${user.id}'),
+        child: Container(
+          width: 34,
+          height: 34,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            gradient: avatar == null ? AppColors.accentGradient : null,
+            shape: BoxShape.circle,
+            image: avatar == null
+                ? null
+                : DecorationImage(
+                    image: NetworkImage(avatar),
+                    fit: BoxFit.cover,
                   ),
-                  decoration: const BoxDecoration(
-                    gradient: AppColors.primaryGradient,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        width: 60,
-                        height: 60,
-                        decoration: BoxDecoration(
-                          gradient: user?.avatarUrl == null
-                              ? AppColors.accentGradient
-                              : null,
-                          color: user?.avatarUrl != null
-                              ? AppColors.cardDark
-                              : null,
-                          shape: BoxShape.circle,
-                          image: user?.avatarUrl != null
-                              ? DecorationImage(
-                                  image: NetworkImage(user.avatarUrl),
-                                  fit: BoxFit.cover,
-                                )
-                              : null,
-                          border: Border.all(
-                            color: AppColors.bgDark.withValues(alpha: 0.3),
-                            width: 2,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.accent.withValues(alpha: 0.4),
-                              blurRadius: 16,
-                            ),
-                          ],
-                        ),
-                        child: user?.avatarUrl == null
-                            ? Center(
-                                child: Text(
-                                  name[0].toUpperCase(),
-                                  style: AppTextStyles.title(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.w900,
-                                    color: AppColors.bgDark,
-                                  ),
-                                ),
-                              )
-                            : null,
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        name,
-                        style: AppTextStyles.title(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                      Text(
-                        email,
-                        style: AppTextStyles.body(
-                          fontSize: 12,
-                          color: Colors.white.withValues(alpha: 0.7),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: const Text(
-                          'System Administrator',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              // Nav items
-              Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 12,
-                  ),
-                  children: [
-                    _NavItem(
-                      icon: Icons.dashboard_rounded,
-                      label: 'Dashboard',
-                      route: '/admin',
-                      current: loc,
-                      onTap: () => context.go('/admin'),
-                    ),
-                    _NavItem(
-                      icon: Icons.people_rounded,
-                      label: 'Users',
-                      route: '/admin/users',
-                      current: loc,
-                      onTap: () => context.go('/admin/users'),
-                    ),
-                    _NavItem(
-                      icon: Icons.flight_takeoff_rounded,
-                      label: 'Drone Fleet',
-                      route: '/admin/drones',
-                      current: loc,
-                      onTap: () => context.go('/admin/drones'),
-                    ),
-                    _NavItem(
-                      icon: Icons.map_rounded,
-                      label: 'Flight Boundaries',
-                      route: '/admin/routes/no-fly-zones',
-                      current: loc,
-                      onTap: () => context.go('/admin/routes/no-fly-zones'),
-                    ),
-                    _NavItem(
-                      icon: Icons.local_shipping_rounded,
-                      label: 'Deliveries',
-                      route: '/admin/deliveries',
-                      current: loc,
-                      onTap: () => context.go('/admin/deliveries'),
-                      trailing: pendingCount > 0
-                          ? Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppColors.accent,
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Text(
-                                '$pendingCount',
-                                style: const TextStyle(
-                                  color: AppColors.bgDark,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 11,
-                                ),
-                              ),
-                            )
-                          : null,
-                    ),
-                    _NavItem(
-                      icon: Icons.bar_chart_rounded,
-                      label: 'Analytics',
-                      route: '/admin/analytics',
-                      current: loc,
-                      onTap: () => context.go('/admin/analytics'),
-                    ),
-                    _NavItem(
-                      icon: Icons.analytics_outlined,
-                      label: 'System Logs',
-                      route: '/admin/reports',
-                      current: loc,
-                      onTap: () => context.go('/admin/reports'),
-                    ),
-                    _NavItem(
-                      icon: Icons.wb_sunny_rounded,
-                      label: 'Weather Controls',
-                      route: '/admin/weather',
-                      current: loc,
-                      onTap: () => context.go('/admin/weather'),
-                    ),
-                    _NavItem(
-                      icon: Icons.settings_rounded,
-                      label: 'Settings',
-                      route: '/admin/settings',
-                      current: loc,
-                      onTap: () => context.go('/admin/settings'),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Sign out
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
-                child: GestureDetector(
-                  onTap: () {
-                    // Close the drawer first
-                    Navigator.of(context).pop();
-                    showLogoutConfirmation(context, ref);
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    decoration: BoxDecoration(
-                      color: AppColors.danger.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: AppColors.danger.withValues(alpha: 0.3),
-                      ),
-                    ),
-                    child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.logout_rounded,
-                          color: AppColors.danger,
-                          size: 18,
-                        ),
-                        SizedBox(width: 8),
-                        Text(
-                          'Sign Out',
-                          style: TextStyle(
-                            color: AppColors.danger,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
+            border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _NavItem extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String route;
-  final String current;
-  final VoidCallback onTap;
-  final Widget? trailing;
-
-  const _NavItem({
-    required this.icon,
-    required this.label,
-    required this.route,
-    required this.current,
-    required this.onTap,
-    this.trailing,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isActive =
-        current == route || (route != '/admin' && current.startsWith(route));
-    return GestureDetector(
-      onTap: () {
-        Navigator.of(context).pop();
-        onTap();
-      },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        margin: const EdgeInsets.only(bottom: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
-        decoration: BoxDecoration(
-          gradient: isActive ? AppColors.primaryGradient : null,
-          color: isActive ? null : Colors.transparent,
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              icon,
-              color: isActive ? Colors.white : AppColors.textSecondaryDark,
-              size: 20,
-            ),
-            const SizedBox(width: 14),
-            Text(
-              label,
-              style: AppTextStyles.body(
-                fontSize: 15,
-                fontWeight: isActive ? FontWeight.w700 : FontWeight.normal,
-                color: isActive ? Colors.white : AppColors.textSecondaryDark,
-              ),
-            ),
-            if (trailing != null) ...[
-              const Spacer(),
-              trailing!,
-            ] else if (isActive) ...[
-              const Spacer(),
-              Container(
-                width: 8,
-                height: 8,
-                decoration: const BoxDecoration(
-                  color: AppColors.accent,
-                  shape: BoxShape.circle,
+          child: avatar != null
+              ? null
+              : Text(
+                  name.isEmpty ? 'A' : name[0].toUpperCase(),
+                  style: AppTextStyles.title(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.bgDark,
+                  ),
                 ),
-              ),
-            ],
-          ],
         ),
       ),
     );

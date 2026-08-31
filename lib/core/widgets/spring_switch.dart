@@ -1,62 +1,90 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+
 import '../theme/app_colors.dart';
+import '../theme/app_motion.dart';
+import '../theme/app_radii.dart';
+import '../theme/app_shadows.dart';
+import 'neu_surface.dart';
 
+/// The app's toggle.
+///
+/// An inset track with a raised thumb — the physical reading of a switch. The
+/// track also tints on when active, so the state is not carried by thumb
+/// position alone.
 class SpringSwitch extends StatelessWidget {
-  final bool value;
-  final ValueChanged<bool> onChanged;
-  final Color activeColor;
-  final Color inactiveColor;
-
   const SpringSwitch({
     super.key,
     required this.value,
     required this.onChanged,
-    this.activeColor = AppColors.primaryLight,
-    this.inactiveColor = AppColors.borderDark,
+    this.activeColor = AppColors.primary,
+    this.enabled = true,
+    this.semanticLabel,
   });
+
+  final bool value;
+  final ValueChanged<bool> onChanged;
+  final Color activeColor;
+  final bool enabled;
+  final String? semanticLabel;
+
+  static const double _w = 52;
+  static const double _h = 30;
+  static const double _thumb = 22;
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.lightImpact();
-        onChanged(!value);
-      },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 250),
-        curve: Curves.easeOutBack,
-        width: 50,
-        height: 28,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(100),
-          color: value
-              ? activeColor.withValues(alpha: 0.2)
-              : inactiveColor.withValues(alpha: 0.4),
-          border: Border.all(
-            color: value ? activeColor : inactiveColor,
-            width: 1.5,
-          ),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 3),
-        alignment: value ? Alignment.centerRight : Alignment.centerLeft,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 250),
-          curve: Curves.easeOutBack,
-          width: 20,
-          height: 20,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: value ? activeColor : Colors.white70,
-            boxShadow: value
-                ? [
-                    BoxShadow(
-                      color: activeColor.withValues(alpha: 0.5),
-                      blurRadius: 6,
-                      spreadRadius: 1,
+    return Semantics(
+      toggled: value,
+      enabled: enabled,
+      label: semanticLabel,
+      child: GestureDetector(
+        onTap: enabled
+            ? () {
+                HapticFeedback.lightImpact();
+                onChanged(!value);
+              }
+            : null,
+        // Keep the 44pt target even though the switch itself is 30pt tall.
+        child: SizedBox(
+          width: _w,
+          height: 44,
+          child: Center(
+            child: Opacity(
+              opacity: enabled ? 1 : 0.45,
+              child: NeuSurface(
+                style: NeuStyle.inset,
+                depth: NeuDepth.flat,
+                width: _w,
+                height: _h,
+                borderRadius: AppRadii.brPill,
+                color: value
+                    ? Color.alphaBlend(
+                        activeColor.withValues(alpha: 0.30),
+                        AppColors.surfaceSunken,
+                      )
+                    : AppColors.surfaceSunken,
+                child: AnimatedAlign(
+                  duration: AppMotion.normal,
+                  curve: AppMotion.spring,
+                  alignment: value
+                      ? Alignment.centerRight
+                      : Alignment.centerLeft,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: Container(
+                      width: _thumb,
+                      height: _thumb,
+                      decoration: BoxDecoration(
+                        color: value ? activeColor : AppColors.base,
+                        shape: BoxShape.circle,
+                        boxShadow: AppShadows.raised(NeuDepth.flat),
+                      ),
                     ),
-                  ]
-                : null,
+                  ),
+                ),
+              ),
+            ),
           ),
         ),
       ),

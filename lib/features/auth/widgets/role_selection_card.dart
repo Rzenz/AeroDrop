@@ -29,10 +29,10 @@ class RoleSelectionCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: selected
               ? AppColors.primary.withValues(alpha: 0.12)
-              : AppColors.cardDark,
+              : AppColors.base,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: selected ? AppColors.accent : AppColors.borderDark,
+            color: selected ? AppColors.accent : AppColors.border,
             width: selected ? 2.0 : 1.5,
           ),
           boxShadow: selected
@@ -54,14 +54,12 @@ class RoleSelectionCard extends StatelessWidget {
               decoration: BoxDecoration(
                 color: selected
                     ? AppColors.accent.withValues(alpha: 0.2)
-                    : AppColors.borderDark,
+                    : AppColors.border,
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 icon,
-                color: selected
-                    ? AppColors.accent
-                    : AppColors.textSecondaryDark,
+                color: selected ? AppColors.accent : AppColors.textSecondary,
                 size: 20,
               ),
             ),
@@ -83,7 +81,7 @@ class RoleSelectionCard extends StatelessWidget {
                     description,
                     style: AppTextStyles.body(
                       fontSize: 11.5,
-                      color: AppColors.textSecondaryDark,
+                      color: AppColors.textSecondary,
                     ),
                   ),
                 ],
@@ -97,9 +95,9 @@ class RoleSelectionCard extends StatelessWidget {
                 size: 20,
               )
             else
-              const Icon(
+              Icon(
                 Icons.radio_button_unchecked_rounded,
-                color: AppColors.borderDark,
+                color: AppColors.border,
                 size: 20,
               ),
           ],

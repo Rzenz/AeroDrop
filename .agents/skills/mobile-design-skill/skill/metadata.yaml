@@ -1,0 +1,369 @@
+name: mobile-design-skill
+title: Mobile App Design Skill
+version: 1.36.0
+status: production-ready
+owner: repository-maintained
+entrypoint: SKILL.md
+description: >
+  A reusable AI skill for designing, reviewing, structuring, and justifying
+  mobile UI/UX decisions for iOS, Android, and cross-platform products.
+compatible_with:
+  - claude-code
+  - codex
+  - prompt-registry
+domain:
+  primary: mobile-ui-ux
+  secondary:
+    - product-design
+    - accessibility
+    - design-systems
+    - ux-review
+modes:
+  - id: generate-screen
+    title: Generate mobile screen concept
+  - id: design-flow
+    title: Design mobile user flow
+  - id: ui-spec
+    title: Create platform-aware UI spec
+  - id: review-screen
+    title: Review screen for usability/accessibility
+    sub_cases:
+      - id: D1
+        title: Review with visual design provided
+      - id: D2
+        title: Review with text description only
+      - id: D3
+        title: Review with problem statement
+      - id: D4
+        title: Review with context change
+  - id: typography-spacing
+    title: Create typography and spacing system
+  - id: rationale-handoff
+    title: Prepare design rationale / handoff
+accepted_inputs:
+  - app idea
+  - feature description
+  - user goal
+  - target audience
+  - platform
+  - screen type
+  - wireframe description
+  - flow description
+  - constraints
+  - benchmark references
+  - rendered artifact description
+  - local URL or prototype reference
+platforms:
+  - ios
+  - android
+  - cross-platform
+response_contract:
+  classify_mode_first: true
+  choose_exactly_one_primary_mode: true
+  determine_platform_scope: true
+  determine_device_class: true
+  apply_clarification_policy: true
+  support_judged_mode_flag: true
+  require_minimal_labeled_assumptions: true
+  ask_only_blocking_clarifying_questions: true
+  max_clarifying_questions: 3
+  include_accessibility_by_default: true
+  include_platform_notes_when_relevant: true
+  distinguish_facts_from_recommendations: true
+  separate_inspiration_from_evidence: true
+  apply_domain_packs_when_relevant: true
+  support_benchmark_report_format: true
+  support_optional_rendered_output_qa: true
+guardrails:
+  - do not invent official platform rules
+  - do not invent research findings or usability test results
+  - do not claim accessibility compliance unless explicitly verified
+  - do not treat inspiration sources as evidence for usability accessibility platform correctness or compliance
+  - do not give aesthetic advice without usability reasoning
+  - do not ignore typography spacing navigation or touch behavior
+  - do not blur ios and android when conventions differ
+  - do not invent missing flows or states unless labeled as assumptions
+source_priority:
+  - official platform guidance and standards
+  - accessibility and usability standards
+  - public-sector and enterprise-grade design systems
+  - established research and case-study sources
+  - workflow and tooling references
+clarification_policy:
+  role: decide when to ask clarifying questions vs proceed with assumptions
+  max_questions: 3
+  ask_when_missing_info_changes:
+    - platform behavior
+    - primary user task
+    - safety accessibility or compliance risk
+    - regulated domain state handling
+    - visual evidence for visual review
+    - production implementation behavior
+  proceed_with_assumptions_when:
+    - conservative cross-platform default is safe
+    - general audience default is safe
+    - brand direction is not central to the task
+    - policy can be labeled as assumption
+    - review can be limited to structure and behavior
+  response_sections_when_blocking:
+    - Clarifying questions
+    - Why this blocks
+    - Fast path
+judged_mode:
+  trigger: "/mobile-design-skill --judge"
+  role: optional interactive orchestration for higher-confidence outputs
+  requires_manual_script_run: false
+  preferred_execution: independent judge agent in same host session
+  fallback: single-agent rubric self-review when subagents are unavailable
+  final_section: Judge summary
+  score_is_derived_not_targeted: true
+  revision_rule: revise when the judge's dimension read shows a boundary question the available input can answer
+design_quality:
+  role: visual hierarchy composition density typography color motion brand and production-readiness calibration
+  dimensions:
+    - attention path and hierarchy
+    - composition and spacing
+    - typography craft
+    - color state and contrast
+    - density and rhythm
+    - interaction polish and motion
+    - context and brand fit
+    - production readiness
+    - distinctiveness and owned assets
+design_quality_rubric:
+  role: 1-5 scoring system for raising proposed design quality and reviewing existing design quality
+  score_is_median_of_assessable_dimension_bands: true
+  band_is_consecutive_boundary_questions_answered_yes: true
+  caps_clamp_the_artifact_score_never_a_dimension_band: true
+  quality_target_names_blocking_dimension: true
+  expose_review_score: true
+  expose_generated_target_when_useful: true
+  eval_pack:
+    before_after_example: examples/rubric-before-after.md
+    golden_examples_index: docs/golden-examples.md
+    golden_examples:
+      - examples/golden/premium-ui.md
+      - examples/golden/enterprise-saas.md
+      - examples/golden/fintech.md
+      - examples/golden/health.md
+      - examples/golden/onboarding.md
+      - examples/golden/settings.md
+      - examples/golden/checkout.md
+    fixtures:
+      - examples/evals/rubric-score-1.json
+      - examples/evals/rubric-score-2.json
+      - examples/evals/rubric-score-3.json
+      - examples/evals/rubric-score-4.json
+      - examples/evals/rubric-score-5.json
+    synthetic_case_studies_index: docs/synthetic-case-studies.md
+    synthetic_case_studies:
+      - examples/case-studies/fintech-account-overview.md
+      - examples/case-studies/health-medication-refill.md
+      - examples/case-studies/saas-approval-queue.md
+      - examples/case-studies/marketplace-checkout-substitution.md
+      - examples/case-studies/social-privacy-settings.md
+      - examples/case-studies/education-lesson-progress.md
+      - examples/case-studies/onboarding-permissions.md
+      - examples/case-studies/settings-consent-destructive-action.md
+      - examples/case-studies/search-results-filtering.md
+      - examples/case-studies/empty-error-state-recovery.md
+      - examples/case-studies/typography-spacing-system.md
+      - examples/case-studies/rationale-handoff.md
+  levels:
+    "1": broken or misleading
+    "2": structurally weak
+    "3": acceptable baseline
+    "4": strong and shippable
+    "5": excellent and resilient
+  dimensions:
+    - attention path and hierarchy
+    - composition and spacing
+    - typography craft
+    - color state and contrast
+    - density and rhythm
+    - interaction polish and motion
+    - context and brand fit
+    - production readiness
+    - distinctiveness and owned assets
+  unverifiable_dimension_marker: "n/v"
+  unverifiable_dimensions_excluded_from_median: true
+adaptive_layout:
+  role: tablet, foldable, and adaptive layout layer beyond phone-first design
+  documentation: docs/adaptive-layout.md
+  device_classes:
+    - phone
+    - tablet
+    - foldable
+    - adaptive
+  width_classes:
+    compact: "< 600dp"
+    medium: "600-839dp"
+    expanded: ">= 840dp"
+  canonical_layouts:
+    - list-detail
+    - supporting pane
+    - feed
+  device_class_is_trigger_not_precedence_rank: true
+llm_judge_runner:
+  role: LLM-agnostic semantic rubric calibration runner with external-agent command support
+  script: scripts/run_rubric_judge.py
+  documentation: docs/llm-judge-runner.md
+  fixture_source: examples/evals
+  supports:
+    - dry-run fixture coverage checks
+    - JSONL judge request export
+    - oracle JSONL output export for runner self-tests
+    - JSONL judge output validation
+    - external judge agent command over stdin/stdout
+    - deterministic oracle agent for command-adapter CI self-tests
+    - versioned request schema independent of provider or model family
+  output_contract:
+    - score
+    - verdict
+    - cap
+    - hard_limits
+    - dimension_scores
+    - failed_dimensions
+    - rationale
+    - improvement_suggestions
+weakness_prevention:
+  role: internal failure-mode preflight for preventing shallow or misleading design output
+  severity_levels:
+    - P0 harmful or misleading
+    - P1 product-breaking
+    - P2 quality regression
+    - P3 craft issue
+  patterns:
+    - generic artifact disguised as a design answer
+    - template completion without real decisions
+    - first-idea bias
+    - aesthetic laundering
+    - evidence overreach
+    - platform flattening
+    - context blindness
+    - happy-path-only design
+    - weak design-quality calibration
+    - visual overclaim in reviews
+    - weak handoff and buildability
+    - overlong process theater
+inspiration_sources:
+  role: non-authoritative visual inspiration and production reference layer
+  benchmark_playbooks: docs/visual-benchmark-playbooks.md
+  benchmark_report_format: docs/benchmark-report-format.md
+  benchmark_report_example: examples/benchmark-report.md
+  production_references:
+    - Mobbin
+    - Page Flows
+    - UI Sources
+    - Pttrns
+    - Screenlane
+  platform_and_awards:
+    - Apple Design Awards
+    - Material Design blog and case studies
+    - Awwwards
+  visual_portfolios_and_moodboards:
+    - Behance
+    - Dribbble
+    - Pinterest
+    - Figma Community
+domain_packs:
+  role: synthetic domain-aware mobile design playbooks
+  index: docs/domain-packs/index.md
+  packs:
+    fintech: docs/domain-packs/fintech.md
+    health: docs/domain-packs/health.md
+    saas: docs/domain-packs/saas.md
+    marketplace: docs/domain-packs/marketplace.md
+    social: docs/domain-packs/social.md
+    education: docs/domain-packs/education.md
+  boundaries:
+    - recommendations not proof
+    - no compliance verdicts
+    - no business metric claims
+    - confirm regulated requirements with qualified owners
+visual_review_fixtures:
+  role: synthetic Figma-like text fixtures for Mode D review calibration
+  index: docs/visual-review-fixtures.md
+  fixtures:
+    - examples/visual-review-fixtures/fintech-dashboard-dense-summary.md
+    - examples/visual-review-fixtures/health-appointment-booking.md
+    - examples/visual-review-fixtures/enterprise-saas-mobile-table-card-list.md
+    - examples/visual-review-fixtures/marketplace-product-detail-checkout-edge.md
+    - examples/visual-review-fixtures/social-profile-privacy-control.md
+    - examples/visual-review-fixtures/education-quiz-results.md
+rendered_output_qa:
+  role: optional post-implementation QA workflow for rendered mobile artifacts
+  documentation: docs/rendered-output-qa.md
+  schema: examples/rendered-output-qa/report-schema.json
+  sample_report: examples/rendered-output-qa/sample-report.json
+  required_by_default: false
+  checks:
+    - mobile viewports
+    - overlap clipping and text overflow
+    - tap target hints
+    - contrast hints
+    - responsive behavior
+    - state coverage
+    - keyboard and focus behavior
+    - reduced motion
+release_automation:
+  role: deterministic release validation without network or model credentials
+  workflow: .github/workflows/release-validate.yml
+  script: scripts/validate_release.py
+  checks:
+    - repository validation
+    - rubric judge dry-run
+    - judge parser self-test
+    - external command oracle self-test
+    - version and tag sanity
+primary_sources:
+  - Apple Human Interface Guidelines
+  - Material Design 3
+  - Android Developers Navigation
+  - WCAG 2.2
+  - W3C Applying WCAG 2.2 to Mobile Applications
+  - ISO 9241-210
+  - ISO 9241-11
+  - GOV.UK Design System patterns
+  - NHS Design System typography
+  - Fluent 2 typography and accessibility
+  - Figma Variables guidance
+  - Material Partner Studies
+tags:
+  - mobile
+  - ios
+  - android
+  - cross-platform
+  - ux
+  - ui
+  - accessibility
+  - design-system
+  - typography
+  - handoff
+quality_bar:
+  concise_operational_guidance: true
+  implementation_ready_outputs: true
+  structured_responses: true
+  evidence_first_reasoning: true
+  mandatory_self_review: true
+  concrete_numeric_thresholds: true
+  design_quality_calibration: true
+  design_quality_rubric_1_to_5: true
+  design_quality_rubric_eval_pack: true
+  golden_examples: true
+  llm_as_judge_runner: true
+  judged_mode_flag: true
+  clarification_policy: true
+  known_weakness_preflight: true
+  design_reasoning_with_alternatives: true
+  context_aware_defaults: true
+  heuristic_grounded_reasoning: true
+  pattern_catalog_grounded: true
+  inspiration_sources_separated_from_evidence: true
+  visual_benchmark_playbooks: true
+  benchmark_report_format: true
+  synthetic_case_studies: true
+  domain_packs: true
+  visual_review_fixtures: true
+  rendered_output_qa: true
+  release_validation: true

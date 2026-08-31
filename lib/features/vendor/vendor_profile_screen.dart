@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../core/widgets/neu_feedback.dart';
+import '../../core/widgets/custom_app_bar.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -33,11 +35,10 @@ class _VendorProfileScreenState extends ConsumerState<VendorProfileScreen> {
       final bytes = await image.readAsBytes();
       if (bytes.length > 2 * 1024 * 1024) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Image must be less than 2MB'),
-              backgroundColor: AppColors.danger,
-            ),
+          showNeuSnack(
+            context,
+            'Image must be less than 2MB',
+            tone: NeuToneKind.error,
           );
         }
         return;
@@ -47,13 +48,10 @@ class _VendorProfileScreenState extends ConsumerState<VendorProfileScreen> {
       final success = await ref.read(authProvider.notifier).updateAvatar(image);
       if (mounted) {
         setState(() => _uploadingAvatar = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              success ? 'Avatar updated!' : 'Failed to upload avatar.',
-            ),
-            backgroundColor: success ? AppColors.success : AppColors.danger,
-          ),
+        showNeuSnack(
+          context,
+          success ? 'Avatar updated!' : 'Failed to upload avatar.',
+          tone: NeuToneKind.success,
         );
       }
     } catch (e) {
@@ -70,12 +68,12 @@ class _VendorProfileScreenState extends ConsumerState<VendorProfileScreen> {
   Widget build(BuildContext context) {
     final user = ref.watch(authProvider).user;
     if (user == null) {
-      return const Scaffold(
-        backgroundColor: AppColors.bgDark,
+      return Scaffold(
+        backgroundColor: AppColors.base,
         body: Center(
           child: Text(
             'No active session.',
-            style: TextStyle(color: Colors.white),
+            style: AppTextStyles.body(color: AppColors.textPrimary),
           ),
         ),
       );
@@ -102,16 +100,8 @@ class _VendorProfileScreenState extends ConsumerState<VendorProfileScreen> {
     final businessName = user.businessName ?? user.fullName;
 
     return Scaffold(
-      backgroundColor: AppColors.bgDark,
-      appBar: AppBar(
-        backgroundColor: AppColors.bgDark,
-        elevation: 0,
-        automaticallyImplyLeading: false,
-        title: Text(
-          'My Profile',
-          style: AppTextStyles.subHead(fontSize: 18, color: Colors.white),
-        ),
-      ),
+      backgroundColor: AppColors.base,
+      appBar: CustomAppBar(title: 'My Profile'),
       body: ListView(
         physics: const BouncingScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 120),
@@ -154,10 +144,9 @@ class _VendorProfileScreenState extends ConsumerState<VendorProfileScreen> {
                             : user.avatarUrl == null
                             ? Text(
                                 initials,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
+                                style: AppTextStyles.heading(
                                   fontSize: 28,
+                                  color: AppColors.textPrimary,
                                 ),
                               )
                             : null,
@@ -190,7 +179,7 @@ class _VendorProfileScreenState extends ConsumerState<VendorProfileScreen> {
                   businessName,
                   style: AppTextStyles.heading(
                     fontSize: 20,
-                    color: Colors.white,
+                    color: AppColors.textPrimary,
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -210,14 +199,15 @@ class _VendorProfileScreenState extends ConsumerState<VendorProfileScreen> {
                         : user.isPendingVendor
                         ? '⏳ Pending Approval'
                         : '● User',
-                    style: TextStyle(
+                    style: AppTextStyles.label(
+                      fontSize: 12,
                       color: user.isVendor
                           ? AppColors.success
                           : user.isPendingVendor
                           ? AppColors.warning
-                          : AppColors.textSecondaryDark,
-                      fontSize: 12,
+                          : AppColors.textSecondary,
                       fontWeight: FontWeight.bold,
+                      letterSpacing: 0,
                     ),
                   ),
                 ),
@@ -249,11 +239,11 @@ class _VendorProfileScreenState extends ConsumerState<VendorProfileScreen> {
             child:
                 (user.businessCategory == null ||
                     user.businessCategory!.trim().isEmpty)
-                ? const Text(
+                ? Text(
                     'Not provided',
-                    style: TextStyle(
-                      color: AppColors.textSecondaryDark,
+                    style: AppTextStyles.body(
                       fontSize: 13,
+                      color: AppColors.textSecondary,
                     ),
                   )
                 : Wrap(
@@ -276,9 +266,9 @@ class _VendorProfileScreenState extends ConsumerState<VendorProfileScreen> {
                         ),
                         child: Text(
                           user.businessCategory!,
-                          style: const TextStyle(
-                            color: AppColors.primaryLight,
+                          style: AppTextStyles.caption(
                             fontSize: 12,
+                            color: AppColors.primaryLight,
                           ),
                         ),
                       ),
@@ -320,9 +310,9 @@ class _VendorProfileScreenState extends ConsumerState<VendorProfileScreen> {
               _confirmLogout();
             },
             icon: const Icon(Icons.logout_rounded, color: AppColors.danger),
-            label: const Text(
+            label: Text(
               'Log Out',
-              style: TextStyle(
+              style: AppTextStyles.subHead(
                 color: AppColors.danger,
                 fontWeight: FontWeight.bold,
               ),
@@ -365,9 +355,9 @@ class _InfoCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.cardDark,
+        color: AppColors.base,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.borderDark),
+        border: Border.all(color: AppColors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -378,7 +368,10 @@ class _InfoCard extends StatelessWidget {
               const SizedBox(width: 8),
               Text(
                 title,
-                style: AppTextStyles.subHead(fontSize: 14, color: Colors.white),
+                style: AppTextStyles.subHead(
+                  fontSize: 14,
+                  color: AppColors.textPrimary,
+                ),
               ),
             ],
           ),
@@ -396,7 +389,7 @@ class _InfoCard extends StatelessWidget {
                       item.label,
                       style: AppTextStyles.body(
                         fontSize: 12,
-                        color: AppColors.textSecondaryDark,
+                        color: AppColors.textSecondary,
                       ),
                     ),
                   ),
@@ -406,7 +399,7 @@ class _InfoCard extends StatelessWidget {
                       item.value,
                       style: AppTextStyles.body(
                         fontSize: 13,
-                        color: Colors.white,
+                        color: AppColors.textPrimary,
                       ),
                     ),
                   ),
@@ -434,7 +427,7 @@ class _ActionTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: AppColors.cardDark,
+      color: AppColors.base,
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
         onTap: onTap,
@@ -448,12 +441,15 @@ class _ActionTile extends StatelessWidget {
               Expanded(
                 child: Text(
                   label,
-                  style: AppTextStyles.body(fontSize: 14, color: Colors.white),
+                  style: AppTextStyles.body(
+                    fontSize: 14,
+                    color: AppColors.textPrimary,
+                  ),
                 ),
               ),
-              const Icon(
+              Icon(
                 Icons.chevron_right_rounded,
-                color: AppColors.textSecondaryDark,
+                color: AppColors.textSecondary,
                 size: 18,
               ),
             ],

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
+import '../../core/widgets/custom_app_bar.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
-import '../../core/widgets/glass_card.dart';
+import '../../core/widgets/neu_card.dart';
 import '../../core/models/order_model.dart';
 import '../../core/providers/order_provider.dart';
 import '../../core/services/supabase_service.dart';
@@ -60,30 +60,10 @@ class OrderDetailsScreen extends ConsumerWidget {
     final orderAsync = ref.watch(orderDetailsProvider(orderId));
 
     return Scaffold(
-      backgroundColor: AppColors.bgDark,
-      appBar: AppBar(
-        backgroundColor: AppColors.bgDark,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-          onPressed: () => context.pop(),
-        ),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Order Details',
-              style: AppTextStyles.subHead(fontSize: 16, color: Colors.white),
-            ),
-            Text(
-              'ID: ${orderId.substring(0, 8).toUpperCase()}',
-              style: const TextStyle(
-                color: AppColors.primaryLight,
-                fontSize: 11,
-              ),
-            ),
-          ],
-        ),
+      backgroundColor: AppColors.base,
+      appBar: CustomAppBar(
+        title: 'Order Details',
+        subtitle: 'ID: ${orderId.substring(0, 8).toUpperCase()}',
       ),
       body: orderAsync.when(
         data: (order) {
@@ -91,7 +71,7 @@ class OrderDetailsScreen extends ConsumerWidget {
             return Center(
               child: Text(
                 'Order not found.',
-                style: TextStyle(color: AppColors.textSecondaryDark),
+                style: AppTextStyles.body(color: AppColors.textSecondary),
               ),
             );
           }
@@ -159,11 +139,11 @@ class OrderDetailsScreen extends ConsumerWidget {
                                   errorBuilder: (_, _, _) => Container(
                                     width: 52,
                                     height: 52,
-                                    color: AppColors.cardDark2,
-                                    child: const Icon(
+                                    color: AppColors.surfaceRaised,
+                                    child: Icon(
                                       Icons.image_outlined,
                                       size: 20,
-                                      color: AppColors.textSecondaryDark,
+                                      color: AppColors.textSecondary,
                                     ),
                                   ),
                                 ),
@@ -178,14 +158,14 @@ class OrderDetailsScreen extends ConsumerWidget {
                                       style: AppTextStyles.body(
                                         fontSize: 13,
                                         fontWeight: FontWeight.bold,
-                                        color: Colors.white,
+                                        color: AppColors.textPrimary,
                                       ),
                                     ),
                                     Text(
                                       '${order.vendorName} · x${item.quantity}',
                                       style: AppTextStyles.body(
                                         fontSize: 11,
-                                        color: AppColors.textSecondaryDark,
+                                        color: AppColors.textSecondary,
                                       ),
                                     ),
                                   ],
@@ -193,10 +173,10 @@ class OrderDetailsScreen extends ConsumerWidget {
                               ),
                               Text(
                                 '₱${(item.unitPrice * item.quantity).toStringAsFixed(2)}',
-                                style: const TextStyle(
+                                style: AppTextStyles.subHead(
+                                  fontSize: 14,
                                   color: AppColors.accent,
                                   fontWeight: FontWeight.bold,
-                                  fontSize: 14,
                                 ),
                               ),
                             ],
@@ -230,7 +210,7 @@ class OrderDetailsScreen extends ConsumerWidget {
                       value: order.paymentReference ?? 'N/A',
                     ),
                     const SizedBox(height: 10),
-                    const Divider(color: AppColors.borderDark),
+                    Divider(color: AppColors.border),
                     const SizedBox(height: 10),
                     _InfoRow(
                       label: 'Total',
@@ -250,7 +230,7 @@ class OrderDetailsScreen extends ConsumerWidget {
         error: (err, _) => Center(
           child: Text(
             'Error: $err',
-            style: const TextStyle(color: AppColors.danger),
+            style: AppTextStyles.body(color: AppColors.danger),
           ),
         ),
       ),
@@ -299,7 +279,7 @@ class OrderDetailsScreen extends ConsumerWidget {
       case 'refunded':
         return AppColors.info;
       default:
-        return AppColors.textSecondaryDark;
+        return AppColors.textSecondary;
     }
   }
 }
@@ -368,19 +348,17 @@ class _StatusTimeline extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: done
                         ? AppColors.accent.withValues(alpha: 0.15)
-                        : AppColors.borderDark,
+                        : AppColors.border,
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: done ? AppColors.accent : AppColors.borderDark,
+                      color: done ? AppColors.accent : AppColors.border,
                       width: current ? 2 : 1,
                     ),
                   ),
                   child: Icon(
                     step.icon,
                     size: 16,
-                    color: done
-                        ? AppColors.accent
-                        : AppColors.textSecondaryDark,
+                    color: done ? AppColors.accent : AppColors.textSecondary,
                   ),
                 ),
                 if (i < _steps.length - 1)
@@ -389,7 +367,7 @@ class _StatusTimeline extends StatelessWidget {
                     height: 20,
                     color: done
                         ? AppColors.accent.withValues(alpha: 0.4)
-                        : AppColors.borderDark,
+                        : AppColors.border,
                   ),
               ],
             ),
@@ -398,10 +376,9 @@ class _StatusTimeline extends StatelessWidget {
               padding: const EdgeInsets.only(top: 6, bottom: 20),
               child: Text(
                 step.label,
-                style: TextStyle(
-                  color: done ? Colors.white : AppColors.textSecondaryDark,
-                  fontWeight: current ? FontWeight.bold : FontWeight.normal,
+                style: AppTextStyles.body(
                   fontSize: 13,
+                  color: done ? Colors.white : AppColors.textSecondary,
                 ),
               ),
             ),
@@ -427,7 +404,7 @@ class _SectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GlassCard(
+    return NeuCard(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -438,7 +415,10 @@ class _SectionCard extends StatelessWidget {
               const SizedBox(width: 8),
               Text(
                 title,
-                style: AppTextStyles.subHead(fontSize: 14, color: Colors.white),
+                style: AppTextStyles.subHead(
+                  fontSize: 14,
+                  color: AppColors.textPrimary,
+                ),
               ),
             ],
           ),
@@ -474,7 +454,7 @@ class _InfoRow extends StatelessWidget {
             label,
             style: AppTextStyles.body(
               fontSize: 12,
-              color: AppColors.textSecondaryDark,
+              color: AppColors.textSecondary,
             ),
           ),
         ),

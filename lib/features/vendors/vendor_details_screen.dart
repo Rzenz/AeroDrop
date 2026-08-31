@@ -4,11 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
-import '../../core/widgets/glass_card.dart';
+import '../../core/widgets/neu_card.dart';
 import '../../core/providers/vendor_provider.dart';
 import '../../core/services/supabase_service.dart';
 import '../../mock_data/products_mock.dart';
-import '../../mock_data/cart_mock.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/widgets/neu_back_button.dart';
+import '../../core/widgets/cart_button.dart';
 
 class VendorDetailsScreen extends ConsumerStatefulWidget {
   final String vendorId;
@@ -123,7 +125,7 @@ class _VendorDetailsScreenState extends ConsumerState<VendorDetailsScreen>
   Widget build(BuildContext context) {
     if (_loading) {
       return Scaffold(
-        backgroundColor: AppColors.bgDark,
+        backgroundColor: AppColors.base,
         body: const Center(
           child: CircularProgressIndicator(color: AppColors.accent),
         ),
@@ -132,12 +134,12 @@ class _VendorDetailsScreenState extends ConsumerState<VendorDetailsScreen>
 
     if (_error != null || _vendor == null) {
       return Scaffold(
-        backgroundColor: AppColors.bgDark,
+        backgroundColor: AppColors.base,
         appBar: AppBar(
-          backgroundColor: AppColors.bgDark,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-            onPressed: () => context.pop(),
+          backgroundColor: AppColors.base,
+          leading: const Padding(
+            padding: EdgeInsets.only(left: AppSpacing.xs),
+            child: Center(child: NeuBackButton()),
           ),
         ),
         body: Center(
@@ -146,17 +148,20 @@ class _VendorDetailsScreenState extends ConsumerState<VendorDetailsScreen>
             children: [
               Text(
                 _error ?? 'Vendor not found.',
-                style: TextStyle(color: AppColors.danger, fontSize: 14),
+                style: AppTextStyles.body(
+                  fontSize: 14,
+                  color: AppColors.danger,
+                ),
               ),
               const SizedBox(height: 12),
               ElevatedButton(
                 onPressed: _loadVendorData,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.cardDark,
+                  backgroundColor: AppColors.base,
                 ),
-                child: const Text(
+                child: Text(
                   'Retry',
-                  style: TextStyle(color: Colors.white),
+                  style: AppTextStyles.body(color: AppColors.textPrimary),
                 ),
               ),
             ],
@@ -169,58 +174,25 @@ class _VendorDetailsScreenState extends ConsumerState<VendorDetailsScreen>
     final products = _products;
 
     return Scaffold(
-      backgroundColor: AppColors.bgDark,
+      backgroundColor: AppColors.base,
       body: NestedScrollView(
         headerSliverBuilder: (context, _) => [
           SliverAppBar(
             expandedHeight: 200,
             pinned: true,
-            backgroundColor: AppColors.bgDark,
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-              onPressed: () => context.pop(),
+            backgroundColor: AppColors.base,
+            leading: const Padding(
+              padding: EdgeInsets.only(left: AppSpacing.xs),
+              child: Center(child: NeuBackButton()),
             ),
             actions: [
-              ValueListenableBuilder<List<CartItem>>(
-                valueListenable: cartNotifier,
-                builder: (_, cart, _) => cart.isNotEmpty
-                    ? Stack(
-                        children: [
-                          IconButton(
-                            icon: const Icon(
-                              Icons.shopping_cart_outlined,
-                              color: Colors.white,
-                            ),
-                            onPressed: () => context.push('/user/cart'),
-                          ),
-                          Positioned(
-                            right: 6,
-                            top: 6,
-                            child: Container(
-                              padding: const EdgeInsets.all(3),
-                              decoration: const BoxDecoration(
-                                color: AppColors.accent,
-                                shape: BoxShape.circle,
-                              ),
-                              child: Text(
-                                '${cartNotifier.totalItems}',
-                                style: const TextStyle(
-                                  color: Colors.black,
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      )
-                    : IconButton(
-                        icon: const Icon(
-                          Icons.shopping_cart_outlined,
-                          color: Colors.white,
-                        ),
-                        onPressed: () => context.push('/user/cart'),
-                      ),
+              Padding(
+                padding: const EdgeInsets.only(right: AppSpacing.xs),
+                child: Center(
+                  child: NeuCartButton(
+                    onPressed: () => context.push('/user/cart'),
+                  ),
+                ),
               ),
             ],
             flexibleSpace: FlexibleSpaceBar(
@@ -256,10 +228,9 @@ class _VendorDetailsScreenState extends ConsumerState<VendorDetailsScreen>
                       alignment: Alignment.center,
                       child: Text(
                         vendor.logoInitials,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
+                        style: AppTextStyles.heading(
                           fontSize: 26,
+                          color: AppColors.textPrimary,
                         ),
                       ),
                     ),
@@ -268,7 +239,7 @@ class _VendorDetailsScreenState extends ConsumerState<VendorDetailsScreen>
                       vendor.businessName,
                       style: AppTextStyles.subHead(
                         fontSize: 18,
-                        color: Colors.white,
+                        color: AppColors.textPrimary,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -285,12 +256,13 @@ class _VendorDetailsScreenState extends ConsumerState<VendorDetailsScreen>
                       ),
                       child: Text(
                         vendor.isOpen ? '● Open Now' : '● Closed',
-                        style: TextStyle(
+                        style: AppTextStyles.label(
+                          fontSize: 12,
                           color: vendor.isOpen
                               ? AppColors.success
                               : AppColors.danger,
-                          fontSize: 12,
                           fontWeight: FontWeight.bold,
+                          letterSpacing: 0,
                         ),
                       ),
                     ),
@@ -302,7 +274,7 @@ class _VendorDetailsScreenState extends ConsumerState<VendorDetailsScreen>
               controller: _tab,
               indicatorColor: AppColors.accent,
               labelColor: AppColors.accent,
-              unselectedLabelColor: AppColors.textSecondaryDark,
+              unselectedLabelColor: AppColors.textSecondary,
               tabs: const [
                 Tab(text: 'Products'),
                 Tab(text: 'About'),
@@ -318,9 +290,7 @@ class _VendorDetailsScreenState extends ConsumerState<VendorDetailsScreen>
                 ? Center(
                     child: Text(
                       'No products listed yet.',
-                      style: AppTextStyles.body(
-                        color: AppColors.textSecondaryDark,
-                      ),
+                      style: AppTextStyles.body(color: AppColors.textSecondary),
                     ),
                   )
                 : GridView.builder(
@@ -386,7 +356,7 @@ class _VendorDetailsScreenState extends ConsumerState<VendorDetailsScreen>
                       '${vendor.rating}',
                       style: AppTextStyles.subHead(
                         fontSize: 14,
-                        color: Colors.white,
+                        color: AppColors.textPrimary,
                       ),
                     ),
                     const SizedBox(width: 6),
@@ -394,7 +364,7 @@ class _VendorDetailsScreenState extends ConsumerState<VendorDetailsScreen>
                       '(${vendor.totalOrders} orders)',
                       style: AppTextStyles.body(
                         fontSize: 12,
-                        color: AppColors.textSecondaryDark,
+                        color: AppColors.textSecondary,
                       ),
                     ),
                   ],
@@ -434,13 +404,16 @@ class _InfoRow extends StatelessWidget {
                 label,
                 style: AppTextStyles.body(
                   fontSize: 11,
-                  color: AppColors.textSecondaryDark,
+                  color: AppColors.textSecondary,
                 ),
               ),
               const SizedBox(height: 2),
               Text(
                 value,
-                style: AppTextStyles.body(fontSize: 14, color: Colors.white),
+                style: AppTextStyles.body(
+                  fontSize: 14,
+                  color: AppColors.textPrimary,
+                ),
               ),
             ],
           ),
@@ -458,7 +431,7 @@ class _ProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GlassCard(
+    return NeuCard(
       onTap: onTap,
       padding: EdgeInsets.zero,
       child: Column(
@@ -473,10 +446,10 @@ class _ProductCard extends StatelessWidget {
               fit: BoxFit.cover,
               errorBuilder: (_, _, _) => Container(
                 height: 110,
-                color: AppColors.cardDark2,
-                child: const Icon(
+                color: AppColors.surfaceRaised,
+                child: Icon(
                   Icons.image_outlined,
-                  color: AppColors.textSecondaryDark,
+                  color: AppColors.textSecondary,
                   size: 32,
                 ),
               ),
@@ -492,7 +465,7 @@ class _ProductCard extends StatelessWidget {
                   style: AppTextStyles.body(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                    color: AppColors.textPrimary,
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
@@ -500,10 +473,10 @@ class _ProductCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   '₱${product.price.toStringAsFixed(2)}',
-                  style: const TextStyle(
+                  style: AppTextStyles.subHead(
+                    fontSize: 14,
                     color: AppColors.accent,
                     fontWeight: FontWeight.bold,
-                    fontSize: 14,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -524,12 +497,13 @@ class _ProductCard extends StatelessWidget {
                         product.isAvailable && product.stock > 0
                             ? 'In Stock'
                             : 'Unavailable',
-                        style: TextStyle(
+                        style: AppTextStyles.label(
+                          fontSize: 9,
                           color: product.isAvailable && product.stock > 0
                               ? AppColors.success
                               : AppColors.danger,
-                          fontSize: 9,
                           fontWeight: FontWeight.bold,
+                          letterSpacing: 0,
                         ),
                       ),
                     ),

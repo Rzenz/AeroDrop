@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/glass_card.dart';
 import '../../core/widgets/status_chip.dart';
 import '../../core/widgets/drone_svg_painter.dart';
+import '../../core/widgets/neu_back_button.dart';
 
 class ReportsPage extends StatefulWidget {
   const ReportsPage({super.key});
@@ -126,21 +126,10 @@ class _ReportsPageState extends State<ReportsPage>
                 // Header app bar
                 Row(
                   children: [
-                    GestureDetector(
-                      onTap: () => context.pop(),
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: AppColors.cardDark,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.borderDark),
-                        ),
-                        child: const Icon(
-                          Icons.arrow_back_rounded,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                      ),
+                    const NeuBackButton(
+                      fallbackRoute: '/admin',
+                      color: AppColors.cardDark,
+                      iconColor: Colors.white,
                     ),
                     const SizedBox(width: 16),
                     Text(

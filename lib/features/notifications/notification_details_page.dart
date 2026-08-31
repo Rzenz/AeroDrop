@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import '../../core/widgets/neu_feedback.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
-import '../../core/widgets/custom_button.dart';
-import '../../core/widgets/glass_card.dart';
+import '../../core/widgets/neu_button.dart';
+import '../../core/widgets/neu_card.dart';
+import '../../core/widgets/neu_back_button.dart';
 
 class NotificationDetailsPage extends StatelessWidget {
   final String notificationId;
@@ -13,7 +15,7 @@ class NotificationDetailsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.bgDark,
+      backgroundColor: AppColors.base,
       body: Container(
         decoration: const BoxDecoration(gradient: AppColors.bgGradientDark),
         child: SafeArea(
@@ -24,29 +26,14 @@ class NotificationDetailsPage extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    GestureDetector(
-                      onTap: () => context.pop(),
-                      child: Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: AppColors.cardDark,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.borderDark),
-                        ),
-                        child: const Icon(
-                          Icons.arrow_back_rounded,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                      ),
-                    ),
+                    const NeuBackButton(),
                     const SizedBox(width: 16),
                     Text(
                       'Alert Center Log',
                       style: AppTextStyles.title(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                        color: AppColors.textPrimary,
                       ),
                     ),
                   ],
@@ -56,7 +43,7 @@ class NotificationDetailsPage extends StatelessWidget {
                   child: SingleChildScrollView(
                     child: Column(
                       children: [
-                        GlassCard(
+                        NeuCard(
                           padding: const EdgeInsets.all(24),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -94,7 +81,7 @@ class NotificationDetailsPage extends StatelessWidget {
                                 style: AppTextStyles.title(
                                   fontSize: 20,
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.white,
+                                  color: AppColors.textPrimary,
                                 ),
                               ),
                               const SizedBox(height: 8),
@@ -102,18 +89,15 @@ class NotificationDetailsPage extends StatelessWidget {
                                 'June 25, 2026 at 10:12 PM',
                                 style: AppTextStyles.body(
                                   fontSize: 12,
-                                  color: AppColors.textSecondaryDark,
+                                  color: AppColors.textSecondary,
                                 ),
                               ),
-                              const Divider(
-                                color: AppColors.borderDark,
-                                height: 32,
-                              ),
+                              Divider(color: AppColors.border, height: 32),
                               Text(
                                 'Your request DEL-892 has been scheduled for aerial dispatch. A quadcopter drone has been assigned and is currently carrying your payload to the destination. Please check the active tracking panel for updates.',
                                 style: AppTextStyles.body(
                                   fontSize: 14,
-                                  color: Colors.white,
+                                  color: AppColors.textPrimary,
                                 ).copyWith(height: 1.6),
                               ),
                               const SizedBox(height: 28),
@@ -138,41 +122,27 @@ class NotificationDetailsPage extends StatelessWidget {
                   padding: const EdgeInsets.only(top: 16),
                   child: Column(
                     children: [
-                      CustomButton(
+                      NeuButton(
                         text: 'Mark Alert As Read',
                         onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: const Text(
-                                'Notification marked as read!',
-                              ),
-                              backgroundColor: AppColors.success,
-                              behavior: SnackBarBehavior.floating,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
+                          showNeuSnack(
+                            context,
+                            'Notification marked as read!',
+                            tone: NeuToneKind.success,
                           );
                           context.pop();
                         },
                         icon: Icons.check_rounded,
                       ),
                       const SizedBox(height: 12),
-                      CustomButton(
+                      NeuButton(
                         text: 'Delete Alert Log',
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF3C1F1F), Color(0xFF2A1515)],
-                        ),
+                        variant: NeuButtonVariant.danger,
                         onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: const Text('Notification deleted!'),
-                              backgroundColor: AppColors.danger,
-                              behavior: SnackBarBehavior.floating,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
+                          showNeuSnack(
+                            context,
+                            'Notification deleted!',
+                            tone: NeuToneKind.error,
                           );
                           context.pop();
                         },
@@ -194,13 +164,13 @@ class NotificationDetailsPage extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
-          Icon(icon, color: AppColors.textSecondaryDark, size: 16),
+          Icon(icon, color: AppColors.textSecondary, size: 16),
           const SizedBox(width: 10),
           Text(
             label,
             style: AppTextStyles.body(
               fontSize: 13,
-              color: AppColors.textSecondaryDark,
+              color: AppColors.textSecondary,
             ),
           ),
           const Spacer(),
@@ -209,7 +179,7 @@ class NotificationDetailsPage extends StatelessWidget {
             style: AppTextStyles.title(
               fontSize: 13,
               fontWeight: FontWeight.bold,
-              color: Colors.white,
+              color: AppColors.textPrimary,
             ),
           ),
         ],

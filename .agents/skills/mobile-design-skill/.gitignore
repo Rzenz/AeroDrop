@@ -1,0 +1,19 @@
+.DS_Store
+Thumbs.db
+*.tmp
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# Local vendor symlinks (machine-specific absolute paths)
+.claude/vendor/
+
+# Locally installed sibling skills (managed in their own repos)
+.claude/skills/mobile-logo-system/
+
+# User work output, not part of the skill
+concepts/
+
+# Playwright MCP session artefacts (console logs + accessibility snapshots)
+.playwright-mcp/

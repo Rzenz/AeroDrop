@@ -1,22 +1,32 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:go_router/go_router.dart';
-import '../theme/app_colors.dart';
+
+import '../theme/app_spacing.dart';
 import '../theme/app_text_styles.dart';
+import 'neu_back_button.dart';
 
+/// The shared screen header.
+///
+/// Transparent by design — it sits directly on the canvas so the only things
+/// with depth are the back button and any action, which is what the eye should
+/// find first.
 class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
-  final String title;
-  final Widget? action;
-  final bool showBackButton;
-  final VoidCallback? onBackPressed;
-
   const CustomAppBar({
     super.key,
     required this.title,
+    this.subtitle,
     this.action,
     this.showBackButton = true,
     this.onBackPressed,
   });
+
+  final String title;
+  final String? subtitle;
+  final Widget? action;
+  final bool showBackButton;
+  final VoidCallback? onBackPressed;
+
+  @override
+  Size get preferredSize => Size.fromHeight(subtitle == null ? 68 : 78);
 
   @override
   Widget build(BuildContext context) {
@@ -24,56 +34,46 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
         showBackButton && (onBackPressed != null || Navigator.canPop(context));
 
     return SafeArea(
+      bottom: false,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        child: NavigationToolbar(
-          leading: canPop
-              ? GestureDetector(
-                  onTap:
-                      onBackPressed ??
-                      () {
-                        HapticFeedback.lightImpact();
-                        if (context.canPop()) {
-                          context.pop();
-                        } else {
-                          Navigator.maybePop(context);
-                        }
-                      },
-                  child: Container(
-                    width: 38,
-                    height: 38,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: AppColors.cardDark.withValues(alpha: 0.6),
-                      border: Border.all(
-                        color: AppColors.borderDark,
-                        width: 1.5,
-                      ),
-                    ),
-                    child: const Icon(
-                      Icons.arrow_back_ios_new_rounded,
-                      color: Colors.white,
-                      size: 16,
-                    ),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.xs,
+        ),
+        child: Row(
+          children: [
+            if (canPop) ...[
+              NeuBackButton(onPressed: onBackPressed),
+              const SizedBox(width: AppSpacing.sm),
+            ],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    title,
+                    style: AppTextStyles.heading(fontSize: 20),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                )
-              : const SizedBox.shrink(),
-          middle: Text(
-            title,
-            style: AppTextStyles.heading(fontSize: 22),
-            overflow: TextOverflow.ellipsis,
-          ),
-          trailing: action != null
-              ? Padding(
-                  padding: const EdgeInsets.only(right: 4),
-                  child: Center(child: action!),
-                )
-              : const SizedBox.shrink(),
+                  if (subtitle != null)
+                    Text(
+                      subtitle!,
+                      style: AppTextStyles.caption(fontSize: 12),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                ],
+              ),
+            ),
+            if (action != null) ...[
+              const SizedBox(width: AppSpacing.xs),
+              action!,
+            ],
+          ],
         ),
       ),
     );
   }
-
-  @override
-  Size get preferredSize => const Size.fromHeight(68);
 }

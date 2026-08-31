@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Aerodrop</string>
+	<string>AeroDrop</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -66,6 +66,8 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>AeroDrop saves your order receipts to your photo library.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>AeroDrop needs access to your photo library to pick and crop profile avatars and vendor logos.</string>
 	<key>NSCameraUsageDescription</key>

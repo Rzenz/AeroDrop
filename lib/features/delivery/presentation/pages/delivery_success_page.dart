@@ -4,8 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:lottie/lottie.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
-import '../../../../core/widgets/custom_button.dart';
-import '../../../../core/widgets/glass_card.dart';
+import '../../../../core/widgets/neu_button.dart';
+import '../../../../core/widgets/neu_card.dart';
 
 class DeliverySuccessPage extends StatelessWidget {
   const DeliverySuccessPage({super.key});
@@ -13,7 +13,7 @@ class DeliverySuccessPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.bgDark,
+      backgroundColor: AppColors.base,
       body: Container(
         decoration: const BoxDecoration(gradient: AppColors.bgGradientDark),
         child: SafeArea(
@@ -37,7 +37,7 @@ class DeliverySuccessPage extends StatelessWidget {
                   style: AppTextStyles.title(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                    color: AppColors.textPrimary,
                   ),
                   textAlign: TextAlign.center,
                 ).animate().fadeIn(delay: 100.ms),
@@ -46,12 +46,12 @@ class DeliverySuccessPage extends StatelessWidget {
                   'Your drone request has been received and scheduled for immediate dispatch.',
                   style: AppTextStyles.body(
                     fontSize: 14,
-                    color: AppColors.textSecondaryDark,
+                    color: AppColors.textSecondary,
                   ),
                   textAlign: TextAlign.center,
                 ).animate().fadeIn(delay: 200.ms),
                 const SizedBox(height: 32),
-                GlassCard(
+                NeuCard(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 24,
                     vertical: 20,
@@ -64,7 +64,7 @@ class DeliverySuccessPage extends StatelessWidget {
                         'Tracking ID',
                         style: AppTextStyles.body(
                           fontSize: 14,
-                          color: AppColors.textSecondaryDark,
+                          color: AppColors.textSecondary,
                         ),
                       ),
                       Text(
@@ -79,17 +79,15 @@ class DeliverySuccessPage extends StatelessWidget {
                   ),
                 ).animate().fadeIn(delay: 300.ms).slideY(begin: 0.08),
                 const SizedBox(height: 48),
-                CustomButton(
+                NeuButton(
                   text: 'Track Live Flight',
                   onPressed: () => context.go('/user/track'),
                   icon: Icons.map_rounded,
                 ).animate().fadeIn(delay: 400.ms),
                 const SizedBox(height: 16),
-                CustomButton(
+                NeuButton(
                   text: 'Return Home Deck',
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF333333), Color(0xFF222222)],
-                  ),
+                  variant: NeuButtonVariant.neutral,
                   onPressed: () => context.go('/user'),
                   icon: Icons.home_rounded,
                 ).animate().fadeIn(delay: 500.ms),

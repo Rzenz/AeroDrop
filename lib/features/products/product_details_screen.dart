@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/widgets/custom_app_bar.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,6 +10,10 @@ import '../../mock_data/products_mock.dart';
 import '../../mock_data/cart_mock.dart';
 import '../../core/providers/product_provider.dart';
 import '../../core/services/supabase_service.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/widgets/neu_back_button.dart';
+import '../../core/widgets/cart_button.dart';
+import '../../core/widgets/neu_feedback.dart';
 
 class ProductDetailsScreen extends ConsumerStatefulWidget {
   final String productId;
@@ -20,6 +25,59 @@ class ProductDetailsScreen extends ConsumerStatefulWidget {
 }
 
 class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
+  /// The hero image, so a product added to the cart flies from the product.
+  final _heroKey = GlobalKey();
+
+  /// Sends a thumbnail of [product] arcing into the cart, then confirms.
+  ///
+  /// The toast is raised when the puck lands rather than on the tap, so the
+  /// two read as one event: the item flies to the cart, and the cart says it
+  /// got it. Firing both at once puts a banner over the flight it is meant to
+  /// be describing.
+  ///
+  /// When the hero has scrolled out from under the pinned bar there is no box
+  /// to measure and the flight is skipped — the toast still appears.
+  void _flyProduct(MockProduct product) {
+    final box = _heroKey.currentContext?.findRenderObject() as RenderBox?;
+    final origin = box == null || !box.hasSize
+        ? null
+        : box.localToGlobal(Offset.zero) & box.size;
+
+    flyToCart(
+      context,
+      // A square token rather than the whole hero: what travels should be the
+      // size of the thing arriving, not the size of the banner it came from.
+      from: Rect.fromCenter(
+        center:
+            origin?.center ?? MediaQuery.sizeOf(context).center(Offset.zero),
+        width: 84,
+        height: 84,
+      ),
+      // The toast carries the wording, so no separate announcement: a screen
+      // reader would otherwise hear the same sentence twice.
+      onArrive: () {
+        if (!mounted) return;
+        showNeuSnack(
+          context,
+          '${product.name} added to cart',
+          tone: NeuToneKind.success,
+        );
+      },
+      thumbnail: Image.network(
+        product.imageUrl,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => ColoredBox(
+          color: AppColors.surfaceSunken,
+          child: Icon(
+            Icons.shopping_bag_rounded,
+            color: AppColors.accentText,
+            size: 30,
+          ),
+        ),
+      ),
+    );
+  }
+
   MockProduct? _directProduct;
   bool _fetching = false;
 
@@ -81,10 +139,9 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
             stock: (res['stock_quantity'] as num?)?.toInt() ?? 0,
             category: cat,
             weightKg: (((res['weight_grams'] as num?) ?? 0) / 1000.0),
-            imageUrl:
-                res['image_url']?.toString().isNotEmpty == true
-                    ? res['image_url'].toString()
-                    : 'https://images.unsplash.com/photo-1569050467447-ce54b3bbc37d?w=400',
+            imageUrl: res['image_url']?.toString().isNotEmpty == true
+                ? res['image_url'].toString()
+                : 'https://images.unsplash.com/photo-1569050467447-ce54b3bbc37d?w=400',
             isAvailable: res['is_active'] as bool? ?? true,
           );
         });
@@ -109,8 +166,8 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
 
     if (product == null) {
       if (_fetching || productState.isLoading) {
-        return const Scaffold(
-          backgroundColor: AppColors.bgDark,
+        return Scaffold(
+          backgroundColor: AppColors.base,
           body: Center(
             child: CircularProgressIndicator(color: AppColors.accent),
           ),
@@ -118,32 +175,24 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
       }
 
       return Scaffold(
-        backgroundColor: AppColors.bgDark,
-        appBar: AppBar(
-          backgroundColor: AppColors.bgDark,
-          elevation: 0,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-            onPressed: () => context.pop(),
-          ),
-          title: const Text(
-            'Product Details',
-            style: TextStyle(color: Colors.white),
-          ),
-        ),
+        backgroundColor: AppColors.base,
+        appBar: CustomAppBar(title: 'Product Details'),
         body: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(
+              Icon(
                 Icons.inventory_2_outlined,
-                color: AppColors.textSecondaryDark,
+                color: AppColors.textSecondary,
                 size: 64,
               ),
               const SizedBox(height: 16),
-              const Text(
+              Text(
                 'Product not found or unavailable.',
-                style: TextStyle(color: Colors.white70, fontSize: 16),
+                style: AppTextStyles.body(
+                  fontSize: 16,
+                  color: AppColors.textSecondary,
+                ),
               ),
               const SizedBox(height: 20),
               ElevatedButton(
@@ -151,9 +200,9 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.accent,
                 ),
-                child: const Text(
+                child: Text(
                   'Go Back',
-                  style: TextStyle(color: Colors.black),
+                  style: AppTextStyles.body(color: Colors.black),
                 ),
               ),
             ],
@@ -165,83 +214,40 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
     final bool available = product.isAvailable && product.stock > 0;
 
     return Scaffold(
-      backgroundColor: AppColors.bgDark,
+      backgroundColor: AppColors.base,
       body: CustomScrollView(
         slivers: [
           // Hero image + back button
           SliverAppBar(
             expandedHeight: 280,
             pinned: true,
-            backgroundColor: AppColors.bgDark,
-            leading: IconButton(
-              icon: Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: Colors.black54,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(
-                  Icons.arrow_back_rounded,
-                  color: Colors.white,
-                  size: 20,
-                ),
-              ),
-              onPressed: () => context.pop(),
+            backgroundColor: AppColors.base,
+            leading: const Padding(
+              padding: EdgeInsets.only(left: AppSpacing.xs),
+              child: Center(child: NeuBackButton()),
             ),
             actions: [
-              ValueListenableBuilder<List<CartItem>>(
-                valueListenable: cartNotifier,
-                builder: (_, cart, _) => Stack(
-                  children: [
-                    IconButton(
-                      icon: Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: Colors.black54,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(
-                          Icons.shopping_cart_outlined,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                      ),
-                      onPressed: () => context.push('/user/cart'),
-                    ),
-                    if (cart.isNotEmpty)
-                      Positioned(
-                        right: 6,
-                        top: 6,
-                        child: Container(
-                          padding: const EdgeInsets.all(3),
-                          decoration: const BoxDecoration(
-                            color: AppColors.accent,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Text(
-                            '${cartNotifier.totalItems}',
-                            style: const TextStyle(
-                              color: Colors.black,
-                              fontSize: 8,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
+              Padding(
+                padding: const EdgeInsets.only(right: AppSpacing.xs),
+                child: Center(
+                  child: NeuCartButton(
+                    onPressed: () => context.push('/user/cart'),
+                  ),
                 ),
               ),
-              const SizedBox(width: 4),
             ],
             flexibleSpace: FlexibleSpaceBar(
+              // Keyed so the add-to-cart flight can start from the product
+              // itself rather than from the button that was pressed.
               background: Image.network(
+                key: _heroKey,
                 product.imageUrl,
                 fit: BoxFit.cover,
                 errorBuilder: (_, _, _) => Container(
-                  color: AppColors.cardDark,
-                  child: const Icon(
+                  color: AppColors.base,
+                  child: Icon(
                     Icons.image_outlined,
-                    color: AppColors.textSecondaryDark,
+                    color: AppColors.textSecondary,
                     size: 60,
                   ),
                 ),
@@ -268,10 +274,10 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
                     ),
                     child: Text(
                       product.category,
-                      style: const TextStyle(
-                        color: AppColors.primaryLight,
+                      style: AppTextStyles.label(
                         fontSize: 11,
-                        fontWeight: FontWeight.w600,
+                        color: AppColors.primaryLight,
+                        letterSpacing: 0,
                       ),
                     ),
                   ).animate().fadeIn(),
@@ -282,7 +288,7 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
                     product.name,
                     style: AppTextStyles.heading(
                       fontSize: 22,
-                      color: Colors.white,
+                      color: AppColors.textPrimary,
                     ),
                   ).animate().fadeIn(delay: 50.ms),
 
@@ -327,10 +333,9 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
                     children: [
                       Text(
                         '₱${product.price.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          color: AppColors.accent,
+                        style: AppTextStyles.heading(
                           fontSize: 28,
-                          fontWeight: FontWeight.bold,
+                          color: AppColors.accent,
                         ),
                       ),
                       const Spacer(),
@@ -356,12 +361,13 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
                             ),
                             child: Text(
                               available ? 'In Stock' : 'Unavailable',
-                              style: TextStyle(
+                              style: AppTextStyles.label(
+                                fontSize: 12,
                                 color: available
                                     ? AppColors.success
                                     : AppColors.danger,
-                                fontSize: 12,
                                 fontWeight: FontWeight.bold,
+                                letterSpacing: 0,
                               ),
                             ),
                           ),
@@ -370,7 +376,7 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
                             '${product.stock} left',
                             style: AppTextStyles.body(
                               fontSize: 11,
-                              color: AppColors.textSecondaryDark,
+                              color: AppColors.textSecondary,
                             ),
                           ),
                         ],
@@ -379,7 +385,7 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
                   ).animate().fadeIn(delay: 100.ms),
 
                   const SizedBox(height: 24),
-                  const Divider(color: AppColors.borderDark),
+                  Divider(color: AppColors.border),
                   const SizedBox(height: 16),
 
                   // Description
@@ -387,7 +393,7 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
                     'Description',
                     style: AppTextStyles.subHead(
                       fontSize: 15,
-                      color: Colors.white,
+                      color: AppColors.textPrimary,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -397,13 +403,13 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
                         : product.description,
                     style: AppTextStyles.body(
                       fontSize: 14,
-                      color: Colors.white70,
+                      color: AppColors.textSecondary,
                       height: 1.6,
                     ),
                   ).animate().fadeIn(delay: 150.ms),
 
                   const SizedBox(height: 20),
-                  const Divider(color: AppColors.borderDark),
+                  Divider(color: AppColors.border),
                   const SizedBox(height: 16),
 
                   // Specs
@@ -411,7 +417,7 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
                     'Product Info',
                     style: AppTextStyles.subHead(
                       fontSize: 15,
-                      color: Colors.white,
+                      color: AppColors.textPrimary,
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -465,21 +471,7 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
                               weightKg: product.weightKg,
                             ),
                           );
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('${product.name} added to cart'),
-                              backgroundColor: AppColors.success,
-                              behavior: SnackBarBehavior.floating,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              action: SnackBarAction(
-                                label: 'View Cart',
-                                textColor: Colors.white,
-                                onPressed: () => context.push('/user/cart'),
-                              ),
-                            ),
-                          );
+                          _flyProduct(product);
                         }
                       }
                     : null,
@@ -490,7 +482,7 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
                 ),
                 label: Text(
                   inCart ? 'View Cart' : 'Add to Cart',
-                  style: const TextStyle(
+                  style: AppTextStyles.subHead(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                   ),
@@ -498,10 +490,10 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
                 style: FilledButton.styleFrom(
                   backgroundColor: available
                       ? AppColors.accent
-                      : AppColors.borderDark,
+                      : AppColors.border,
                   foregroundColor: available
                       ? AppColors.bgDark
-                      : AppColors.textSecondaryDark,
+                      : AppColors.textSecondary,
                   minimumSize: const Size(double.infinity, 54),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
@@ -531,13 +523,13 @@ class _SpecRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(icon, color: AppColors.textSecondaryDark, size: 16),
+        Icon(icon, color: AppColors.textSecondary, size: 16),
         const SizedBox(width: 10),
         Text(
           label,
           style: AppTextStyles.body(
             fontSize: 13,
-            color: AppColors.textSecondaryDark,
+            color: AppColors.textSecondary,
           ),
         ),
         const Spacer(),
@@ -546,7 +538,7 @@ class _SpecRow extends StatelessWidget {
           style: AppTextStyles.body(
             fontSize: 13,
             fontWeight: FontWeight.bold,
-            color: Colors.white,
+            color: AppColors.textPrimary,
           ),
         ),
       ],

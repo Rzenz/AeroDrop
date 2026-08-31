@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+
 import '../theme/app_colors.dart';
+import '../theme/app_radii.dart';
+import '../theme/app_spacing.dart';
 import '../theme/app_text_styles.dart';
+import 'neu_card.dart';
+import 'neu_surface.dart';
 
+/// A single metric: value, label, delta, and an icon that identifies it.
+///
+/// The icon well is inset while the card is raised — that contrast is what
+/// keeps a grid of these from reading as a flat wall of boxes.
 class AnalyticsCard extends StatelessWidget {
-  final String title;
-  final String value;
-  final String change;
-  final bool isPositive;
-  final IconData icon;
-  final Color iconColor;
-  final int animDelay;
-
   const AnalyticsCard({
     super.key,
     required this.title,
@@ -21,135 +21,135 @@ class AnalyticsCard extends StatelessWidget {
     required this.icon,
     required this.iconColor,
     this.animDelay = 0,
+    this.onTap,
   });
 
-  LinearGradient _gradientFor(Color color) {
-    return LinearGradient(
-      colors: [color.withValues(alpha: 0.18), color.withValues(alpha: 0.06)],
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-    );
+  final String title;
+  final String value;
+  final String change;
+  final bool isPositive;
+  final IconData icon;
+  final Color iconColor;
+  final int animDelay;
+  final VoidCallback? onTap;
+
+  /// Height this card needs at the current text scale. Callers should feed
+  /// this to `SliverGridDelegate.mainAxisExtent` — a fixed `childAspectRatio`
+  /// makes tile height a function of screen *width*, which has nothing to do
+  /// with how tall the content actually is and overflows on narrow phones.
+  static double preferredHeight(BuildContext context) {
+    final scale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.8);
+    return 124 * scale;
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final deltaColor = isPositive ? AppColors.success : AppColors.danger;
 
-    return Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            gradient: isDark
-                ? _gradientFor(iconColor)
-                : LinearGradient(
-                    colors: [Colors.white, AppColors.bgLight],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: isDark
-                  ? iconColor.withValues(alpha: 0.25)
-                  : AppColors.borderLight,
+    final header = Row(
+      children: [
+        NeuSurface(
+          style: NeuStyle.inset,
+          depth: NeuDepth.flat,
+          width: 32,
+          height: 32,
+          alignment: Alignment.center,
+          borderRadius: AppRadii.brSm,
+          color: AppColors.surfaceSunken,
+          child: Icon(icon, color: iconColor, size: 16),
+        ),
+        const SizedBox(width: AppSpacing.xs),
+        const Spacer(),
+        Flexible(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+            decoration: BoxDecoration(
+              color: deltaColor.withValues(alpha: 0.12),
+              borderRadius: AppRadii.brPill,
             ),
-            boxShadow: isDark
-                ? [
-                    BoxShadow(
-                      color: iconColor.withValues(alpha: 0.1),
-                      blurRadius: 20,
-                      offset: const Offset(0, 8),
-                    ),
-                  ]
-                : [
-                    const BoxShadow(
-                      color: Color(0x0F000000),
-                      blurRadius: 12,
-                      offset: Offset(0, 4),
-                    ),
-                  ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: iconColor.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(icon, color: iconColor, size: 18),
-                  ),
-                  Flexible(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color:
-                            (isPositive ? AppColors.success : AppColors.danger)
-                                .withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            isPositive
-                                ? Icons.arrow_upward_rounded
-                                : Icons.arrow_downward_rounded,
-                            color: isPositive
-                                ? AppColors.success
-                                : AppColors.danger,
-                            size: 10,
-                          ),
-                          const SizedBox(width: 2),
-                          Flexible(
-                            child: Text(
-                              change,
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: isPositive
-                                    ? AppColors.success
-                                    : AppColors.danger,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  isPositive
+                      ? Icons.trending_up_rounded
+                      : Icons.trending_down_rounded,
+                  color: deltaColor,
+                  size: 11,
+                ),
+                const SizedBox(width: 3),
+                Flexible(
+                  child: Text(
+                    change,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.label(
+                      fontSize: 10,
+                      color: AppColors.readable(deltaColor),
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0,
                     ),
                   ),
-                ],
-              ),
-              const Spacer(),
-              Text(
-                value,
-                style: AppTextStyles.title(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w900,
-                  color: isDark ? Colors.white : AppColors.textPrimaryLight,
                 ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                title,
-                style: AppTextStyles.body(
-                  fontSize: 12,
-                  color: isDark
-                      ? AppColors.textSecondaryDark
-                      : AppColors.textSecondaryLight,
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
-        )
-        .animate(delay: Duration(milliseconds: animDelay))
-        .fadeIn(duration: 400.ms)
-        .slideY(begin: 0.15, end: 0, curve: Curves.easeOutCubic);
+        ),
+      ],
+    );
+
+    return NeuCardEntrance(
+      index: animDelay ~/ 60,
+      child: NeuCard(
+        onTap: onTap,
+        padding: const EdgeInsets.all(AppSpacing.sm + 2),
+        borderRadius: AppRadii.brLg,
+        semanticLabel: '$title: $value, $change',
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            // Only take flexible children when the height is actually bounded —
+            // a flex child under unbounded constraints throws.
+            final bounded = constraints.maxHeight.isFinite;
+
+            final body = Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.numeric(fontSize: 22),
+                ),
+                const SizedBox(height: 2),
+                _label(bounded),
+              ],
+            );
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: bounded ? MainAxisSize.max : MainAxisSize.min,
+              children: [
+                header,
+                const SizedBox(height: AppSpacing.xs + 2),
+                if (bounded) Flexible(child: body) else body,
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  /// The metric label. Given a bounded height it becomes flexible so it can
+  /// give up its second line instead of overflowing the tile.
+  Widget _label(bool bounded) {
+    final text = Text(
+      title,
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+      style: AppTextStyles.body(fontSize: 12, color: AppColors.textSecondary),
+    );
+    return bounded ? Flexible(child: text) : text;
   }
 }

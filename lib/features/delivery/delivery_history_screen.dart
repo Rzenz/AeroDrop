@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/widgets/neu_input.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
@@ -7,7 +8,7 @@ import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/delivery_card.dart';
 import '../../core/widgets/empty_state_widget.dart';
 import '../../core/widgets/custom_app_bar.dart';
-import '../../core/widgets/glass_card.dart';
+import '../../core/widgets/neu_card.dart';
 import '../../core/widgets/status_chip.dart';
 import '../../core/providers/delivery_provider.dart';
 import '../../core/providers/notification_provider.dart';
@@ -46,7 +47,7 @@ class _DeliveryHistoryScreenState extends ConsumerState<DeliveryHistoryScreen> {
         : all.where((d) => d.status == _filter).toList();
 
     return Scaffold(
-      backgroundColor: AppColors.bgDark,
+      backgroundColor: AppColors.base,
       appBar: const CustomAppBar(
         title: 'Flight Records',
         showBackButton: false,
@@ -65,7 +66,7 @@ class _DeliveryHistoryScreenState extends ConsumerState<DeliveryHistoryScreen> {
                     'All drone dispatches & delivery logs',
                     style: AppTextStyles.body(
                       fontSize: 14,
-                      color: AppColors.textSecondaryDark,
+                      color: AppColors.textSecondary,
                     ),
                   ),
                 ],
@@ -110,7 +111,7 @@ class _DeliveryHistoryScreenState extends ConsumerState<DeliveryHistoryScreen> {
               child: RefreshIndicator(
                 onRefresh: _handleRefresh,
                 color: AppColors.accent,
-                backgroundColor: AppColors.cardDark,
+                backgroundColor: AppColors.base,
                 strokeWidth: 2.5,
                 child: filtered.isEmpty
                     ? EmptyStateWidget(
@@ -132,7 +133,7 @@ class _DeliveryHistoryScreenState extends ConsumerState<DeliveryHistoryScreen> {
                           final isEven = i % 2 == 0;
 
                           // Alternate between a standard DeliveryCard (which is an AnimatedCard)
-                          // and a frosted GlassCard container representing the delivery.
+                          // and a frosted NeuCard container representing the delivery.
                           // Also apply alternating wide/narrow margins.
                           Widget card;
                           if (isEven) {
@@ -148,14 +149,11 @@ class _DeliveryHistoryScreenState extends ConsumerState<DeliveryHistoryScreen> {
                           } else {
                             card = Padding(
                               padding: const EdgeInsets.only(left: 16),
-                              child: GlassCard(
+                              child: NeuCard(
                                 onTap: () => context.push(
                                   '/user/track/details?id=${item.id}',
                                 ),
                                 padding: const EdgeInsets.all(18),
-                                borderGradient: const LinearGradient(
-                                  colors: [Colors.white24, Colors.white12],
-                                ),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
@@ -179,7 +177,7 @@ class _DeliveryHistoryScreenState extends ConsumerState<DeliveryHistoryScreen> {
                                       style: AppTextStyles.title(
                                         fontSize: 16,
                                         fontWeight: FontWeight.bold,
-                                        color: Colors.white,
+                                        color: AppColors.textPrimary,
                                       ),
                                     ),
                                     const SizedBox(height: 8),
@@ -191,7 +189,7 @@ class _DeliveryHistoryScreenState extends ConsumerState<DeliveryHistoryScreen> {
                                           item.packageType,
                                           style: AppTextStyles.body(
                                             fontSize: 12.5,
-                                            color: AppColors.textSecondaryDark,
+                                            color: AppColors.textSecondary,
                                           ),
                                         ),
                                         Text(
@@ -199,7 +197,7 @@ class _DeliveryHistoryScreenState extends ConsumerState<DeliveryHistoryScreen> {
                                           style: AppTextStyles.body(
                                             fontSize: 12.5,
                                             fontWeight: FontWeight.bold,
-                                            color: AppColors.textSecondaryDark,
+                                            color: AppColors.textSecondary,
                                           ),
                                         ),
                                       ],
@@ -254,32 +252,6 @@ class _HistoryFilterChip extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final activeColor = color ?? AppColors.accent;
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-        decoration: BoxDecoration(
-          color: selected
-              ? activeColor.withValues(alpha: 0.15)
-              : AppColors.cardDark2,
-          borderRadius: BorderRadius.circular(100),
-          border: Border.all(
-            color: selected ? activeColor : AppColors.borderDark,
-            width: 1.5,
-          ),
-        ),
-        child: Text(
-          label,
-          style: AppTextStyles.title(
-            fontSize: 13,
-            fontWeight: selected ? FontWeight.bold : FontWeight.normal,
-            color: selected ? activeColor : AppColors.textSecondaryDark,
-          ),
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) =>
+      NeuFilterChip(label: label, selected: selected, onTap: onTap);
 }

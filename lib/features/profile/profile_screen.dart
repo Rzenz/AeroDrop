@@ -2,13 +2,24 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:flutter_animate/flutter_animate.dart';
-import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_text_styles.dart';
-import '../../core/widgets/glass_card.dart';
-import '../../core/providers/auth_provider.dart';
-import '../../core/utils/logout_helper.dart';
 
+import '../../core/providers/auth_provider.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_radii.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_text_styles.dart';
+import '../../core/utils/logout_helper.dart';
+import '../../core/widgets/neu_avatar.dart';
+import '../../core/widgets/neu_card.dart';
+import '../../core/widgets/neu_list_tile.dart';
+import '../../core/widgets/neu_surface.dart';
+
+/// The customer's account screen.
+///
+/// The header is an identity card on the canvas rather than the previous
+/// full-bleed blue gradient with a glowing avatar. Every row below it is a
+/// [NeuListTile], so this screen and the settings screen have identical row
+/// metrics instead of two hand-built variants.
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
 
@@ -22,370 +33,215 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final user = ref.watch(authProvider).user;
     final name = user?.name ?? 'User';
     final email = user?.email ?? '';
+    final gutter = AppSpacing.pageGutter(context);
 
     return Scaffold(
-      backgroundColor: AppColors.bgDark,
-      body: CustomScrollView(
-        physics: const BouncingScrollPhysics(),
-        slivers: [
-          // Collapsible Parallax Header
-          SliverAppBar(
-            expandedHeight: 250,
-            backgroundColor: AppColors.bgDark,
-            elevation: 0,
-            pinned: true,
-            flexibleSpace: FlexibleSpaceBar(
-              collapseMode: CollapseMode.parallax,
-              background: Stack(
-                fit: StackFit.expand,
-                children: [
-                  // Gradient overlay
-                  Container(
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Color(0xFF1565C0), AppColors.bgDark],
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                      ),
+      backgroundColor: AppColors.base,
+      body: SafeArea(
+        bottom: false,
+        child: ListView(
+          padding: EdgeInsets.fromLTRB(
+            gutter,
+            AppSpacing.md,
+            gutter,
+            AppSpacing.dockClearance(context),
+          ),
+          children: [
+            Text('Profile', style: AppTextStyles.heading(fontSize: 24)),
+            const SizedBox(height: AppSpacing.md),
+            _IdentityCard(
+              name: name,
+              email: email,
+              avatarUrl: user?.avatarUrl,
+              role: user?.role,
+              onTap: () => context.push('/user/profile/edit'),
+            ),
+            const SizedBox(height: AppSpacing.xl),
+            NeuTileGroup(
+              label: 'Account',
+              children: [
+                NeuListTile(
+                  icon: Icons.edit_rounded,
+                  title: 'Edit profile details',
+                  subtitle: 'Name, phone, and photo',
+                  onTap: () => context.push('/user/profile/edit'),
+                ),
+                NeuListTile(
+                  icon: Icons.lock_outline_rounded,
+                  title: 'Change password',
+                  onTap: () => context.push('/user/profile/change-password'),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            NeuTileGroup(
+              label: 'Activity',
+              children: [
+                NeuListTile(
+                  icon: Icons.notifications_none_rounded,
+                  title: 'Notifications',
+                  iconColor: AppColors.accentText,
+                  onTap: () => context.go('/user/notifications'),
+                ),
+                NeuListTile(
+                  icon: Icons.history_toggle_off_rounded,
+                  title: 'Order history',
+                  iconColor: AppColors.accentText,
+                  onTap: () => context.go('/user/orders'),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            NeuTileGroup(
+              label: 'Preferences and help',
+              children: [
+                NeuListTile(
+                  icon: Icons.settings_outlined,
+                  title: 'Settings',
+                  iconColor: AppColors.textSecondary,
+                  onTap: () => context.push('/user/settings'),
+                ),
+                NeuListTile(
+                  icon: Icons.help_outline_rounded,
+                  title: 'Help and support',
+                  iconColor: AppColors.textSecondary,
+                  onTap: () => context.push('/shared/help'),
+                ),
+                NeuListTile(
+                  icon: Icons.info_outline_rounded,
+                  title: 'About AeroDrop',
+                  iconColor: AppColors.textSecondary,
+                  onTap: () => context.push('/shared/about'),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.xl),
+            NeuListTile(
+              icon: Icons.logout_rounded,
+              title: 'Sign out',
+              destructive: true,
+              showChevron: false,
+              onTap: () {
+                HapticFeedback.mediumImpact();
+                showLogoutConfirmation(context, ref);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Avatar, name, email and role in one raised card.
+class _IdentityCard extends StatelessWidget {
+  const _IdentityCard({
+    required this.name,
+    required this.email,
+    required this.avatarUrl,
+    required this.role,
+    required this.onTap,
+  });
+
+  final String name;
+  final String email;
+  final String? avatarUrl;
+  final String? role;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return NeuCard(
+      onTap: onTap,
+      depth: NeuDepth.medium,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      semanticLabel: 'Your profile: $name',
+      child: Row(
+        children: [
+          NeuAvatar(name: name, imageUrl: avatarUrl, size: 62),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  name,
+                  style: AppTextStyles.heading(fontSize: 18),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (email.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    email,
+                    style: AppTextStyles.body(
+                      fontSize: 13,
+                      color: AppColors.textSecondary,
                     ),
-                  ),
-                  // Avatar & Name content
-                  SafeArea(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const SizedBox(height: 10),
-                        // Pulsing Avatar Glow
-                        Container(
-                          width: 80,
-                          height: 80,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: user?.avatarUrl == null
-                                ? AppColors.accentGradient
-                                : null,
-                            color: user?.avatarUrl != null
-                                ? AppColors.cardDark
-                                : null,
-                            image: user?.avatarUrl != null
-                                ? DecorationImage(
-                                    image: NetworkImage(user!.avatarUrl!),
-                                    fit: BoxFit.cover,
-                                  )
-                                : null,
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppColors.accent.withValues(alpha: 0.35),
-                                blurRadius: 20,
-                                offset: const Offset(0, 8),
-                              ),
-                            ],
-                          ),
-                          child: user?.avatarUrl == null
-                              ? Center(
-                                  child: Text(
-                                    name.isNotEmpty
-                                        ? name[0].toUpperCase()
-                                        : 'U',
-                                    style: AppTextStyles.title(
-                                      fontSize: 32,
-                                      fontWeight: FontWeight.w900,
-                                      color: AppColors.bgDark,
-                                    ),
-                                  ),
-                                )
-                              : null,
-                        ).animate().scale(
-                          curve: Curves.elasticOut,
-                          duration: 600.ms,
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          name,
-                          style: AppTextStyles.heading(fontSize: 22),
-                        ).animate().fadeIn(delay: 150.ms),
-                        const SizedBox(height: 4),
-                        Text(
-                          email,
-                          style: AppTextStyles.body(
-                            fontSize: 13.5,
-                            color: AppColors.textSecondaryDark,
-                          ),
-                        ).animate().fadeIn(delay: 250.ms),
-                        const SizedBox(height: 10),
-                        _buildRoleTag(user?.role),
-                      ],
-                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
-              ),
+                if (role != null) ...[
+                  const SizedBox(height: AppSpacing.xs),
+                  _RoleTag(role: role!),
+                ],
+              ],
             ),
           ),
-
-          // Menu List
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(24, 20, 24, 140),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                _ProfileSection(
-                  title: 'ACCOUNT CREDENTIALS',
-                  items: [
-                    _ProfileMenuItem(
-                      icon: Icons.edit_rounded,
-                      label: 'Edit Profile Details',
-                      color: AppColors.primaryLight,
-                      onTap: () => context.push('/user/profile/edit'),
-                    ),
-                    _ProfileMenuItem(
-                      icon: Icons.lock_outline_rounded,
-                      label: 'Change Password',
-                      color: AppColors.primaryLight,
-                      onTap: () =>
-                          context.push('/user/profile/change-password'),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                _ProfileSection(
-                  title: 'ACTIVITY LOGS',
-                  items: [
-                    _ProfileMenuItem(
-                      icon: Icons.notifications_none_rounded,
-                      label: 'Notifications',
-                      color: AppColors.accent,
-                      onTap: () => context.go('/user/notifications'),
-                    ),
-                    _ProfileMenuItem(
-                      icon: Icons.history_toggle_off_rounded,
-                      label: 'Order History',
-                      color: AppColors.accent,
-                      onTap: () => context.go('/user/orders'),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                _ProfileSection(
-                  title: 'PREFERENCES & HELP',
-                  items: [
-                    _ProfileMenuItem(
-                      icon: Icons.settings_outlined,
-                      label: 'System Settings',
-                      color: AppColors.textSecondaryDark,
-                      onTap: () => context.push('/user/settings'),
-                    ),
-                    _ProfileMenuItem(
-                      icon: Icons.help_outline_rounded,
-                      label: 'Help & Support Desk',
-                      color: AppColors.textSecondaryDark,
-                      onTap: () => context.push('/shared/help'),
-                    ),
-                    _ProfileMenuItem(
-                      icon: Icons.info_outline_rounded,
-                      label: 'About AeroDrop System',
-                      color: AppColors.textSecondaryDark,
-                      onTap: () => context.push('/shared/about'),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 36),
-
-                // Sign Out Card
-                GestureDetector(
-                  onTap: () {
-                    HapticFeedback.mediumImpact();
-                    showLogoutConfirmation(context, ref);
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    decoration: BoxDecoration(
-                      color: AppColors.danger.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: AppColors.danger.withValues(alpha: 0.25),
-                        width: 1.5,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(
-                          Icons.logout_rounded,
-                          color: AppColors.danger,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 10),
-                        Text(
-                          'Sign Out Session',
-                          style: AppTextStyles.title(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.danger,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ]),
-            ),
+          Icon(
+            Icons.chevron_right_rounded,
+            size: 20,
+            color: AppColors.textTertiary,
           ),
         ],
       ),
     );
   }
+}
 
-  Widget _buildRoleTag(String? role) {
-    if (role == null) return const SizedBox.shrink();
+/// Role pill. Carries an icon as well as a colour so the role survives
+/// greyscale and colour-blind viewing.
+class _RoleTag extends StatelessWidget {
+  const _RoleTag({required this.role});
 
-    final isAdmin = role == 'admin';
-    final isVendor = role == 'vendor';
+  final String role;
 
-    final label = isAdmin
-        ? 'ADMIN'
-        : isVendor
-        ? 'VENDOR'
-        : 'USER';
-
-    final color = isAdmin
-        ? AppColors.danger
-        : isVendor
-        ? AppColors.accent
-        : Colors.teal;
-
-    final icon = isAdmin
-        ? Icons.admin_panel_settings_rounded
-        : isVendor
-        ? Icons.storefront_rounded
-        : Icons.person_rounded;
+  @override
+  Widget build(BuildContext context) {
+    final (Color color, IconData icon, String label) = switch (role) {
+      'admin' => (
+        AppColors.danger,
+        Icons.admin_panel_settings_rounded,
+        'Admin',
+      ),
+      'vendor' => (AppColors.accentText, Icons.storefront_rounded, 'Vendor'),
+      _ => (AppColors.success, Icons.person_rounded, 'Customer'),
+    };
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(30),
-        border: Border.all(color: color.withValues(alpha: 0.25), width: 1.5),
+        color: color.withValues(alpha: 0.12),
+        borderRadius: AppRadii.brPill,
+        border: Border.all(color: color.withValues(alpha: 0.28)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: color, size: 14),
-          const SizedBox(width: 6),
+          Icon(icon, color: AppColors.readable(color), size: 12),
+          const SizedBox(width: 5),
           Text(
             label,
             style: AppTextStyles.label(
-              fontSize: 10,
-              color: color,
-              letterSpacing: 0.8,
+              fontSize: 10.5,
+              color: AppColors.readable(color),
+              letterSpacing: 0.4,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ],
-      ),
-    ).animate().fadeIn(delay: 300.ms).scale(begin: const Offset(0.9, 0.9));
-  }
-}
-
-class _ProfileSection extends StatelessWidget {
-  final String title;
-  final List<_ProfileMenuItem> items;
-
-  const _ProfileSection({required this.title, required this.items});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 8),
-          child: Text(
-            title,
-            style: AppTextStyles.label(
-              fontSize: 11,
-              color: AppColors.textSecondaryDark,
-            ),
-          ),
-        ),
-        GlassCard(
-          padding: EdgeInsets.zero,
-          borderRadius: BorderRadius.circular(24),
-          borderGradient: const LinearGradient(
-            colors: [Colors.white12, Colors.transparent],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          child: Column(
-            children: List.generate(items.length, (i) {
-              final item = items[i];
-              return Column(
-                children: [
-                  item,
-                  if (i < items.length - 1)
-                    const Divider(
-                      height: 1,
-                      indent: 52,
-                      endIndent: 16,
-                      color: AppColors.borderDark,
-                    ),
-                ],
-              );
-            }),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _ProfileMenuItem extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _ProfileMenuItem({
-    required this.icon,
-    required this.label,
-    required this.color,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.lightImpact();
-        onTap();
-      },
-      behavior: HitTestBehavior.opaque,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(icon, color: color, size: 20),
-            ),
-            const SizedBox(width: 14),
-            Text(
-              label,
-              style: AppTextStyles.title(
-                fontSize: 14.5,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
-            const Spacer(),
-            const Icon(
-              Icons.chevron_right_rounded,
-              color: AppColors.textSecondaryDark,
-              size: 20,
-            ),
-          ],
-        ),
       ),
     );
   }

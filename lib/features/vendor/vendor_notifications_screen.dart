@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import '../../core/widgets/custom_app_bar.dart';
+import '../../core/widgets/neu_feedback.dart';
+import '../../core/widgets/neu_surface.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
-import '../../core/widgets/glass_card.dart';
+import '../../core/widgets/neu_card.dart';
 import '../../core/providers/notification_provider.dart';
 import '../../core/models/notification_model.dart';
 
@@ -32,37 +35,24 @@ class VendorNotificationsScreen extends ConsumerWidget {
     }
 
     return Scaffold(
-      backgroundColor: AppColors.bgDark,
-      appBar: AppBar(
-        backgroundColor: AppColors.bgDark,
-        elevation: 0,
-        automaticallyImplyLeading: false,
-        title: Text(
-          'Notifications',
-          style: AppTextStyles.subHead(fontSize: 18, color: Colors.white),
-        ),
-        actions: [
-          if (notifications.any((n) => !n.isRead))
-            IconButton(
-              icon: const Icon(Icons.done_all_rounded, color: Colors.white70),
-              tooltip: 'Mark all as read',
-              onPressed: () {
-                HapticFeedback.lightImpact();
-                ref.read(notificationProvider.notifier).markAllAsRead();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: const Text('All notifications marked as read.'),
-                    backgroundColor: AppColors.primary,
-                    behavior: SnackBarBehavior.floating,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                );
-              },
-            ),
-          const SizedBox(width: 8),
-        ],
+      backgroundColor: AppColors.base,
+      appBar: CustomAppBar(
+        title: 'Notifications',
+        action: !notifications.any((n) => !n.isRead)
+            ? null
+            : NeuIconButton(
+                icon: Icons.done_all_rounded,
+                tooltip: 'Mark all as read',
+                onPressed: () {
+                  HapticFeedback.lightImpact();
+                  ref.read(notificationProvider.notifier).markAllAsRead();
+                  showNeuSnack(
+                    context,
+                    'All notifications marked as read.',
+                    tone: NeuToneKind.success,
+                  );
+                },
+              ),
       ),
       body: notifications.isEmpty
           ? Center(
@@ -72,12 +62,15 @@ class VendorNotificationsScreen extends ConsumerWidget {
                   Icon(
                     Icons.notifications_none_rounded,
                     size: 56,
-                    color: Colors.white24,
+                    color: AppColors.surfaceSunken,
                   ),
                   const SizedBox(height: 16),
                   Text(
                     'No notifications yet.',
-                    style: TextStyle(color: Colors.white38, fontSize: 14),
+                    style: AppTextStyles.body(
+                      fontSize: 14,
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                 ],
               ),
@@ -128,9 +121,9 @@ class VendorNotificationsScreen extends ConsumerWidget {
       padding: const EdgeInsets.only(left: 4, bottom: 10, top: 4),
       child: Text(
         title,
-        style: const TextStyle(
-          color: AppColors.textSecondaryDark,
+        style: AppTextStyles.label(
           fontSize: 11,
+          color: AppColors.textSecondary,
           fontWeight: FontWeight.bold,
           letterSpacing: 1.2,
         ),
@@ -189,7 +182,7 @@ class VendorNotificationsScreen extends ConsumerWidget {
       },
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),
-        child: GlassCard(
+        child: NeuCard(
           padding: const EdgeInsets.all(16),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -212,12 +205,9 @@ class VendorNotificationsScreen extends ConsumerWidget {
                         Expanded(
                           child: Text(
                             n.title,
-                            style: TextStyle(
-                              color: Colors.white,
+                            style: AppTextStyles.body(
                               fontSize: 13.5,
-                              fontWeight: n.isRead
-                                  ? FontWeight.bold
-                                  : FontWeight.w800,
+                              color: AppColors.textPrimary,
                             ),
                           ),
                         ),
@@ -235,25 +225,20 @@ class VendorNotificationsScreen extends ConsumerWidget {
                     const SizedBox(height: 4),
                     Text(
                       n.message,
-                      style: const TextStyle(
-                        color: AppColors.textSecondaryDark,
+                      style: AppTextStyles.body(
                         fontSize: 12.5,
+                        color: AppColors.textSecondary,
                         height: 1.35,
                       ),
                     ),
                     const SizedBox(height: 6),
                     Text(
                       _timeLabel(n.createdAt),
-                      style: TextStyle(
+                      style: AppTextStyles.caption(
+                        fontSize: 11,
                         color: !n.isRead
                             ? AppColors.accent
-                            : AppColors.textSecondaryDark.withValues(
-                                alpha: 0.6,
-                              ),
-                        fontSize: 11,
-                        fontWeight: !n.isRead
-                            ? FontWeight.bold
-                            : FontWeight.normal,
+                            : AppColors.textSecondary.withValues(alpha: 0.6),
                       ),
                     ),
                   ],

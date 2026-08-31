@@ -3,12 +3,15 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_radii.dart';
+import '../../core/widgets/neu_input.dart';
+import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/custom_app_bar.dart';
-import '../../core/widgets/glass_card.dart';
+import '../../core/widgets/neu_card.dart';
 import '../../mock_data/products_mock.dart';
-import '../../mock_data/cart_mock.dart';
 import '../../core/providers/product_provider.dart';
+import '../../core/widgets/cart_button.dart';
 
 class ProductsScreen extends ConsumerStatefulWidget {
   const ProductsScreen({super.key});
@@ -38,124 +41,42 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
     final filtered = _getFiltered(productState.products);
 
     return Scaffold(
-      backgroundColor: AppColors.bgDark,
+      backgroundColor: AppColors.base,
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(56),
         child: CustomAppBar(
           title: 'Shop',
           showBackButton: false,
-          action: ValueListenableBuilder<List<CartItem>>(
-            valueListenable: cartNotifier,
-            builder: (_, cart, _) => Stack(
-              children: [
-                IconButton(
-                  icon: const Icon(
-                    Icons.shopping_cart_outlined,
-                    color: Colors.white,
-                  ),
-                  onPressed: () => context.push('/user/cart'),
-                ),
-                if (cart.isNotEmpty)
-                  Positioned(
-                    right: 6,
-                    top: 6,
-                    child: Container(
-                      padding: const EdgeInsets.all(3),
-                      decoration: const BoxDecoration(
-                        color: AppColors.accent,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Text(
-                        '${cartNotifier.totalItems}',
-                        style: const TextStyle(
-                          color: Colors.black,
-                          fontSize: 9,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
+          action: NeuCartButton(onPressed: () => context.push('/user/cart')),
         ),
       ),
       body: Column(
         children: [
-          // Search
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-            child: TextField(
+            padding: EdgeInsets.fromLTRB(
+              AppSpacing.pageGutter(context),
+              AppSpacing.xs,
+              AppSpacing.pageGutter(context),
+              0,
+            ),
+            child: NeuSearchField(
+              hintText: 'Search products',
               onChanged: (v) => setState(() => _search = v),
-              style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(
-                hintText: 'Search products…',
-                hintStyle: TextStyle(color: AppColors.textSecondaryDark),
-                prefixIcon: const Icon(
-                  Icons.search_rounded,
-                  color: AppColors.textSecondaryDark,
-                ),
-                suffixIcon: _search.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(
-                          Icons.clear_rounded,
-                          color: AppColors.textSecondaryDark,
-                        ),
-                        onPressed: () => setState(() => _search = ''),
-                      )
-                    : null,
-                filled: true,
-                fillColor: AppColors.cardDark,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide.none,
-                ),
-                contentPadding: const EdgeInsets.symmetric(vertical: 12),
-              ),
             ),
           ),
 
           // Category chips
           SizedBox(
-            height: 52,
-            child: ListView.separated(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              scrollDirection: Axis.horizontal,
-              itemCount: productState.categories.length,
-              separatorBuilder: (_, _) => const SizedBox(width: 8),
-              itemBuilder: (context, i) {
-                final cat = productState.categories[i];
-                final selected = cat == _category;
-                return GestureDetector(
-                  onTap: () => setState(() => _category = cat),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: selected ? AppColors.accent : AppColors.cardDark,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: selected
-                            ? AppColors.accent
-                            : AppColors.borderDark,
-                      ),
-                    ),
-                    child: Text(
-                      cat,
-                      style: TextStyle(
-                        color: selected ? AppColors.bgDark : Colors.white,
-                        fontWeight: selected
-                            ? FontWeight.bold
-                            : FontWeight.normal,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                );
-              },
+            height: 56,
+            child: NeuFilterBar(
+              padding: EdgeInsets.symmetric(
+                horizontal: AppSpacing.pageGutter(context),
+                vertical: AppSpacing.xs,
+              ),
+              options: productState.categories,
+              selectedIndex: productState.categories.indexOf(_category),
+              onSelected: (i) =>
+                  setState(() => _category = productState.categories[i]),
             ),
           ),
 
@@ -169,7 +90,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                     '${filtered.length} product${filtered.length == 1 ? '' : 's'}',
                     style: AppTextStyles.body(
                       fontSize: 12,
-                      color: AppColors.textSecondaryDark,
+                      color: AppColors.textSecondary,
                     ),
                   ),
                 ],
@@ -188,22 +109,24 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.inventory_2_outlined,
-                          color: AppColors.textSecondaryDark,
+                          color: AppColors.textSecondary,
                           size: 56,
                         ),
                         const SizedBox(height: 12),
                         Text(
                           'No products are currently available.',
-                          style: AppTextStyles.subHead(color: Colors.white70),
+                          style: AppTextStyles.subHead(
+                            color: AppColors.textSecondary,
+                          ),
                         ),
                         const SizedBox(height: 16),
                         ElevatedButton.icon(
                           onPressed: () =>
                               ref.read(productProvider.notifier).loadProducts(),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.cardDark,
+                            backgroundColor: AppColors.base,
                             foregroundColor: Colors.white,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
@@ -216,14 +139,19 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                     ),
                   )
                 : GridView.builder(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          mainAxisSpacing: 12,
-                          crossAxisSpacing: 12,
-                          childAspectRatio: 0.70,
-                        ),
+                    padding: EdgeInsets.fromLTRB(
+                      AppSpacing.pageGutter(context),
+                      0,
+                      AppSpacing.pageGutter(context),
+                      AppSpacing.dockClearance(context),
+                    ),
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      // Two up on phones, three on tablets, four on desktop.
+                      crossAxisCount: AppBreakpoints.gridColumns(context),
+                      mainAxisSpacing: AppSpacing.sm,
+                      crossAxisSpacing: AppSpacing.sm,
+                      mainAxisExtent: _ProductGridCard.preferredHeight(context),
+                    ),
                     itemCount: filtered.length,
                     itemBuilder: (context, i) =>
                         _ProductGridCard(
@@ -244,120 +172,144 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
 }
 
 class _ProductGridCard extends StatelessWidget {
+  const _ProductGridCard({required this.product, required this.onTap});
+
   final MockProduct product;
   final VoidCallback onTap;
 
-  const _ProductGridCard({required this.product, required this.onTap});
+  static const double _imageHeight = 118;
+
+  /// Tile height, scaled with the user's text size so the details block never
+  /// gets squeezed out at large accessibility settings.
+  static double preferredHeight(BuildContext context) {
+    final scale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.6);
+    return _imageHeight + 104 * scale;
+  }
 
   @override
   Widget build(BuildContext context) {
-    return GlassCard(
+    final unavailable = !product.isAvailable || product.stock == 0;
+
+    return NeuCard(
       onTap: onTap,
       padding: EdgeInsets.zero,
+      borderRadius: AppRadii.brLg,
+      semanticLabel:
+          '${product.name} from ${product.vendorName}, '
+          '₱${product.price.toStringAsFixed(2)}'
+          '${unavailable ? ', unavailable' : ''}',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Image
           ClipRRect(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-            child: Stack(
-              children: [
-                Image.network(
-                  product.imageUrl,
-                  height: 120,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) => Container(
-                    height: 120,
-                    color: AppColors.cardDark2,
-                    child: const Icon(
-                      Icons.image_outlined,
-                      color: AppColors.textSecondaryDark,
-                      size: 32,
+            // Matches the card radius exactly — a 16 against a 20 leaves a
+            // visible sliver of card behind the image corners.
+            borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(AppRadii.lg),
+            ),
+            child: SizedBox(
+              height: _imageHeight,
+              width: double.infinity,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.network(
+                    product.imageUrl,
+                    fit: BoxFit.cover,
+                    // Decode at roughly display size rather than full
+                    // resolution; a grid of full-size decodes is the usual
+                    // cause of jank on a product list.
+                    cacheWidth: 400,
+                    loadingBuilder: (_, child, progress) => progress == null
+                        ? child
+                        : Container(color: AppColors.surfaceSunken),
+                    errorBuilder: (_, _, _) => Container(
+                      color: AppColors.surfaceSunken,
+                      child: Icon(
+                        Icons.image_outlined,
+                        color: AppColors.textTertiary,
+                        size: 28,
+                      ),
                     ),
                   ),
-                ),
-                if (!product.isAvailable || product.stock == 0)
-                  Positioned.fill(
-                    child: Container(
-                      color: Colors.black.withValues(alpha: 0.5),
+                  if (unavailable)
+                    Container(
+                      color: AppColors.bgDark.withValues(alpha: 0.62),
                       alignment: Alignment.center,
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
+                          horizontal: 9,
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
                           color: AppColors.danger,
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: AppRadii.brPill,
                         ),
-                        child: const Text(
+                        child: Text(
                           'Unavailable',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
+                          style: AppTextStyles.label(
+                            fontSize: 10.5,
+                            color: AppColors.textPrimary,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                       ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
           ),
-          // Details
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.all(10),
+              padding: const EdgeInsets.all(AppSpacing.sm - 2),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    product.name,
-                    style: AppTextStyles.body(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                  Flexible(
+                    child: Text(
+                      product.name,
+                      style: AppTextStyles.subHead(fontSize: 13),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 3),
+                  const SizedBox(height: 2),
                   Text(
                     product.vendorName,
-                    style: AppTextStyles.body(
-                      fontSize: 10,
-                      color: AppColors.textSecondaryDark,
-                    ),
+                    style: AppTextStyles.caption(fontSize: 11),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                   const Spacer(),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  // Wrap, not Row: at a large text scale a long price and a
+                  // long category cannot share one line.
+                  Wrap(
+                    spacing: AppSpacing.xs,
+                    runSpacing: 4,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       Text(
                         '₱${product.price.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          color: AppColors.accent,
-                          fontWeight: FontWeight.bold,
+                        style: AppTextStyles.numeric(
                           fontSize: 14,
+                          color: AppColors.accentText,
                         ),
                       ),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
+                          horizontal: 7,
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: AppColors.primaryLight.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(6),
+                          color: AppColors.primary.withValues(alpha: 0.14),
+                          borderRadius: AppRadii.brPill,
                         ),
                         child: Text(
                           product.category,
-                          style: const TextStyle(
-                            color: AppColors.primaryLight,
-                            fontSize: 9,
+                          style: AppTextStyles.label(
+                            fontSize: 10,
+                            color: AppColors.primaryText,
+                            letterSpacing: 0,
                           ),
                         ),
                       ),

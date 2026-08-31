@@ -1,20 +1,34 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import '../../core/widgets/neu_feedback.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'presentation/controllers/login_controller.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_radii.dart';
+import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_text_styles.dart';
-import '../../core/widgets/gradient_button.dart';
-import '../../core/widgets/custom_text_field.dart';
-import '../../core/widgets/glass_card.dart';
-import '../../core/widgets/drone_svg_painter.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+
+import '../../core/widgets/entrance.dart';
+import '../../core/widgets/neu_button.dart';
+import 'widgets/auth_hero.dart';
+import 'widgets/auth_switch_link.dart';
+import '../../core/widgets/neu_text_field.dart';
+import '../../core/widgets/neu_surface.dart';
+import '../../core/widgets/neu_back_button.dart';
 import '../../core/providers/auth_provider.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
-  const LoginScreen({super.key});
+  const LoginScreen({super.key, this.asVendor = false});
+
+  /// Set by `/login?role=vendor` from the welcome screen, and the starting
+  /// value of the door the user can switch on this screen. It labels the
+  /// screen for vendors — it does not change the credentials check or where
+  /// the router sends them afterwards, both of which stay driven by the
+  /// account's real role.
+  final bool asVendor;
 
   @override
   ConsumerState<LoginScreen> createState() => _LoginScreenState();
@@ -22,21 +36,41 @@ class LoginScreen extends ConsumerStatefulWidget {
 
 class _LoginScreenState extends ConsumerState<LoginScreen>
     with SingleTickerProviderStateMixin {
+  late final AnimationController _intro;
+
+  /// Which door the user says they are coming in through. Local rather than
+  /// read straight from the widget, because the button below the form flips
+  /// it without a round trip through the router.
+  late bool _asVendor = widget.asVendor;
+
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
   bool _rememberMe = false;
-  late AnimationController _bgRotateController;
 
   @override
   void initState() {
     super.initState();
-    _bgRotateController = AnimationController(
+    _intro = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 16),
-    )..repeat();
+      duration: const Duration(milliseconds: 900),
+    );
     _loadRememberedCredentials();
+  }
+
+  bool _reduceMotionApplied = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_reduceMotionApplied) return;
+    _reduceMotionApplied = true;
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _intro.value = 1;
+    } else {
+      _intro.forward();
+    }
   }
 
   Future<void> _loadRememberedCredentials() async {
@@ -61,10 +95,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
   @override
   void dispose() {
+    _intro.dispose();
     _emailController.dispose();
     _passwordController.dispose();
-    _bgRotateController.dispose();
     super.dispose();
+  }
+
+  void _continueWithGoogle() {
+    // Same honest stop as the welcome screen: no OAuth provider is wired to
+    // Supabase, so the button says so instead of opening a sheet that cannot
+    // finish. See WelcomeScreen._continueWithGoogle.
+    showNeuSnack(
+      context,
+      'Google sign-in is not connected yet. Use your email and password.',
+      tone: NeuToneKind.info,
+    );
   }
 
   void _handleLogin() async {
@@ -102,16 +147,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         final errorMsg =
             ref.read(authProvider).errorMessage ??
             'Login failed. Please try again.';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMsg),
-            backgroundColor: AppColors.danger,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        );
+        showNeuSnack(context, errorMsg, tone: NeuToneKind.error);
       }
     }
   }
@@ -119,378 +155,252 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
+    final gutter = AppSpacing.pageGutter(context);
+    final compact = MediaQuery.sizeOf(context).height < 720;
 
     return Scaffold(
-      backgroundColor: AppColors.bgDark,
-      body: Stack(
-        children: [
-          // Background: Editorial rich gradient
-          Positioned.fill(
-            child: Container(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Color(0xFF0F2B48),
-                    AppColors.bgDark,
-                    Color(0xFF070D14),
-                  ],
-                  stops: [0.0, 0.5, 1.0],
-                ),
-              ),
-            ),
-          ),
-
-          // Ambient blue-yellow rotating radar
-          Positioned(
-            top: -150,
-            right: -150,
-            child: AnimatedBuilder(
-              animation: _bgRotateController,
-              builder: (context, child) => Transform.rotate(
-                angle: _bgRotateController.value * 2 * math.pi,
-                child: child,
-              ),
-              child: Container(
-                width: 480,
-                height: 480,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: AppColors.primary.withValues(alpha: 0.08),
-                    width: 2,
-                  ),
-                ),
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    Container(
-                      width: 360,
-                      height: 360,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: AppColors.accent.withValues(alpha: 0.05),
-                          width: 1.5,
-                        ),
-                      ),
-                    ),
-                    Container(
-                      width: 240,
-                      height: 240,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: AppColors.primary.withValues(alpha: 0.08),
-                          width: 1,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-
-          // Ambient yellow glow bottom-left
-          Positioned(
-            bottom: -80,
-            left: -80,
-            child: Container(
-              width: 320,
-              height: 320,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    AppColors.accent.withValues(alpha: 0.12),
-                    Colors.transparent,
-                  ],
-                ),
-              ),
-            ),
-          ),
-
-          // Main scrollable content
-          SafeArea(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                return SingleChildScrollView(
-                  physics: const BouncingScrollPhysics(),
+      backgroundColor: AppColors.base,
+      body: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              physics: const ClampingScrollPhysics(),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: Center(
                   child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      minHeight: constraints.maxHeight,
-                    ),
+                    // Keep the form at a comfortable measure on tablets and
+                    // desktop instead of stretching it across the window.
+                    constraints: const BoxConstraints(maxWidth: 460),
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      padding: EdgeInsets.fromLTRB(
+                        gutter,
+                        AppSpacing.md,
+                        gutter,
+                        AppSpacing.xl,
+                      ),
                       child: Form(
                         key: _formKey,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const SizedBox(height: 32),
-
-                            // Header Section
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'AeroDrop',
-                                      style: AppTextStyles.display(
-                                        fontSize: 42,
-                                        letterSpacing: -1.5,
-                                      ),
-                                    ).animate().fadeIn().slideX(begin: -0.1),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      'UCLM DRONE DELIVERY SYSTEM',
-                                      style: AppTextStyles.subHead(
-                                        fontSize: 14,
-                                        color: AppColors.textSecondaryDark,
-                                      ),
-                                    ).animate().fadeIn(delay: 100.ms),
-                                  ],
-                                ),
-                                Container(
-                                      width: 54,
-                                      height: 54,
-                                      decoration: BoxDecoration(
-                                        gradient: AppColors.accentGradient,
-                                        borderRadius: BorderRadius.circular(18),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: AppColors.accent.withValues(
-                                              alpha: 0.3,
-                                            ),
-                                            blurRadius: 16,
-                                            offset: const Offset(0, 6),
-                                          ),
-                                        ],
-                                      ),
-                                      child: Center(
-                                        child: AnimatedBuilder(
-                                          animation: _bgRotateController,
-                                          builder: (context, _) {
-                                            return SizedBox(
-                                              width: 32,
-                                              height: 32,
-                                              child: CustomPaint(
-                                                size: const Size(32, 32),
-                                                painter: DroneSvgPainter(
-                                                  animationValue:
-                                                      _bgRotateController.value,
-                                                  lineColor: AppColors.bgDark,
-                                                  accentColor: const Color(
-                                                    0xFF4F46E5,
-                                                  ),
-                                                ),
-                                              ),
-                                            );
-                                          },
-                                        ),
-                                      ),
-                                    )
-                                    .animate()
-                                    .scale(
-                                      duration: 600.ms,
-                                      curve: Curves.elasticOut,
-                                    )
-                                    .fadeIn(),
-                              ],
+                            if (Navigator.canPop(context))
+                              const Align(
+                                alignment: Alignment.centerLeft,
+                                child: NeuBackButton(),
+                              ),
+                            AuthHero(
+                              progress: _intro,
+                              compact: compact,
+                              title: 'Sign in to AeroDrop',
+                              subtitle: _asVendor
+                                  ? 'Vendor sign-in'
+                                  : 'Welcome back. Enter your details to '
+                                        'continue.',
                             ),
-
-                            const SizedBox(height: 40),
-
-                            // Glassmorphism Card
-                            GlassCard(
-                                  padding: const EdgeInsets.all(24),
-                                  borderRadius: BorderRadius.circular(28),
-                                  borderGradient: const LinearGradient(
-                                    colors: [
-                                      AppColors.accent,
-                                      AppColors.primary,
-                                      Colors.transparent,
-                                    ],
-                                    stops: [0.0, 0.4, 1.0],
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.stretch,
-                                    children: [
-                                      Text(
-                                        'Sign In',
-                                        style: AppTextStyles.heading(
-                                          fontSize: 22,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 24),
-                                      CustomTextField(
-                                        labelText: 'Email',
-                                        hintText: 'yourname@email.com',
-                                        prefixIcon: Icons.email_outlined,
-                                        controller: _emailController,
-                                        keyboardType:
-                                            TextInputType.emailAddress,
-                                        validator:
-                                            LoginController.validateEmail,
-                                        textInputAction: TextInputAction.next,
-                                      ),
-                                      const SizedBox(height: 20),
-                                      CustomTextField(
-                                        labelText: 'Password',
-                                        hintText: '••••••••',
-                                        prefixIcon: Icons.lock_outline_rounded,
-                                        controller: _passwordController,
-                                        obscureText: _obscurePassword,
-                                        textInputAction: TextInputAction.done,
-                                        suffixIcon: IconButton(
-                                          icon: Icon(
-                                            _obscurePassword
-                                                ? Icons.visibility_off_outlined
-                                                : Icons.visibility_outlined,
-                                            color: AppColors.textSecondaryDark,
-                                            size: 20,
-                                          ),
-                                          onPressed: () => setState(
-                                            () => _obscurePassword =
-                                                !_obscurePassword,
-                                          ),
-                                        ),
-                                        validator:
-                                            LoginController.validatePassword,
-                                      ),
-                                      Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Flexible(
-                                            child: Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Theme(
-                                                  data: Theme.of(context).copyWith(
-                                                    unselectedWidgetColor:
-                                                        AppColors
-                                                            .textSecondaryDark,
-                                                  ),
-                                                  child: Checkbox(
-                                                    value: _rememberMe,
-                                                    activeColor:
-                                                        AppColors.accent,
-                                                    checkColor:
-                                                        AppColors.bgDark,
-                                                    onChanged: (val) {
-                                                      setState(() {
-                                                        _rememberMe =
-                                                            val ?? false;
-                                                      });
-                                                    },
-                                                  ),
-                                                ),
-                                                Flexible(
-                                                  child: Text(
-                                                    'Remember me',
-                                                    style: AppTextStyles.body(
-                                                      fontSize: 13,
-                                                      color: Colors.white70,
-                                                    ),
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                          Flexible(
-                                            child: TextButton(
-                                              onPressed: () => context.push(
-                                                '/forgot-password',
-                                              ),
-                                              style: TextButton.styleFrom(
-                                                padding: EdgeInsets.zero,
-                                                minimumSize: Size.zero,
-                                                tapTargetSize:
-                                                    MaterialTapTargetSize
-                                                        .shrinkWrap,
-                                              ),
-                                              child: Text(
-                                                'Forgot Password?',
-                                                style: AppTextStyles.body(
-                                                  fontSize: 13,
-                                                  fontWeight: FontWeight.bold,
-                                                  color: AppColors.accentLight,
-                                                ),
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 12),
-                                      GradientButton(
-                                        text: 'Log In',
-                                        isLoading: authState.isLoading,
-                                        onPressed: _handleLogin,
-                                        icon: Icons.login_rounded,
-                                      ),
-                                    ],
-                                  ),
-                                )
-                                .animate()
-                                .fadeIn(delay: 200.ms)
-                                .slideY(
-                                  begin: 0.1,
-                                  end: 0,
-                                  curve: Curves.easeOutCubic,
-                                ),
-
-                            const SizedBox(height: 32),
-
-                            // Register Link
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  "Don't have an Account?",
-                                  style: AppTextStyles.body(
-                                    fontSize: 14,
-                                    color: AppColors.textSecondaryDark,
-                                  ),
-                                ),
-                                TextButton(
-                                  onPressed: () => context.push('/register'),
-                                  child: Text(
-                                    'Create Account',
-                                    style: AppTextStyles.body(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppColors.accentLight,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ).animate().fadeIn(delay: 300.ms),
-
-                            const SizedBox(height: 16),
+                            SizedBox(
+                              height: compact ? AppSpacing.lg : AppSpacing.xxl,
+                            ),
+                            ..._formBeats(authState.isLoading),
                           ],
                         ),
                       ),
                     ),
                   ),
-                );
-              },
-            ),
-          ),
-        ],
+                ),
+              ),
+            );
+          },
+        ),
       ),
     );
   }
+
+  /// The form, one staggered beat per row.
+  ///
+  /// Returned as a list rather than wrapped in a card so the wells sit
+  /// directly on the canvas. A raised card holding debossed fields stacks two
+  /// depths inside one radius, and the inner and outer curves stop agreeing.
+  List<Widget> _formBeats(bool isLoading) {
+    // Indices, not hand-written intervals — reordering a row cannot desync the
+    // stagger from the layout.
+    var i = 0;
+    Widget beat(Widget child) => Entrance.stagger(
+      progress: _intro,
+      index: i++,
+      from: 0.26,
+      child: child,
+    );
+
+    return [
+      beat(
+        NeuTextField(
+          labelText: 'Email',
+          hintText: 'yourname@email.com',
+          prefixIcon: Icons.email_outlined,
+          controller: _emailController,
+          keyboardType: TextInputType.emailAddress,
+          validator: LoginController.validateEmail,
+          textInputAction: TextInputAction.next,
+          autofillHints: const [AutofillHints.email],
+        ),
+      ),
+      const SizedBox(height: AppSpacing.md),
+      beat(
+        NeuTextField(
+          labelText: 'Password',
+          hintText: 'Enter your password',
+          prefixIcon: Icons.lock_outline_rounded,
+          controller: _passwordController,
+          obscureText: _obscurePassword,
+          textInputAction: TextInputAction.done,
+          validator: LoginController.validatePassword,
+          autofillHints: const [AutofillHints.password],
+          suffixIcon: IconButton(
+            icon: Icon(
+              _obscurePassword
+                  ? Icons.visibility_off_outlined
+                  : Icons.visibility_outlined,
+              color: AppColors.textTertiary,
+              size: 20,
+            ),
+            tooltip: _obscurePassword ? 'Show password' : 'Hide password',
+            onPressed: () =>
+                setState(() => _obscurePassword = !_obscurePassword),
+          ),
+        ),
+      ),
+      const SizedBox(height: AppSpacing.sm),
+      beat(_buildOptionsRow()),
+      const SizedBox(height: AppSpacing.lg),
+      beat(
+        NeuButton(text: 'Login', isLoading: isLoading, onPressed: _handleLogin),
+      ),
+      const SizedBox(height: AppSpacing.md),
+      beat(const _OrDivider()),
+      const SizedBox(height: AppSpacing.md),
+      beat(
+        NeuButton(
+          text: 'Continue with Google',
+          variant: NeuButtonVariant.neutral,
+          leading: SvgPicture.asset(
+            'assets/svg/google_g.svg',
+            width: 19,
+            height: 19,
+          ),
+          onPressed: _continueWithGoogle,
+        ),
+      ),
+      const SizedBox(height: AppSpacing.sm),
+      beat(
+        NeuButton(
+          text: _asVendor ? 'Login as customer' : 'Login as vendor',
+          variant: NeuButtonVariant.neutral,
+          icon: _asVendor ? Icons.person_rounded : Icons.storefront_rounded,
+          // Flips back as well as forward. A one-way switch leaves a vendor
+          // who tapped it by accident with no way out but the back button.
+          onPressed: () {
+            HapticFeedback.selectionClick();
+            setState(() => _asVendor = !_asVendor);
+          },
+        ),
+      ),
+      const SizedBox(height: AppSpacing.lg),
+      beat(const _RegisterLink()),
+    ];
+  }
+
+  Widget _buildOptionsRow() {
+    return Wrap(
+      alignment: WrapAlignment.spaceBetween,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: AppSpacing.xs,
+      children: [
+        Semantics(
+          toggled: _rememberMe,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => setState(() => _rememberMe = !_rememberMe),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                NeuSurface(
+                  style: _rememberMe ? NeuStyle.raised : NeuStyle.inset,
+                  depth: NeuDepth.flat,
+                  width: 20,
+                  height: 20,
+                  alignment: Alignment.center,
+                  borderRadius: AppRadii.brXs,
+                  color: _rememberMe
+                      ? AppColors.accent
+                      : AppColors.surfaceSunken,
+                  child: _rememberMe
+                      ? const Icon(
+                          Icons.check_rounded,
+                          size: 14,
+                          color: AppColors.bgDark,
+                        )
+                      : const SizedBox.shrink(),
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                Text(
+                  'Remember me',
+                  style: AppTextStyles.body(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        TextButton(
+          onPressed: () => context.push('/forgot-password'),
+          child: Text(
+            'Forgot password?',
+            style: AppTextStyles.label(
+              fontSize: 13,
+              color: AppColors.primaryText,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// A hairline with "or" set into it, separating the credential path from the
+/// provider path.
+class _OrDivider extends StatelessWidget {
+  const _OrDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    final rule = Expanded(
+      child: Divider(color: AppColors.border, height: 1, thickness: 1),
+    );
+
+    return Row(
+      children: [
+        rule,
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+          child: Text('or', style: AppTextStyles.caption(fontSize: 12)),
+        ),
+        rule,
+      ],
+    );
+  }
+}
+
+class _RegisterLink extends StatelessWidget {
+  const _RegisterLink();
+
+  @override
+  Widget build(BuildContext context) => AuthSwitchLink(
+    question: "Don't have an account?",
+    action: 'Create account',
+    onPressed: () => context.push('/register'),
+  );
 }

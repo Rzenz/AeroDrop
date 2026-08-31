@@ -1,78 +1,42 @@
 import 'package:flutter/material.dart';
+
 import '../theme/app_colors.dart';
+import '../theme/app_shadows.dart';
+import 'neu_surface.dart';
 
-class AnimatedFAB extends StatefulWidget {
-  final IconData icon;
-  final VoidCallback onPressed;
-  final String? tooltip;
-
+/// Standalone floating action button.
+///
+/// Accent-filled with a soft halo — the FAB is the one control allowed to
+/// announce itself loudly, because it is the screen's single primary action.
+class AnimatedFAB extends StatelessWidget {
   const AnimatedFAB({
     super.key,
     required this.icon,
     required this.onPressed,
     this.tooltip,
+    this.size = 56,
   });
 
-  @override
-  State<AnimatedFAB> createState() => _AnimatedFABState();
-}
-
-class _AnimatedFABState extends State<AnimatedFAB>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _scaleAnimation;
+  final IconData icon;
+  final VoidCallback onPressed;
+  final String? tooltip;
+  final double size;
 
   @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 150),
-    );
-    _scaleAnimation = Tween<double>(
-      begin: 1.0,
-      end: 0.88,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
-  }
+  Widget build(BuildContext context) => NeuPressable(
+    onTap: onPressed,
+    width: size,
+    height: size,
+    borderRadius: BorderRadius.circular(size / 2),
+    color: AppColors.accentFill,
+    alignment: Alignment.center,
+    depth: NeuDepth.medium,
+    semanticLabel: tooltip,
+    scaleOnPress: 0.92,
+    child: Icon(icon, color: AppColors.onAccentFill, size: size * 0.44),
+  );
 
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapDown: (_) => _controller.forward(),
-      onTapUp: (_) {
-        _controller.reverse();
-        widget.onPressed();
-      },
-      onTapCancel: () => _controller.reverse(),
-      child: ScaleTransition(
-        scale: _scaleAnimation,
-        child: Container(
-          width: 56,
-          height: 56,
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [AppColors.primary, AppColors.secondary],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.primary.withValues(alpha: 0.4),
-                blurRadius: 16,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          child: Icon(widget.icon, color: Colors.white, size: 26),
-        ),
-      ),
-    );
-  }
+  /// Shadow used when this FAB is composed into a nav dock.
+  static List<BoxShadow> get halo =>
+      AppShadows.glow(AppColors.accentFill, alpha: 0.28);
 }

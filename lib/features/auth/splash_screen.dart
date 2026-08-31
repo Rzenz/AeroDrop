@@ -1,13 +1,20 @@
-import 'dart:math' as math;
-import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
-import 'package:animated_text_kit/animated_text_kit.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
-import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_text_styles.dart';
-import '../../core/widgets/drone_svg_painter.dart';
 
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_motion.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_text_styles.dart';
+import '../../core/widgets/brand_mark.dart';
+import '../../core/widgets/neu_input.dart';
+
+/// The launch screen.
+///
+/// One animation controller drives everything: the progress bar, the stage
+/// label and the entrance. The previous version ran five simultaneous infinite
+/// controllers behind a radar sweep and two glow layers, which cost a repaint
+/// every frame to say the same thing a progress bar already says.
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -16,296 +23,166 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen>
-    with TickerProviderStateMixin {
-  late AnimationController _scanController;
-  late AnimationController _rotateController;
-  Timer? _navigationTimer;
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _progress;
+
+  /// Shown in sequence as the bar fills. Kept short and plain — a launch
+  /// screen reports what it is doing, it does not perform.
+  static const _stages = [
+    'Connecting to the fleet',
+    'Checking campus airspace',
+    'Loading your deliveries',
+    'Ready for takeoff',
+  ];
+
+  int _stage = 0;
 
   @override
   void initState() {
     super.initState();
-    _scanController = AnimationController(
+    _progress = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2200),
-    )..repeat();
+      duration: const Duration(milliseconds: 2600),
+    );
 
-    _rotateController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 8),
-    )..repeat();
-
-    _navigationTimer = Timer(const Duration(milliseconds: 3600), () {
-      if (mounted) {
-        context.go('/onboarding');
+    _progress.addListener(() {
+      final next = (_progress.value * _stages.length).floor().clamp(
+        0,
+        _stages.length - 1,
+      );
+      if (next != _stage) {
+        setState(() => _stage = next);
+        HapticFeedback.selectionClick();
       }
+    });
+
+    _progress.forward().then((_) {
+      if (!mounted) return;
+      HapticFeedback.mediumImpact();
+      context.go('/onboarding');
     });
   }
 
   @override
   void dispose() {
-    _scanController.dispose();
-    _rotateController.dispose();
-    _navigationTimer?.cancel();
+    _progress.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-
-    final screenHeight = MediaQuery.of(context).size.height;
-    final isSmallScreen = screenHeight < 680;
-    final graphicSize = isSmallScreen ? 180.0 : 240.0;
+    final compact = MediaQuery.sizeOf(context).height < 680;
+    final markSize = compact ? 104.0 : 124.0;
 
     return Scaffold(
-      backgroundColor: AppColors.bgDark,
-      body: Stack(
-        children: [
-          // Background: Deep navy with radial blue glow
-          Positioned.fill(
-            child: Container(
-              decoration: const BoxDecoration(
-                gradient: RadialGradient(
-                  center: Alignment(0.0, -0.25),
-                  radius: 0.85,
-                  colors: [Color(0xFF0F2B48), AppColors.bgDark],
+      backgroundColor: AppColors.base,
+      body: SafeArea(
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: AppSpacing.pageGutter(context),
+          ),
+          child: Column(
+            children: [
+              const Spacer(flex: 3),
+              _BrandMark(size: markSize),
+              SizedBox(height: compact ? AppSpacing.xl : AppSpacing.xxl),
+              Text(
+                'AeroDrop',
+                style: AppTextStyles.display(fontSize: compact ? 34 : 40),
+              ),
+              const SizedBox(height: AppSpacing.xxs),
+              Text(
+                'UCLM Drone Delivery System',
+                textAlign: TextAlign.center,
+                style: AppTextStyles.body(
+                  fontSize: 13.5,
+                  color: AppColors.textSecondary,
                 ),
               ),
-            ),
+              const Spacer(flex: 4),
+              _ProgressBlock(progress: _progress, label: _stages[_stage]),
+              const SizedBox(height: AppSpacing.xxl),
+            ],
           ),
-
-          // Ambient yellow bottom glow
-          Positioned(
-            bottom: -120,
-            left: size.width * 0.15,
-            right: size.width * 0.15,
-            child: Container(
-              height: 240,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.accent.withValues(alpha: 0.18),
-                    blurRadius: 120,
-                    spreadRadius: 40,
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // Main content
-          SafeArea(
-            child: Column(
-              children: [
-                const Spacer(flex: 3),
-
-                // Drone graphic with rotating ring
-                SizedBox(
-                      width: graphicSize,
-                      height: graphicSize,
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          // Outer rotating dashed ring
-                          AnimatedBuilder(
-                            animation: _rotateController,
-                            builder: (_, _) => Transform.rotate(
-                              angle: _rotateController.value * 2 * math.pi,
-                              child: CustomPaint(
-                                size: Size(graphicSize, graphicSize),
-                                painter: _DashedRingPainter(
-                                  color: AppColors.accent.withValues(
-                                    alpha: 0.45,
-                                  ),
-                                  radius: graphicSize / 2 - 5,
-                                  dashCount: 24,
-                                ),
-                              ),
-                            ),
-                          ),
-                          // Inner blue ring
-                          Container(
-                            width: graphicSize * 0.75,
-                            height: graphicSize * 0.75,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: AppColors.primary.withValues(
-                                  alpha: 0.35,
-                                ),
-                                width: 1.5,
-                              ),
-                            ),
-                          ),
-                          // Scan line sweep
-                          AnimatedBuilder(
-                            animation: _scanController,
-                            builder: (_, _) => Opacity(
-                              opacity: (1 - _scanController.value).clamp(
-                                0.0,
-                                0.75,
-                              ),
-                              child: Container(
-                                width: graphicSize * 0.7,
-                                height: graphicSize * 0.7,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  gradient: SweepGradient(
-                                    startAngle: 0,
-                                    endAngle:
-                                        _scanController.value * 2 * math.pi,
-                                    colors: [
-                                      Colors.transparent,
-                                      AppColors.primary.withValues(alpha: 0.35),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                          // Custom SVG Drone Illustration
-                          AnimatedBuilder(
-                            animation: _scanController,
-                            builder: (context, _) {
-                              return SizedBox(
-                                width: graphicSize * 0.4,
-                                height: graphicSize * 0.4,
-                                child: CustomPaint(
-                                  size: Size(
-                                    graphicSize * 0.4,
-                                    graphicSize * 0.4,
-                                  ),
-                                  painter: DroneSvgPainter(
-                                    animationValue: _scanController.value,
-                                    lineColor: Colors.white.withValues(
-                                      alpha: 0.9,
-                                    ),
-                                    accentColor: const Color(0xFF4F46E5),
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        ],
-                      ),
-                    )
-                    .animate()
-                    .scale(
-                      duration: 800.ms,
-                      curve: Curves.elasticOut,
-                      begin: const Offset(0.4, 0.4),
-                    )
-                    .fadeIn(duration: 500.ms),
-
-                const SizedBox(height: 52),
-
-                // Wordmark — yellow typewriter reveal
-                ShaderMask(
-                  shaderCallback: (bounds) =>
-                      AppColors.accentGradient.createShader(bounds),
-                  blendMode: BlendMode.srcIn,
-                  child: AnimatedTextKit(
-                    totalRepeatCount: 1,
-                    isRepeatingAnimation: false,
-                    animatedTexts: [
-                      TypewriterAnimatedText(
-                        'AERODROP',
-                        textStyle: AppTextStyles.display(
-                          fontSize: 44,
-                          letterSpacing: 10,
-                        ),
-                        speed: const Duration(milliseconds: 90),
-                      ),
-                    ],
-                  ),
-                ).animate().fadeIn(delay: 600.ms),
-
-                const SizedBox(height: 12),
-
-                Text(
-                  'UCLM DRONE DELIVERY SYSTEM',
-                  style: AppTextStyles.label(
-                    fontSize: 11,
-                    color: AppColors.textSecondaryDark,
-                    letterSpacing: 3,
-                  ),
-                ).animate().fadeIn(delay: 1100.ms),
-
-                const Spacer(flex: 3),
-
-                // Progress indicator at the bottom
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(60, 0, 60, 48),
-                  child: Column(
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: const SizedBox(
-                          height: 4,
-                          child: LinearProgressIndicator(
-                            backgroundColor: AppColors.borderDark,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              AppColors.accent,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      Text(
-                        'Initializing drone fleet...',
-                        style: AppTextStyles.body(
-                          fontSize: 12,
-                          color: AppColors.textSecondaryDark,
-                        ),
-                      ),
-                    ],
-                  ),
-                ).animate().fadeIn(delay: 1300.ms),
-              ],
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
 }
 
-class _DashedRingPainter extends CustomPainter {
-  final Color color;
-  final double radius;
-  final int dashCount;
+/// The app mark, scaled up for the launch screen.
+///
+/// Static, with a single settle-in scale. A logo that spins forever reads as a
+/// page that has not finished loading.
+class _BrandMark extends StatelessWidget {
+  const _BrandMark({required this.size});
 
-  _DashedRingPainter({
-    required this.color,
-    required this.radius,
-    required this.dashCount,
-  });
+  final double size;
 
   @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final paint = Paint()
-      ..color = color
-      ..strokeWidth = 1.5
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-
-    final angleStep = (2 * math.pi) / dashCount;
-    final dashLength = angleStep * 0.45;
-
-    for (int i = 0; i < dashCount; i++) {
-      final startAngle = i * angleStep;
-      canvas.drawArc(
-        Rect.fromCircle(center: center, radius: radius),
-        startAngle,
-        dashLength,
-        false,
-        paint,
-      );
-    }
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.88, end: 1),
+      duration: AppMotion.slow,
+      curve: AppMotion.enter,
+      builder: (context, t, child) => Transform.scale(
+        scale: t,
+        child: Opacity(opacity: t.clamp(0, 1), child: child),
+      ),
+      child: BrandMark(size: size),
+    );
   }
+}
+
+/// Stage label, percentage and the fill bar.
+class _ProgressBlock extends StatelessWidget {
+  const _ProgressBlock({required this.progress, required this.label});
+
+  final Animation<double> progress;
+  final String label;
 
   @override
-  bool shouldRepaint(covariant _DashedRingPainter old) => false;
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: progress,
+      builder: (context, _) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: AnimatedSwitcher(
+                  duration: AppMotion.fast,
+                  child: Text(
+                    label,
+                    key: ValueKey(label),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.body(
+                      fontSize: 13,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.xs),
+              Text(
+                '${(progress.value * 100).round()}%',
+                style: AppTextStyles.numeric(
+                  fontSize: 13,
+                  color: AppColors.accentText,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xs + 2),
+          NeuProgressBar(
+            value: progress.value,
+            height: 7,
+            semanticLabel: 'Startup progress',
+          ),
+        ],
+      ),
+    );
+  }
 }

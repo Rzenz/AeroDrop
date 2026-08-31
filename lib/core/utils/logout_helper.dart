@@ -1,96 +1,32 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
 import '../providers/auth_provider.dart';
-import '../theme/app_colors.dart';
+import '../widgets/neu_feedback.dart';
 
+/// Asks the user to confirm signing out, then does it.
+///
+/// The sign-out runs inside the dialog rather than after it, so the confirm
+/// button can show progress and a failure can be reported in place. The
+/// previous version closed the dialog first and then raised a snackbar, which
+/// meant the error arrived on whatever screen happened to be underneath.
 Future<void> showLogoutConfirmation(BuildContext context, WidgetRef ref) async {
-  bool isLoggingOut = false;
-
-  final confirmed = await showDialog<bool>(
-    context: context,
-    barrierDismissible: false,
-    builder: (dialogContext) {
-      return StatefulBuilder(
-        builder: (ctx, setState) {
-          return AlertDialog(
-            backgroundColor: AppColors.cardDark,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            title: const Text(
-              'Log Out',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            content: const Text(
-              'Are you sure you want to log out of your account?',
-              style: TextStyle(color: Colors.white70, fontSize: 14),
-            ),
-            actions: [
-              TextButton(
-                onPressed: isLoggingOut
-                    ? null
-                    : () => Navigator.pop(ctx, false),
-                child: const Text(
-                  'Cancel',
-                  style: TextStyle(color: Colors.grey),
-                ),
-              ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.danger,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                onPressed: isLoggingOut
-                    ? null
-                    : () async {
-                        setState(() => isLoggingOut = true);
-                        final success = await ref
-                            .read(authProvider.notifier)
-                            .logout();
-                        if (success) {
-                          if (ctx.mounted) Navigator.pop(ctx, true);
-                        } else {
-                          setState(() => isLoggingOut = false);
-                          if (ctx.mounted) {
-                            Navigator.pop(ctx, false);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'Unable to log out. Please try again.',
-                                ),
-                                backgroundColor: AppColors.danger,
-                                behavior: SnackBarBehavior.floating,
-                              ),
-                            );
-                          }
-                        }
-                      },
-                child: isLoggingOut
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Text('Log Out'),
-              ),
-            ],
-          );
-        },
-      );
+  final loggedOut = await showNeuConfirm(
+    context,
+    title: 'Log Out',
+    message: 'Are you sure you want to log out of your account?',
+    confirmLabel: 'Log Out',
+    cancelLabel: 'Cancel',
+    destructive: true,
+    icon: Icons.logout_rounded,
+    onConfirm: () async {
+      final success = await ref.read(authProvider.notifier).logout();
+      return success ? null : 'Could not log out. Check your connection.';
     },
   );
 
-  if (confirmed == true && context.mounted) {
+  if (loggedOut && context.mounted) {
     context.go('/login');
   }
 }

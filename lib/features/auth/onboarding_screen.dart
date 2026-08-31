@@ -1,14 +1,26 @@
 import 'dart:math' as math;
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter_animate/flutter_animate.dart' hide ScaleEffect;
-import 'package:go_router/go_router.dart';
-import 'package:smooth_page_indicator/smooth_page_indicator.dart';
-import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_text_styles.dart';
-import '../../core/widgets/gradient_button.dart';
-import '../../core/widgets/drone_svg_painter.dart';
 
+import 'package:flutter/material.dart';
+import 'package:flutter/physics.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_motion.dart';
+import '../../core/theme/app_radii.dart';
+import '../../core/theme/app_shadows.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_text_styles.dart';
+import '../../core/widgets/brand_mark.dart';
+import '../../core/widgets/entrance.dart';
+
+/// First-run introduction.
+///
+/// One screen, not three. The old carousel asked for two swipes before anyone
+/// could reach a sign-in button, and the two slides in the middle repeated
+/// what the third already said. A single panel states what the app does and
+/// puts the way in under it.
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
 
@@ -17,391 +29,123 @@ class OnboardingScreen extends StatefulWidget {
 }
 
 class _OnboardingScreenState extends State<OnboardingScreen>
-    with TickerProviderStateMixin {
-  final _pageController = PageController();
-  int _currentPage = 0;
-
-  late AnimationController _radarAnimController;
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _intro;
+  bool _armed = false;
 
   @override
   void initState() {
     super.initState();
-    _radarAnimController = AnimationController(
+    _intro = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 4),
-    )..repeat();
+      duration: const Duration(milliseconds: 1100),
+    );
   }
 
   @override
-  void dispose() {
-    _pageController.dispose();
-    _radarAnimController.dispose();
-    super.dispose();
-  }
-
-  void _next() {
-    if (_currentPage < 2) {
-      _pageController.nextPage(
-        duration: const Duration(milliseconds: 500),
-        curve: Curves.easeOutCubic,
-      );
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_armed) return;
+    _armed = true;
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _intro.value = 1;
     } else {
-      context.go('/login');
+      _intro.forward();
     }
   }
 
   @override
+  void dispose() {
+    _intro.dispose();
+    super.dispose();
+  }
+
+  void _start() {
+    HapticFeedback.mediumImpact();
+    context.go('/welcome');
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final screenHeight = MediaQuery.of(context).size.height;
-    final isSmallScreen = screenHeight < 680;
-    final isLast = _currentPage == 2;
+    final media = MediaQuery.of(context);
+    final size = media.size;
+    final compact = size.height < 720;
+    final gutter = AppSpacing.pageGutter(context);
 
-    final List<_SlideData> slides = [
-      _SlideData(
-        title: 'Order from\nCampus Vendors',
-        description:
-            'Browse delicious food, refreshing drinks, books, and university supplies from trusted local campus vendors.',
-        gradientBegin: Alignment.topLeft,
-        gradientEnd: Alignment.bottomRight,
-        colors: [const Color(0xFF0D1B2A), const Color(0xFF1565C0)],
-        illustrationBuilder: (context, animController) {
-          return Center(
-            child: _DroneAndTruckIllustration(
-              animController: animController,
-              size: isSmallScreen ? 180.0 : 240.0,
-            ),
-          );
-        },
-      ),
-      _SlideData(
-        title: 'Smart Drone\nDelivery',
-        description:
-            'Your order is prepared by the vendor and dispatched automatically via our high-speed drone fleet to your drop-off zone.',
-        gradientBegin: Alignment.topRight,
-        gradientEnd: Alignment.bottomLeft,
-        colors: [const Color(0xFF0D1B2A), const Color(0xFF00838F)],
-        illustrationBuilder: (context, animController) {
-          return _RadarIllustration(
-            animController: animController,
-            size: isSmallScreen ? 160.0 : 220.0,
-          );
-        },
-      ),
-      _SlideData(
-        title: 'Real-time\nRadar Tracking',
-        description:
-            'Watch your drone fly in real-time. Track flight path, altitude, speed, and exact estimated arrival time.',
-        gradientBegin: Alignment.bottomCenter,
-        gradientEnd: Alignment.topCenter,
-        colors: [const Color(0xFF0D1B2A), const Color(0xFF00796B)],
-        illustrationBuilder: (context, animController) {
-          final size = isSmallScreen ? 170.0 : 230.0;
-          return Center(
-            child: AnimatedBuilder(
-              animation: animController,
-              builder: (context, child) {
-                // Subtle floating up-and-down effect using the slide animation controller
-                final floatOffset = Offset(
-                  0,
-                  -8 * math.sin(animController.value * 2 * math.pi),
-                );
-                return Transform.translate(
-                  offset: floatOffset,
-                  child: Transform(
-                    transform: Matrix4.identity()
-                      ..setEntry(3, 2, 0.001) // perspective
-                      ..rotateY(0.08) // subtle 3D tilt
-                      ..rotateX(0.04),
-                    alignment: Alignment.center,
-                    child: child,
-                  ),
-                );
-              },
-              child: Container(
-                width: size * 1.1,
-                height: size * 0.7,
-                padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF1565C0), Color(0xFF42A5F5)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.2),
-                    width: 1.5,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF1565C0).withValues(alpha: 0.35),
-                      blurRadius: 20,
-                      offset: const Offset(0, 10),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        // Card Chip
-                        Container(
-                          width: 32,
-                          height: 24,
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFFFFD600), Color(0xFFFFCA28)],
-                            ),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                        ),
-                        // Contactless icon
-                        const Icon(
-                          Icons.wifi_rounded,
-                          color: Colors.white70,
-                          size: 20,
-                        ),
-                      ],
-                    ),
-                    const Text(
-                      '••••  ••••  ••••  8842',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 2,
-                      ),
-                    ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'CARDHOLDER',
-                              style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: 8,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 1,
-                              ),
-                            ),
-                            Text(
-                              'AERODROP MEMBER',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                        Container(
-                          width: 28,
-                          height: 28,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.15),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.credit_card_rounded,
-                            color: Colors.white,
-                            size: 14,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    ];
-
-    final currentSlide = slides[_currentPage];
+    // The banner takes a share of the screen so the copy below it always has
+    // the same room, rather than being whatever is left over. At large text
+    // scales it gives some of that share back — the words need it more than
+    // the pattern does.
+    final scaled = media.textScaler.scale(16) / 16;
+    final fraction = scaled > 1.2
+        ? 0.34
+        : compact
+        ? 0.46
+        : 0.52;
+    final bannerHeight = (size.height * fraction).clamp(220.0, 520.0);
 
     return Scaffold(
-      body: Stack(
+      backgroundColor: AppColors.base,
+      body: Column(
         children: [
-          // Background PageView for full-bleed gradient transitions
-          Positioned.fill(
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 600),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: currentSlide.gradientBegin,
-                  end: currentSlide.gradientEnd,
-                  colors: currentSlide.colors,
-                ),
-              ),
-            ),
+          SizedBox(
+            height: bannerHeight,
+            child: _Banner(progress: _intro, compact: compact),
           ),
-
-          // Content PageView
-          SafeArea(
-            child: Column(
-              children: [
-                // Top Skip Button
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 12,
-                  ),
-                  child: Align(
-                    alignment: Alignment.topRight,
-                    child: AnimatedOpacity(
-                      opacity: isLast ? 0.0 : 1.0,
-                      duration: const Duration(milliseconds: 200),
-                      child: IgnorePointer(
-                        ignoring: isLast,
-                        child: TextButton(
-                          onPressed: () {
-                            HapticFeedback.lightImpact();
-                            context.go('/login');
-                          },
+          Expanded(
+            // Centred when it fits, scrollable when it does not. The call to
+            // action is the only thing on this screen worth reaching, so it
+            // must never be the part that falls off the bottom.
+            child: LayoutBuilder(
+              builder: (context, constraints) => SingleChildScrollView(
+                physics: const ClampingScrollPhysics(),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      gutter,
+                      compact ? AppSpacing.md : AppSpacing.xl,
+                      gutter,
+                      compact ? AppSpacing.md : AppSpacing.xl,
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Entrance(
+                          progress: _intro,
+                          start: 0.42,
+                          child: _Headline(compact: compact),
+                        ),
+                        SizedBox(
+                          height: compact ? AppSpacing.xs : AppSpacing.sm,
+                        ),
+                        Entrance(
+                          progress: _intro,
+                          start: 0.50,
                           child: Text(
-                            'Skip',
-                            style: AppTextStyles.subHead(
-                              fontSize: 15,
-                              color: AppColors.textSecondaryDark,
+                            'Order from campus vendors and have it flown to your '
+                            'drop zone.',
+                            textAlign: TextAlign.center,
+                            style: AppTextStyles.body(
+                              fontSize: 14,
+                              color: AppColors.textSecondary,
                             ),
                           ),
                         ),
-                      ),
+                        SizedBox(
+                          height: compact ? AppSpacing.lg : AppSpacing.xxl,
+                        ),
+                        Entrance(
+                          progress: _intro,
+                          start: 0.58,
+                          child: _SlideToStart(onConfirmed: _start),
+                        ),
+                      ],
                     ),
                   ),
                 ),
-
-                // Illustration & Text Slider
-                Expanded(
-                  child: PageView.builder(
-                    controller: _pageController,
-                    onPageChanged: (index) {
-                      setState(() {
-                        _currentPage = index;
-                      });
-                    },
-                    itemCount: slides.length,
-                    itemBuilder: (context, index) {
-                      final slide = slides[index];
-                      return Column(
-                        children: [
-                          // Top 55% space for Illustration
-                          Expanded(
-                            flex: 11,
-                            child: slide
-                                .illustrationBuilder(
-                                  context,
-                                  _radarAnimController,
-                                )
-                                .animate(key: ValueKey('illust_$index'))
-                                .scale(
-                                  duration: 600.ms,
-                                  curve: Curves.elasticOut,
-                                )
-                                .fadeIn(duration: 400.ms),
-                          ),
-                          // Bottom space for Title & Description
-                          Expanded(
-                            flex: 9,
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 32,
-                              ),
-                              child: SingleChildScrollView(
-                                physics: const BouncingScrollPhysics(),
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                          slide.title,
-                                          style: AppTextStyles.display(
-                                            fontSize: isSmallScreen ? 26 : 34,
-                                            letterSpacing: -0.5,
-                                          ),
-                                          textAlign: TextAlign.center,
-                                        )
-                                        .animate(key: ValueKey('title_$index'))
-                                        .fadeIn(duration: 400.ms)
-                                        .slideY(
-                                          begin: 0.2,
-                                          end: 0,
-                                          curve: Curves.easeOutCubic,
-                                        ),
-                                    const SizedBox(height: 12),
-                                    Text(
-                                          slide.description,
-                                          style: AppTextStyles.body(
-                                            fontSize: isSmallScreen ? 13.5 : 15,
-                                            color: AppColors.textSecondaryDark,
-                                            height: 1.5,
-                                          ),
-                                          textAlign: TextAlign.center,
-                                        )
-                                        .animate(key: ValueKey('desc_$index'))
-                                        .fadeIn(delay: 150.ms, duration: 400.ms)
-                                        .slideY(
-                                          begin: 0.2,
-                                          end: 0,
-                                          curve: Curves.easeOutCubic,
-                                        ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      );
-                    },
-                  ),
-                ),
-
-                // Bottom Controls Area
-                Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    24,
-                    8,
-                    24,
-                    isSmallScreen ? 16 : 36,
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Smooth Page Indicator with scale effect
-                      SmoothPageIndicator(
-                        controller: _pageController,
-                        count: slides.length,
-                        effect: const ScaleEffect(
-                          dotColor: AppColors.borderDark,
-                          activeDotColor: AppColors.accent,
-                          dotHeight: 8,
-                          dotWidth: 8,
-                          scale: 1.6,
-                          spacing: 12,
-                        ),
-                      ),
-                      SizedBox(height: isSmallScreen ? 20 : 36),
-                      // Gradient Button CTA
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: GradientButton(
-                          text: isLast ? 'Get Started' : 'Next',
-                          onPressed: _next,
-                          icon: isLast
-                              ? Icons.rocket_launch_rounded
-                              : Icons.arrow_forward_rounded,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         ],
@@ -410,254 +154,525 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   }
 }
 
-class _SlideData {
-  final String title;
-  final String description;
-  final Alignment gradientBegin;
-  final Alignment gradientEnd;
-  final List<Color> colors;
-  final Widget Function(BuildContext, AnimationController) illustrationBuilder;
+// ─── Banner ────────────────────────────────────────────────────────────────
 
-  _SlideData({
-    required this.title,
-    required this.description,
-    required this.gradientBegin,
-    required this.gradientEnd,
-    required this.colors,
-    required this.illustrationBuilder,
-  });
-}
+/// The brand panel: a tiled drone pattern under the app mark, cut off along a
+/// curve so the screen does not read as two stacked rectangles.
+class _Banner extends StatelessWidget {
+  const _Banner({required this.progress, required this.compact});
 
-class _RadarIllustration extends StatelessWidget {
-  final AnimationController animController;
-  final double size;
-
-  const _RadarIllustration({required this.animController, required this.size});
+  final Animation<double> progress;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: SizedBox(
-        width: size,
-        height: size,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            // Outer rotating ring
-            AnimatedBuilder(
-              animation: animController,
-              builder: (_, _) => Transform.rotate(
-                angle: animController.value * 2 * math.pi,
-                child: CustomPaint(
-                  size: Size(size, size),
-                  painter: _DashedCirclePainter(
-                    color: AppColors.primary.withValues(alpha: 0.4),
-                    radius: size / 2 - 10,
-                    dashCount: 16,
+    final settle = CurvedAnimation(
+      parent: progress,
+      curve: const Interval(0, 0.7, curve: Curves.easeOutCubic),
+    );
+
+    return ClipPath(
+      clipper: const _ArcClipper(),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          const DecoratedBox(
+            decoration: BoxDecoration(gradient: AppColors.brandGradient),
+          ),
+          // The pattern is the product's own line art, repeated. Drawn rather
+          // than shipped as an image so it tiles at any size and stays a
+          // single colour at any density.
+          // Its own layer: thirty pieces of vector art that never change,
+          // sitting under a knob that repaints on every frame of a drag.
+          const Positioned.fill(child: RepaintBoundary(child: _DronePattern())),
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+              child: AnimatedBuilder(
+                animation: settle,
+                builder: (context, child) => Transform.translate(
+                  offset: Offset(0, 24 * (1 - settle.value)),
+                  child: Transform.scale(
+                    scale: 0.88 + 0.12 * settle.value,
+                    child: Opacity(opacity: settle.value, child: child),
                   ),
                 ),
+                child: _Lockup(compact: compact),
               ),
             ),
-            // Middle ring
-            Container(
-              width: size * 0.68,
-              height: size * 0.68,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: AppColors.accent.withValues(alpha: 0.25),
-                  width: 1.5,
-                ),
-              ),
-            ),
-            // Scan Sweep
-            AnimatedBuilder(
-              animation: animController,
-              builder: (_, _) => Opacity(
-                opacity: (1 - animController.value).clamp(0.1, 0.65),
-                child: Container(
-                  width: size * 0.66,
-                  height: size * 0.66,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: SweepGradient(
-                      startAngle: 0,
-                      endAngle: animController.value * 2 * math.pi,
-                      colors: [
-                        Colors.transparent,
-                        AppColors.accent.withValues(alpha: 0.3),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            // Core pulsing dot
-            Container(
-              width: size * 0.1,
-              height: size * 0.1,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: AppColors.accentGradient,
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.accent.withValues(alpha: 0.4),
-                    blurRadius: 12,
-                    spreadRadius: 2,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _DashedCirclePainter extends CustomPainter {
-  final Color color;
-  final double radius;
-  final int dashCount;
+/// Cuts the banner's lower edge into a shallow dome.
+class _ArcClipper extends CustomClipper<Path> {
+  const _ArcClipper();
 
-  _DashedCirclePainter({
-    required this.color,
-    required this.radius,
-    required this.dashCount,
-  });
+  /// How far the centre of the curve hangs below its edges.
+  static const double _drop = 56;
 
   @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final paint = Paint()
-      ..color = color
-      ..strokeWidth = 1.5
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
+  Path getClip(Size size) => Path()
+    ..lineTo(0, size.height - _drop)
+    ..quadraticBezierTo(
+      size.width / 2,
+      size.height + _drop,
+      size.width,
+      size.height - _drop,
+    )
+    ..lineTo(size.width, 0)
+    ..close();
 
-    final angleStep = (2 * math.pi) / dashCount;
-    final dashLength = angleStep * 0.4;
+  @override
+  bool shouldReclip(_ArcClipper old) => false;
+}
 
-    for (int i = 0; i < dashCount; i++) {
-      final startAngle = i * angleStep;
-      canvas.drawArc(
-        Rect.fromCircle(center: center, radius: radius),
-        startAngle,
-        dashLength,
-        false,
-        paint,
-      );
-    }
+/// The mark and the wordmark, on the banner.
+class _Lockup extends StatelessWidget {
+  const _Lockup({required this.compact});
+
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        BrandMark(size: compact ? 66 : 84),
+        SizedBox(height: compact ? AppSpacing.sm : AppSpacing.md),
+        Text(
+          'AeroDrop',
+          maxLines: 1,
+          style: AppTextStyles.display(
+            fontSize: compact ? 31 : 40,
+            color: Colors.white,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          'UCLM Drone Delivery System',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: AppTextStyles.label(
+            fontSize: compact ? 10.5 : 11.5,
+            letterSpacing: compact ? 1.1 : 1.6,
+            color: Colors.white.withValues(alpha: 0.82),
+          ),
+        ),
+      ],
+    );
   }
-
-  @override
-  bool shouldRepaint(covariant _DashedCirclePainter old) => false;
 }
 
-class _PropellerWidget extends StatefulWidget {
-  final double size;
-
-  const _PropellerWidget({required this.size});
+/// A field of drones and parcels, tiled behind the lockup.
+class _DronePattern extends StatelessWidget {
+  const _DronePattern();
 
   @override
-  State<_PropellerWidget> createState() => _PropellerWidgetState();
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          const cell = 92.0;
+          final cols = (constraints.maxWidth / cell).ceil() + 1;
+          final rows = (constraints.maxHeight / cell).ceil() + 1;
+
+          return Opacity(
+            // Faint enough to stay a texture. Any louder and it competes with
+            // the mark it is meant to sit behind.
+            opacity: 0.16,
+            child: Stack(
+              children: [
+                for (var r = 0; r < rows; r++)
+                  for (var c = 0; c < cols; c++)
+                    Positioned(
+                      // Every other row is offset half a cell, so the grid
+                      // reads as a pattern rather than as a spreadsheet.
+                      left: c * cell + (r.isOdd ? cell / 2 : 0) - cell / 2,
+                      top: r * cell - cell / 2,
+                      width: cell,
+                      height: cell,
+                      child: Transform.rotate(
+                        angle: ((r * 7 + c * 13) % 5 - 2) * 0.12,
+                        child: Padding(
+                          padding: const EdgeInsets.all(18),
+                          child: SvgPicture.asset(
+                            'assets/svg/drone_delivery.svg',
+                            colorFilter: const ColorFilter.mode(
+                              Colors.white,
+                              BlendMode.srcIn,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
 }
 
-class _PropellerWidgetState extends State<_PropellerWidget>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _spinController;
+// ─── Copy and call to action ───────────────────────────────────────────────
+
+/// Two tones, so the question and the answer read as one line.
+class _Headline extends StatelessWidget {
+  const _Headline({required this.compact});
+
+  final bool compact;
 
   @override
-  void initState() {
-    super.initState();
-    _spinController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 150),
-    )..repeat();
+  Widget build(BuildContext context) {
+    final base = AppTextStyles.display(
+      fontSize: compact ? 27 : 32,
+    ).copyWith(height: 1.15);
+
+    return Text.rich(
+      TextSpan(
+        children: [
+          TextSpan(
+            text: 'Hungry? ',
+            style: base.copyWith(color: AppColors.accentText),
+          ),
+          TextSpan(text: 'We fly it over.', style: base),
+        ],
+      ),
+      textAlign: TextAlign.center,
+    );
+  }
+}
+
+/// The way in: drag the drone across the track to begin.
+///
+/// A slide rather than a tap because this is the one deliberate action on a
+/// screen that has nothing else on it — and because a drag lets the control
+/// show progress while it is happening, which a button cannot.
+///
+/// The knob follows the finger one-to-one and is released to a spring, per the
+/// rule that gesture-driven motion is physics and not a curve: a flick carries
+/// its velocity through the snap instead of having it thrown away and replaced
+/// with a fixed duration.
+class _SlideToStart extends StatefulWidget {
+  const _SlideToStart({required this.onConfirmed});
+
+  final VoidCallback onConfirmed;
+
+  @override
+  State<_SlideToStart> createState() => _SlideToStartState();
+}
+
+class _SlideToStartState extends State<_SlideToStart>
+    with TickerProviderStateMixin {
+  /// Knob position, 0 at rest and 1 at the far end.
+  late final AnimationController _knob = AnimationController(
+    vsync: this,
+    duration: AppMotion.normal,
+  );
+
+  /// Drives the chevrons. Stops once the user starts dragging — the hint has
+  /// done its job and competing with the thing it was pointing at is noise.
+  late final AnimationController _nudge = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1600),
+  );
+
+  /// How far along the user has to get before releasing completes it. Low
+  /// enough that a confident flick lands, high enough that a brush does not.
+  static const double _threshold = 0.55;
+
+  static const double _height = 68;
+  static const double _knobSize = 52;
+  static const double _inset = 8;
+
+  /// A firm, barely-bouncy spring. Overshoot on a control that ends against a
+  /// physical edge reads as a bug, not as personality.
+  static const _spring = SpringDescription(
+    mass: 1,
+    stiffness: 520,
+    damping: 32,
+  );
+
+  bool _dragging = false;
+  bool _done = false;
+  bool _armed = false;
+  double _travel = 1;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_armed) return;
+    _armed = true;
+    if (!MediaQuery.disableAnimationsOf(context)) _nudge.repeat();
   }
 
   @override
   void dispose() {
-    _spinController.dispose();
+    _knob.dispose();
+    _nudge.dispose();
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _spinController,
-      builder: (context, child) {
-        return Transform.rotate(
-          angle: _spinController.value * 2 * math.pi,
-          child: child,
-        );
-      },
-      child: SizedBox(
-        width: widget.size,
-        height: widget.size,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            // Motor Hub
-            Container(
-              width: 4,
-              height: 4,
-              decoration: const BoxDecoration(
-                color: Colors.white30,
-                shape: BoxShape.circle,
-              ),
-            ),
-            // Blades
-            Container(
-              width: widget.size,
-              height: 1.2,
-              decoration: BoxDecoration(
-                color: AppColors.accent.withValues(alpha: 0.35),
-                borderRadius: BorderRadius.circular(1),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+  void _onStart(DragStartDetails _) {
+    if (_done) return;
+    setState(() => _dragging = true);
+    _knob.stop();
+    _nudge.stop();
   }
-}
 
-class _DroneAndTruckIllustration extends StatelessWidget {
-  final AnimationController animController;
-  final double size;
+  void _onUpdate(DragUpdateDetails d) {
+    if (_done) return;
+    _knob.value = (_knob.value + d.primaryDelta! / _travel).clamp(0.0, 1.0);
+  }
 
-  const _DroneAndTruckIllustration({
-    required this.animController,
-    required this.size,
-  });
+  void _onEnd(DragEndDetails d) {
+    if (_done) return;
+    setState(() => _dragging = false);
+
+    // Velocity in track-fractions per second, which is the unit the
+    // controller animates in.
+    final velocity = d.primaryVelocity == null
+        ? 0.0
+        : d.primaryVelocity! / _travel;
+
+    // A hard flick completes even from short of the threshold: the user's
+    // intent is in the speed, not only in the distance.
+    final completes = _knob.value >= _threshold || velocity > 1.4;
+
+    _knob
+        .animateWith(
+          SpringSimulation(_spring, _knob.value, completes ? 1 : 0, velocity),
+        )
+        .whenCompleteOrCancel(() {
+          if (!mounted || !completes || _done) return;
+          _done = true;
+          widget.onConfirmed();
+        });
+
+    if (completes) {
+      HapticFeedback.mediumImpact();
+    } else {
+      HapticFeedback.selectionClick();
+      if (!MediaQuery.disableAnimationsOf(context)) _nudge.repeat();
+    }
+  }
+
+  /// Completes without a drag.
+  ///
+  /// The semantics layer routes here, so the control is operable by anyone who
+  /// cannot make a precise horizontal gesture — a slider that only answers to
+  /// dragging is a locked door for them.
+  void _complete() {
+    if (_done) return;
+    _done = true;
+    HapticFeedback.mediumImpact();
+    _knob
+        .animateWith(SpringSimulation(_spring, _knob.value, 1, 0))
+        .whenCompleteOrCancel(() {
+          if (mounted) widget.onConfirmed();
+        });
+  }
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: size,
-      height: size,
-      child: AnimatedBuilder(
-        animation: animController,
-        builder: (context, child) {
-          // Floating hovering animation
-          final floatOffset = Offset(
-            0,
-            -12 * math.sin(animController.value * 2 * math.pi),
-          );
-          return Transform.translate(
-            offset: floatOffset,
-            child: CustomPaint(
-              size: Size(size, size),
-              painter: DroneSvgPainter(
-                animationValue: animController.value,
-                lineColor: Colors.white,
-                accentColor: const Color(0xFF4F46E5),
+    return Semantics(
+      button: true,
+      label: 'Get started',
+      hint: 'Swipe right, or double tap to continue',
+      excludeSemantics: true,
+      onTap: _complete,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          _travel = math.max(1, constraints.maxWidth - _inset * 2 - _knobSize);
+
+          return GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onHorizontalDragStart: _onStart,
+            onHorizontalDragUpdate: _onUpdate,
+            onHorizontalDragEnd: _onEnd,
+            child: SizedBox(
+              height: _height,
+              child: AnimatedBuilder(
+                animation: _knob,
+                builder: (context, _) {
+                  final t = _knob.value;
+                  return Stack(
+                    children: [
+                      Positioned.fill(child: _Track(progress: t)),
+                      Positioned.fill(
+                        child: IgnorePointer(
+                          child: _Label(progress: t, nudge: _nudge),
+                        ),
+                      ),
+                      Positioned(
+                        left: _inset + t * _travel,
+                        top: (_height - _knobSize) / 2,
+                        child: _Knob(size: _knobSize, pressed: _dragging),
+                      ),
+                    ],
+                  );
+                },
               ),
             ),
           );
         },
       ),
+    );
+  }
+}
+
+/// The groove, with the distance already covered filled in behind the knob.
+class _Track extends StatelessWidget {
+  const _Track({required this.progress});
+
+  final double progress;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.base,
+        borderRadius: AppRadii.brPill,
+        border: Border.all(color: AppColors.border),
+        boxShadow: AppShadows.raised(NeuDepth.medium),
+      ),
+      child: ClipRRect(
+        borderRadius: AppRadii.brPill,
+        child: Align(
+          alignment: Alignment.centerLeft,
+          // Width, not a transform: the fill is a measurement of how far the
+          // user has got, and a scaled rounded rect would distort its ends.
+          widthFactor: progress.clamp(0.0, 1.0),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: AppColors.accentFill.withValues(alpha: 0.18),
+            ),
+            child: const SizedBox.expand(),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The label and the chevrons, both giving way as the knob advances.
+class _Label extends StatelessWidget {
+  const _Label({required this.progress, required this.nudge});
+
+  final double progress;
+  final Animation<double> nudge;
+
+  @override
+  Widget build(BuildContext context) {
+    // Clears early rather than at the end, so the knob is never sitting on
+    // top of the words it is covering.
+    final fade = (1 - progress * 1.8).clamp(0.0, 1.0);
+
+    return Opacity(
+      opacity: fade,
+      child: Row(
+        children: [
+          const SizedBox(width: _SlideToStartState._knobSize + 18),
+          Expanded(
+            child: Text(
+              'Get Started',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.title(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ),
+          _Chevrons(progress: nudge),
+          const SizedBox(width: AppSpacing.md),
+        ],
+      ),
+    );
+  }
+}
+
+/// The drone the user pushes across the track.
+class _Knob extends StatelessWidget {
+  const _Knob({required this.size, required this.pressed});
+
+  final double size;
+  final bool pressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedScale(
+      scale: pressed ? 1.06 : 1,
+      duration: AppMotion.instant,
+      curve: AppMotion.standard,
+      child: Container(
+        width: size,
+        height: size,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: AppColors.accentFill,
+          shape: BoxShape.circle,
+          boxShadow: [
+            ...AppShadows.raised(NeuDepth.low),
+            ...AppShadows.glow(AppColors.accentFill, alpha: 0.30),
+          ],
+        ),
+        child: Padding(
+          padding: EdgeInsets.all(size * 0.22),
+          child: RepaintBoundary(
+            child: SvgPicture.asset(
+              'assets/svg/drone_delivery.svg',
+              colorFilter: ColorFilter.mode(
+                AppColors.onAccentFill,
+                BlendMode.srcIn,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Three chevrons brightening in sequence, left to right.
+class _Chevrons extends StatelessWidget {
+  const _Chevrons({required this.progress});
+
+  final Animation<double> progress;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: progress,
+      builder: (context, _) {
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (var i = 0; i < 3; i++)
+              Icon(
+                Icons.chevron_right_rounded,
+                size: 20,
+                // A travelling wave: each chevron peaks a third of a cycle
+                // after the one before it.
+                color: AppColors.accentText.withValues(
+                  alpha:
+                      0.25 +
+                      0.75 *
+                          math.max(
+                            0,
+                            math.sin((progress.value - i * 0.14) * 2 * math.pi),
+                          ),
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 }

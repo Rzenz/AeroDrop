@@ -53,15 +53,16 @@ class PasswordStrengthIndicator extends StatelessWidget {
               'Password Strength:',
               style: AppTextStyles.body(
                 fontSize: 12,
-                color: AppColors.textSecondaryDark,
+                color: AppColors.textSecondary,
               ),
             ),
             Text(
               strengthText,
-              style: TextStyle(
+              style: AppTextStyles.label(
                 fontSize: 12,
-                fontWeight: FontWeight.bold,
                 color: barColor,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 0,
               ),
             ),
           ],
@@ -71,7 +72,7 @@ class PasswordStrengthIndicator extends StatelessWidget {
           borderRadius: BorderRadius.circular(4),
           child: LinearProgressIndicator(
             value: progress,
-            backgroundColor: AppColors.borderDark,
+            backgroundColor: AppColors.border,
             valueColor: AlwaysStoppedAnimation<Color>(barColor),
             minHeight: 6,
           ),
@@ -115,7 +116,7 @@ class _RequirementRow extends StatelessWidget {
           met
               ? Icons.check_circle_rounded
               : Icons.radio_button_unchecked_rounded,
-          color: met ? AppColors.success : AppColors.textSecondaryDark,
+          color: met ? AppColors.success : AppColors.textSecondary,
           size: 14,
         ),
         const SizedBox(width: 8),
@@ -124,7 +125,7 @@ class _RequirementRow extends StatelessWidget {
             label,
             style: TextStyle(
               fontSize: 11.5,
-              color: met ? Colors.white : AppColors.textSecondaryDark,
+              color: met ? Colors.white : AppColors.textSecondary,
               decoration: met ? TextDecoration.lineThrough : null,
             ),
           ),

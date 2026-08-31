@@ -4,9 +4,10 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
-import '../../core/widgets/gradient_button.dart';
-import '../../core/widgets/custom_text_field.dart';
-import '../../core/widgets/glass_card.dart';
+import '../../core/widgets/neu_button.dart';
+import '../../core/widgets/neu_text_field.dart';
+import '../../core/widgets/neu_card.dart';
+import '../../core/widgets/neu_back_button.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -58,41 +59,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.bgDark,
+      backgroundColor: AppColors.base,
       body: Stack(
         children: [
-          // Background Radial Glow
-          Positioned.fill(
-            child: Container(
-              decoration: const BoxDecoration(
-                gradient: RadialGradient(
-                  center: Alignment(0.3, -0.2),
-                  radius: 0.8,
-                  colors: [Color(0xFF102847), AppColors.bgDark],
-                ),
-              ),
-            ),
-          ),
-
-          // Ambient yellow glow in top-left
-          Positioned(
-            top: -60,
-            left: -60,
-            child: Container(
-              width: 260,
-              height: 260,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    AppColors.accent.withValues(alpha: 0.08),
-                    Colors.transparent,
-                  ],
-                ),
-              ),
-            ),
-          ),
-
           SafeArea(
             child: SingleChildScrollView(
               physics: const BouncingScrollPhysics(),
@@ -103,28 +72,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                   // Back button
                   Align(
                     alignment: Alignment.topLeft,
-                    child: GestureDetector(
-                      onTap: () {
+                    child: NeuBackButton(
+                      onPressed: () {
                         HapticFeedback.lightImpact();
                         context.pop();
                       },
-                      child: Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: AppColors.cardDark.withValues(alpha: 0.8),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(
-                            color: AppColors.borderDark,
-                            width: 1.5,
-                          ),
-                        ),
-                        child: const Icon(
-                          Icons.arrow_back_ios_new_rounded,
-                          color: Colors.white,
-                          size: 16,
-                        ),
-                      ),
                     ),
                   ).animate().fadeIn().scale(begin: const Offset(0.8, 0.8)),
 
@@ -154,10 +106,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                           child: child,
                         );
                       },
-                      child: const Icon(
+                      child: Icon(
                         Icons.lock_reset_rounded,
                         size: 38,
-                        color: Colors.white,
+                        color: AppColors.textPrimary,
                       ),
                     ),
                   ).animate().scale(curve: Curves.elasticOut, duration: 600.ms),
@@ -177,29 +129,22 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                       "Verify your university credentials below to receive a secure recovery link.",
                       style: AppTextStyles.body(
                         fontSize: 14.5,
-                        color: AppColors.textSecondaryDark,
+                        color: AppColors.textSecondary,
                         height: 1.5,
                       ),
                       textAlign: TextAlign.center,
                     ),
                   ).animate().fadeIn(delay: 250.ms),
                   const SizedBox(height: 36),
-                  GlassCard(
+                  NeuCard(
                     padding: const EdgeInsets.all(24),
                     borderRadius: BorderRadius.circular(28),
-                    borderGradient: const LinearGradient(
-                      colors: [
-                        AppColors.accent,
-                        AppColors.primary,
-                        Colors.transparent,
-                      ],
-                      stops: [0.0, 0.5, 1.0],
-                    ),
+                    accent: AppColors.accent,
                     child: Form(
                       key: _formKey,
                       child: Column(
                         children: [
-                          CustomTextField(
+                          NeuTextField(
                             labelText: 'Email',
                             hintText: 'yourname@email.com',
                             prefixIcon: Icons.email_outlined,
@@ -211,7 +156,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                                 : null,
                           ),
                           const SizedBox(height: 24),
-                          GradientButton(
+                          NeuButton(
                             text: 'Request Link',
                             isLoading: _loading,
                             onPressed: _handleSubmit,

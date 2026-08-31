@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
+import '../../core/widgets/custom_app_bar.dart';
+import '../../core/widgets/neu_feedback.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
-import '../../core/widgets/glass_card.dart';
+import '../../core/widgets/neu_card.dart';
 import '../../mock_data/cart_mock.dart';
 import '../../core/providers/product_provider.dart';
 
@@ -18,31 +20,34 @@ class CartScreen extends ConsumerWidget {
       valueListenable: cartNotifier,
       builder: (context, cart, _) {
         return Scaffold(
-          backgroundColor: AppColors.bgDark,
-          appBar: AppBar(
-            backgroundColor: AppColors.bgDark,
-            elevation: 0,
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-              onPressed: () => context.pop(),
-            ),
-            title: Text(
-              'Cart',
-              style: AppTextStyles.subHead(fontSize: 18, color: Colors.white),
-            ),
-            actions: [
-              if (cart.isNotEmpty)
-                TextButton(
-                  onPressed: () {
-                    HapticFeedback.mediumImpact();
-                    cartNotifier.clear();
-                  },
-                  child: const Text(
-                    'Clear all',
-                    style: TextStyle(color: AppColors.danger),
+          backgroundColor: AppColors.base,
+          appBar: CustomAppBar(
+            title: 'Cart',
+            action: cart.isEmpty
+                ? null
+                : TextButton(
+                    onPressed: () async {
+                      final ok = await showNeuConfirm(
+                        context,
+                        title: 'Clear your cart?',
+                        message:
+                            'This removes every item. It cannot be undone.',
+                        confirmLabel: 'Clear cart',
+                        destructive: true,
+                        icon: Icons.remove_shopping_cart_rounded,
+                      );
+                      if (!ok) return;
+                      HapticFeedback.mediumImpact();
+                      cartNotifier.clear();
+                    },
+                    child: Text(
+                      'Clear all',
+                      style: AppTextStyles.label(
+                        fontSize: 13,
+                        color: AppColors.danger,
+                      ),
+                    ),
                   ),
-                ),
-            ],
           ),
           body: cart.isEmpty
               ? _EmptyCart(onShop: () => context.go('/user/shop'))
@@ -78,22 +83,25 @@ class _EmptyCart extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(
+          Icon(
             Icons.shopping_cart_outlined,
-            color: AppColors.textSecondaryDark,
+            color: AppColors.textSecondary,
             size: 72,
           ),
           const SizedBox(height: 16),
           Text(
             'Your cart is empty',
-            style: AppTextStyles.subHead(fontSize: 18, color: Colors.white),
+            style: AppTextStyles.subHead(
+              fontSize: 18,
+              color: AppColors.textPrimary,
+            ),
           ),
           const SizedBox(height: 8),
           Text(
             'Browse vendors and add items to order.',
             style: AppTextStyles.body(
               fontSize: 13,
-              color: AppColors.textSecondaryDark,
+              color: AppColors.textSecondary,
             ),
           ),
           const SizedBox(height: 24),
@@ -143,7 +151,7 @@ class _CartItemCard extends StatelessWidget {
       },
       child: Padding(
         padding: const EdgeInsets.only(bottom: 12),
-        child: GlassCard(
+        child: NeuCard(
           padding: const EdgeInsets.all(14),
           child: Row(
             children: [
@@ -158,10 +166,10 @@ class _CartItemCard extends StatelessWidget {
                   errorBuilder: (_, _, _) => Container(
                     width: 64,
                     height: 64,
-                    color: AppColors.cardDark2,
-                    child: const Icon(
+                    color: AppColors.surfaceRaised,
+                    child: Icon(
                       Icons.image_outlined,
-                      color: AppColors.textSecondaryDark,
+                      color: AppColors.textSecondary,
                       size: 24,
                     ),
                   ),
@@ -179,7 +187,7 @@ class _CartItemCard extends StatelessWidget {
                       style: AppTextStyles.body(
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                        color: AppColors.textPrimary,
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
@@ -189,16 +197,16 @@ class _CartItemCard extends StatelessWidget {
                       item.vendorName,
                       style: AppTextStyles.body(
                         fontSize: 11,
-                        color: AppColors.textSecondaryDark,
+                        color: AppColors.textSecondary,
                       ),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       '₱${item.subtotal.toStringAsFixed(2)}',
-                      style: const TextStyle(
+                      style: AppTextStyles.subHead(
+                        fontSize: 15,
                         color: AppColors.accent,
                         fontWeight: FontWeight.bold,
-                        fontSize: 15,
                       ),
                     ),
                   ],
@@ -217,7 +225,7 @@ class _CartItemCard extends StatelessWidget {
                     '${item.quantity}',
                     style: AppTextStyles.subHead(
                       fontSize: 15,
-                      color: Colors.white,
+                      color: AppColors.textPrimary,
                     ),
                   ),
                   const SizedBox(height: 6),
@@ -286,9 +294,9 @@ class _CartSummary extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
       decoration: BoxDecoration(
-        color: AppColors.cardDark,
+        color: AppColors.base,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        border: Border.all(color: AppColors.borderDark),
+        border: Border.all(color: AppColors.border),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.3),
@@ -306,12 +314,15 @@ class _CartSummary extends ConsumerWidget {
                 'Items ($totalItems)',
                 style: AppTextStyles.body(
                   fontSize: 13,
-                  color: AppColors.textSecondaryDark,
+                  color: AppColors.textSecondary,
                 ),
               ),
               Text(
                 '₱${totalAmount.toStringAsFixed(2)}',
-                style: AppTextStyles.body(fontSize: 13, color: Colors.white),
+                style: AppTextStyles.body(
+                  fontSize: 13,
+                  color: AppColors.textPrimary,
+                ),
               ),
             ],
           ),
@@ -323,31 +334,36 @@ class _CartSummary extends ConsumerWidget {
                 'Drone Delivery',
                 style: AppTextStyles.body(
                   fontSize: 13,
-                  color: AppColors.textSecondaryDark,
+                  color: AppColors.textSecondary,
                 ),
               ),
-              const Text(
+              Text(
                 '₱20.00',
-                style: TextStyle(color: Colors.white, fontSize: 13),
+                style: AppTextStyles.body(
+                  fontSize: 13,
+                  color: AppColors.textPrimary,
+                ),
               ),
             ],
           ),
           const SizedBox(height: 10),
-          const Divider(color: AppColors.borderDark),
+          Divider(color: AppColors.border),
           const SizedBox(height: 10),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
                 'Total',
-                style: AppTextStyles.subHead(fontSize: 16, color: Colors.white),
+                style: AppTextStyles.subHead(
+                  fontSize: 16,
+                  color: AppColors.textPrimary,
+                ),
               ),
               Text(
                 '₱${grandTotal.toStringAsFixed(2)}',
-                style: const TextStyle(
-                  color: AppColors.accent,
-                  fontWeight: FontWeight.bold,
+                style: AppTextStyles.heading(
                   fontSize: 20,
+                  color: AppColors.accent,
                 ),
               ),
             ],
@@ -368,7 +384,9 @@ class _CartSummary extends ConsumerWidget {
                   if (match != null) {
                     if (!match.isAvailable || match.stock <= 0) {
                       cartNotifier.removeItem(item.productId);
-                      removedOrFlagged.add('${item.productName} (out of stock)');
+                      removedOrFlagged.add(
+                        '${item.productName} (out of stock)',
+                      );
                     } else {
                       // Update price if changed
                       if (item.unitPrice != match.price) {
@@ -387,25 +405,19 @@ class _CartSummary extends ConsumerWidget {
               }
 
               if (removedOrFlagged.isNotEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'Cart updated: ${removedOrFlagged.join(", ")}',
-                    ),
-                    backgroundColor: AppColors.info,
-                    behavior: SnackBarBehavior.floating,
-                  ),
+                showNeuSnack(
+                  context,
+                  'Cart updated: ${removedOrFlagged.join(", ")}',
+                  tone: NeuToneKind.info,
                 );
                 return; // Let user review changes before proceeding
               }
 
               if (cart.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Your cart is empty.'),
-                    backgroundColor: AppColors.warning,
-                    behavior: SnackBarBehavior.floating,
-                  ),
+                showNeuSnack(
+                  context,
+                  'Your cart is empty.',
+                  tone: NeuToneKind.warning,
                 );
                 return;
               }
@@ -420,9 +432,12 @@ class _CartSummary extends ConsumerWidget {
                 borderRadius: BorderRadius.circular(16),
               ),
             ),
-            child: const Text(
+            child: Text(
               'Proceed to Checkout',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              style: AppTextStyles.subHead(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         ],

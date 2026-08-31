@@ -10,6 +10,7 @@ import 'auth_guard.dart';
 import '../../features/auth/splash_screen.dart';
 import '../../features/auth/onboarding_screen.dart';
 import '../../features/auth/login_screen.dart';
+import '../../features/auth/welcome_screen.dart';
 import '../../features/auth/register_screen.dart';
 import '../../features/auth/forgot_password_screen.dart';
 import '../../features/auth/otp_email_sent_screen.dart';
@@ -56,6 +57,7 @@ import '../../features/cart/cart_screen.dart';
 import '../../features/cart/checkout_screen.dart';
 import '../../features/orders/orders_screen.dart';
 import '../../features/orders/order_details_screen.dart';
+import '../../features/orders/receipt_screen.dart';
 import '../../features/payment/payment_screen.dart';
 
 // Vendor
@@ -85,6 +87,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           state.uri.path == '/register' ||
           state.uri.path == '/forgot-password' ||
           state.uri.path == '/onboarding' ||
+          state.uri.path == '/welcome' ||
           state.uri.path == '/splash';
 
       if (!isLoggedIn) {
@@ -146,8 +149,15 @@ final routerProvider = Provider<GoRouter>((ref) {
         pageBuilder: (context, state) => _fade(state, const OnboardingScreen()),
       ),
       GoRoute(
+        path: '/welcome',
+        pageBuilder: (context, state) => _fade(state, const WelcomeScreen()),
+      ),
+      GoRoute(
         path: '/login',
-        pageBuilder: (context, state) => _fade(state, const LoginScreen()),
+        pageBuilder: (context, state) => _fade(
+          state,
+          LoginScreen(asVendor: state.uri.queryParameters['role'] == 'vendor'),
+        ),
       ),
       GoRoute(
         path: '/register',
@@ -244,6 +254,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/user/checkout',
         pageBuilder: (context, state) => _slide(state, const CheckoutScreen()),
+      ),
+      GoRoute(
+        path: '/user/receipt',
+        pageBuilder: (context, state) =>
+            _fade(state, ReceiptScreen(data: state.extra! as ReceiptData)),
       ),
       GoRoute(
         path: '/user/orders/:id',

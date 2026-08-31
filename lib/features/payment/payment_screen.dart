@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
+import '../../core/widgets/neu_feedback.dart';
+import '../../core/widgets/custom_app_bar.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
-import '../../core/widgets/glass_card.dart';
+import '../../core/widgets/neu_card.dart';
 import '../../core/models/order_model.dart';
 import '../../core/providers/order_provider.dart';
 import '../../core/services/supabase_service.dart';
@@ -95,22 +97,16 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Scaffold(
-        backgroundColor: AppColors.bgDark,
+      return Scaffold(
+        backgroundColor: AppColors.base,
         body: Center(child: CircularProgressIndicator(color: AppColors.accent)),
       );
     }
 
     if (_error != null || _order == null) {
       return Scaffold(
-        backgroundColor: AppColors.bgDark,
-        appBar: AppBar(
-          backgroundColor: AppColors.bgDark,
-          title: const Text(
-            'Payment Error',
-            style: TextStyle(color: Colors.white),
-          ),
-        ),
+        backgroundColor: AppColors.base,
+        appBar: CustomAppBar(title: 'Payment Error'),
         body: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -123,13 +119,13 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
               const SizedBox(height: 16),
               Text(
                 _error ?? 'Unable to find order.',
-                style: const TextStyle(color: Colors.white70),
+                style: AppTextStyles.body(color: AppColors.textSecondary),
               ),
               const SizedBox(height: 24),
               ElevatedButton(
                 onPressed: _loadOrderDetails,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.cardDark,
+                  backgroundColor: AppColors.base,
                 ),
                 child: const Text('Retry'),
               ),
@@ -142,19 +138,8 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     final order = _order!;
 
     return Scaffold(
-      backgroundColor: AppColors.bgDark,
-      appBar: AppBar(
-        backgroundColor: AppColors.bgDark,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-          onPressed: () => context.pop(),
-        ),
-        title: Text(
-          'Payment',
-          style: AppTextStyles.subHead(fontSize: 18, color: Colors.white),
-        ),
-      ),
+      backgroundColor: AppColors.base,
+      appBar: CustomAppBar(title: 'Payment'),
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
@@ -162,11 +147,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
           Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF1565C0), Color(0xFF0D1B2A)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
+              color: AppColors.base,
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
@@ -177,9 +158,9 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
             ),
             child: Column(
               children: [
-                const Icon(
+                Icon(
                   Icons.flight_rounded,
-                  color: Colors.white70,
+                  color: AppColors.textSecondary,
                   size: 28,
                 ),
                 const SizedBox(height: 8),
@@ -187,7 +168,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                   'Total Amount',
                   style: AppTextStyles.body(
                     fontSize: 13,
-                    color: Colors.white60,
+                    color: AppColors.textSecondary,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -203,7 +184,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                   'AD-${order.id.substring(0, 8).toUpperCase()}',
                   style: AppTextStyles.body(
                     fontSize: 12,
-                    color: Colors.white54,
+                    color: AppColors.textSecondary,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -250,12 +231,12 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(color: AppColors.warning),
                     ),
-                    child: const Text(
+                    child: Text(
                       'AWAITING PAYMENT',
-                      style: TextStyle(
+                      style: AppTextStyles.label(
+                        fontSize: 12,
                         color: AppColors.warning,
                         fontWeight: FontWeight.bold,
-                        fontSize: 12,
                         letterSpacing: 1.5,
                       ),
                     ),
@@ -269,7 +250,10 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
           if (!_paid) ...[
             Text(
               'Select Payment Method',
-              style: AppTextStyles.subHead(fontSize: 15, color: Colors.white),
+              style: AppTextStyles.subHead(
+                fontSize: 15,
+                color: AppColors.textPrimary,
+              ),
             ),
             const SizedBox(height: 12),
             _MethodCard(
@@ -321,11 +305,11 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                         color: AppColors.bgDark,
                       ),
                     )
-                  : const Text(
+                  : Text(
                       'Confirm Payment',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
+                      style: AppTextStyles.subHead(
                         fontSize: 16,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
             ).animate().fadeIn(delay: 200.ms),
@@ -371,12 +355,10 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _processing = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Payment transaction failed: $e'),
-            backgroundColor: AppColors.danger,
-            behavior: SnackBarBehavior.floating,
-          ),
+        showNeuSnack(
+          context,
+          'Payment transaction failed: $e',
+          tone: NeuToneKind.error,
         );
       }
     }
@@ -410,10 +392,10 @@ class _MethodCard extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: selected ? color.withValues(alpha: 0.1) : AppColors.cardDark,
+          color: selected ? color.withValues(alpha: 0.1) : AppColors.base,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: selected ? color : AppColors.borderDark,
+            color: selected ? color : AppColors.border,
             width: selected ? 1.5 : 1,
           ),
         ),
@@ -434,17 +416,17 @@ class _MethodCard extends StatelessWidget {
                 children: [
                   Text(
                     label,
-                    style: TextStyle(
+                    style: AppTextStyles.subHead(
+                      fontSize: 14,
                       color: selected ? Colors.white : Colors.white70,
                       fontWeight: FontWeight.bold,
-                      fontSize: 14,
                     ),
                   ),
                   Text(
                     subtitle,
                     style: AppTextStyles.body(
                       fontSize: 11,
-                      color: AppColors.textSecondaryDark,
+                      color: AppColors.textSecondary,
                     ),
                   ),
                 ],
@@ -472,7 +454,7 @@ class _Receipt extends StatelessWidget {
       _ => 'Credit / Debit Card',
     };
 
-    return GlassCard(
+    return NeuCard(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -487,7 +469,10 @@ class _Receipt extends StatelessWidget {
               const SizedBox(width: 8),
               Text(
                 'Payment Receipt',
-                style: AppTextStyles.subHead(fontSize: 14, color: Colors.white),
+                style: AppTextStyles.subHead(
+                  fontSize: 14,
+                  color: AppColors.textPrimary,
+                ),
               ),
             ],
           ),
@@ -502,7 +487,7 @@ class _Receipt extends StatelessWidget {
           ),
           _receiptRow('Payment Method', methodLabel),
           _receiptRow('Vendor', order.vendorName),
-          const Divider(color: AppColors.borderDark, height: 24),
+          Divider(color: AppColors.border, height: 24),
           _receiptRow(
             'Total Paid',
             '₱${order.totalAmount.toStringAsFixed(2)}',
@@ -541,9 +526,9 @@ class _Receipt extends StatelessWidget {
         children: [
           Text(
             label,
-            style: const TextStyle(
-              color: AppColors.textSecondaryDark,
+            style: AppTextStyles.caption(
               fontSize: 12,
+              color: AppColors.textSecondary,
             ),
           ),
           Text(

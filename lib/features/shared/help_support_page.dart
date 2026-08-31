@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
-import '../../core/widgets/glass_card.dart';
+import '../../core/widgets/neu_card.dart';
+import '../../core/widgets/neu_back_button.dart';
 
 class HelpSupportPage extends StatelessWidget {
   const HelpSupportPage({super.key});
@@ -29,7 +29,7 @@ class HelpSupportPage extends StatelessWidget {
     ];
 
     return Scaffold(
-      backgroundColor: AppColors.bgDark,
+      backgroundColor: AppColors.base,
       body: Container(
         decoration: const BoxDecoration(gradient: AppColors.bgGradientDark),
         child: SafeArea(
@@ -41,29 +41,14 @@ class HelpSupportPage extends StatelessWidget {
                 // Header
                 Row(
                   children: [
-                    GestureDetector(
-                      onTap: () => context.pop(),
-                      child: Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: AppColors.cardDark,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.borderDark),
-                        ),
-                        child: const Icon(
-                          Icons.arrow_back_rounded,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                      ),
-                    ),
+                    const NeuBackButton(),
                     const SizedBox(width: 16),
                     Text(
                       'Help & Campus Support',
                       style: AppTextStyles.title(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                        color: AppColors.textPrimary,
                       ),
                     ),
                   ],
@@ -81,14 +66,14 @@ class HelpSupportPage extends StatelessWidget {
                           style: AppTextStyles.title(
                             fontSize: 15,
                             fontWeight: FontWeight.bold,
-                            color: Colors.white,
+                            color: AppColors.textPrimary,
                           ),
                         ),
                         const SizedBox(height: 12),
                         ...faqs.asMap().entries.map((e) {
                           return Container(
                                 margin: const EdgeInsets.only(bottom: 12),
-                                child: GlassCard(
+                                child: NeuCard(
                                   padding: const EdgeInsets.all(16),
                                   child: Column(
                                     crossAxisAlignment:
@@ -107,7 +92,7 @@ class HelpSupportPage extends StatelessWidget {
                                         e.value['a']!,
                                         style: AppTextStyles.body(
                                           fontSize: 12,
-                                          color: AppColors.textSecondaryDark,
+                                          color: AppColors.textSecondary,
                                         ),
                                       ),
                                     ],
@@ -128,11 +113,11 @@ class HelpSupportPage extends StatelessWidget {
                           style: AppTextStyles.title(
                             fontSize: 15,
                             fontWeight: FontWeight.bold,
-                            color: Colors.white,
+                            color: AppColors.textPrimary,
                           ),
                         ),
                         const SizedBox(height: 12),
-                        GlassCard(
+                        NeuCard(
                           padding: const EdgeInsets.all(16),
                           child: Column(
                             children: [
@@ -140,10 +125,7 @@ class HelpSupportPage extends StatelessWidget {
                                 Icons.mail_outline_rounded,
                                 'aerodrop.fleet.support@gmail.com',
                               ),
-                              const Divider(
-                                color: AppColors.borderDark,
-                                height: 24,
-                              ),
+                              Divider(color: AppColors.border, height: 24),
                               _buildContactRow(
                                 Icons.phone_outlined,
                                 'Local Campus Tel: +63 32 400 9011',
@@ -168,7 +150,10 @@ class HelpSupportPage extends StatelessWidget {
       children: [
         Icon(icon, color: AppColors.primary, size: 20),
         const SizedBox(width: 12),
-        Text(text, style: const TextStyle(color: Colors.white, fontSize: 13)),
+        Text(
+          text,
+          style: AppTextStyles.body(fontSize: 13, color: AppColors.textPrimary),
+        ),
       ],
     );
   }

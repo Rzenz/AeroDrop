@@ -1,7 +1,16 @@
 import 'package:flutter/material.dart';
-import '../theme/app_colors.dart';
-import '../theme/app_theme.dart';
 
+import '../theme/app_colors.dart';
+import '../theme/app_radii.dart';
+import '../theme/app_spacing.dart';
+import '../theme/app_text_styles.dart';
+import 'neu_button.dart';
+import 'neu_surface.dart';
+
+/// Shared warning / advisory dialog.
+///
+/// The illustrative icon sits in a debossed well tinted by its own colour, so
+/// severity is legible before the text is read.
 void showAeroDropWarningDialog({
   required BuildContext context,
   required String title,
@@ -13,58 +22,69 @@ void showAeroDropWarningDialog({
 }) {
   showDialog(
     context: context,
-    builder: (dialogContext) {
-      final isDark = AppTheme.isDarkMode;
-      return AlertDialog(
-        backgroundColor: isDark ? AppColors.cardDark : AppColors.cardLight,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: Row(
-          children: [
-            Icon(icon, color: iconColor, size: 28),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                title,
-                style: TextStyle(
-                  color: isDark ? Colors.white : AppColors.textPrimaryLight,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                ),
-              ),
+    builder: (dialogContext) => AlertDialog(
+      backgroundColor: AppColors.base,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      shape: const RoundedRectangleBorder(borderRadius: AppRadii.brXl),
+      titlePadding: const EdgeInsets.fromLTRB(
+        AppSpacing.lg,
+        AppSpacing.lg,
+        AppSpacing.lg,
+        AppSpacing.sm,
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+      actionsPadding: const EdgeInsets.fromLTRB(
+        AppSpacing.lg,
+        AppSpacing.md,
+        AppSpacing.lg,
+        AppSpacing.md,
+      ),
+      title: Row(
+        children: [
+          Icon(icon, color: iconColor, size: 24),
+          const SizedBox(width: AppSpacing.xs),
+          Expanded(
+            child: Text(title, style: AppTextStyles.heading(fontSize: 18)),
+          ),
+        ],
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            message,
+            style: AppTextStyles.body(
+              fontSize: 14,
+              color: AppColors.textSecondary,
             ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              message,
-              style: TextStyle(
-                color: isDark ? Colors.white70 : AppColors.textSecondaryLight,
-                fontSize: 14,
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Center(
+            child: NeuSurface(
+              style: NeuStyle.inset,
+              depth: NeuDepth.medium,
+              width: 76,
+              height: 76,
+              alignment: Alignment.center,
+              borderRadius: BorderRadius.circular(38),
+              color: Color.alphaBlend(
+                centerIconColor.withValues(alpha: 0.12),
+                AppColors.surfaceSunken,
               ),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [Icon(centerIcon, color: centerIconColor, size: 48)],
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text(
-              'OK',
-              style: TextStyle(
-                color: AppColors.accent,
-                fontWeight: FontWeight.bold,
-              ),
+              child: Icon(centerIcon, color: centerIconColor, size: 34),
             ),
           ),
         ],
-      );
-    },
+      ),
+      actions: [
+        NeuButton(
+          text: 'OK',
+          height: 46,
+          onPressed: () => Navigator.of(dialogContext).pop(),
+        ),
+      ],
+    ),
   );
 }

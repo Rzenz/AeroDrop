@@ -4,8 +4,14 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'widgets/aerodrop_bottom_navigation.dart';
+import '../../mock_data/cart_mock.dart';
 import '../../core/services/supabase_service.dart';
 import '../../core/providers/auth_provider.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_radii.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_text_styles.dart';
+import '../../core/widgets/neu_button.dart';
 
 class UserShell extends ConsumerStatefulWidget {
   final Widget child;
@@ -103,23 +109,21 @@ class _UserShellState extends ConsumerState<UserShell>
           builder: (dialogContext) => PopScope(
             canPop: false,
             child: AlertDialog(
-              backgroundColor: const Color(0xFF132031),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
-              ),
+              backgroundColor: AppColors.base,
+              surfaceTintColor: Colors.transparent,
+              shape: const RoundedRectangleBorder(borderRadius: AppRadii.brXl),
               title: Row(
                 children: [
                   const Icon(
                     Icons.error_outline_rounded,
-                    color: Colors.redAccent,
-                    size: 28,
+                    color: AppColors.danger,
+                    size: 26,
                   ),
-                  const SizedBox(width: 12),
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: AppTextStyles.heading(fontSize: 18),
                     ),
                   ),
                 ],
@@ -130,27 +134,33 @@ class _UserShellState extends ConsumerState<UserShell>
                 children: [
                   Text(
                     baseMsg,
-                    style: const TextStyle(color: Colors.white70, fontSize: 14),
+                    style: AppTextStyles.body(
+                      fontSize: 14,
+                      color: AppColors.textSecondary,
+                    ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: AppSpacing.sm),
                   Text(
                     'Reason: $reason',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
+                    style: AppTextStyles.body(
                       fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
                     ),
                   ),
                 ],
               ),
+              actionsPadding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                0,
+                AppSpacing.lg,
+                AppSpacing.md,
+              ),
               actions: [
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.redAccent,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
+                NeuButton(
+                  text: 'Log Out',
+                  variant: NeuButtonVariant.danger,
+                  icon: Icons.logout_rounded,
                   onPressed: () {
                     // Close dialog
                     Navigator.of(dialogContext).pop();
@@ -161,13 +171,6 @@ class _UserShellState extends ConsumerState<UserShell>
                     // Go to login screen safely
                     context.go('/login');
                   },
-                  child: const Text(
-                    'Log Out',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
                 ),
               ],
             ),
@@ -226,14 +229,20 @@ class _UserShellState extends ConsumerState<UserShell>
         bottom: true,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-          child: AeroDropBottomNavigation(
-            selectedIndex: selected,
-            onTap: (index) => _onTap(index, context),
-            onFabPressed: () {
-              _checkAccountStatus(); // Check account status
-              HapticFeedback.mediumImpact();
-              context.push('/user/cart');
-            },
+          // The dock's cart badge tracks the live cart, so adding an item is
+          // visible without opening the cart screen.
+          child: ValueListenableBuilder<List<CartItem>>(
+            valueListenable: cartNotifier,
+            builder: (context, cart, _) => AeroDropBottomNavigation(
+              selectedIndex: selected,
+              cartCount: cart.fold<int>(0, (sum, i) => sum + i.quantity),
+              onTap: (index) => _onTap(index, context),
+              onFabPressed: () {
+                _checkAccountStatus(); // Check account status
+                HapticFeedback.mediumImpact();
+                context.push('/user/cart');
+              },
+            ),
           ),
         ),
       ),

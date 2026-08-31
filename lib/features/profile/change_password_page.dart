@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
+import '../../core/widgets/neu_feedback.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
-import '../../core/widgets/gradient_button.dart';
-import '../../core/widgets/custom_text_field.dart';
-import '../../core/widgets/glass_card.dart';
+import '../../core/widgets/neu_button.dart';
+import '../../core/widgets/neu_text_field.dart';
+import '../../core/widgets/neu_card.dart';
 import '../../core/widgets/custom_app_bar.dart';
 import '../../core/services/supabase_service.dart';
 
@@ -38,14 +39,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
   void _showMessage(String message, bool success) {
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: success ? AppColors.success : AppColors.danger,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-    );
+    showNeuSnack(context, message, tone: NeuToneKind.success);
   }
 
   Future<void> _save() async {
@@ -110,16 +104,10 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.bgDark,
+      backgroundColor: AppColors.base,
       appBar: const CustomAppBar(title: 'Change Password'),
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFF0F243A), AppColors.bgDark],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-          ),
-        ),
+        decoration: BoxDecoration(color: AppColors.base),
         child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -132,20 +120,13 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                   Expanded(
                     child: SingleChildScrollView(
                       physics: const BouncingScrollPhysics(),
-                      child: GlassCard(
+                      child: NeuCard(
                         padding: const EdgeInsets.all(24),
                         borderRadius: BorderRadius.circular(24),
-                        borderGradient: const LinearGradient(
-                          colors: [
-                            AppColors.accent,
-                            AppColors.primary,
-                            Colors.transparent,
-                          ],
-                          stops: [0.0, 0.5, 1.0],
-                        ),
+                        accent: AppColors.accent,
                         child: Column(
                           children: [
-                            CustomTextField(
+                            NeuTextField(
                               labelText: 'Current Password',
                               hintText: '••••••••',
                               prefixIcon: Icons.lock_outline_rounded,
@@ -156,7 +137,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                                   : null,
                             ),
                             const SizedBox(height: 20),
-                            CustomTextField(
+                            NeuTextField(
                               labelText: 'New Password',
                               hintText: '••••••••',
                               prefixIcon: Icons.lock_outline_rounded,
@@ -179,7 +160,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                               },
                             ),
                             const SizedBox(height: 20),
-                            CustomTextField(
+                            NeuTextField(
                               labelText: 'Confirm New Password',
                               hintText: '••••••••',
                               prefixIcon: Icons.lock_outline_rounded,
@@ -197,7 +178,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                               children: [
                                 Theme(
                                   data: ThemeData(
-                                    unselectedWidgetColor: AppColors.borderDark,
+                                    unselectedWidgetColor: AppColors.border,
                                   ),
                                   child: Checkbox(
                                     value: !_obscureText,
@@ -216,7 +197,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                                   'Show passwords',
                                   style: AppTextStyles.body(
                                     fontSize: 13.5,
-                                    color: AppColors.textSecondaryDark,
+                                    color: AppColors.textSecondary,
                                   ),
                                 ),
                               ],
@@ -228,7 +209,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                   ),
                   Padding(
                     padding: const EdgeInsets.only(bottom: 24),
-                    child: GradientButton(
+                    child: NeuButton(
                       text: 'Save Password',
                       onPressed: _isSaving ? null : _save,
                       isLoading: _isSaving,

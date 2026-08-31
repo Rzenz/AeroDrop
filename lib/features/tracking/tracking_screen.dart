@@ -6,8 +6,8 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
-import '../../core/widgets/glass_card.dart';
-import '../../core/widgets/gradient_button.dart';
+import '../../core/widgets/neu_card.dart';
+import '../../core/widgets/neu_button.dart';
 import '../../core/providers/delivery_provider.dart';
 import '../../core/models/delivery_model.dart';
 import '../../core/services/supabase_service.dart';
@@ -258,12 +258,12 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
     final activeDelivery = active.isNotEmpty ? active.first : null;
 
     return Scaffold(
-      backgroundColor: AppColors.bgDark,
+      backgroundColor: AppColors.base,
       extendBody: true,
       resizeToAvoidBottomInset: false,
       body: RefreshIndicator(
         color: AppColors.accent,
-        backgroundColor: AppColors.cardDark,
+        backgroundColor: AppColors.base,
         onRefresh: () async {
           await ref
               .read(deliveryProvider.notifier)
@@ -470,20 +470,13 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
                     child: SafeArea(
                       child: Padding(
                         padding: const EdgeInsets.all(16),
-                        child: GlassCard(
+                        child: NeuCard(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 20,
                             vertical: 14,
                           ),
                           borderRadius: BorderRadius.circular(24),
-                          borderGradient: const LinearGradient(
-                            colors: [
-                              AppColors.accent,
-                              AppColors.primary,
-                              Colors.transparent,
-                            ],
-                            stops: [0.0, 0.5, 1.0],
-                          ),
+                          accent: AppColors.accent,
                           child: Row(
                             children: [
                               Container(
@@ -503,7 +496,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
                                   .animate(onPlay: (c) => c.repeat())
                                   .shimmer(
                                     duration: 2000.ms,
-                                    color: Colors.white24,
+                                    color: AppColors.surfaceSunken,
                                   ),
                               const SizedBox(width: 14),
                               Expanded(
@@ -516,14 +509,14 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
                                       style: AppTextStyles.title(
                                         fontSize: 15,
                                         fontWeight: FontWeight.bold,
-                                        color: Colors.white,
+                                        color: AppColors.textPrimary,
                                       ),
                                     ),
                                     Text(
                                       'Prototype Telemetry Active',
                                       style: AppTextStyles.body(
                                         fontSize: 11,
-                                        color: AppColors.textSecondaryDark,
+                                        color: AppColors.textSecondary,
                                         height: 1.0,
                                       ),
                                     ),
@@ -589,7 +582,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
                           curve: Curves.easeInOut,
                           height: panelHeight,
                           decoration: BoxDecoration(
-                            color: AppColors.cardDark,
+                            color: AppColors.base,
                             borderRadius: const BorderRadius.vertical(
                               top: Radius.circular(24),
                             ),
@@ -637,7 +630,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
                                         _panelExpanded
                                             ? Icons.keyboard_arrow_down_rounded
                                             : Icons.keyboard_arrow_up_rounded,
-                                        color: AppColors.textSecondaryDark,
+                                        color: AppColors.textSecondary,
                                         size: 20,
                                       ),
                                     ],
@@ -729,10 +722,11 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
                 ),
                 child: Text(
                   _shortLabel(name),
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: AppTextStyles.label(
                     fontSize: 10,
+                    color: AppColors.textPrimary,
                     fontWeight: FontWeight.bold,
+                    letterSpacing: 0,
                   ),
                 ),
               ),
@@ -831,9 +825,9 @@ class _DockedCard extends StatelessWidget {
             color: Colors.white.withValues(alpha: 0.05),
             shape: BoxShape.circle,
           ),
-          child: const Icon(
+          child: Icon(
             Icons.flight_land_rounded,
-            color: AppColors.textSecondaryDark,
+            color: AppColors.textSecondary,
             size: 24,
           ),
         ),
@@ -848,7 +842,7 @@ class _DockedCard extends StatelessWidget {
                 style: AppTextStyles.title(
                   fontSize: 15,
                   fontWeight: FontWeight.bold,
-                  color: Colors.white,
+                  color: AppColors.textPrimary,
                 ),
               ),
               const SizedBox(height: 2),
@@ -856,7 +850,7 @@ class _DockedCard extends StatelessWidget {
                 messageText,
                 style: AppTextStyles.body(
                   fontSize: 12,
-                  color: AppColors.textSecondaryDark,
+                  color: AppColors.textSecondary,
                 ),
               ),
             ],
@@ -893,7 +887,7 @@ class _CollapsedSummary extends StatelessWidget {
                 style: AppTextStyles.title(
                   fontSize: 13,
                   fontWeight: FontWeight.bold,
-                  color: Colors.white,
+                  color: AppColors.textPrimary,
                 ),
                 overflow: TextOverflow.ellipsis,
               ),
@@ -910,7 +904,7 @@ class _CollapsedSummary extends StatelessWidget {
                   route,
                   style: AppTextStyles.body(
                     fontSize: 11,
-                    color: AppColors.textSecondaryDark,
+                    color: AppColors.textSecondary,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -947,13 +941,13 @@ class _ActiveCard extends StatelessWidget {
       children: [
         Row(
           children: [
-            Icon(icon, size: 11, color: AppColors.textSecondaryDark),
+            Icon(icon, size: 11, color: AppColors.textSecondary),
             const SizedBox(width: 4),
             Text(
               label,
-              style: const TextStyle(
+              style: AppTextStyles.caption(
                 fontSize: 10,
-                color: AppColors.textSecondaryDark,
+                color: AppColors.textSecondary,
               ),
             ),
           ],
@@ -961,10 +955,11 @@ class _ActiveCard extends StatelessWidget {
         const SizedBox(height: 2),
         Text(
           value.replaceFirst('Drone Battery: ', ''),
-          style: const TextStyle(
+          style: AppTextStyles.label(
             fontSize: 12,
+            color: AppColors.textPrimary,
             fontWeight: FontWeight.bold,
-            color: Colors.white,
+            letterSpacing: 0,
           ),
         ),
       ],
@@ -1014,7 +1009,7 @@ class _ActiveCard extends StatelessWidget {
           style: AppTextStyles.title(
             fontSize: 16,
             fontWeight: FontWeight.bold,
-            color: Colors.white,
+            color: AppColors.textPrimary,
           ),
           overflow: TextOverflow.ellipsis,
         ),
@@ -1023,7 +1018,7 @@ class _ActiveCard extends StatelessWidget {
           'Route: ${delivery.deliveryAddress}',
           style: AppTextStyles.body(
             fontSize: 12,
-            color: AppColors.textSecondaryDark,
+            color: AppColors.textSecondary,
           ),
           overflow: TextOverflow.ellipsis,
         ),
@@ -1047,7 +1042,7 @@ class _ActiveCard extends StatelessWidget {
             droneBatteryText,
             style: AppTextStyles.body(
               fontSize: 12,
-              color: AppColors.textSecondaryDark,
+              color: AppColors.textSecondary,
             ),
           ),
         ],
@@ -1060,7 +1055,7 @@ class _ActiveCard extends StatelessWidget {
               style: AppTextStyles.body(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: Colors.white70,
+                color: AppColors.textSecondary,
               ),
             ),
             Text(
@@ -1078,13 +1073,13 @@ class _ActiveCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(6),
           child: LinearProgressIndicator(
             value: progress,
-            backgroundColor: AppColors.borderDark,
+            backgroundColor: AppColors.border,
             valueColor: const AlwaysStoppedAnimation<Color>(AppColors.accent),
             minHeight: 6,
           ),
         ),
         const SizedBox(height: 14),
-        GradientButton(
+        NeuButton(
           text: 'View Telemetry Logs',
           height: 42,
           onPressed: () =>

@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
-import '../../core/widgets/glass_card.dart';
+import '../../core/widgets/neu_card.dart';
 import '../../core/models/order_model.dart';
 import '../../core/providers/order_provider.dart';
 
@@ -61,33 +61,33 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen>
     final allOrders = orderState.orders;
 
     return Scaffold(
-      backgroundColor: AppColors.bgDark,
+      backgroundColor: AppColors.base,
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(100),
         child: AppBar(
-          backgroundColor: AppColors.bgDark,
+          backgroundColor: AppColors.base,
           elevation: 0,
           automaticallyImplyLeading: false,
           title: Text(
             'My Orders',
-            style: AppTextStyles.subHead(fontSize: 18, color: Colors.white),
+            style: AppTextStyles.subHead(
+              fontSize: 18,
+              color: AppColors.textPrimary,
+            ),
           ),
           bottom: TabBar(
             controller: _tab,
             isScrollable: true,
             indicatorColor: AppColors.accent,
             labelColor: AppColors.accent,
-            unselectedLabelColor: AppColors.textSecondaryDark,
+            unselectedLabelColor: AppColors.textSecondary,
             tabAlignment: TabAlignment.start,
             padding: const EdgeInsets.symmetric(horizontal: 8),
-            labelStyle: const TextStyle(
+            labelStyle: AppTextStyles.subHead(
+              fontSize: 13,
               fontWeight: FontWeight.bold,
-              fontSize: 13,
             ),
-            unselectedLabelStyle: const TextStyle(
-              fontWeight: FontWeight.normal,
-              fontSize: 13,
-            ),
+            unselectedLabelStyle: AppTextStyles.body(fontSize: 13),
             tabs: _tabs.map((t) {
               final count = _filterOrders(allOrders, t.statusKeys).length;
               return Tab(
@@ -108,10 +108,11 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen>
                         ),
                         child: Text(
                           '$count',
-                          style: const TextStyle(
-                            color: AppColors.accent,
+                          style: AppTextStyles.label(
                             fontSize: 10,
+                            color: AppColors.accent,
                             fontWeight: FontWeight.bold,
+                            letterSpacing: 0,
                           ),
                         ),
                       ),
@@ -126,7 +127,7 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen>
       body: RefreshIndicator(
         onRefresh: () => ref.read(orderProvider.notifier).loadOrders(),
         color: AppColors.accent,
-        backgroundColor: AppColors.cardDark,
+        backgroundColor: AppColors.base,
         child: TabBarView(
           controller: _tab,
           children: _tabs.map((t) {
@@ -170,21 +171,17 @@ class _EmptyOrders extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            _statusIcon(label),
-            color: AppColors.textSecondaryDark,
-            size: 60,
-          ),
+          Icon(_statusIcon(label), color: AppColors.textSecondary, size: 60),
           const SizedBox(height: 14),
           Text(
             'You have no $label orders yet.',
-            style: AppTextStyles.subHead(color: Colors.white70),
+            style: AppTextStyles.subHead(color: AppColors.textSecondary),
           ),
           const SizedBox(height: 16),
           ElevatedButton.icon(
             onPressed: onRetry,
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.cardDark,
+              backgroundColor: AppColors.base,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -224,7 +221,7 @@ class _OrderCard extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
-      child: GlassCard(
+      child: NeuCard(
         onTap: onTap,
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -239,10 +236,9 @@ class _OrderCard extends StatelessWidget {
                     children: [
                       Text(
                         'AD-${order.id.substring(0, 8).toUpperCase()}',
-                        style: const TextStyle(
-                          color: AppColors.primaryLight,
+                        style: AppTextStyles.label(
                           fontSize: 11,
-                          fontWeight: FontWeight.w600,
+                          color: AppColors.primaryLight,
                           letterSpacing: 0.5,
                         ),
                       ),
@@ -251,7 +247,7 @@ class _OrderCard extends StatelessWidget {
                         order.vendorName,
                         style: AppTextStyles.subHead(
                           fontSize: 15,
-                          color: Colors.white,
+                          color: AppColors.textPrimary,
                         ),
                       ),
                     ],
@@ -273,10 +269,11 @@ class _OrderCard extends StatelessWidget {
                   ),
                   child: Text(
                     statusLabel,
-                    style: TextStyle(
-                      color: statusColor,
+                    style: AppTextStyles.label(
                       fontSize: 11,
+                      color: statusColor,
                       fontWeight: FontWeight.bold,
+                      letterSpacing: 0,
                     ),
                   ),
                 ),
@@ -292,13 +289,13 @@ class _OrderCard extends StatelessWidget {
                         .join(', '),
               style: AppTextStyles.body(
                 fontSize: 12,
-                color: AppColors.textSecondaryDark,
+                color: AppColors.textSecondary,
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 10),
-            const Divider(color: AppColors.borderDark, height: 1),
+            Divider(color: AppColors.border, height: 1),
             const SizedBox(height: 10),
             // Footer
             Row(
@@ -315,17 +312,17 @@ class _OrderCard extends StatelessWidget {
                   children: [
                     Text(
                       '₱${order.totalAmount.toStringAsFixed(2)}',
-                      style: const TextStyle(
+                      style: AppTextStyles.subHead(
+                        fontSize: 16,
                         color: AppColors.accent,
                         fontWeight: FontWeight.bold,
-                        fontSize: 16,
                       ),
                     ),
                     Text(
                       _formatDate(order.createdAt),
                       style: AppTextStyles.body(
                         fontSize: 10,
-                        color: AppColors.textSecondaryDark,
+                        color: AppColors.textSecondary,
                       ),
                     ),
                   ],
@@ -425,10 +422,11 @@ class _PaymentBadge extends StatelessWidget {
           ),
           child: Text(
             label,
-            style: TextStyle(
-              color: color,
+            style: AppTextStyles.label(
               fontSize: 10,
+              color: color,
               fontWeight: FontWeight.bold,
+              letterSpacing: 0,
             ),
           ),
         ),
@@ -437,7 +435,7 @@ class _PaymentBadge extends StatelessWidget {
           methodLabel,
           style: AppTextStyles.body(
             fontSize: 11,
-            color: AppColors.textSecondaryDark,
+            color: AppColors.textSecondary,
           ),
         ),
       ],

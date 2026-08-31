@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
-import '../../core/widgets/glass_card.dart';
+import '../../core/widgets/neu_card.dart';
+import '../../core/widgets/neu_back_button.dart';
 
 class AboutPage extends StatelessWidget {
   const AboutPage({super.key});
@@ -11,7 +11,7 @@ class AboutPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.bgDark,
+      backgroundColor: AppColors.base,
       body: Container(
         decoration: const BoxDecoration(gradient: AppColors.bgGradientDark),
         child: SafeArea(
@@ -23,29 +23,14 @@ class AboutPage extends StatelessWidget {
                 // Header
                 Row(
                   children: [
-                    GestureDetector(
-                      onTap: () => context.pop(),
-                      child: Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: AppColors.cardDark,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.borderDark),
-                        ),
-                        child: const Icon(
-                          Icons.arrow_back_rounded,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                      ),
-                    ),
+                    const NeuBackButton(),
                     const SizedBox(width: 16),
                     Text(
                       'About AeroDrop',
                       style: AppTextStyles.title(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                        color: AppColors.textPrimary,
                       ),
                     ),
                   ],
@@ -61,10 +46,10 @@ class AboutPage extends StatelessWidget {
                         ShaderMask(
                           shaderCallback: (b) =>
                               AppColors.primaryGradient.createShader(b),
-                          child: const Icon(
+                          child: Icon(
                             Icons.flight_takeoff_rounded,
                             size: 72,
-                            color: Colors.white,
+                            color: AppColors.textPrimary,
                           ),
                         ).animate().scale(
                           duration: 500.ms,
@@ -76,7 +61,7 @@ class AboutPage extends StatelessWidget {
                           style: AppTextStyles.title(
                             fontSize: 20,
                             fontWeight: FontWeight.w900,
-                            color: Colors.white,
+                            color: AppColors.textPrimary,
                           ),
                           textAlign: TextAlign.center,
                         ),
@@ -84,14 +69,14 @@ class AboutPage extends StatelessWidget {
                           'Version 1.0.0 (Build 2026.06.25)',
                           style: AppTextStyles.body(
                             fontSize: 12,
-                            color: AppColors.textSecondaryDark,
+                            color: AppColors.textSecondary,
                           ),
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 28),
 
                         // System description
-                        GlassCard(
+                        NeuCard(
                           padding: const EdgeInsets.all(20),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -101,7 +86,7 @@ class AboutPage extends StatelessWidget {
                                 style: AppTextStyles.title(
                                   fontSize: 14,
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.white,
+                                  color: AppColors.textPrimary,
                                 ),
                               ),
                               const SizedBox(height: 10),
@@ -109,7 +94,7 @@ class AboutPage extends StatelessWidget {
                                 'AeroDrop is an official campus initiative designed for fast, contactless delivery of essential academic payloads, document sets, medical resources, and lab equipment across platforms at UCLM.',
                                 style: AppTextStyles.body(
                                   fontSize: 13,
-                                  color: AppColors.textSecondaryDark,
+                                  color: AppColors.textSecondary,
                                 ),
                               ),
                             ],
@@ -118,7 +103,7 @@ class AboutPage extends StatelessWidget {
                         const SizedBox(height: 20),
 
                         // Hardware specifications
-                        GlassCard(
+                        NeuCard(
                           padding: const EdgeInsets.all(20),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -128,7 +113,7 @@ class AboutPage extends StatelessWidget {
                                 style: AppTextStyles.title(
                                   fontSize: 14,
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.white,
+                                  color: AppColors.textPrimary,
                                 ),
                               ),
                               const SizedBox(height: 12),
@@ -174,13 +159,16 @@ class AboutPage extends StatelessWidget {
           Expanded(
             child: RichText(
               text: TextSpan(
-                style: const TextStyle(fontSize: 12, color: Colors.white),
+                style: AppTextStyles.caption(
+                  fontSize: 12,
+                  color: AppColors.textPrimary,
+                ),
                 children: [
                   TextSpan(
                     text: '$label: ',
-                    style: const TextStyle(
+                    style: AppTextStyles.subHead(
+                      color: AppColors.textSecondary,
                       fontWeight: FontWeight.bold,
-                      color: AppColors.textSecondaryDark,
                     ),
                   ),
                   TextSpan(text: value),

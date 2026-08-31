@@ -1,20 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+
 import '../theme/app_colors.dart';
+import '../theme/app_radii.dart';
+import '../theme/app_shadows.dart';
+import '../theme/app_spacing.dart';
 import '../theme/app_text_styles.dart';
+import 'neu_card.dart';
 
-class AnimatedCard extends StatefulWidget {
-  final String? title;
-  final String? subtitle;
-  final Widget? leading;
-  final Widget? trailing;
-  final Widget?
-  child; // If custom child is provided, use it instead of title/subtitle
-  final VoidCallback? onTap;
-  final double scaleFactor;
-  final Gradient? borderGradient;
-
+/// A list-row card: leading slot, title/subtitle stack, trailing affordance.
+///
+/// Thin wrapper over [NeuCard] — it exists so the dozens of list rows across
+/// the app share one row rhythm rather than each re-deciding its own padding.
+class AnimatedCard extends StatelessWidget {
   const AnimatedCard({
     super.key,
     this.title,
@@ -23,185 +20,88 @@ class AnimatedCard extends StatefulWidget {
     this.trailing,
     this.child,
     this.onTap,
-    this.scaleFactor = 0.98, // Scale down 2% on press
-    this.borderGradient,
+    this.accent,
+    this.padding,
+    this.borderRadius,
+    this.animate = true,
+    this.index = 0,
   });
 
-  @override
-  State<AnimatedCard> createState() => _AnimatedCardState();
-}
+  final String? title;
+  final String? subtitle;
+  final Widget? leading;
+  final Widget? trailing;
 
-class _AnimatedCardState extends State<AnimatedCard>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _pressController;
-  late Animation<double> _scaleAnimation;
-  DateTime? _lastTapped;
+  /// Custom content. When supplied, title/subtitle/leading/trailing are ignored.
+  final Widget? child;
 
-  @override
-  void initState() {
-    super.initState();
-    _pressController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 90),
-    );
-    _scaleAnimation = Tween<double>(begin: 1.0, end: widget.scaleFactor)
-        .animate(
-          CurvedAnimation(parent: _pressController, curve: Curves.easeInOut),
-        );
-  }
+  final VoidCallback? onTap;
 
-  @override
-  void dispose() {
-    _pressController.dispose();
-    super.dispose();
-  }
+  /// Semantic rim colour — status, brand, category.
+  final Color? accent;
+
+  final EdgeInsetsGeometry? padding;
+  final BorderRadius? borderRadius;
+  final bool animate;
+  final int index;
 
   @override
   Widget build(BuildContext context) {
-    final radius = BorderRadius.circular(22);
-    final borderGrad =
-        widget.borderGradient ??
-        LinearGradient(
-          colors: [
-            AppColors.primary.withValues(alpha: 0.35),
-            AppColors.accent.withValues(alpha: 0.15),
+    final content =
+        child ??
+        Row(
+          children: [
+            if (leading != null) ...[leading!, AppSpacing.gapMd],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (title != null)
+                    Text(
+                      title!,
+                      style: AppTextStyles.subHead(fontSize: 15),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      subtitle!,
+                      style: AppTextStyles.body(
+                        fontSize: 13,
+                        color: AppColors.textSecondary,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            if (trailing != null) ...[
+              const SizedBox(width: AppSpacing.sm),
+              trailing!,
+            ] else if (onTap != null) ...[
+              const SizedBox(width: AppSpacing.xs),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: AppColors.textTertiary,
+                size: 20,
+              ),
+            ],
           ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
         );
 
-    Widget innerContent;
-    if (widget.child != null) {
-      innerContent = widget.child!;
-    } else {
-      innerContent = Row(
-        children: [
-          if (widget.leading != null) ...[
-            widget.leading!,
-            const SizedBox(width: 16),
-          ],
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (widget.title != null)
-                  Text(
-                    widget.title!,
-                    style: AppTextStyles.title(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                if (widget.subtitle != null) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    widget.subtitle!,
-                    style: AppTextStyles.body(
-                      fontSize: 13,
-                      color: AppColors.textSecondaryDark,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          if (widget.trailing != null) ...[
-            const SizedBox(width: 12),
-            widget.trailing!,
-          ] else if (widget.onTap != null) ...[
-            const SizedBox(width: 12),
-            const Icon(
-              Icons.chevron_right_rounded,
-              color: AppColors.textSecondaryDark,
-              size: 20,
-            ),
-          ],
-        ],
-      );
-    }
-
-    Widget card = CustomPaint(
-      painter: _GradientBorderPainter(
-        radius: radius,
-        strokeWidth: 1.5,
-        gradient: borderGrad,
-      ),
-      child: Container(
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: AppColors.cardDark,
-          borderRadius: radius,
-        ),
-        child: innerContent,
-      ),
+    final card = NeuCard(
+      onTap: onTap,
+      accent: accent,
+      depth: NeuDepth.low,
+      padding: padding ?? AppSpacing.allMd,
+      borderRadius: borderRadius ?? AppRadii.brLg,
+      child: content,
     );
 
-    if (widget.onTap != null) {
-      card = GestureDetector(
-        onTapDown: (_) {
-          HapticFeedback.lightImpact();
-          _pressController.forward();
-        },
-        onTapUp: (_) {
-          _pressController.reverse();
-          final now = DateTime.now();
-          if (_lastTapped != null &&
-              now.difference(_lastTapped!) <
-                  const Duration(milliseconds: 500)) {
-            return;
-          }
-          _lastTapped = now;
-          widget.onTap!();
-        },
-        onTapCancel: () => _pressController.reverse(),
-        child: ScaleTransition(scale: _scaleAnimation, child: card),
-      );
-    }
-
-    // Staggered entrance animation
-    return card
-        .animate()
-        .fadeIn(duration: 400.ms, curve: Curves.easeOut)
-        .slideY(begin: 0.1, end: 0.0, duration: 400.ms, curve: Curves.easeOut);
-  }
-}
-
-class _GradientBorderPainter extends CustomPainter {
-  final BorderRadius radius;
-  final double strokeWidth;
-  final Gradient gradient;
-
-  _GradientBorderPainter({
-    required this.radius,
-    required this.strokeWidth,
-    required this.gradient,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final rect = Rect.fromLTWH(
-      strokeWidth / 2,
-      strokeWidth / 2,
-      size.width - strokeWidth,
-      size.height - strokeWidth,
-    );
-
-    final rrect = radius.toRRect(rect);
-
-    final paint = Paint()
-      ..strokeWidth = strokeWidth
-      ..style = PaintingStyle.stroke
-      ..shader = gradient.createShader(rect);
-
-    canvas.drawRRect(rrect, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant _GradientBorderPainter oldDelegate) {
-    return oldDelegate.radius != radius ||
-        oldDelegate.strokeWidth != strokeWidth ||
-        oldDelegate.gradient != gradient;
+    return NeuCardEntrance(index: index, enabled: animate, child: card);
   }
 }

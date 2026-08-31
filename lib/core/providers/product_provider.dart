@@ -80,10 +80,12 @@ class ProductNotifier extends StateNotifier<ProductState> {
         final vendorMap = p['users'] as Map<String, dynamic>?;
         if (vendorMap != null) {
           final role = vendorMap['role']?.toString().toLowerCase();
-          final vendorStatus =
-              vendorMap['vendor_status']?.toString().toLowerCase();
-          final accountStatus =
-              vendorMap['account_status']?.toString().toLowerCase();
+          final vendorStatus = vendorMap['vendor_status']
+              ?.toString()
+              .toLowerCase();
+          final accountStatus = vendorMap['account_status']
+              ?.toString()
+              .toLowerCase();
 
           if (accountStatus == 'suspended' ||
               accountStatus == 'deleted' ||
@@ -114,10 +116,9 @@ class ProductNotifier extends StateNotifier<ProductState> {
             stock: (p['stock_quantity'] as num?)?.toInt() ?? 0,
             category: cat,
             weightKg: (((p['weight_grams'] as num?) ?? 0) / 1000.0),
-            imageUrl:
-                p['image_url']?.toString().isNotEmpty == true
-                    ? p['image_url'].toString()
-                    : 'https://images.unsplash.com/photo-1569050467447-ce54b3bbc37d?w=400',
+            imageUrl: p['image_url']?.toString().isNotEmpty == true
+                ? p['image_url'].toString()
+                : 'https://images.unsplash.com/photo-1569050467447-ce54b3bbc37d?w=400',
             isAvailable: p['is_active'] as bool? ?? true,
           ),
         );

@@ -3,8 +3,9 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
-import '../../../../core/widgets/custom_button.dart';
-import '../../../../core/widgets/glass_card.dart';
+import '../../../../core/widgets/neu_button.dart';
+import '../../../../core/widgets/neu_card.dart';
+import '../../../../core/widgets/neu_back_button.dart';
 
 class DeliverySummaryPage extends StatelessWidget {
   const DeliverySummaryPage({super.key});
@@ -12,7 +13,7 @@ class DeliverySummaryPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.bgDark,
+      backgroundColor: AppColors.base,
       body: Container(
         decoration: const BoxDecoration(gradient: AppColors.bgGradientDark),
         child: SafeArea(
@@ -23,29 +24,14 @@ class DeliverySummaryPage extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    GestureDetector(
-                      onTap: () => context.pop(),
-                      child: Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: AppColors.cardDark,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.borderDark),
-                        ),
-                        child: const Icon(
-                          Icons.arrow_back_rounded,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                      ),
-                    ),
+                    const NeuBackButton(),
                     const SizedBox(width: 16),
                     Text(
                       'Delivery Summary',
                       style: AppTextStyles.title(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                        color: AppColors.textPrimary,
                       ),
                     ),
                   ],
@@ -55,7 +41,7 @@ class DeliverySummaryPage extends StatelessWidget {
                   child: SingleChildScrollView(
                     child: Column(
                       children: [
-                        GlassCard(
+                        NeuCard(
                           padding: const EdgeInsets.all(20),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -76,7 +62,7 @@ class DeliverySummaryPage extends StatelessWidget {
                           ),
                         ).animate().fadeIn(delay: 100.ms),
                         const SizedBox(height: 16),
-                        GlassCard(
+                        NeuCard(
                           padding: const EdgeInsets.all(20),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -100,7 +86,7 @@ class DeliverySummaryPage extends StatelessWidget {
                           ),
                         ).animate().fadeIn(delay: 200.ms),
                         const SizedBox(height: 16),
-                        GlassCard(
+                        NeuCard(
                           padding: const EdgeInsets.all(20),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -121,7 +107,7 @@ class DeliverySummaryPage extends StatelessWidget {
                           ),
                         ).animate().fadeIn(delay: 300.ms),
                         const SizedBox(height: 16),
-                        GlassCard(
+                        NeuCard(
                           padding: const EdgeInsets.all(20),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -137,10 +123,7 @@ class DeliverySummaryPage extends StatelessWidget {
                               const SizedBox(height: 12),
                               _rowItem('Base Delivery Fee', '₱45.00'),
                               _rowItem('Priority Dispatch', '₱15.00'),
-                              const Divider(
-                                color: AppColors.borderDark,
-                                height: 24,
-                              ),
+                              Divider(color: AppColors.border, height: 24),
                               Row(
                                 mainAxisAlignment:
                                     MainAxisAlignment.spaceBetween,
@@ -150,7 +133,7 @@ class DeliverySummaryPage extends StatelessWidget {
                                     style: AppTextStyles.title(
                                       fontSize: 16,
                                       fontWeight: FontWeight.bold,
-                                      color: Colors.white,
+                                      color: AppColors.textPrimary,
                                     ),
                                   ),
                                   Text(
@@ -172,7 +155,7 @@ class DeliverySummaryPage extends StatelessWidget {
                 ),
                 Padding(
                   padding: const EdgeInsets.only(top: 16),
-                  child: CustomButton(
+                  child: NeuButton(
                     text: 'Proceed to Checkout',
                     onPressed: () => context.go('/user/delivery/success'),
                     icon: Icons.payment_rounded,
@@ -196,7 +179,7 @@ class DeliverySummaryPage extends StatelessWidget {
             label,
             style: AppTextStyles.body(
               fontSize: 13,
-              color: AppColors.textSecondaryDark,
+              color: AppColors.textSecondary,
             ),
           ),
           Text(
@@ -204,7 +187,7 @@ class DeliverySummaryPage extends StatelessWidget {
             style: AppTextStyles.title(
               fontSize: 13,
               fontWeight: FontWeight.bold,
-              color: Colors.white,
+              color: AppColors.textPrimary,
             ),
           ),
         ],

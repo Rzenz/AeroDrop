@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
-import '../../core/widgets/glass_card.dart';
+import '../../core/widgets/neu_card.dart';
 import '../../core/widgets/section_header.dart';
 import '../../core/models/order_model.dart';
 import '../../core/providers/order_provider.dart';
@@ -29,7 +29,7 @@ class VendorDashboardScreen extends ConsumerWidget {
         : 'Good Evening 🌙';
 
     return Scaffold(
-      backgroundColor: AppColors.bgDark,
+      backgroundColor: AppColors.base,
       body: currentVendorAsync.when(
         data: (vendor) {
           if (vendor == null) {
@@ -45,7 +45,7 @@ class VendorDashboardScreen extends ConsumerWidget {
                   const SizedBox(height: 16),
                   Text(
                     'No vendor profile is registered for this account.',
-                    style: AppTextStyles.subHead(color: Colors.white),
+                    style: AppTextStyles.subHead(color: AppColors.textPrimary),
                   ),
                   const SizedBox(height: 24),
                   ElevatedButton(
@@ -56,9 +56,9 @@ class VendorDashboardScreen extends ConsumerWidget {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.danger,
                     ),
-                    child: const Text(
+                    child: Text(
                       'Log Out',
-                      style: TextStyle(color: Colors.white),
+                      style: AppTextStyles.body(color: AppColors.textPrimary),
                     ),
                   ),
                 ],
@@ -106,7 +106,7 @@ class VendorDashboardScreen extends ConsumerWidget {
 
           return RefreshIndicator(
             color: AppColors.accent,
-            backgroundColor: AppColors.cardDark,
+            backgroundColor: AppColors.base,
             onRefresh: () async {
               ref.invalidate(currentVendorProvider);
               await ref.read(vendorOrdersProvider.notifier).loadOrders();
@@ -120,18 +120,12 @@ class VendorDashboardScreen extends ConsumerWidget {
                   floating: false,
                   pinned: true,
                   stretch: true,
-                  backgroundColor: AppColors.bgDark,
+                  backgroundColor: AppColors.base,
                   elevation: 0,
                   flexibleSpace: FlexibleSpaceBar(
                     collapseMode: CollapseMode.parallax,
                     background: Container(
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [Color(0xFF1565C0), AppColors.bgDark],
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                        ),
-                      ),
+                      decoration: BoxDecoration(color: AppColors.base),
                     ),
                     titlePadding: const EdgeInsets.symmetric(
                       horizontal: 20,
@@ -148,7 +142,7 @@ class VendorDashboardScreen extends ConsumerWidget {
                               greeting,
                               style: AppTextStyles.label(
                                 fontSize: 10,
-                                color: Colors.white70,
+                                color: AppColors.textSecondary,
                               ),
                             ),
                             Text(
@@ -156,7 +150,7 @@ class VendorDashboardScreen extends ConsumerWidget {
                               style: AppTextStyles.title(
                                 fontSize: 20,
                                 fontWeight: FontWeight.w900,
-                                color: Colors.white,
+                                color: AppColors.textPrimary,
                               ),
                             ),
                           ],
@@ -182,11 +176,9 @@ class VendorDashboardScreen extends ConsumerWidget {
                   padding: const EdgeInsets.fromLTRB(20, 16, 20, 120),
                   sliver: SliverList(
                     delegate: SliverChildListDelegate([
-                      // Revenue GlassCard
-                      GlassCard(
-                        borderGradient: const LinearGradient(
-                          colors: [AppColors.accent, AppColors.primary],
-                        ),
+                      // Revenue NeuCard
+                      NeuCard(
+                        accent: AppColors.accent,
                         padding: const EdgeInsets.all(20),
                         child: Row(
                           children: [
@@ -198,7 +190,7 @@ class VendorDashboardScreen extends ConsumerWidget {
                                     'Total Gross Revenue',
                                     style: AppTextStyles.label(
                                       fontSize: 11,
-                                      color: AppColors.textSecondaryDark,
+                                      color: AppColors.textSecondary,
                                     ),
                                   ),
                                   const SizedBox(height: 6),
@@ -214,7 +206,7 @@ class VendorDashboardScreen extends ConsumerWidget {
                                     'From $completed successful completed orders',
                                     style: AppTextStyles.body(
                                       fontSize: 11.5,
-                                      color: Colors.white70,
+                                      color: AppColors.textSecondary,
                                     ),
                                   ),
                                 ],
@@ -280,7 +272,7 @@ class VendorDashboardScreen extends ConsumerWidget {
                       const SizedBox(height: 28),
 
                       // Weekly Sales Chart
-                      GlassCard(
+                      NeuCard(
                         padding: const EdgeInsets.all(20),
                         child: WeeklySalesChart(orders: vendorOrders),
                       ).animate().fadeIn(delay: 150.ms),
@@ -343,7 +335,7 @@ class VendorDashboardScreen extends ConsumerWidget {
                             child: Text(
                               'No orders received yet.',
                               style: AppTextStyles.body(
-                                color: AppColors.textSecondaryDark,
+                                color: AppColors.textSecondary,
                               ),
                             ),
                           ),
@@ -365,7 +357,7 @@ class VendorDashboardScreen extends ConsumerWidget {
         error: (err, _) => Center(
           child: Text(
             'Error: $err',
-            style: const TextStyle(color: AppColors.danger),
+            style: AppTextStyles.body(color: AppColors.danger),
           ),
         ),
       ),
@@ -391,12 +383,12 @@ class VendorDashboardScreen extends ConsumerWidget {
               size: 28,
             ),
             const SizedBox(width: 12),
-            const Text(
+            Text(
               'Performance Analytics',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
+              style: AppTextStyles.subHead(
                 fontSize: 18,
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.bold,
               ),
             ),
           ],
@@ -425,9 +417,9 @@ class VendorDashboardScreen extends ConsumerWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text(
+            child: Text(
               'Done',
-              style: TextStyle(
+              style: AppTextStyles.subHead(
                 color: AppColors.accent,
                 fontWeight: FontWeight.bold,
               ),
@@ -456,7 +448,7 @@ class _QuickActionBtn extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: GlassCard(
+      child: NeuCard(
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
         child: SizedBox(
           width: 70,
@@ -473,10 +465,10 @@ class _QuickActionBtn extends StatelessWidget {
               const SizedBox(height: 8),
               Text(
                 label,
-                style: const TextStyle(
-                  color: Colors.white70,
+                style: AppTextStyles.label(
                   fontSize: 10,
-                  fontWeight: FontWeight.w600,
+                  color: AppColors.textSecondary,
+                  letterSpacing: 0,
                 ),
                 textAlign: TextAlign.center,
                 maxLines: 1,
@@ -502,17 +494,17 @@ class _AnalyticsRow extends StatelessWidget {
       children: [
         Text(
           label,
-          style: const TextStyle(
-            color: AppColors.textSecondaryDark,
+          style: AppTextStyles.body(
             fontSize: 13,
+            color: AppColors.textSecondary,
           ),
         ),
         Text(
           value,
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
+          style: AppTextStyles.subHead(
             fontSize: 13.5,
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.bold,
           ),
         ),
       ],
@@ -546,19 +538,19 @@ class WeeklySalesChart extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
+            Text(
               'Weekly Performance',
-              style: TextStyle(
-                color: Colors.white,
+              style: AppTextStyles.subHead(
                 fontSize: 13,
+                color: AppColors.textPrimary,
                 fontWeight: FontWeight.bold,
               ),
             ),
             Text(
               '₱${totalAmount.toStringAsFixed(2)} total',
-              style: const TextStyle(
-                color: AppColors.accent,
+              style: AppTextStyles.subHead(
                 fontSize: 13,
+                color: AppColors.accent,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -579,9 +571,9 @@ class WeeklySalesChart extends StatelessWidget {
                   children: [
                     Text(
                       '₱${(amounts[i] / 1000).toStringAsFixed(1)}k',
-                      style: const TextStyle(
-                        color: AppColors.textSecondaryDark,
+                      style: AppTextStyles.caption(
                         fontSize: 8.5,
+                        color: AppColors.textSecondary,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -604,9 +596,9 @@ class WeeklySalesChart extends StatelessWidget {
                     const SizedBox(height: 6),
                     Text(
                       days[i],
-                      style: const TextStyle(
-                        color: Colors.white70,
+                      style: AppTextStyles.caption(
                         fontSize: 9.5,
+                        color: AppColors.textSecondary,
                       ),
                     ),
                   ],
@@ -635,7 +627,7 @@ class _StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GlassCard(
+    return NeuCard(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -644,14 +636,17 @@ class _StatCard extends StatelessWidget {
           const Spacer(),
           Text(
             value,
-            style: AppTextStyles.heading(fontSize: 24, color: Colors.white),
+            style: AppTextStyles.heading(
+              fontSize: 24,
+              color: AppColors.textPrimary,
+            ),
           ),
           const SizedBox(height: 2),
           Text(
             label,
             style: AppTextStyles.body(
               fontSize: 11.5,
-              color: AppColors.textSecondaryDark,
+              color: AppColors.textSecondary,
             ),
           ),
         ],
@@ -686,9 +681,9 @@ class _MiniOrderCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: AppColors.cardDark,
+        color: AppColors.base,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.borderDark),
+        border: Border.all(color: AppColors.border),
       ),
       child: Row(
         children: [
@@ -698,9 +693,9 @@ class _MiniOrderCard extends StatelessWidget {
               children: [
                 Text(
                   'AD-${order.id.substring(0, 8).toUpperCase()}',
-                  style: const TextStyle(
-                    color: AppColors.primaryLight,
+                  style: AppTextStyles.caption(
                     fontSize: 11,
+                    color: AppColors.primaryLight,
                   ),
                 ),
                 Text(
@@ -708,7 +703,7 @@ class _MiniOrderCard extends StatelessWidget {
                   style: AppTextStyles.body(
                     fontSize: 13.5,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                    color: AppColors.textPrimary,
                   ),
                 ),
               ],
@@ -725,19 +720,20 @@ class _MiniOrderCard extends StatelessWidget {
                 ),
                 child: Text(
                   statusLabel,
-                  style: TextStyle(
-                    color: color,
+                  style: AppTextStyles.label(
                     fontSize: 10,
+                    color: color,
                     fontWeight: FontWeight.bold,
+                    letterSpacing: 0,
                   ),
                 ),
               ),
               const SizedBox(height: 3),
               Text(
                 '₱${order.totalAmount.toStringAsFixed(2)}',
-                style: const TextStyle(
-                  color: AppColors.accent,
+                style: AppTextStyles.subHead(
                   fontSize: 13,
+                  color: AppColors.accent,
                   fontWeight: FontWeight.bold,
                 ),
               ),

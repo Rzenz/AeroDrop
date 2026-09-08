@@ -1,9 +1,11 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../mock_data/cart_mock.dart';
 import '../services/supabase_service.dart';
 import '../models/order_model.dart';
 import 'auth_provider.dart';
+import 'product_provider.dart';
 
 class OrderState {
   final List<OrderModel> orders;
@@ -28,6 +30,7 @@ class OrderNotifier extends StateNotifier<OrderState> {
   Future<void> loadOrders() async {
     final authUser = SupabaseService.client.auth.currentUser;
     if (authUser == null) {
+      if (!mounted) return;
       state = OrderState(orders: []);
       return;
     }
@@ -86,6 +89,22 @@ class OrderNotifier extends StateNotifier<OrderState> {
     final user = ref.read(authProvider).user;
     if (user == null) return false;
 
+    // Validate maximum drone payload (0.5 kg = 500 grams)
+    final totalWeightGrams = items.fold<int>(
+      0,
+      (sum, item) => sum + ((item.weightKg * 1000).round() * item.quantity),
+    );
+    if (totalWeightGrams > 500) {
+      final weightKg = (totalWeightGrams / 1000.0).toStringAsFixed(2);
+      state = OrderState(
+        orders: state.orders,
+        isLoading: false,
+        errorMessage:
+            "This order exceeds the drone's maximum payload of 0.5 kg. Your order weighs $weightKg kg.",
+      );
+      return false;
+    }
+
     state = OrderState(orders: state.orders, isLoading: true);
 
     try {
@@ -94,53 +113,45 @@ class OrderNotifier extends StateNotifier<OrderState> {
         return true;
       }
 
-      // Insert order with flat text columns — no lookup UUID needed.
-      final orderRes = await _client
-          .from('orders')
-          .insert({
-            'user_id': user.id,
-            'vendor_id': vendorId,
-            'delivery_location_id': dropoffLocationId,
-            'order_status': 'pending',
-            'subtotal': subtotal,
-            'delivery_fee': deliveryFee,
-            'total_amount': totalAmount,
-            'payment_method': paymentMethod,
-            'payment_status': paymentMethod == 'gcash_simulated'
-                ? 'paid'
-                : 'pending',
-            'payment_reference': 'PAY-${DateTime.now().millisecondsSinceEpoch}',
-          })
-          .select('id')
-          .single();
-
-      final orderId = orderRes['id'].toString();
-
-      // Insert order items
-      final itemsData = items
+      final itemsPayload = items
           .map(
             (item) => {
-              'order_id': orderId,
               'product_id': item.productId,
               'product_name': item.productName,
               'quantity': item.quantity,
               'unit_price': item.unitPrice,
-              'weight_grams': (item.weightKg * 1000).toInt(),
-              'subtotal': item.unitPrice * item.quantity,
             },
           )
           .toList();
 
-      await _client.from('order_items').insert(itemsData);
+      // Transactional atomic order placement RPC with row locking, stock reduction & payload check
+      await _client.rpc(
+        'place_order',
+        params: {
+          'p_vendor_id': vendorId,
+          'p_delivery_location_id': dropoffLocationId,
+          'p_subtotal': subtotal,
+          'p_delivery_fee': deliveryFee,
+          'p_total_amount': totalAmount,
+          'p_payment_method': paymentMethod,
+          'p_items': itemsPayload,
+        },
+      );
+
+      if (!mounted) return true;
 
       await loadOrders();
+      // Invalidate/reload product inventory and vendor orders so changes reflect immediately
+      ref.read(productProvider.notifier).loadProducts();
+      ref.read(vendorOrdersProvider.notifier).loadOrders();
       return true;
     } catch (e) {
       debugPrint('Place order failed: $e');
+      final errorMsg = e is PostgrestException ? e.message : e.toString();
       state = OrderState(
         orders: state.orders,
         isLoading: false,
-        errorMessage: e.toString(),
+        errorMessage: errorMsg,
       );
       return false;
     }
@@ -155,15 +166,48 @@ final orderProvider = StateNotifierProvider<OrderNotifier, OrderState>((ref) {
 
 class VendorOrdersNotifier extends StateNotifier<OrderState> {
   final Ref ref;
+  RealtimeChannel? _ordersSubscription;
+
   VendorOrdersNotifier(this.ref) : super(OrderState.empty()) {
     loadOrders();
+    _subscribeToOrders();
   }
 
   final _client = SupabaseService.client;
 
+  void _subscribeToOrders() {
+    if (!SupabaseService.isConfigured) return;
+    final user = ref.read(authProvider).user;
+    if (user == null) return;
+
+    try {
+      _ordersSubscription = _client
+          .channel('vendor_orders_${user.id}')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'orders',
+            filter: PostgresChangeFilter(
+              type: PostgresChangeFilterType.eq,
+              column: 'vendor_id',
+              value: user.id,
+            ),
+            callback: (payload) {
+              if (mounted) {
+                loadOrders();
+              }
+            },
+          )
+          .subscribe();
+    } catch (e) {
+      debugPrint('Error subscribing to vendor orders realtime: $e');
+    }
+  }
+
   Future<void> loadOrders() async {
     final authUser = SupabaseService.client.auth.currentUser;
     if (authUser == null) {
+      if (!mounted) return;
       state = OrderState(orders: []);
       return;
     }
@@ -231,6 +275,35 @@ class VendorOrdersNotifier extends StateNotifier<OrderState> {
       debugPrint('Update order status failed: $e');
       return false;
     }
+  }
+
+  /// Triggers the full drone assignment, weather check, and delivery workflow
+  /// using the secure vendor_mark_order_ready RPC. Returns an error message if failed.
+  Future<String?> markOrderReady(String orderId) async {
+    try {
+      await _client.rpc(
+        'vendor_mark_order_ready',
+        params: {'p_order_id': orderId},
+      );
+
+      if (!mounted) return null;
+
+      await loadOrders();
+      ref.read(orderProvider.notifier).loadOrders();
+      return null;
+    } catch (e) {
+      debugPrint('vendor_mark_order_ready failed: $e');
+      if (e is PostgrestException) {
+        return e.message;
+      }
+      return e.toString();
+    }
+  }
+
+  @override
+  void dispose() {
+    _ordersSubscription?.unsubscribe();
+    super.dispose();
   }
 }
 

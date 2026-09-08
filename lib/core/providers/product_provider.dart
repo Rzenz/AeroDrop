@@ -33,6 +33,7 @@ class ProductNotifier extends StateNotifier<ProductState> {
   Future<void> loadProducts() async {
     final authUser = SupabaseService.client.auth.currentUser;
     if (authUser == null) {
+      if (!mounted) return;
       state = ProductState(products: [], categories: ['All']);
       return;
     }
@@ -177,6 +178,7 @@ class VendorProductsNotifier extends StateNotifier<ProductState> {
   Future<void> loadProducts() async {
     final authUser = SupabaseService.client.auth.currentUser;
     if (authUser == null) {
+      if (!mounted) return;
       state = ProductState(products: [], categories: ['All']);
       return;
     }

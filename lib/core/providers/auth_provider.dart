@@ -540,17 +540,20 @@ class AuthNotifier extends StateNotifier<AuthState> {
     String reason = 'Deleted by admin',
   }) async {
     if (!SupabaseService.isConfigured) return 'Supabase is not configured.';
+    if (state.user?.id == userId) {
+      return 'You cannot delete your own administrator account.';
+    }
     try {
-      await SupabaseService.client
-          .from('users')
-          .update({
-            'account_status': 'deleted',
-            'updated_at': DateTime.now().toUtc().toIso8601String(),
-          })
-          .eq('id', userId);
+      await SupabaseService.client.rpc(
+        'delete_user_account',
+        params: {'p_target_user_id': userId},
+      );
       return null;
     } catch (e) {
       debugPrint('Delete user account failed: $e');
+      if (e is PostgrestException) {
+        return e.message;
+      }
       return e.toString();
     }
   }

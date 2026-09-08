@@ -18,7 +18,9 @@ class NotificationNotifier extends StateNotifier<List<NotificationModel>> {
       }, fireImmediately: true);
     } else {
       if (SupabaseService.isConfigured) {
-        Future.microtask(loadNotifications);
+        Future.microtask(() {
+          if (mounted) loadNotifications();
+        });
       }
     }
   }
@@ -29,6 +31,7 @@ class NotificationNotifier extends StateNotifier<List<NotificationModel>> {
 
     final currentUser = SupabaseService.client.auth.currentUser;
     if (currentUser == null) {
+      if (!mounted) return;
       state = [];
       return;
     }

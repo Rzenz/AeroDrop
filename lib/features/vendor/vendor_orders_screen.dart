@@ -25,11 +25,18 @@ class _VendorOrdersScreenState extends ConsumerState<VendorOrdersScreen>
     (label: 'Preparing', statusKeys: ['preparing']),
     (
       label: 'Ready',
-      statusKeys: ['ready', 'ready_for_pickup', 'ready for pickup'],
+      statusKeys: [
+        'ready',
+        'ready_for_delivery',
+        'ready_for_pickup',
+        'ready for pickup',
+      ],
     ),
     (label: 'Delivered', statusKeys: ['delivered']),
     (label: 'Cancelled', statusKeys: ['cancelled', 'rejected', 'failed']),
   ];
+
+  final Set<String> _updatingOrderIds = {};
 
   @override
   void initState() {
@@ -206,11 +213,18 @@ class _VendorOrdersScreenState extends ConsumerState<VendorOrdersScreen>
                         VoidCallback? readyCb;
 
                         final status = order.orderStatus.toLowerCase();
+                        final isUpdating = _updatingOrderIds.contains(order.id);
                         if (status == 'pending') {
-                          acceptCb = () => _handleUpdate(order.id, 'preparing');
-                          rejectCb = () => _handleUpdate(order.id, 'cancelled');
+                          acceptCb = isUpdating
+                              ? null
+                              : () => _handleUpdate(order.id, 'preparing');
+                          rejectCb = isUpdating
+                              ? null
+                              : () => _handleUpdate(order.id, 'cancelled');
                         } else if (status == 'preparing') {
-                          readyCb = () => _handleUpdate(order.id, 'ready');
+                          readyCb = isUpdating
+                              ? null
+                              : () => _handleMarkReady(order.id);
                         }
 
                         return _DispatchCard(
@@ -236,11 +250,14 @@ class _VendorOrdersScreenState extends ConsumerState<VendorOrdersScreen>
   }
 
   Future<void> _handleUpdate(String orderId, String nextStatus) async {
+    if (_updatingOrderIds.contains(orderId)) return;
+    setState(() => _updatingOrderIds.add(orderId));
     HapticFeedback.mediumImpact();
     final success = await ref
         .read(vendorOrdersProvider.notifier)
         .updateOrderStatus(orderId, nextStatus);
     if (mounted) {
+      setState(() => _updatingOrderIds.remove(orderId));
       showNeuSnack(
         context,
         success
@@ -248,6 +265,29 @@ class _VendorOrdersScreenState extends ConsumerState<VendorOrdersScreen>
             : 'Failed to update order status.',
         tone: NeuToneKind.success,
       );
+    }
+  }
+
+  Future<void> _handleMarkReady(String orderId) async {
+    if (_updatingOrderIds.contains(orderId)) return;
+    setState(() => _updatingOrderIds.add(orderId));
+    HapticFeedback.mediumImpact();
+
+    final error = await ref
+        .read(vendorOrdersProvider.notifier)
+        .markOrderReady(orderId);
+
+    if (mounted) {
+      setState(() => _updatingOrderIds.remove(orderId));
+      if (error == null) {
+        showNeuSnack(
+          context,
+          'Order is ready for drone pickup! Drone dispatch initiated.',
+          tone: NeuToneKind.success,
+        );
+      } else {
+        showNeuSnack(context, error, tone: NeuToneKind.error);
+      }
     }
   }
 }
@@ -421,7 +461,7 @@ class _DispatchCard extends StatelessWidget {
                   if (onReady != null && onPrepare == null) ...[
                     Expanded(
                       child: _ActionBtn(
-                        label: 'Ready for Drone Cargo',
+                        label: 'Ready for Drone Pickup',
                         color: AppColors.accent,
                         icon: Icons.flight_takeoff_rounded,
                         onTap: onReady!,

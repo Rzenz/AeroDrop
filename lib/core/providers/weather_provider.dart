@@ -73,13 +73,16 @@ class WeatherNotifier extends StateNotifier<WeatherState> {
     if (!SupabaseService.isConfigured) return;
     final authUser = SupabaseService.client.auth.currentUser;
     if (authUser == null) {
+      if (!mounted) return;
       state = const WeatherState(
         safetyStatus: 'grounded',
         message: 'No authenticated user session.',
       );
       return;
     }
+    if (!mounted) return;
     state = state.copyWith(isLoading: true, errorMessage: null);
+
     try {
       final row = await SupabaseService.client
           .from('weather_safety')

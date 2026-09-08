@@ -19,7 +19,9 @@ class DroneNotifier extends StateNotifier<List<DroneModel>> {
         state = next;
       }, fireImmediately: true);
     } else {
-      Future.microtask(loadDronesFromSupabase);
+      Future.microtask(() {
+        if (mounted) loadDronesFromSupabase();
+      });
     }
   }
 
@@ -64,6 +66,7 @@ class DroneNotifier extends StateNotifier<List<DroneModel>> {
     if (!SupabaseService.isConfigured) return;
     final authUser = SupabaseService.client.auth.currentUser;
     if (authUser == null) {
+      if (!mounted) return;
       state = [];
       return;
     }

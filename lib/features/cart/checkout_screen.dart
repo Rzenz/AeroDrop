@@ -29,6 +29,12 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   Widget build(BuildContext context) {
     final cart = cartNotifier.value;
     final total = cartNotifier.totalAmount + 20.0;
+    final totalWeightGrams = cart.fold<int>(
+      0,
+      (sum, item) => sum + ((item.weightKg * 1000).round() * item.quantity),
+    );
+    final isOverweight = totalWeightGrams > 500;
+    final totalWeightKg = (totalWeightGrams / 1000.0).toStringAsFixed(2);
     final locationsAsync = ref.watch(campusLocationsProvider);
 
     return Scaffold(
@@ -191,6 +197,21 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                           label: 'Drone Delivery Fee',
                           value: '₱20.00',
                         ),
+                        const SizedBox(height: 6),
+                        _SummaryRow(
+                          label: 'Total Cargo Weight',
+                          value: '$totalWeightGrams g ($totalWeightKg kg)',
+                          valueColor: isOverweight
+                              ? AppColors.danger
+                              : Colors.white,
+                          bold: isOverweight,
+                        ),
+
+                        const SizedBox(height: 6),
+                        _SummaryRow(
+                          label: 'Maximum Drone Payload',
+                          value: '500 g (0.50 kg)',
+                        ),
                         const SizedBox(height: 10),
                         Divider(color: AppColors.border),
                         const SizedBox(height: 10),
@@ -203,14 +224,53 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                       ],
                     ),
                   ).animate().fadeIn(delay: 200.ms),
+
+                  // Overweight warning banner
+                  if (isOverweight) ...[
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.danger.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: AppColors.danger.withValues(alpha: 0.5),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.warning_amber_rounded,
+                            color: AppColors.danger,
+                            size: 24,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              "This order exceeds the drone's maximum payload of 0.5 kg. Your order weighs $totalWeightKg kg.",
+                              style: const TextStyle(
+                                color: AppColors.danger,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+
                   const SizedBox(height: 32),
 
                   // Confirm button
                   FilledButton(
-                    onPressed: _placing ? null : _placeOrder,
+                    onPressed: (_placing || isOverweight) ? null : _placeOrder,
                     style: FilledButton.styleFrom(
                       backgroundColor: AppColors.accent,
                       foregroundColor: AppColors.bgDark,
+                      disabledBackgroundColor: isOverweight
+                          ? AppColors.cardDark
+                          : null,
                       minimumSize: const Size(double.infinity, 56),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
@@ -226,10 +286,11 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                             ),
                           )
                         : Text(
-                            'Confirm Order',
+                            isOverweight ? 'Payload Exceeded' : 'Confirm Order',
                             style: AppTextStyles.subHead(
                               fontSize: 17,
                               fontWeight: FontWeight.bold,
+                              color: isOverweight ? Colors.grey : null,
                             ),
                           ),
                   ).animate().fadeIn(delay: 250.ms),
@@ -246,6 +307,21 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     final cart = cartNotifier.value;
     if (cart.isEmpty) {
       setState(() => _placing = false);
+      return;
+    }
+
+    final totalWeightGrams = cart.fold<int>(
+      0,
+      (sum, item) => sum + ((item.weightKg * 1000).round() * item.quantity),
+    );
+    if (totalWeightGrams > 500) {
+      setState(() => _placing = false);
+      final weightKg = (totalWeightGrams / 1000.0).toStringAsFixed(2);
+      showNeuSnack(
+        context,
+        "This order exceeds the drone's maximum payload of 0.5 kg. Your order weighs $weightKg kg.",
+        tone: NeuToneKind.error,
+      );
       return;
     }
 

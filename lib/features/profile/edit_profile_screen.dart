@@ -139,13 +139,13 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: Icon(
+              leading: const Icon(
                 Icons.photo_library_outlined,
-                color: AppColors.textPrimary,
+                color: Colors.white,
               ),
-              title: Text(
+              title: const Text(
                 'Upload Photo',
-                style: AppTextStyles.body(color: AppColors.textPrimary),
+                style: TextStyle(color: Colors.white),
               ),
               onTap: () {
                 Navigator.pop(context);
@@ -158,9 +158,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                   Icons.delete_outline_rounded,
                   color: AppColors.danger,
                 ),
-                title: Text(
+                title: const Text(
                   'Remove Current Photo',
-                  style: AppTextStyles.body(color: AppColors.danger),
+                  style: TextStyle(color: AppColors.danger),
                 ),
                 onTap: () {
                   Navigator.pop(context);
@@ -169,10 +169,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
               ),
             ListTile(
               leading: const Icon(Icons.close_rounded, color: Colors.grey),
-              title: Text(
-                'Cancel',
-                style: AppTextStyles.body(color: Colors.grey),
-              ),
+              title: const Text('Cancel', style: TextStyle(color: Colors.grey)),
               onTap: () => Navigator.pop(context),
             ),
           ],

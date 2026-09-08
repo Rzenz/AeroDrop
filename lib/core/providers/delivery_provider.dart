@@ -21,8 +21,12 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
         state = next;
       }, fireImmediately: true);
     } else {
-      Future.microtask(loadDeliveriesFromSupabase);
-      Future.microtask(refreshPendingDeliveriesCount);
+      Future.microtask(() {
+        if (mounted) loadDeliveriesFromSupabase();
+      });
+      Future.microtask(() {
+        if (mounted) refreshPendingDeliveriesCount();
+      });
       _startSimulation();
     }
   }

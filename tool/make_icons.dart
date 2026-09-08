@@ -167,7 +167,9 @@ void main() {
   // A solid colour would flatten the icon against the real artwork, so the
   // background is the same vertical gradient, sampled from the source.
   final bg = Image(width: _size, height: _size, numChannels: 4);
-  final t0r = topLeft.r.toInt(), t0g = topLeft.g.toInt(), t0b = topLeft.b.toInt();
+  final t0r = topLeft.r.toInt(),
+      t0g = topLeft.g.toInt(),
+      t0b = topLeft.b.toInt();
   final t1r = bottomRight.r.toInt(),
       t1g = bottomRight.g.toInt(),
       t1b = bottomRight.b.toInt();
@@ -181,7 +183,9 @@ void main() {
     }
   }
   File('$_outDir/app_icon_background.png').writeAsBytesSync(encodePng(bg));
-  stdout.writeln('wrote app_icon_background.png (${hex(topLeft)} to ${hex(bottomRight)})');
+  stdout.writeln(
+    'wrote app_icon_background.png (${hex(topLeft)} to ${hex(bottomRight)})',
+  );
 }
 
 int _minChannel(Pixel p) {

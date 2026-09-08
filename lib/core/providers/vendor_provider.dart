@@ -96,6 +96,7 @@ class VendorNotifier extends StateNotifier<VendorState> {
   Future<void> loadVendors() async {
     final authUser = SupabaseService.client.auth.currentUser;
     if (authUser == null) {
+      if (!mounted) return;
       state = VendorState(vendors: []);
       return;
     }

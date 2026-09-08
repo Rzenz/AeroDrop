@@ -22,9 +22,9 @@ class VendorProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _VendorProfileScreenState extends ConsumerState<VendorProfileScreen> {
-  bool _uploadingAvatar = false;
+  bool _uploadingLogo = false;
 
-  Future<void> _changeAvatar() async {
+  Future<void> _changeBusinessLogo() async {
     try {
       final image = await ImageUtils.pickAndCropImage(
         source: ImageSource.gallery,
@@ -44,19 +44,21 @@ class _VendorProfileScreenState extends ConsumerState<VendorProfileScreen> {
         return;
       }
 
-      setState(() => _uploadingAvatar = true);
-      final success = await ref.read(authProvider.notifier).updateAvatar(image);
+      setState(() => _uploadingLogo = true);
+      final success = await ref
+          .read(authProvider.notifier)
+          .updateBusinessLogo(image);
       if (mounted) {
-        setState(() => _uploadingAvatar = false);
+        setState(() => _uploadingLogo = false);
         showNeuSnack(
           context,
-          success ? 'Avatar updated!' : 'Failed to upload avatar.',
-          tone: NeuToneKind.success,
+          success ? 'Store photo updated!' : 'Failed to upload store photo.',
+          tone: success ? NeuToneKind.success : NeuToneKind.error,
         );
       }
     } catch (e) {
-      debugPrint('Avatar change error: $e');
-      if (mounted) setState(() => _uploadingAvatar = false);
+      debugPrint('Business logo change error: $e');
+      if (mounted) setState(() => _uploadingLogo = false);
     }
   }
 
@@ -111,7 +113,7 @@ class _VendorProfileScreenState extends ConsumerState<VendorProfileScreen> {
             child: Column(
               children: [
                 GestureDetector(
-                  onTap: _changeAvatar,
+                  onTap: _changeBusinessLogo,
                   child: Stack(
                     children: [
                       Container(
@@ -120,9 +122,9 @@ class _VendorProfileScreenState extends ConsumerState<VendorProfileScreen> {
                         decoration: BoxDecoration(
                           color: const Color(0xFFFF6B35),
                           borderRadius: BorderRadius.circular(20),
-                          image: user.avatarUrl != null
+                          image: user.businessLogoUrl != null
                               ? DecorationImage(
-                                  image: NetworkImage(user.avatarUrl!),
+                                  image: NetworkImage(user.businessLogoUrl!),
                                   fit: BoxFit.cover,
                                 )
                               : null,
@@ -136,12 +138,12 @@ class _VendorProfileScreenState extends ConsumerState<VendorProfileScreen> {
                           ],
                         ),
                         alignment: Alignment.center,
-                        child: _uploadingAvatar
+                        child: _uploadingLogo
                             ? const CircularProgressIndicator(
                                 color: Colors.white,
                                 strokeWidth: 2,
                               )
-                            : user.avatarUrl == null
+                            : user.businessLogoUrl == null
                             ? Text(
                                 initials,
                                 style: AppTextStyles.heading(

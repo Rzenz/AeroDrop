@@ -217,6 +217,12 @@ class _VendorDetailsScreenState extends ConsumerState<VendorDetailsScreen>
                       decoration: BoxDecoration(
                         color: vendor.logoColor,
                         borderRadius: BorderRadius.circular(18),
+                        image: vendor.businessLogoUrl != null
+                            ? DecorationImage(
+                                image: NetworkImage(vendor.businessLogoUrl!),
+                                fit: BoxFit.cover,
+                              )
+                            : null,
                         boxShadow: [
                           BoxShadow(
                             color: vendor.logoColor.withValues(alpha: 0.4),
@@ -226,13 +232,15 @@ class _VendorDetailsScreenState extends ConsumerState<VendorDetailsScreen>
                         ],
                       ),
                       alignment: Alignment.center,
-                      child: Text(
-                        vendor.logoInitials,
-                        style: AppTextStyles.heading(
-                          fontSize: 26,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
+                      child: vendor.businessLogoUrl == null
+                          ? Text(
+                              vendor.logoInitials,
+                              style: AppTextStyles.heading(
+                                fontSize: 26,
+                                color: AppColors.textPrimary,
+                              ),
+                            )
+                          : null,
                     ),
                     const SizedBox(height: 12),
                     Text(

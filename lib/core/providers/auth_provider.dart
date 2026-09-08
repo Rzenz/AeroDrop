@@ -496,6 +496,60 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  Future<bool> updateBusinessLogo(XFile? logoFile) async {
+    if (state.user == null) {
+      state = state.copyWith(errorMessage: 'Not logged in.');
+      return false;
+    }
+
+    state = state.copyWith(isLoading: true, errorMessage: null);
+
+    try {
+      final userId = state.user!.id;
+      String? logoUrl;
+
+      if (logoFile != null) {
+        final bytes = await logoFile.readAsBytes();
+        final ext = logoFile.name.split('.').last.toLowerCase();
+        final storagePath = '$userId/logo.$ext';
+
+        await SupabaseService.client.storage
+            .from('vendor-logos')
+            .uploadBinary(
+              storagePath,
+              bytes,
+              fileOptions: const FileOptions(upsert: true),
+            );
+
+        logoUrl = SupabaseService.client.storage
+            .from('vendor-logos')
+            .getPublicUrl(storagePath);
+      }
+
+      await SupabaseService.client
+          .from('users')
+          .update({
+            'business_logo_url': logoUrl,
+            'updated_at': DateTime.now().toUtc().toIso8601String(),
+          })
+          .eq('id', userId);
+
+      state = state.copyWith(
+        user: state.user!.copyWith(businessLogoUrl: logoUrl),
+        isLoading: false,
+        errorMessage: null,
+      );
+      return true;
+    } catch (error) {
+      debugPrint('Business logo update failed: $error');
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: 'Logo update failed. Please try again.',
+      );
+      return false;
+    }
+  }
+
   // ── Admin user management ─────────────────────────────────────────────────
 
   Future<String?> suspendUser(

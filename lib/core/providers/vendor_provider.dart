@@ -11,6 +11,7 @@ class VendorViewModel {
   final String phoneNumber;
   final String email;
   final String? avatarUrl;
+  final String? businessLogoUrl;
   final String? campusLocationId;
 
   // UI compatibility helpers
@@ -35,6 +36,7 @@ class VendorViewModel {
     required this.phoneNumber,
     required this.email,
     this.avatarUrl,
+    this.businessLogoUrl,
     this.campusLocationId,
     required this.building,
     this.logoColor = const Color(0xFFFF6B35),
@@ -65,6 +67,7 @@ class VendorViewModel {
       phoneNumber: v['phone_number']?.toString() ?? '',
       email: v['email']?.toString() ?? '',
       avatarUrl: v['avatar_url']?.toString(),
+      businessLogoUrl: v['business_logo_url']?.toString(),
       campusLocationId: v['campus_location_id']?.toString(),
       building: locName,
       logoInitials: initials,

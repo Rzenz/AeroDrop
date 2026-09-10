@@ -1,4 +1,4 @@
--- 09_secure_telemetry_rpc.sql
+-- 10_secure_telemetry_rpc.sql
 -- Creates the secure record_simulated_telemetry function compatible with the simplified schema.
 
 CREATE OR REPLACE FUNCTION public.record_simulated_telemetry(

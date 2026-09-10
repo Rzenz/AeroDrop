@@ -1,6 +1,6 @@
 -- ============================================================
 -- AERODROP USER/VENDOR ACCOUNT WORKFLOW MIGRATION
--- File: supabase/migrations/03_user_vendor_account_workflow.sql
+-- File: supabase/migrations/04_user_vendor_account_workflow.sql
 --
 -- Changes:
 -- 1. Consolidates roles into user, vendor, admin

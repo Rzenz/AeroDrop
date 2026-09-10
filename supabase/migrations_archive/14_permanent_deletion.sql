@@ -1,4 +1,4 @@
--- 13_permanent_deletion.sql
+-- 14_permanent_deletion.sql
 -- Secure RPC function for Admin permanent user deletion & safe FK constraints
 
 -- Function to permanently delete a user account from auth.users & public.users

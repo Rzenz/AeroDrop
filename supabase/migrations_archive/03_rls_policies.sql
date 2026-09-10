@@ -6,16 +6,15 @@ CREATE OR REPLACE FUNCTION public.is_admin(p_user_id uuid)
 RETURNS boolean AS $$
 BEGIN
   RETURN EXISTS (
-    SELECT 1 FROM public.user_credentials uc
-    JOIN public.user_roles ur ON uc.role_id = ur.role_id
-    WHERE uc.user_id = p_user_id AND ur.role_name = 'admin'
+    SELECT 1 FROM public.users u
+    WHERE u.id = p_user_id
+      AND u.role = 'admin'
+      AND (u.account_status = 'active' OR u.account_status IS NULL)
   );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Enable RLS on all tables
-ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.vendor_statuses ENABLE ROW LEVEL SECURITY;
+-- Enable RLS on all valid tables
 ALTER TABLE public.order_statuses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.payment_methods ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.payment_statuses ENABLE ROW LEVEL SECURITY;
@@ -32,10 +31,7 @@ ALTER TABLE public.weather_statuses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.no_fly_zone_statuses ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.user_credentials ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.user_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.campus_locations ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.vendors ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.product_categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
@@ -53,8 +49,6 @@ ALTER TABLE public.weather_safety ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.no_fly_zones ENABLE ROW LEVEL SECURITY;
 
 -- 1. READ ONLY LOOKUP TABLES FOR ALL USERS
-CREATE POLICY select_lookups ON public.user_roles FOR SELECT USING (true);
-CREATE POLICY select_vendor_statuses ON public.vendor_statuses FOR SELECT USING (true);
 CREATE POLICY select_order_statuses ON public.order_statuses FOR SELECT USING (true);
 CREATE POLICY select_payment_methods ON public.payment_methods FOR SELECT USING (true);
 CREATE POLICY select_payment_statuses ON public.payment_statuses FOR SELECT USING (true);
@@ -72,7 +66,6 @@ CREATE POLICY select_no_fly_zone_statuses ON public.no_fly_zone_statuses FOR SEL
 
 -- 2. PUBLIC READ TABLES
 CREATE POLICY select_campus_locations ON public.campus_locations FOR SELECT USING (true);
-CREATE POLICY select_vendors ON public.vendors FOR SELECT USING (true);
 CREATE POLICY select_products ON public.products FOR SELECT USING (true);
 CREATE POLICY select_categories ON public.product_categories FOR SELECT USING (true);
 CREATE POLICY select_weather_safety ON public.weather_safety FOR SELECT USING (true);
@@ -81,15 +74,17 @@ CREATE POLICY select_no_fly_zones ON public.no_fly_zones FOR SELECT USING (true)
 -- 3. WRITE ONLY BY SERVICE ROLE OR ADMIN FOR LOOKUPS
 -- (Postgres default permits superuser/service_role to bypass RLS, so no explicit admin policy required for service_role)
 
--- 4. USER SPECIFIC PROFILE & CREDENTIAL POLICIES
-CREATE POLICY select_user_credentials ON public.user_credentials FOR SELECT USING (auth.uid() = user_id OR public.is_admin(auth.uid()));
-CREATE POLICY select_user_profiles ON public.user_profiles FOR SELECT USING (true);
-CREATE POLICY update_own_profile ON public.user_profiles FOR UPDATE USING (auth.uid() = user_id);
+-- 4. USER SPECIFIC PROFILE POLICIES (Consolidated on public.users)
+CREATE POLICY select_users ON public.users FOR SELECT USING (true);
+CREATE POLICY insert_users ON public.users FOR INSERT WITH CHECK (auth.uid() = id OR public.is_admin(auth.uid()));
+CREATE POLICY update_own_user ON public.users FOR UPDATE USING (auth.uid() = id OR public.is_admin(auth.uid()));
 
 -- 5. ORDER POLICIES
-CREATE POLICY select_own_orders ON public.orders FOR SELECT USING (auth.uid() = user_id OR public.is_admin(auth.uid()) OR EXISTS (
-  SELECT 1 FROM public.vendors v WHERE v.user_id = auth.uid() AND v.id = orders.vendor_id
-));
+CREATE POLICY select_own_orders ON public.orders FOR SELECT USING (
+  auth.uid() = user_id 
+  OR public.is_admin(auth.uid()) 
+  OR auth.uid() = vendor_id
+);
 CREATE POLICY insert_own_orders ON public.orders FOR INSERT WITH CHECK (auth.uid() = user_id);
 
 -- 6. DELIVERY POLICIES

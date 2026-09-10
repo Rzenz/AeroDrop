@@ -1,4 +1,4 @@
--- 14_order_visibility_and_atomic_placement.sql
+-- 15_order_visibility_and_atomic_placement.sql
 -- 1. Fix RLS policies on public.orders to allow vendors to see their orders in the simplified schema
 
 DROP POLICY IF EXISTS select_own_orders ON public.orders;
@@ -6,9 +6,6 @@ CREATE POLICY select_own_orders ON public.orders FOR SELECT USING (
   auth.uid() = user_id 
   OR public.is_admin(auth.uid()) 
   OR auth.uid() = vendor_id
-  OR EXISTS (
-    SELECT 1 FROM public.vendors v WHERE v.user_id = auth.uid() AND v.id = orders.vendor_id
-  )
 );
 
 -- Allow vendors to update order status for their orders
@@ -17,9 +14,6 @@ CREATE POLICY update_own_orders ON public.orders FOR UPDATE USING (
   auth.uid() = user_id
   OR public.is_admin(auth.uid())
   OR auth.uid() = vendor_id
-  OR EXISTS (
-    SELECT 1 FROM public.vendors v WHERE v.user_id = auth.uid() AND v.id = orders.vendor_id
-  )
 );
 
 -- Ensure select on order_items for users and vendors

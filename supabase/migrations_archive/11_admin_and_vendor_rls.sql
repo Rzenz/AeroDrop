@@ -1,5 +1,5 @@
--- 10_admin_and_vendor_rls.sql
--- RLS policies for admin management, vendors, drones, and telemetry.
+-- 11_admin_and_vendor_rls.sql
+-- RLS policies for admin management, users/vendors, drones, and telemetry.
 
 begin;
 
@@ -16,12 +16,10 @@ set search_path = public, pg_temp
 as $$
   select exists (
     select 1
-    from public.user_credentials uc
-    join public.user_roles ur
-      on ur.role_id = uc.role_id
-    where uc.user_id = p_user_id
-      and lower(ur.role_name) = 'admin'
-      and uc.account_status = 'active'
+    from public.users u
+    where u.id = p_user_id
+      and lower(u.role) = 'admin'
+      and (u.account_status = 'active' or u.account_status is null)
   );
 $$;
 
@@ -33,55 +31,27 @@ grant execute on function public.is_admin(uuid) to service_role;
 -- ENABLE ROW LEVEL SECURITY
 -- =========================================================
 
-alter table public.user_credentials enable row level security;
-alter table public.vendors enable row level security;
+alter table public.users enable row level security;
 alter table public.drones enable row level security;
 alter table public.drone_telemetry enable row level security;
 
 -- =========================================================
--- USER CREDENTIALS
+-- USERS & VENDORS (Consolidated on public.users)
 -- =========================================================
 
--- Only active admins can update user credentials.
-drop policy if exists update_user_credentials
-on public.user_credentials;
+-- Active admins can manage any user or vendor profile.
+drop policy if exists admin_manage_users
+on public.users;
 
-create policy update_user_credentials
-on public.user_credentials
-for update
+create policy admin_manage_users
+on public.users
+for all
 to authenticated
 using (
   public.is_admin(auth.uid())
 )
 with check (
   public.is_admin(auth.uid())
-);
-
--- =========================================================
--- VENDORS
--- =========================================================
-
--- Vendor onboarding is handled by the authentication trigger.
--- Remove direct vendor insertion from the Flutter client.
-drop policy if exists insert_vendors
-on public.vendors;
-
--- Vendor owners can update their own store.
--- Active admins can update any vendor.
-drop policy if exists update_vendors
-on public.vendors;
-
-create policy update_vendors
-on public.vendors
-for update
-to authenticated
-using (
-  auth.uid() = user_id
-  or public.is_admin(auth.uid())
-)
-with check (
-  auth.uid() = user_id
-  or public.is_admin(auth.uid())
 );
 
 -- =========================================================
@@ -119,8 +89,8 @@ with check (
 
 -- Telemetry can be read by:
 -- 1. An active administrator
--- 2. The student who owns the related order
--- 3. The vendor assigned to the related order
+-- 2. The user who placed the order
+-- 3. The vendor assigned to the order (orders.vendor_id = auth.uid())
 drop policy if exists select_drone_telemetry
 on public.drone_telemetry;
 
@@ -135,12 +105,10 @@ using (
     from public.deliveries d
     join public.orders o
       on o.id = d.order_id
-    left join public.vendors v
-      on v.id = o.vendor_id
     where d.id = drone_telemetry.delivery_id
       and (
         o.user_id = auth.uid()
-        or v.user_id = auth.uid()
+        or o.vendor_id = auth.uid()
       )
   )
 );

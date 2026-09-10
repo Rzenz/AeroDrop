@@ -46,3 +46,6 @@ app.*.map.json
 
 # Local configuration secrets
 config.json
+supabase/.temp/
+
+supabase/remote_backup/

@@ -1,4 +1,4 @@
--- 12_simplified_trigger.sql
+-- 13_simplified_trigger.sql
 -- Replaces handle_new_auth_user() to support the new single-table denormalized users schema.
 
 CREATE OR REPLACE FUNCTION public.handle_new_auth_user()
@@ -7,18 +7,17 @@ DECLARE
     v_role text;
     v_vendor_status text;
 BEGIN
-    -- Resolve requested role (default to student)
-    v_role := COALESCE(NEW.raw_user_meta_data->>'requested_role', NEW.raw_user_meta_data->>'role', 'student');
+    -- Resolve requested role (default to user)
+    v_role := COALESCE(NEW.raw_user_meta_data->>'requested_role', NEW.raw_user_meta_data->>'role', 'user');
 
     -- Prevent self-registration as admin
-    IF v_role = 'admin' THEN
-        v_role := 'student';
+    IF v_role = 'admin' OR v_role NOT IN ('user', 'vendor', 'admin') THEN
+        v_role := 'user';
     END IF;
 
-    -- Faculty staff or student roles are kept as requested.
-    -- Vendor applicants start with a role of 'student' and vendor_status as 'pending'
+    -- Vendor applicants start with a role of 'user' and vendor_status as 'pending'
     IF v_role = 'vendor' THEN
-        v_role := 'student';
+        v_role := 'user';
         v_vendor_status := 'pending';
     ELSE
         v_vendor_status := NULL;

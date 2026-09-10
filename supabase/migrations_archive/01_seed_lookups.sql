@@ -1,21 +1,9 @@
 -- 01_seed_lookups.sql
 -- Seeds all lookup tables, status codes, default drone, and campus locations.
 
--- 1. USER ROLES
-INSERT INTO public.user_roles (role_id, role_name) VALUES
-  ('d3b07384-d113-4956-a5db-e1c300c8f5bb', 'student'),
-  ('c2c191a3-2c1b-4d7a-8f1b-252ea93ad805', 'faculty_staff'),
-  ('b1b2a92e-3d14-41d1-817d-2b4a39b348d3', 'vendor'),
-  ('a0a1a82f-4d15-41e1-827d-2b4a39b348d4', 'admin')
-ON CONFLICT (role_id) DO UPDATE SET role_name = EXCLUDED.role_name;
+-- 1. USER ROLES (Obsolete lookup table removed; roles are consolidated directly on public.users: 'user', 'vendor', 'admin')
 
--- 2. VENDOR STATUSES
-INSERT INTO public.vendor_statuses (id, name) VALUES
-  ('e1a12a3d-4c8d-4a11-b0e1-123456789abc', 'pending'),
-  ('e2a23b4e-5d9e-5b22-c1f2-23456789abcd', 'active'),
-  ('e3a34c5f-6e0f-6c33-d2a3-3456789abcde', 'suspended'),
-  ('e4a45d6a-7f1a-7d44-e3b4-456789abcdef', 'rejected')
-ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
+-- 2. VENDOR STATUSES (Obsolete lookup table removed; vendor_status is stored directly on public.users: 'pending', 'active', 'suspended', 'rejected')
 
 -- 3. ORDER STATUSES
 INSERT INTO public.order_statuses (id, name) VALUES

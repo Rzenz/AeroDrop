@@ -169,10 +169,10 @@ class _VerificationPageState extends ConsumerState<VerificationPage> {
       final user = ref.read(authProvider).user;
       if (user?.isAdmin == true) {
         context.go('/admin');
-      } else if (user?.isVendor == true) {
-        context.go('/vendor');
       } else if (user?.vendorStatus == 'pending') {
         context.go('/account-pending');
+      } else if (user?.isVendor == true) {
+        context.go('/vendor');
       } else {
         context.go('/user');
       }

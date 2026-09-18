@@ -145,8 +145,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         final user = ref.read(authProvider).user;
         if (user != null && user.isAdmin) {
           context.go('/admin');
-        } else if (user != null && user.vendorStatus == 'pending') {
-          context.go('/account-pending');
         } else {
           context.go('/verification');
         }

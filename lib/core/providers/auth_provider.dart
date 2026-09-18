@@ -301,20 +301,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
       // Role enforcement against the selected login mode
       if (expectedRole != null) {
         if (expectedRole == 'vendor') {
-          // Check if user is a pending applicant
-          if (aeroUser.role == 'user' && aeroUser.vendorStatus == 'pending') {
-            state = state.copyWith(
-              user: aeroUser,
-              sessionUnlocked: true,
-              requiresVerification: false,
-              isVerified: true,
-              isLoading: false,
-              errorMessage: null,
-            );
-            return true;
-          }
-
-          if (aeroUser.role != 'vendor' && !aeroUser.isAdmin) {
+          final isPendingApplicant = aeroUser.vendorStatus == 'pending';
+          if (!isPendingApplicant &&
+              aeroUser.role != 'vendor' &&
+              !aeroUser.isAdmin) {
             await SupabaseService.client.auth.signOut();
             state = state.copyWith(
               isLoading: false,
@@ -342,18 +332,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
                     'Your vendor application was rejected. Please contact the administrator.',
               );
               return false;
-            }
-
-            if (aeroUser.vendorStatus == 'pending') {
-              state = state.copyWith(
-                user: aeroUser,
-                sessionUnlocked: true,
-                requiresVerification: false,
-                isVerified: true,
-                isLoading: false,
-                errorMessage: null,
-              );
-              return true;
             }
           }
         } else if (expectedRole == 'user') {

@@ -9,6 +9,7 @@ import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/neu_card.dart';
 import '../../core/widgets/neu_button.dart';
 import '../../core/providers/delivery_provider.dart';
+import '../../core/providers/auth_provider.dart';
 import '../../core/models/delivery_model.dart';
 import '../../core/services/supabase_service.dart';
 
@@ -78,9 +79,9 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
   List<Map<String, dynamic>> _locations = [];
   Map<String, dynamic>? _activeDeliveryRow;
 
-  String _droneBatteryText = 'Drone not assigned yet';
-  String _flightSpeed = '-- km/h';
-  String _flightAltitude = '-- m';
+  String _droneBatteryText = '—';
+  String _flightSpeed = '—';
+  String _flightAltitude = '—';
 
   String? _tappedBuildingName;
 
@@ -133,12 +134,25 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
 
     try {
       final activeStatusNames = ['pending', 'assigning', 'in_transit'];
+      final authState = ref.read(authProvider);
+      final user = authState.user;
+      final isAdmin = user?.isAdmin ?? false;
+      final isVendor = user?.isVendor ?? false;
 
-      final response = await SupabaseService.client
+      var query = SupabaseService.client
           .from('deliveries')
-          .select('*, orders!inner(user_id)')
-          .eq('orders.user_id', currentUser.id)
-          .inFilter('status', activeStatusNames)
+          .select('*, orders!inner(user_id, vendor_id)')
+          .inFilter('status', activeStatusNames);
+
+      if (!isAdmin) {
+        if (isVendor) {
+          query = query.eq('orders.vendor_id', currentUser.id);
+        } else {
+          query = query.eq('orders.user_id', currentUser.id);
+        }
+      }
+
+      final response = await query
           .order('created_at', ascending: false)
           .limit(1)
           .maybeSingle();
@@ -162,9 +176,9 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
     if (droneId == null) {
       if (mounted) {
         setState(() {
-          _droneBatteryText = 'No telemetry records available.';
-          _flightSpeed = '-- km/h';
-          _flightAltitude = '-- m';
+          _droneBatteryText = '—';
+          _flightSpeed = '—';
+          _flightAltitude = '—';
         });
       }
       return;
@@ -178,9 +192,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
       if (drone != null && mounted) {
         final lvl = drone['battery_level'];
         setState(() {
-          _droneBatteryText = lvl != null
-              ? 'Drone Battery: $lvl%'
-              : 'Drone Battery: Unknown';
+          _droneBatteryText = lvl != null ? '$lvl%' : '—';
         });
       }
 
@@ -200,13 +212,13 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
             _flightAltitude = '${tel['altitude']} m';
           }
           if (tel['battery_level'] != null) {
-            _droneBatteryText = 'Drone Battery: ${tel['battery_level']}%';
+            _droneBatteryText = '${tel['battery_level']}%';
           }
         });
       } else {
         if (mounted) {
           setState(() {
-            _droneBatteryText = 'No telemetry records available.';
+            _droneBatteryText = '—';
           });
         }
       }
@@ -228,19 +240,6 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
   @override
   Widget build(BuildContext context) {
     ref.listen<List<DeliveryModel>>(deliveryProvider, (previous, next) {
-      if (previous != null) {
-        for (final nextDel in next) {
-          final prev = previous.firstWhere(
-            (d) => d.id == nextDel.id,
-            orElse: () => nextDel,
-          );
-          if (prev.status == DeliveryStatus.inTransit &&
-              nextDel.status == DeliveryStatus.delivered) {
-            context.go('/user/delivery/completed');
-            break;
-          }
-        }
-      }
       _fetchActiveDeliveryRow();
     });
 
@@ -313,45 +312,38 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
                     break;
 
                   case DeliveryStatus.assigning:
-                    statusLabel = 'Assigning Drone';
-                    messageText = 'Preparing drone for dispatch.';
-                    progress = 0.0;
-                    showPlannedRoute = hasRoute;
-                    showDrone = false;
+                    statusLabel = 'Drone Heading to Vendor';
+                    messageText =
+                        'Drone DRN-001 is en route to pick up the package from the vendor.';
+                    progress = activeDelivery.progress.clamp(0.0, 1.0);
+                    showPlannedRoute = false;
+                    showActiveRoute = hasRoute;
+                    showDrone = true;
                     break;
 
                   case DeliveryStatus.inTransit:
                     showActiveRoute = hasRoute;
-                    showDrone = hasRoute;
-                    final startedAt = activeDelivery.deliveryStartedAt;
-                    if (startedAt != null) {
-                      final total = activeDelivery.estimatedDeliverySeconds;
-                      final elapsed = DateTime.now()
-                          .difference(startedAt)
-                          .inSeconds;
-                      progress = (elapsed / total).clamp(0.0, 1.0);
-                      remainingSeconds = (total - elapsed).clamp(0, total);
-                      if (remainingSeconds <= 0) {
-                        statusLabel = 'Arrived at destination';
-                        messageText = 'Your order has arrived! 🎉';
-                        progress = 1.0;
-                      } else {
-                        final mm = (remainingSeconds ~/ 60).toString().padLeft(
-                          2,
-                          '0',
-                        );
-                        final ss = (remainingSeconds % 60).toString().padLeft(
-                          2,
-                          '0',
-                        );
-                        statusLabel = 'Arriving in $mm:$ss';
-                        messageText =
-                            'Drone is on its way to your destination.';
-                      }
+                    showDrone = true;
+                    progress = activeDelivery.progress.clamp(0.0, 1.0);
+                    final total = activeDelivery.estimatedDeliverySeconds > 0
+                        ? activeDelivery.estimatedDeliverySeconds
+                        : 300;
+                    remainingSeconds = ((1.0 - progress) * total).round();
+                    if (progress >= 1.0 || remainingSeconds <= 0) {
+                      statusLabel = 'Arrived at destination';
+                      messageText = 'Your order has arrived! 🎉';
+                      progress = 1.0;
                     } else {
-                      statusLabel = 'Waiting for dispatch';
-                      messageText = 'Awaiting dispatch signal.';
-                      showDrone = false;
+                      final mm = (remainingSeconds ~/ 60).toString().padLeft(
+                        2,
+                        '0',
+                      );
+                      final ss = (remainingSeconds % 60).toString().padLeft(
+                        2,
+                        '0',
+                      );
+                      statusLabel = 'Arriving in $mm:$ss';
+                      messageText = 'Drone is on its way to your destination.';
                     }
                     break;
 
@@ -378,7 +370,19 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
                     row['dropoff_location_id']?.toString(),
                     size,
                   );
-                  if (pickup != null && dropoff != null) {
+                  if (activeDelivery.status == DeliveryStatus.assigning) {
+                    final hub = Offset(0.50 * size.width, 0.33 * size.height);
+                    if (pickup != null) {
+                      startOffset = hub;
+                      endOffset = pickup;
+                      droneOffset = Offset(
+                        startOffset.dx +
+                            (endOffset.dx - startOffset.dx) * progress,
+                        startOffset.dy +
+                            (endOffset.dy - startOffset.dy) * progress,
+                      );
+                    }
+                  } else if (pickup != null && dropoff != null) {
                     startOffset = pickup;
                     endOffset = dropoff;
                     droneOffset = Offset(

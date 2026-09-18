@@ -904,7 +904,8 @@ ALTER TABLE public.delivery_status_logs ENABLE ROW LEVEL SECURITY;
 
 -- campus_locations policies
 DROP POLICY IF EXISTS campus_locations_select ON public.campus_locations;
-CREATE POLICY campus_locations_select ON public.campus_locations FOR SELECT TO authenticated USING (true);
+CREATE POLICY campus_locations_select ON public.campus_locations FOR SELECT TO anon, authenticated USING (true);
+GRANT SELECT ON public.campus_locations TO anon;
 
 DROP POLICY IF EXISTS campus_locations_admin_insert ON public.campus_locations;
 CREATE POLICY campus_locations_admin_insert ON public.campus_locations FOR INSERT TO authenticated WITH CHECK (public.is_admin());

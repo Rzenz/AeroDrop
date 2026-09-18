@@ -69,7 +69,8 @@ class _UserShellState extends ConsumerState<UserShell>
 
     final authState = ref.read(authProvider);
     final currentUser = authState.user;
-    if (currentUser == null) return;
+    if (currentUser == null || !authState.sessionUnlocked) return;
+    if (SupabaseService.client.auth.currentUser == null) return;
 
     // Do not check admin account if current user is admin. Admin side should remain usable.
     if (currentUser.isAdmin) return;

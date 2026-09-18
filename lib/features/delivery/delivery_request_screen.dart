@@ -508,7 +508,7 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
         final droneResponse = await SupabaseService.client
             .from('drones')
             .select('battery_level')
-            .eq('id', 'DRN-001')
+            .eq('drone_code', 'DRN-001')
             .maybeSingle();
 
         if (droneResponse != null) {

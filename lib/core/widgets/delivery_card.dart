@@ -72,22 +72,19 @@ class _DeliveryCardState extends ConsumerState<DeliveryCard> {
     final status = widget.delivery.status;
     final isInTransit = status == DeliveryStatus.inTransit;
 
-    double progress = widget.delivery.progress;
+    double progress = widget.delivery.progress.clamp(0.0, 1.0);
     int remainingSeconds = 0;
 
     if (isInTransit) {
-      final startedAt = widget.delivery.deliveryStartedAt;
-      if (startedAt != null) {
-        final totalSecs = widget.delivery.estimatedDeliverySeconds;
-        final elapsed = DateTime.now().difference(startedAt).inSeconds;
-        progress = (elapsed / totalSecs).clamp(0.0, 1.0);
-        remainingSeconds = (totalSecs - elapsed).clamp(0, totalSecs);
-      }
+      final totalSecs = widget.delivery.estimatedDeliverySeconds > 0
+          ? widget.delivery.estimatedDeliverySeconds
+          : 300;
+      remainingSeconds = ((1.0 - progress) * totalSecs).round();
     } else if (status == DeliveryStatus.delivered) {
       progress = 1.0;
     }
 
-    final percentage = (progress * 100).toInt();
+    final percentage = (progress * 100).round();
 
     return AnimatedCard(
       onTap: widget.onTap,

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
@@ -26,6 +27,9 @@ class ReceiptData {
   const ReceiptData({
     required this.orderRef,
     required this.vendorName,
+    this.vendorInfo,
+    this.customerName,
+    this.customerPhone,
     required this.lines,
     required this.subtotal,
     required this.deliveryFee,
@@ -33,10 +37,17 @@ class ReceiptData {
     required this.paymentLabel,
     required this.placedAt,
     this.dropoffName,
+    this.totalWeightGrams,
+    this.customerNote,
+    this.orderStatus,
+    this.deliveryId,
   });
 
   final String orderRef;
   final String vendorName;
+  final String? vendorInfo;
+  final String? customerName;
+  final String? customerPhone;
   final List<ReceiptLine> lines;
   final double subtotal;
   final double deliveryFee;
@@ -44,6 +55,10 @@ class ReceiptData {
   final String paymentLabel;
   final DateTime placedAt;
   final String? dropoffName;
+  final int? totalWeightGrams;
+  final String? customerNote;
+  final String? orderStatus;
+  final String? deliveryId;
 }
 
 /// One printed line item.
@@ -139,22 +154,42 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
 
       if (bytes == null) throw StateError('Could not encode the receipt.');
 
-      await Gal.putImageBytes(
-        bytes.buffer.asUint8List(),
-        name: 'AeroDrop-${widget.data.orderRef}',
-        album: 'AeroDrop',
-      );
+      if (Platform.isWindows) {
+        final userProfile = Platform.environment['USERPROFILE'] ?? '.';
+        final downloadsDir = Directory('$userProfile\\Downloads');
+        if (!downloadsDir.existsSync()) {
+          downloadsDir.createSync(recursive: true);
+        }
+        final safeRef = widget.data.orderRef.replaceAll(
+          RegExp(r'[^\w\-]'),
+          '_',
+        );
+        final fileName = 'AeroDrop-Receipt-$safeRef.png';
+        final targetFile = File('${downloadsDir.path}\\$fileName');
+        await targetFile.writeAsBytes(bytes.buffer.asUint8List());
 
-      if (!mounted) return;
-      showNeuSnack(
-        context,
-        'Receipt saved to your photos.',
-        tone: NeuToneKind.success,
-      );
+        if (!mounted) return;
+        showNeuSnack(
+          context,
+          'Receipt saved to Downloads\\$fileName',
+          tone: NeuToneKind.success,
+        );
+      } else {
+        await Gal.putImageBytes(
+          bytes.buffer.asUint8List(),
+          name: 'AeroDrop-${widget.data.orderRef}',
+          album: 'AeroDrop',
+        );
+
+        if (!mounted) return;
+        showNeuSnack(
+          context,
+          'Receipt saved to your photos.',
+          tone: NeuToneKind.success,
+        );
+      }
     } on GalException catch (e) {
       if (!mounted) return;
-      // Gal reports a refused photo-library permission as its own type, and
-      // that needs different advice from a failure to encode.
       showNeuSnack(
         context,
         e.type == GalExceptionType.accessDenied
@@ -162,11 +197,11 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
             : 'Could not save the receipt. Please try again.',
         tone: NeuToneKind.error,
       );
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
       showNeuSnack(
         context,
-        'Could not save the receipt. Please try again.',
+        'Could not save receipt: ${e.toString()}',
         tone: NeuToneKind.error,
       );
     } finally {
@@ -220,9 +255,26 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                   visible: _printed,
                   saving: _saving,
                   onDownload: _download,
+                  onTrack: widget.data.deliveryId != null
+                      ? () {
+                          HapticFeedback.lightImpact();
+                          final isVendor = GoRouterState.of(context)
+                              .uri
+                              .path
+                              .startsWith('/vendor');
+                          final trackPath = isVendor
+                              ? '/vendor/track/details?id=${widget.data.deliveryId}'
+                              : '/user/track/details?id=${widget.data.deliveryId}';
+                          context.push(trackPath);
+                        }
+                      : null,
                   onHome: () {
                     HapticFeedback.lightImpact();
-                    context.go('/user');
+                    final isVendor = GoRouterState.of(context)
+                        .uri
+                        .path
+                        .startsWith('/vendor');
+                    context.go(isVendor ? '/vendor' : '/user');
                   },
                 ),
               ),
@@ -355,7 +407,24 @@ class _Paper extends StatelessWidget {
                     style: AppTextStyles.receipt(fontSize: 10, color: _faint),
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 14),
+                const _Perforation(),
+                const SizedBox(height: 10),
+
+                // Order Metadata
+                _Row(label: 'Vendor', value: data.vendorName),
+                if (data.vendorInfo != null && data.vendorInfo!.isNotEmpty)
+                  _Row(label: 'Pickup Hub', value: data.vendorInfo!),
+                if (data.customerName != null && data.customerName!.isNotEmpty)
+                  _Row(label: 'Customer', value: data.customerName!),
+                if (data.customerPhone != null &&
+                    data.customerPhone!.isNotEmpty)
+                  _Row(label: 'Phone', value: data.customerPhone!),
+                if (data.dropoffName != null && data.dropoffName!.isNotEmpty)
+                  _Row(label: 'Drop-off', value: data.dropoffName!),
+                if (data.orderStatus != null && data.orderStatus!.isNotEmpty)
+                  _Row(label: 'Status', value: data.orderStatus!),
+                const SizedBox(height: 6),
                 const _Perforation(),
                 const SizedBox(height: 14),
 
@@ -370,6 +439,12 @@ class _Paper extends StatelessWidget {
 
                 _Row(label: 'Subtotal', value: _peso(data.subtotal)),
                 _Row(label: 'Delivery fee', value: _peso(data.deliveryFee)),
+                if (data.totalWeightGrams != null && data.totalWeightGrams! > 0)
+                  _Row(
+                    label: 'Cargo Weight',
+                    value:
+                        '${(data.totalWeightGrams! / 1000.0).toStringAsFixed(2)} kg',
+                  ),
                 const SizedBox(height: 10),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
@@ -401,8 +476,8 @@ class _Paper extends StatelessWidget {
 
                 _Row(label: 'Order', value: data.orderRef, mono: true),
                 _Row(label: 'Paid with', value: data.paymentLabel),
-                if (data.dropoffName != null)
-                  _Row(label: 'Drop-off', value: data.dropoffName!),
+                if (data.customerNote != null && data.customerNote!.isNotEmpty)
+                  _Row(label: 'Order Note', value: data.customerNote!),
                 _Row(label: 'Date', value: _stamp(data.placedAt)),
 
                 const SizedBox(height: 20),
@@ -633,12 +708,14 @@ class _Actions extends StatelessWidget {
     required this.saving,
     required this.onDownload,
     required this.onHome,
+    this.onTrack,
   });
 
   final bool visible;
   final bool saving;
   final VoidCallback onDownload;
   final VoidCallback onHome;
+  final VoidCallback? onTrack;
 
   @override
   Widget build(BuildContext context) {
@@ -656,9 +733,20 @@ class _Actions extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              if (onTrack != null) ...[
+                NeuButton(
+                  text: 'Track My Order',
+                  icon: Icons.navigation_rounded,
+                  onPressed: onTrack,
+                ),
+                const SizedBox(height: AppSpacing.sm),
+              ],
               NeuButton(
                 text: 'Download Receipt',
                 icon: Icons.download_rounded,
+                variant: onTrack != null
+                    ? NeuButtonVariant.neutral
+                    : NeuButtonVariant.primary,
                 isLoading: saving,
                 onPressed: onDownload,
               ),

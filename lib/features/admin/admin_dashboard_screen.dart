@@ -10,20 +10,42 @@ import '../../core/widgets/delivery_card.dart';
 import '../../core/widgets/glass_card.dart';
 import '../../core/providers/delivery_provider.dart';
 import '../../core/providers/drone_provider.dart';
+import '../../core/providers/telemetry_provider.dart';
 import '../../core/models/delivery_model.dart';
 import '../../core/models/drone_model.dart';
 import '../../core/providers/settings_provider.dart';
+import '../../core/widgets/shared_drone_radar.dart';
 
-class AdminDashboardScreen extends ConsumerWidget {
+class AdminDashboardScreen extends ConsumerStatefulWidget {
   const AdminDashboardScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AdminDashboardScreen> createState() => _AdminDashboardScreenState();
+}
+
+class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(() {
+      ref.read(deliveryProvider.notifier).loadAdminDeliveriesFromSupabase();
+      ref.read(droneProvider.notifier).loadDronesFromSupabase();
+      ref.read(fleetTelemetryProvider.notifier).loadFleetTelemetry();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final deliveries = ref.watch(deliveryProvider);
     final drones = ref.watch(droneProvider);
-    final active = deliveries
-        .where((d) => d.status == DeliveryStatus.inTransit)
-        .length;
+    final activeDeliveries = deliveries
+        .where(
+          (d) =>
+              d.status == DeliveryStatus.inTransit ||
+              d.status == DeliveryStatus.assigning,
+        )
+        .toList();
+    final active = activeDeliveries.length;
     final pending = deliveries
         .where((d) => d.status == DeliveryStatus.pending)
         .length;
@@ -31,20 +53,10 @@ class AdminDashboardScreen extends ConsumerWidget {
         .where((d) => d.status == DroneStatus.available)
         .length;
     final lowBatteryAlerts = ref.watch(lowBatteryAlertsProvider);
-    final drone001 = drones.firstWhere(
-      (d) => d.id == 'DRN-001',
-      orElse: () => DroneModel(
-        id: 'DRN-001',
-        name: 'AeroCarrier Alpha',
-        batteryLevel: 100.0,
-        status: DroneStatus.available,
-        maxPayload: 0.5,
-        modelType: '001',
-        currentCoordinates: '10.3456,123.9478',
-      ),
-    );
+    final lowBatteryDrone =
+        drones.where((d) => d.batteryLevel < 10.0).firstOrNull;
     final showLowBatteryWarning =
-        lowBatteryAlerts && drone001.batteryLevel < 10.0;
+        lowBatteryAlerts && lowBatteryDrone != null;
     final totalCount = deliveries.length;
     final deliveredCount = deliveries
         .where((d) => d.status == DeliveryStatus.delivered)
@@ -71,6 +83,9 @@ class AdminDashboardScreen extends ConsumerWidget {
       lineSpots.add(FlSpot(i.toDouble(), count.toDouble()));
     }
 
+    final activeDelivery = activeDeliveries.firstOrNull;
+    final hasActiveDelivery = activeDelivery != null;
+
     return Scaffold(
       backgroundColor: AppColors.bgDark,
       body: RefreshIndicator(
@@ -81,6 +96,7 @@ class AdminDashboardScreen extends ConsumerWidget {
               .read(deliveryProvider.notifier)
               .loadAdminDeliveriesFromSupabase();
           await ref.read(droneProvider.notifier).loadDronesFromSupabase();
+          await ref.read(fleetTelemetryProvider.notifier).loadFleetTelemetry();
         },
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -105,7 +121,7 @@ class AdminDashboardScreen extends ConsumerWidget {
                 ),
               ).animate().fadeIn(delay: 100.ms),
 
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
 
               if (showLowBatteryWarning) ...[
                 Container(
@@ -145,18 +161,18 @@ class AdminDashboardScreen extends ConsumerWidget {
                 ).animate().shake(hz: 4, curve: Curves.easeInOut),
               ],
 
-              // Hero Banner Card: Accent Gradient Highlight (Moved from User Dashboard)
+              // Hero Banner Card: Accent Gradient Highlight
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.all(22),
-                margin: const EdgeInsets.only(bottom: 24),
+                padding: const EdgeInsets.all(20),
+                margin: const EdgeInsets.only(bottom: 20),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
                     colors: [Color(0xFF42A5F5), AppColors.accent],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
-                  borderRadius: BorderRadius.circular(24),
+                  borderRadius: BorderRadius.circular(20),
                   boxShadow: [
                     BoxShadow(
                       color: AppColors.accent.withValues(alpha: 0.25),
@@ -196,15 +212,15 @@ class AdminDashboardScreen extends ConsumerWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 14),
                     Text(
                       'Campus Fleet Active',
                       style: AppTextStyles.display(
-                        fontSize: 28,
+                        fontSize: 26,
                         color: AppColors.bgDark,
                       ),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 4),
                     Text(
                       '$availDrones drones ready for immediate dispatch.',
                       style: AppTextStyles.body(
@@ -216,6 +232,62 @@ class AdminDashboardScreen extends ConsumerWidget {
                   ],
                 ),
               ).animate().fadeIn(delay: 150.ms).slideY(begin: 0.05, end: 0),
+
+              // Prominent Live Drone Radar for Admin Dashboard
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Campus Drone Radar',
+                    style: AppTextStyles.title(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: () {
+                      if (hasActiveDelivery) {
+                        context.go(
+                          '/admin/deliveries/details?id=${activeDelivery.id}',
+                        );
+                      } else {
+                        context.go('/admin/deliveries');
+                      }
+                    },
+                    icon: const Icon(Icons.fullscreen_rounded, size: 16, color: AppColors.accent),
+                    label: Text(
+                      hasActiveDelivery ? 'Track Mission' : 'Deliveries',
+                      style: AppTextStyles.body(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.accent,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              SharedDroneRadar(
+                delivery: activeDelivery,
+                isCompact: false,
+                title: hasActiveDelivery
+                    ? 'Active Mission • ${activeDelivery.droneId ?? (drones.isNotEmpty ? drones.first.name : "Active Flight")}'
+                    : (drones.isNotEmpty
+                        ? 'Campus Drone Radar • ${drones.first.status.name[0].toUpperCase()}${drones.first.status.name.substring(1)}'
+                        : 'Campus Drone Radar • Standby'),
+                onTapDetails: () {
+                  if (hasActiveDelivery) {
+                    context.go(
+                      '/admin/deliveries/details?id=${activeDelivery.id}',
+                    );
+                  } else {
+                    context.go('/admin/deliveries');
+                  }
+                },
+              ).animate().fadeIn(delay: 200.ms),
+
+              const SizedBox(height: 24),
 
               // KPI grid
               GridView.count(
@@ -229,7 +301,7 @@ class AdminDashboardScreen extends ConsumerWidget {
                   AnalyticsCard(
                     title: 'Active Flights',
                     value: '$active',
-                    change: '+12.5%',
+                    change: 'In-Flight',
                     isPositive: true,
                     icon: Icons.flight_takeoff_rounded,
                     iconColor: AppColors.primary,
@@ -238,8 +310,8 @@ class AdminDashboardScreen extends ConsumerWidget {
                   AnalyticsCard(
                     title: 'Pending',
                     value: '$pending',
-                    change: '-4.8%',
-                    isPositive: false,
+                    change: 'Awaiting',
+                    isPositive: pending == 0,
                     icon: Icons.schedule_rounded,
                     iconColor: AppColors.warning,
                     animDelay: 80,
@@ -312,28 +384,35 @@ class AdminDashboardScreen extends ConsumerWidget {
                           gridData: FlGridData(
                             show: true,
                             drawVerticalLine: false,
-                            getDrawingHorizontalLine: (_) => FlLine(
-                              color: AppColors.borderDark.withValues(
-                                alpha: 0.4,
-                              ),
+                            getDrawingHorizontalLine: (val) => FlLine(
+                              color: AppColors.borderDark,
                               strokeWidth: 1,
                             ),
                           ),
                           titlesData: FlTitlesData(
-                            leftTitles: const AxisTitles(
-                              sideTitles: SideTitles(showTitles: false),
-                            ),
-                            rightTitles: const AxisTitles(
-                              sideTitles: SideTitles(showTitles: false),
-                            ),
-                            topTitles: const AxisTitles(
-                              sideTitles: SideTitles(showTitles: false),
+                            leftTitles: AxisTitles(
+                              sideTitles: SideTitles(
+                                showTitles: true,
+                                reservedSize: 28,
+                                getTitlesWidget: (val, _) => Text(
+                                  val.toInt().toString(),
+                                  style: const TextStyle(
+                                    color: AppColors.textSecondaryDark,
+                                    fontSize: 10,
+                                  ),
+                                ),
+                              ),
                             ),
                             bottomTitles: AxisTitles(
                               sideTitles: SideTitles(
                                 showTitles: true,
-                                getTitlesWidget: (v, _) {
-                                  const days = [
+                                getTitlesWidget: (val, _) {
+                                  final i = val.toInt();
+                                  if (i < 0 || i >= 7) {
+                                    return const SizedBox.shrink();
+                                  }
+                                  final d = last7Days[i];
+                                  final days = [
                                     'M',
                                     'T',
                                     'W',
@@ -342,23 +421,21 @@ class AdminDashboardScreen extends ConsumerWidget {
                                     'S',
                                     'S',
                                   ];
-                                  final index = v.toInt();
-                                  if (index >= 0 && index < days.length) {
-                                    return Padding(
-                                      padding: const EdgeInsets.only(top: 8),
-                                      child: Text(
-                                        days[index],
-                                        style: const TextStyle(
-                                          color: AppColors.textSecondaryDark,
-                                          fontSize: 11,
-                                        ),
-                                      ),
-                                    );
-                                  }
-                                  return const SizedBox.shrink();
+                                  return Text(
+                                    days[d.weekday - 1],
+                                    style: const TextStyle(
+                                      color: AppColors.textSecondaryDark,
+                                      fontSize: 10,
+                                    ),
+                                  );
                                 },
-                                reservedSize: 28,
                               ),
+                            ),
+                            topTitles: const AxisTitles(
+                              sideTitles: SideTitles(showTitles: false),
+                            ),
+                            rightTitles: const AxisTitles(
+                              sideTitles: SideTitles(showTitles: false),
                             ),
                           ),
                           borderData: FlBorderData(show: false),
@@ -370,26 +447,16 @@ class AdminDashboardScreen extends ConsumerWidget {
                             LineChartBarData(
                               spots: lineSpots,
                               isCurved: true,
-                              gradient: const LinearGradient(
-                                colors: [AppColors.primary, AppColors.accent],
-                              ),
+                              color: AppColors.accent,
                               barWidth: 3,
-                              dotData: FlDotData(
-                                show: true,
-                                getDotPainter: (s, x, bar, i) =>
-                                    FlDotCirclePainter(
-                                      radius: 4,
-                                      color: AppColors.accent,
-                                      strokeWidth: 2,
-                                      strokeColor: AppColors.bgDark,
-                                    ),
-                              ),
+                              isStrokeCapRound: true,
+                              dotData: const FlDotData(show: false),
                               belowBarData: BarAreaData(
                                 show: true,
                                 gradient: LinearGradient(
                                   colors: [
-                                    AppColors.primary.withValues(alpha: 0.3),
-                                    AppColors.primary.withValues(alpha: 0.0),
+                                    AppColors.accent.withValues(alpha: 0.3),
+                                    AppColors.accent.withValues(alpha: 0.0),
                                   ],
                                   begin: Alignment.topCenter,
                                   end: Alignment.bottomCenter,

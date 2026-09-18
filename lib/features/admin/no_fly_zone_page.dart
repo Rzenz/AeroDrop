@@ -31,32 +31,7 @@ class _NoFlyZonePageState extends ConsumerState<NoFlyZonePage> {
     if (!mounted) return;
     if (!SupabaseService.isConfigured) {
       setState(() {
-        _zones = [
-          {
-            'id': 'NFZ-101',
-            'name': 'Gymnasium Dome',
-            'radius': '75m',
-            'coords': '10.3282° N, 123.9515° E',
-            'reason': 'Indoor activities, structural height risk',
-            'status': 'active',
-          },
-          {
-            'id': 'NFZ-102',
-            'name': 'University Grandstand',
-            'radius': '100m',
-            'coords': '10.3290° N, 123.9520° E',
-            'reason': 'High student assembly density, open sports area',
-            'status': 'active',
-          },
-          {
-            'id': 'NFZ-103',
-            'name': 'Power Station Grid',
-            'radius': '50m',
-            'coords': '10.3260° N, 123.9490° E',
-            'reason': 'Magnetic frequency interference risk',
-            'status': 'active',
-          },
-        ];
+        _zones = [];
         _loading = false;
       });
       return;
@@ -98,13 +73,10 @@ class _NoFlyZonePageState extends ConsumerState<NoFlyZonePage> {
 
   Future<void> _deleteZone(String id) async {
     if (!SupabaseService.isConfigured) {
-      setState(() {
-        _zones.removeWhere((z) => z['id'] == id);
-      });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Geofence zone $id deleted!'),
-          backgroundColor: AppColors.danger,
+        const SnackBar(
+          content: Text('Database service is not configured.'),
+          backgroundColor: AppColors.warning,
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -208,20 +180,10 @@ class _NoFlyZonePageState extends ConsumerState<NoFlyZonePage> {
               Navigator.pop(ctx);
 
               if (!SupabaseService.isConfigured) {
-                setState(() {
-                  _zones.add({
-                    'id': 'NFZ-${100 + _zones.length + 1}',
-                    'name': nameController.text,
-                    'radius': radiusController.text,
-                    'coords': coordsController.text,
-                    'reason': reasonController.text,
-                    'status': 'active',
-                  });
-                });
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('New geofence restriction active!'),
-                    backgroundColor: AppColors.success,
+                    content: Text('Database service is not configured.'),
+                    backgroundColor: AppColors.warning,
                   ),
                 );
                 return;
@@ -346,22 +308,10 @@ class _NoFlyZonePageState extends ConsumerState<NoFlyZonePage> {
               Navigator.pop(ctx);
 
               if (!SupabaseService.isConfigured) {
-                setState(() {
-                  final idx = _zones.indexWhere((z) => z['id'] == zone['id']);
-                  if (idx != -1) {
-                    _zones[idx] = {
-                      ..._zones[idx],
-                      'name': nameController.text,
-                      'radius': radiusController.text,
-                      'coords': coordsController.text,
-                      'reason': reasonController.text,
-                    };
-                  }
-                });
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('Restriction parameters updated!'),
-                    backgroundColor: AppColors.success,
+                    content: Text('Database service is not configured.'),
+                    backgroundColor: AppColors.warning,
                   ),
                 );
                 return;

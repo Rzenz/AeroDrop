@@ -213,25 +213,34 @@ class _ProductGridCard extends StatelessWidget {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  Image.network(
-                    product.imageUrl,
-                    fit: BoxFit.cover,
-                    // Decode at roughly display size rather than full
-                    // resolution; a grid of full-size decodes is the usual
-                    // cause of jank on a product list.
-                    cacheWidth: 400,
-                    loadingBuilder: (_, child, progress) => progress == null
-                        ? child
-                        : Container(color: AppColors.surfaceSunken),
-                    errorBuilder: (_, _, _) => Container(
+                  if (product.imageUrl.isNotEmpty)
+                    Image.network(
+                      product.imageUrl,
+                      fit: BoxFit.cover,
+                      cacheWidth: 400,
+                      loadingBuilder: (_, child, progress) => progress == null
+                          ? child
+                          : Container(color: AppColors.surfaceSunken),
+                      errorBuilder: (_, _, _) => Container(
+                        color: AppColors.surfaceSunken,
+                        child: Icon(
+                          Icons.image_outlined,
+                          color: AppColors.textTertiary,
+                          size: 28,
+                        ),
+                      ),
+                    )
+                  else
+                    Container(
                       color: AppColors.surfaceSunken,
-                      child: Icon(
-                        Icons.image_outlined,
-                        color: AppColors.textTertiary,
-                        size: 28,
+                      child: Center(
+                        child: Icon(
+                          Icons.inventory_2_outlined,
+                          color: AppColors.textTertiary,
+                          size: 28,
+                        ),
                       ),
                     ),
-                  ),
                   if (unavailable)
                     Container(
                       color: AppColors.bgDark.withValues(alpha: 0.62),

@@ -313,12 +313,14 @@ class VendorProductCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isLowStock = product.stock <= 5;
-    return NeuCard(
-      padding: EdgeInsets.zero,
-      borderRadius: BorderRadius.circular(18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
+    return GestureDetector(
+      onTap: onEdit,
+      child: NeuCard(
+        padding: EdgeInsets.zero,
+        borderRadius: BorderRadius.circular(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
           // Image + Availability Badge
           Stack(
             children: [
@@ -326,21 +328,33 @@ class VendorProductCard extends StatelessWidget {
                 borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(18),
                 ),
-                child: Image.network(
-                  product.imageUrl,
-                  height: 110,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) => Container(
-                    height: 110,
-                    color: AppColors.surfaceRaised,
-                    child: Icon(
-                      Icons.image_outlined,
-                      color: AppColors.textSecondary,
-                      size: 30,
-                    ),
-                  ),
-                ),
+                child: product.imageUrl.isNotEmpty
+                    ? Image.network(
+                        product.imageUrl,
+                        height: 110,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => Container(
+                          height: 110,
+                          color: AppColors.surfaceRaised,
+                          child: Icon(
+                            Icons.image_outlined,
+                            color: AppColors.textSecondary,
+                            size: 30,
+                          ),
+                        ),
+                      )
+                    : Container(
+                        height: 110,
+                        color: AppColors.surfaceRaised,
+                        child: Center(
+                          child: Icon(
+                            Icons.inventory_2_outlined,
+                            color: AppColors.textSecondary,
+                            size: 30,
+                          ),
+                        ),
+                      ),
               ),
               if (!product.isAvailable || product.stock == 0)
                 Positioned.fill(
@@ -474,6 +488,7 @@ class VendorProductCard extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 }

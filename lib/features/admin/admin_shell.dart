@@ -34,6 +34,7 @@ const _extra = <_Dest>[
   _Dest(Icons.bar_chart_rounded, 'Analytics', '/admin/analytics'),
   _Dest(Icons.map_rounded, 'Flight\nBoundaries', '/admin/routes/no-fly-zones'),
   _Dest(Icons.wb_sunny_rounded, 'Weather', '/admin/weather'),
+  _Dest(Icons.support_agent_rounded, 'Support', '/admin/support'),
   _Dest(Icons.analytics_outlined, 'System\nLogs', '/admin/reports'),
   _Dest(Icons.settings_rounded, 'Settings', '/admin/settings'),
 ];
@@ -88,6 +89,11 @@ class _AdminShellState extends ConsumerState<AdminShell>
       // are explicit that these should not take the same time.
       reverseDuration: const Duration(milliseconds: 260),
     );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && SupabaseService.isConfigured) {
+        ref.read(deliveryProvider.notifier).loadAdminDeliveriesFromSupabase();
+      }
+    });
   }
 
   @override
@@ -129,12 +135,6 @@ class _AdminShellState extends ConsumerState<AdminShell>
 
   @override
   Widget build(BuildContext context) {
-    if (SupabaseService.isConfigured) {
-      Future.microtask(() {
-        ref.read(deliveryProvider.notifier).loadAdminDeliveriesFromSupabase();
-      });
-    }
-
     final loc = GoRouterState.of(context).uri.toString();
     final pending = ref.watch(pendingDeliveriesCountProvider);
     final selected = _primary.indexWhere((d) => _isActive(d.route, loc));
@@ -240,6 +240,7 @@ class _AdminAppBar extends ConsumerWidget implements PreferredSizeWidget {
     }
     if (loc.startsWith('/admin/reports')) return 'System Logs';
     if (loc.startsWith('/admin/weather')) return 'Weather Controls';
+    if (loc.startsWith('/admin/support')) return 'Support & Inquiries';
     if (loc.startsWith('/admin/settings')) return 'Settings';
     return 'Command Deck';
   }

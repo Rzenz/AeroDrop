@@ -247,9 +247,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 if (val == null || val.trim().isEmpty) {
                   return 'Email is required';
                 }
-                if (!RegExp(
-                  r'^[\w-\.]+@([\w-]+\.)+[a-zA-Z]{2,4}$',
-                ).hasMatch(val.trim())) {
+                if (!isValidEmail(val.trim())) {
                   return 'Enter a valid email address';
                 }
                 return null;

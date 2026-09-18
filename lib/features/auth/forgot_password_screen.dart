@@ -2,21 +2,25 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/neu_button.dart';
 import '../../core/widgets/neu_text_field.dart';
 import '../../core/widgets/neu_card.dart';
 import '../../core/widgets/neu_back_button.dart';
+import '../../core/widgets/neu_feedback.dart';
+import '../../core/providers/auth_provider.dart';
 
-class ForgotPasswordScreen extends StatefulWidget {
+class ForgotPasswordScreen extends ConsumerStatefulWidget {
   const ForgotPasswordScreen({super.key});
 
   @override
-  State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
+  ConsumerState<ForgotPasswordScreen> createState() =>
+      _ForgotPasswordScreenState();
 }
 
-class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
+class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen>
     with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
@@ -43,15 +47,22 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
     if (_loading) return;
     if (_formKey.currentState!.validate()) {
       setState(() => _loading = true);
-      await Future.delayed(const Duration(seconds: 2));
+      final email = _emailController.text.trim();
+      final success =
+          await ref.read(authProvider.notifier).sendPasswordReset(email);
+
       if (mounted) {
-        setState(() {
-          _loading = false;
-        });
-        context.push(
-          '/email-sent',
-          extra: {'email': _emailController.text, 'type': 'reset'},
-        );
+        setState(() => _loading = false);
+        if (success) {
+          context.push(
+            '/email-sent',
+            extra: {'email': email, 'type': 'reset'},
+          );
+        } else {
+          final error = ref.read(authProvider).errorMessage ??
+              'Failed to send password reset code. Please try again.';
+          showNeuSnack(context, error, tone: NeuToneKind.error);
+        }
       }
     }
   }
@@ -126,7 +137,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Text(
-                      "Verify your university credentials below to receive a secure recovery link.",
+                      "Enter your registered email address to receive a secure recovery code.",
                       style: AppTextStyles.body(
                         fontSize: 14.5,
                         color: AppColors.textSecondary,
@@ -151,13 +162,19 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                             controller: _emailController,
                             keyboardType: TextInputType.emailAddress,
                             textInputAction: TextInputAction.done,
-                            validator: (v) => (v == null || v.isEmpty)
-                                ? 'Email is required'
-                                : null,
+                            validator: (v) {
+                              if (v == null || v.trim().isEmpty) {
+                                return 'Email is required';
+                              }
+                              if (!isValidEmail(v.trim())) {
+                                return 'Please enter a valid email address';
+                              }
+                              return null;
+                            },
                           ),
                           const SizedBox(height: 24),
                           NeuButton(
-                            text: 'Request Link',
+                            text: 'Request Code',
                             isLoading: _loading,
                             onPressed: _handleSubmit,
                             icon: Icons.send_rounded,

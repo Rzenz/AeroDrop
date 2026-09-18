@@ -40,16 +40,19 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   Future<void> _changeAvatar() async {
     try {
       final XFile? image = await ImageUtils.pickAndCropImage(
+        context: context,
         source: ImageSource.gallery,
-        title: 'Crop Profile Avatar',
+        title: 'Adjust Profile Picture',
+        isCircle: true,
       );
       if (image != null) {
-        final bytes = await image.readAsBytes();
-        if (bytes.length > 2 * 1024 * 1024) {
+        final validation = await ImageUtils.validateImage(image);
+        if (!validation.isValid) {
           if (!mounted) return;
           showNeuSnack(
             context,
-            'Avatar file size must be less than 2MB',
+            validation.errorMessage ??
+                'Unsupported image format. Please choose a JPG, PNG, or WebP image.',
             tone: NeuToneKind.error,
           );
           return;
@@ -66,8 +69,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             context,
             success
                 ? 'Profile picture updated!'
-                : 'Failed to upload profile picture.',
-            tone: NeuToneKind.success,
+                : (ref.read(authProvider).errorMessage ??
+                    'Failed to upload profile picture.'),
+            tone: success ? NeuToneKind.success : NeuToneKind.error,
           );
         }
       }
@@ -312,8 +316,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                         GestureDetector(
                           onTap: user?.isAdmin == true
                               ? null
-                              : () =>
-                                    _showAvatarOptions(user?.avatarUrl != null),
+                              : () => _showAvatarOptions(
+                                  user?.avatarUrl != null &&
+                                      user!.avatarUrl!.isNotEmpty,
+                                ),
                           child: Container(
                             width: 100,
                             height: 100,

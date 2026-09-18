@@ -3,6 +3,7 @@ import '../../core/widgets/neu_feedback.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/neu_card.dart';
@@ -22,15 +23,14 @@ class _VendorOrdersScreenState extends ConsumerState<VendorOrdersScreen>
 
   static const _statusTabs = [
     (label: 'Pending', statusKeys: ['pending']),
-    (label: 'Preparing', statusKeys: ['preparing']),
+    (label: 'Preparing', statusKeys: ['preparing', 'confirmed']),
     (
       label: 'Ready',
-      statusKeys: [
-        'ready',
-        'ready_for_delivery',
-        'ready_for_pickup',
-        'ready for pickup',
-      ],
+      statusKeys: ['ready', 'ready_for_delivery', 'ready_for_pickup'],
+    ),
+    (
+      label: 'In Transit',
+      statusKeys: ['in_transit', 'out_for_delivery', 'picked_up'],
     ),
     (label: 'Delivered', statusKeys: ['delivered']),
     (label: 'Cancelled', statusKeys: ['cancelled', 'rejected', 'failed']),
@@ -42,6 +42,11 @@ class _VendorOrdersScreenState extends ConsumerState<VendorOrdersScreen>
   void initState() {
     super.initState();
     _tab = TabController(length: _statusTabs.length, vsync: this);
+    Future.microtask(() {
+      if (mounted) {
+        ref.read(vendorOrdersProvider.notifier).loadOrders();
+      }
+    });
   }
 
   @override
@@ -54,9 +59,7 @@ class _VendorOrdersScreenState extends ConsumerState<VendorOrdersScreen>
     List<OrderModel> orders,
     List<String> statusKeys,
   ) {
-    return orders
-        .where((o) => statusKeys.contains(o.orderStatus.toLowerCase()))
-        .toList();
+    return orders.where((o) => statusKeys.contains(o.effectiveStatus)).toList();
   }
 
   @override
@@ -212,16 +215,27 @@ class _VendorOrdersScreenState extends ConsumerState<VendorOrdersScreen>
                         VoidCallback? prepareCb;
                         VoidCallback? readyCb;
 
-                        final status = order.orderStatus.toLowerCase();
+                        final status = order.effectiveStatus;
                         final isUpdating = _updatingOrderIds.contains(order.id);
                         if (status == 'pending') {
                           acceptCb = isUpdating
                               ? null
-                              : () => _handleUpdate(order.id, 'preparing');
+                              : () => _handleUpdate(order.id, 'confirmed');
                           rejectCb = isUpdating
                               ? null
                               : () => _handleUpdate(order.id, 'cancelled');
+                        } else if (status == 'confirmed') {
+                          prepareCb = isUpdating
+                              ? null
+                              : () => _handleUpdate(order.id, 'preparing');
                         } else if (status == 'preparing') {
+                          readyCb = isUpdating
+                              ? null
+                              : () => _handleMarkReady(order.id);
+                        } else if (status == 'ready_for_delivery' &&
+                            (order.deliveryStatus == null ||
+                                order.deliveryStatus?.toLowerCase() ==
+                                    'pending')) {
                           readyCb = isUpdating
                               ? null
                               : () => _handleMarkReady(order.id);
@@ -273,20 +287,20 @@ class _VendorOrdersScreenState extends ConsumerState<VendorOrdersScreen>
     setState(() => _updatingOrderIds.add(orderId));
     HapticFeedback.mediumImpact();
 
-    final error = await ref
+    final result = await ref
         .read(vendorOrdersProvider.notifier)
         .markOrderReady(orderId);
 
     if (mounted) {
       setState(() => _updatingOrderIds.remove(orderId));
-      if (error == null) {
+      if (result.success) {
         showNeuSnack(
           context,
-          'Order is ready for drone pickup! Drone dispatch initiated.',
-          tone: NeuToneKind.success,
+          result.message,
+          tone: result.droneDispatched ? NeuToneKind.success : NeuToneKind.info,
         );
       } else {
-        showNeuSnack(context, error, tone: NeuToneKind.error);
+        showNeuSnack(context, result.message, tone: NeuToneKind.error);
       }
     }
   }
@@ -309,9 +323,25 @@ class _DispatchCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final status = order.effectiveStatus;
+    final statusColor = switch (status) {
+      'pending' => AppColors.warning,
+      'confirmed' || 'preparing' => AppColors.info,
+      'ready_for_delivery' => AppColors.primaryLight,
+      'in_transit' => AppColors.accent,
+      'delivered' => AppColors.success,
+      _ => AppColors.danger,
+    };
+
+    final customerTitle =
+        order.customerName.isNotEmpty && order.customerName != 'Me'
+        ? order.customerName
+        : 'Customer (${order.userId.substring(0, 8)})';
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: NeuCard(
+        onTap: () => context.push('/vendor/orders/${order.id}'),
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -319,34 +349,69 @@ class _DispatchCard extends StatelessWidget {
             // Header Row
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'AD-${order.id.substring(0, 8).toUpperCase()}',
+                        style: AppTextStyles.caption(
+                          fontSize: 11,
+                          color: AppColors.primaryLight,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        customerTitle,
+                        style: AppTextStyles.subHead(
+                          fontSize: 14.5,
+                          color: AppColors.textPrimary,
+                        ).copyWith(fontWeight: FontWeight.bold),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
                 Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      'AD-${order.id.substring(0, 8).toUpperCase()}',
-                      style: AppTextStyles.caption(
-                        fontSize: 11,
-                        color: AppColors.primaryLight,
+                      '₱${order.totalAmount.toStringAsFixed(2)}',
+                      style: AppTextStyles.subHead(
+                        fontSize: 16,
+                        color: AppColors.accent,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      order.userId.substring(0, 8),
-                      style: AppTextStyles.subHead(
-                        fontSize: 14.5,
-                        color: AppColors.textPrimary,
-                      ).copyWith(fontWeight: FontWeight.bold),
+                    const SizedBox(height: 3),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: statusColor.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: statusColor.withValues(alpha: 0.3),
+                          width: 1,
+                        ),
+                      ),
+                      child: Text(
+                        order.statusDisplay,
+                        style: AppTextStyles.label(
+                          fontSize: 10,
+                          color: statusColor,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0,
+                        ),
+                      ),
                     ),
                   ],
-                ),
-                Text(
-                  '₱${order.totalAmount.toStringAsFixed(2)}',
-                  style: AppTextStyles.subHead(
-                    fontSize: 16,
-                    color: AppColors.accent,
-                    fontWeight: FontWeight.bold,
-                  ),
                 ),
               ],
             ),
@@ -394,11 +459,48 @@ class _DispatchCard extends StatelessWidget {
               ),
             ),
 
+            if (order.notes != null && order.notes!.trim().isNotEmpty) ...[
+              Container(
+                margin: const EdgeInsets.only(top: 4, bottom: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.accent.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: AppColors.accent.withValues(alpha: 0.25),
+                  ),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(
+                      Icons.note_alt_outlined,
+                      size: 15,
+                      color: AppColors.accent,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Note: ${order.notes!}',
+                        style: AppTextStyles.caption(
+                          fontSize: 12,
+                          color: AppColors.accent,
+                        ).copyWith(fontWeight: FontWeight.w500),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
             const SizedBox(height: 12),
             Divider(color: AppColors.border, height: 1),
             const SizedBox(height: 12),
 
-            // Drop-off Location info
+            // Drop-off Location & Details hint info
             Row(
               children: [
                 Icon(
@@ -414,10 +516,70 @@ class _DispatchCard extends StatelessWidget {
                       fontSize: 11.5,
                       color: AppColors.textSecondary,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                Text(
+                  'Details →',
+                  style: AppTextStyles.caption(
+                    fontSize: 11.5,
+                    color: AppColors.accent,
                   ),
                 ),
               ],
             ),
+
+            // Drone Status info for Ready for Delivery
+            if (status == 'ready_for_delivery') ...[
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color:
+                      (order.deliveryStatus?.toLowerCase() == 'assigning'
+                              ? AppColors.info
+                              : AppColors.warning)
+                          .withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color:
+                        (order.deliveryStatus?.toLowerCase() == 'assigning'
+                                ? AppColors.info
+                                : AppColors.warning)
+                            .withValues(alpha: 0.35),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      order.deliveryStatus?.toLowerCase() == 'assigning'
+                          ? Icons.flight_takeoff_rounded
+                          : Icons.hourglass_top_rounded,
+                      size: 16,
+                      color: order.deliveryStatus?.toLowerCase() == 'assigning'
+                          ? AppColors.info
+                          : AppColors.warning,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        order.deliveryStatus?.toLowerCase() == 'assigning'
+                            ? 'Drone DRN-001 en route to store for pickup.'
+                            : 'Waiting for available drone. Auto-dispatches when drone is free.',
+                        style: AppTextStyles.caption(
+                          fontSize: 11.5,
+                          color: AppColors.textPrimary,
+                        ).copyWith(fontWeight: FontWeight.w500),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
 
             // Dispatches Action Buttons
             if (onAccept != null ||
@@ -430,7 +592,7 @@ class _DispatchCard extends StatelessWidget {
                   if (onAccept != null) ...[
                     Expanded(
                       child: _ActionBtn(
-                        label: 'Accept',
+                        label: 'Accept Order',
                         color: AppColors.success,
                         icon: Icons.check_rounded,
                         onTap: onAccept!,
@@ -458,10 +620,12 @@ class _DispatchCard extends StatelessWidget {
                       ),
                     ),
                   ],
-                  if (onReady != null && onPrepare == null) ...[
+                  if (onReady != null) ...[
                     Expanded(
                       child: _ActionBtn(
-                        label: 'Ready for Drone Pickup',
+                        label: status == 'ready_for_delivery'
+                            ? 'Dispatch Drone'
+                            : 'Mark as Ready',
                         color: AppColors.accent,
                         icon: Icons.flight_takeoff_rounded,
                         onTap: onReady!,

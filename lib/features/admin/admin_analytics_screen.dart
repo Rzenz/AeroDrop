@@ -9,7 +9,6 @@ import '../../core/widgets/glass_card.dart';
 import '../../core/providers/delivery_provider.dart';
 import '../../core/providers/drone_provider.dart';
 import '../../core/models/delivery_model.dart';
-import '../../core/models/drone_model.dart';
 import '../../core/services/supabase_service.dart';
 
 class AdminAnalyticsScreen extends ConsumerStatefulWidget {
@@ -90,11 +89,11 @@ class _AdminAnalyticsScreenState extends ConsumerState<AdminAnalyticsScreen> {
       } else {
         if (mounted) {
           setState(() {
-            _totalUsers = 12;
-            _activeUsers = 10;
-            _suspendedUsers = 1;
-            _deletedUsers = 1;
-            _totalRevenue = 450.0;
+            _totalUsers = 0;
+            _activeUsers = 0;
+            _suspendedUsers = 0;
+            _deletedUsers = 0;
+            _totalRevenue = 0.0;
             _loadingStats = false;
           });
         }
@@ -130,19 +129,6 @@ class _AdminAnalyticsScreenState extends ConsumerState<AdminAnalyticsScreen> {
   Widget build(BuildContext context) {
     final deliveries = ref.watch(deliveryProvider);
     final drones = ref.watch(droneProvider);
-
-    final drone001 = drones.firstWhere(
-      (d) => d.id == 'DRN-001',
-      orElse: () => DroneModel(
-        id: 'DRN-001',
-        name: 'AeroCarrier Alpha',
-        batteryLevel: 100.0,
-        status: DroneStatus.available,
-        maxPayload: 0.5,
-        modelType: '001',
-        currentCoordinates: '10.3456,123.9478',
-      ),
-    );
 
     // Compute delivery counts
     int totalCount = deliveries.length;
@@ -465,15 +451,24 @@ class _AdminAnalyticsScreenState extends ConsumerState<AdminAnalyticsScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    _droneRow(
-                      rank: '#1',
-                      name: drone001.name,
-                      trips: '$deliveredCount delivered dispatches',
-                      battery:
-                          '${drone001.batteryLevel.toStringAsFixed(0)}% battery',
-                      status: drone001.status.name.toUpperCase(),
-                      color: AppColors.primary,
-                    ),
+                    if (drones.isNotEmpty)
+                      _droneRow(
+                        rank: '#1',
+                        name: drones.first.name,
+                        trips: '$deliveredCount delivered dispatches',
+                        battery:
+                            '${drones.first.batteryLevel.toStringAsFixed(0)}% battery',
+                        status: drones.first.status.name.toUpperCase(),
+                        color: AppColors.primary,
+                      )
+                    else
+                      Text(
+                        'No fleet drones registered.',
+                        style: TextStyle(
+                          color: AppColors.textSecondaryDark,
+                          fontSize: 13,
+                        ),
+                      ),
                   ],
                 ),
               ).animate(delay: 520.ms).fadeIn().slideY(begin: 0.1),

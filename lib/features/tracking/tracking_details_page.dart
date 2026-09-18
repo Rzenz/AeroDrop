@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
-import '../../core/widgets/neu_feedback.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/neu_card.dart';
 import '../../core/widgets/custom_app_bar.dart';
 import '../../core/widgets/staggered_list.dart';
+import '../../core/widgets/neu_feedback.dart';
+import '../../core/widgets/shared_drone_radar.dart';
 import '../../core/providers/delivery_provider.dart';
+import '../../core/providers/telemetry_provider.dart';
 import '../../core/models/delivery_model.dart';
 import '../../core/services/supabase_service.dart';
 
@@ -21,18 +24,89 @@ class TrackingDetailsPage extends ConsumerStatefulWidget {
 }
 
 class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
-  String _pickupName = 'Pickup location unavailable';
-  String _dropoffName = 'Drop-off location unavailable';
-  String _droneBatteryText = 'Drone not assigned yet';
-  String _droneName = 'Assigning...';
-  String _flightSpeed = '-- km/h';
-  String _flightAltitude = '-- m';
+  String _pickupName = '—';
+  String _dropoffName = '—';
+  String _droneBatteryText = '—';
+  String _droneName = '—';
+  String _flightSpeed = '—';
+  String _flightAltitude = '—';
+  String _signalStrengthText = '—';
+  String _headingText = '—';
+
   DeliveryModel? _fetchedDelivery;
+  RealtimeChannel? _delChannel;
+  RealtimeChannel? _telChannel;
 
   @override
   void initState() {
     super.initState();
-    Future.microtask(_fetchDetails);
+    Future.microtask(() {
+      _fetchDetails();
+      _setupRealtime();
+    });
+  }
+
+  @override
+  void dispose() {
+    _delChannel?.unsubscribe();
+    _telChannel?.unsubscribe();
+    super.dispose();
+  }
+
+  void _setupRealtime() {
+    if (!SupabaseService.isConfigured) return;
+    try {
+      _delChannel = SupabaseService.client
+          .channel('tracking_details_del:${widget.deliveryId}')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'deliveries',
+            filter: PostgresChangeFilter(
+              type: PostgresChangeFilterType.eq,
+              column: 'id',
+              value: widget.deliveryId,
+            ),
+            callback: (_) {
+              if (mounted) _fetchDetails();
+            },
+          )
+          .subscribe();
+
+      _telChannel = SupabaseService.client
+          .channel('tracking_details_tel:${widget.deliveryId}')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.insert,
+            schema: 'public',
+            table: 'drone_telemetry',
+            filter: PostgresChangeFilter(
+              type: PostgresChangeFilterType.eq,
+              column: 'delivery_id',
+              value: widget.deliveryId,
+            ),
+            callback: (payload) {
+              if (!mounted) return;
+              final rec = payload.newRecord;
+              setState(() {
+                final speed = rec['speed'];
+                final alt = rec['altitude'];
+                final battery = rec['battery_level'];
+                final signal = rec['signal_strength'];
+                final heading = rec['heading'];
+
+                if (speed != null) _flightSpeed = '$speed km/h';
+                if (alt != null) _flightAltitude = '$alt m';
+                if (battery != null) _droneBatteryText = '$battery%';
+                if (signal != null) _signalStrengthText = '$signal%';
+                if (heading != null) _headingText = '$heading°';
+              });
+              _fetchDetails();
+            },
+          )
+          .subscribe();
+    } catch (e) {
+      debugPrint('Realtime subscription error in tracking details: $e');
+    }
   }
 
   Future<void> _fetchDetails() async {
@@ -51,52 +125,39 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
         final data = Map<String, dynamic>.from(delResponse);
 
         // Convert map to DeliveryModel status
-        final isComplete =
-            data['status']?.toString().toLowerCase() == 'delivered';
+        final rawStatus = data['status']?.toString().toLowerCase();
+        final isComplete = rawStatus == 'delivered';
         final status = isComplete
             ? DeliveryStatus.delivered
-            : (data['status']?.toString().toLowerCase() == 'intransit' ||
-                  data['status']?.toString().toLowerCase() == 'in_transit')
+            : (rawStatus == 'intransit' || rawStatus == 'in_transit')
             ? DeliveryStatus.inTransit
-            : data['status']?.toString().toLowerCase() == 'cancelled'
+            : rawStatus == 'assigning'
+            ? DeliveryStatus.assigning
+            : rawStatus == 'cancelled'
             ? DeliveryStatus.cancelled
             : DeliveryStatus.pending;
 
-        // Progress helper
-        double progress = 0.0;
-        if (status == DeliveryStatus.delivered) {
-          progress = 1.0;
-        } else if (status == DeliveryStatus.inTransit) {
-          final startedAt = data['delivery_started_at'] != null
-              ? DateTime.tryParse(data['delivery_started_at'].toString())
-              : null;
-          if (startedAt != null) {
-            final totalSecs =
-                (data['estimated_delivery_seconds'] as num?)?.toInt() ?? 60;
-            final elapsed = DateTime.now().difference(startedAt).inSeconds;
-            progress = (elapsed / totalSecs).clamp(0.0, 1.0);
-          }
-        }
+        // Single authoritative source of truth: deliveries.progress
+        final double rawProgress = (data['progress'] as num?)?.toDouble() ?? 0.0;
+        final double progress = status == DeliveryStatus.delivered
+            ? 1.0
+            : rawProgress.clamp(0.0, 1.0);
 
         // ETA helper
         String etaStr = data['eta']?.toString() ?? 'TBD';
         if (status == DeliveryStatus.delivered) {
           etaStr = '0 mins';
         } else if (status == DeliveryStatus.inTransit) {
-          final startedAt = data['delivery_started_at'] != null
-              ? DateTime.tryParse(data['delivery_started_at'].toString())
-              : null;
-          if (startedAt != null) {
-            final totalSecs =
-                (data['estimated_delivery_seconds'] as num?)?.toInt() ?? 60;
-            final elapsed = DateTime.now().difference(startedAt).inSeconds;
-            final remaining = (totalSecs - elapsed).clamp(0, totalSecs);
-            etaStr = remaining <= 0
-                ? '0 mins'
-                : remaining < 60
-                ? '$remaining secs'
-                : '${(remaining / 60).ceil()} mins';
-          }
+          final totalSecs =
+              (data['estimated_delivery_seconds'] as num?)?.toInt() ?? 60;
+          final remaining = ((1.0 - progress) * totalSecs).round();
+          etaStr = remaining <= 0
+              ? '0 mins'
+              : remaining < 60
+              ? '$remaining secs'
+              : '${(remaining / 60).ceil()} mins';
+        } else if (status == DeliveryStatus.assigning) {
+          etaStr = 'En route to vendor';
         }
 
         final model = DeliveryModel(
@@ -110,7 +171,7 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
           packageWeight: (data['package_weight'] as num?)?.toDouble() ?? 0.0,
           packageType: data['package_type']?.toString() ?? 'Other',
           status: status,
-          droneId: data['drone_id']?.toString(),
+          droneId: data['drone_id']?.toString() ?? 'DRN-001',
           eta: etaStr,
           createdAt: data['created_at'] != null
               ? DateTime.tryParse(data['created_at'].toString()) ??
@@ -155,6 +216,7 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
             });
           }
         }
+
         if (dropoffId != null) {
           final d = await SupabaseService.client
               .from('campus_locations')
@@ -174,16 +236,19 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
         if (droneId != null) {
           final drone = await SupabaseService.client
               .from('drones')
-              .select('name, battery_level')
+              .select('drone_name, drone_code, battery_level')
               .eq('id', droneId)
               .maybeSingle();
           if (drone != null && mounted) {
             setState(() {
-              _droneName = drone['name']?.toString() ?? droneId.toString();
+              _droneName =
+                  drone['drone_name']?.toString() ??
+                  drone['drone_code']?.toString() ??
+                  'DRN-001';
               final lvl = drone['battery_level'];
-              _droneBatteryText = lvl != null
-                  ? 'Drone Battery: $lvl%'
-                  : 'Drone Battery: Unknown';
+              if (lvl != null) {
+                _droneBatteryText = '$lvl%';
+              }
             });
           }
 
@@ -200,29 +265,28 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
               final speed = tel['speed'];
               final alt = tel['altitude'];
               final battery = tel['battery_level'];
+              final signal = tel['signal_strength'];
+              final heading = tel['heading'];
 
               if (speed != null) {
                 _flightSpeed = '$speed km/h';
-              } else {
-                _flightSpeed = '-- km/h';
+              } else if (status == DeliveryStatus.delivered) {
+                _flightSpeed = '0 km/h';
               }
               if (alt != null) {
                 _flightAltitude = '$alt m';
-              } else {
-                _flightAltitude = '-- m';
+              } else if (status == DeliveryStatus.delivered) {
+                _flightAltitude = '0 m';
               }
               if (battery != null) {
-                _droneBatteryText = 'Drone Battery: $battery%';
+                _droneBatteryText = '$battery%';
               }
-            });
-          }
-        } else {
-          if (mounted) {
-            setState(() {
-              _droneName = 'Assigning...';
-              _droneBatteryText = 'Drone not assigned yet';
-              _flightSpeed = '-- km/h';
-              _flightAltitude = '-- m';
+              if (signal != null) {
+                _signalStrengthText = '$signal%';
+              }
+              if (heading != null) {
+                _headingText = '$heading°';
+              }
             });
           }
         }
@@ -234,53 +298,77 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
 
   @override
   Widget build(BuildContext context) {
-    ref.listen<List<DeliveryModel>>(deliveryProvider, (previous, next) {
-      if (previous != null) {
-        for (final nextDel in next) {
-          final prevDel = previous.firstWhere(
-            (d) => d.id == nextDel.id,
-            orElse: () => nextDel,
-          );
-          if (prevDel.status == DeliveryStatus.inTransit &&
-              nextDel.status == DeliveryStatus.delivered) {
-            context.go('/user/delivery/completed');
-            break;
-          }
-        }
-      }
-    });
-
     final deliveries = ref.watch(deliveryProvider);
-    final providerDelivery = deliveries.firstWhere(
-      (d) => d.id == widget.deliveryId,
-      orElse: () => DeliveryModel(
-        id: widget.deliveryId,
-        senderName: '',
-        recipientName: '',
-        recipientPhone: '',
-        deliveryAddress: '',
-        packageName: 'Unknown Package',
-        packageWeight: 0,
-        packageType: '',
-        status: DeliveryStatus.cancelled,
-        eta: 'N/A',
-        createdAt: DateTime.now(),
-        progress: 0,
-      ),
+    final providerDelivery =
+        deliveries.where((d) => d.id == widget.deliveryId).firstOrNull;
+
+    final baseDelivery = providerDelivery ?? _fetchedDelivery;
+    final status = baseDelivery?.status ?? DeliveryStatus.pending;
+    final progress = (status == DeliveryStatus.delivered)
+        ? 1.0
+        : (baseDelivery?.progress ?? 0.0).clamp(0.0, 1.0);
+
+    final double? parsedBattery = double.tryParse(
+      _droneBatteryText.replaceAll('%', '').trim(),
+    );
+    final double? parsedSpeed = double.tryParse(
+      _flightSpeed.replaceAll('km/h', '').trim(),
+    );
+    final double? parsedAlt = double.tryParse(
+      _flightAltitude.replaceAll('m', '').trim(),
     );
 
-    final delivery = _fetchedDelivery ?? providerDelivery;
+    final activeDelivery = (baseDelivery ??
+            DeliveryModel(
+              id: widget.deliveryId,
+              senderName: '',
+              recipientName: '',
+              recipientPhone: '',
+              deliveryAddress: '',
+              packageName: 'AeroDrop Package',
+              packageWeight: 0,
+              packageType: 'Package',
+              status: status,
+              eta: 'TBD',
+              createdAt: DateTime.now(),
+              progress: progress,
+            ))
+        .copyWith(
+          status: status,
+          progress: progress,
+          pickupLocationName: baseDelivery?.pickupLocationName ?? _pickupName,
+          dropoffLocationName:
+              baseDelivery?.dropoffLocationName ?? _dropoffName,
+          batteryLevel: baseDelivery?.batteryLevel ?? parsedBattery ?? (status == DeliveryStatus.delivered ? 88.0 : 96.0),
+          currentSpeed: baseDelivery?.currentSpeed ?? parsedSpeed ?? (status == DeliveryStatus.delivered ? 0.0 : 18.0),
+          currentAltitude: baseDelivery?.currentAltitude ?? parsedAlt ?? (status == DeliveryStatus.delivered ? 0.0 : 25.0),
+        );
+
+    final isDelivered = activeDelivery.status == DeliveryStatus.delivered;
+    final isAssigning = activeDelivery.status == DeliveryStatus.assigning;
+
+    final radarTitle = isDelivered
+        ? 'DELIVERED'
+        : (isAssigning ? 'HEADING TO PICKUP' : 'DRONE EN ROUTE');
+
+    final progressPercent = (activeDelivery.progress * 100).round();
 
     return Scaffold(
       backgroundColor: AppColors.base,
-      appBar: const CustomAppBar(title: 'Tracking Telemetry'),
+      appBar: CustomAppBar(
+        title: isDelivered ? 'Delivery Completed' : 'Live Flight Tracking',
+        subtitle: 'ID: ${widget.deliveryId.length > 8 ? widget.deliveryId.substring(0, 8).toUpperCase() : widget.deliveryId}',
+      ),
       body: Container(
         decoration: BoxDecoration(color: AppColors.base),
         child: SafeArea(
           child: RefreshIndicator(
             color: AppColors.accent,
             backgroundColor: AppColors.base,
-            onRefresh: _fetchDetails,
+            onRefresh: () async {
+              await ref.read(deliveryProvider.notifier).loadDeliveriesFromSupabase();
+              await _fetchDetails();
+            },
             child: SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               child: Padding(
@@ -290,21 +378,30 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
                   children: [
                     const SizedBox(height: 12),
 
-                    // ETA Card
+                    // Simulated Drone Radar / Campus Map
+                    SharedDroneRadar(
+                      delivery: activeDelivery,
+                      isCompact: false,
+                      title: radarTitle,
+                    ),
+                    const SizedBox(height: 16),
+
+                    // ETA / Arrival Status Card
                     NeuCard(
                       padding: const EdgeInsets.all(20),
-                      accent: AppColors.primary,
+                      accent: isDelivered ? AppColors.success : AppColors.primary,
                       child: Row(
                         children: [
                           Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: AppColors.primary.withValues(alpha: 0.15),
+                              color: (isDelivered ? AppColors.success : AppColors.primary)
+                                  .withValues(alpha: 0.15),
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(
-                              Icons.timer_rounded,
-                              color: AppColors.primaryLight,
+                            child: Icon(
+                              isDelivered ? Icons.check_circle_rounded : Icons.timer_rounded,
+                              color: isDelivered ? AppColors.success : AppColors.primaryLight,
                               size: 28,
                             ),
                           ),
@@ -314,7 +411,7 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Estimated Arrival Time',
+                                  isDelivered ? 'Delivery Status' : 'Estimated Arrival Time',
                                   style: AppTextStyles.body(
                                     fontSize: 12,
                                     color: AppColors.textSecondary,
@@ -322,16 +419,17 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  delivery.status == DeliveryStatus.delivered
-                                      ? 'Delivered'
-                                      : delivery.status ==
-                                            DeliveryStatus.cancelled
+                                  isDelivered
+                                      ? 'Order Delivered Successfully 🎉'
+                                      : activeDelivery.status == DeliveryStatus.cancelled
                                       ? 'Cancelled'
-                                      : '${delivery.eta} remaining',
+                                      : isAssigning
+                                      ? 'En Route to Pickup'
+                                      : '${activeDelivery.eta} remaining',
                                   style: AppTextStyles.title(
                                     fontSize: 18,
                                     fontWeight: FontWeight.bold,
-                                    color: AppColors.textPrimary,
+                                    color: isDelivered ? AppColors.success : AppColors.textPrimary,
                                   ),
                                 ),
                               ],
@@ -342,77 +440,137 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
                     ),
                     const SizedBox(height: 16),
 
-                    // Drone info
+                    // Live Telemetry & Authoritative Progress Card
                     NeuCard(
                       padding: const EdgeInsets.all(20),
                       accent: AppColors.accent,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            'Assigned Hardware',
-                            style: AppTextStyles.title(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.accent,
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                isDelivered ? 'Delivery Summary' : 'Flight Telemetry',
+                                style: AppTextStyles.title(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.accent,
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: (isDelivered ? AppColors.success : AppColors.accent)
+                                      .withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                    color: (isDelivered ? AppColors.success : AppColors.accent)
+                                        .withValues(alpha: 0.3),
+                                  ),
+                                ),
+                                child: Text(
+                                  'Progress: $progressPercent%',
+                                  style: AppTextStyles.caption(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: isDelivered ? AppColors.success : AppColors.accent,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: LinearProgressIndicator(
+                              value: activeDelivery.progress,
+                              backgroundColor: AppColors.border,
+                              valueColor: AlwaysStoppedAnimation(
+                                isDelivered ? AppColors.success : AppColors.accent,
+                              ),
+                              minHeight: 8,
                             ),
                           ),
                           Divider(color: AppColors.border, height: 24),
                           _rowDetail(
-                            Icons.airplay_rounded,
-                            'Drone ID',
+                            Icons.airplanemode_active_rounded,
+                            'Drone',
                             _droneName,
                           ),
                           _rowDetail(
-                            Icons.battery_charging_full_rounded,
-                            'Drone Battery',
-                            _droneBatteryText,
+                            Icons.my_location_rounded,
+                            'Current Location',
+                            isDelivered
+                                ? _dropoffName
+                                : (isAssigning
+                                    ? 'En route to $_pickupName'
+                                    : 'Flying along campus flight path'),
                           ),
                           _rowDetail(
-                            Icons.speed_rounded,
-                            'Flight Speed',
-                            _flightSpeed,
+                            Icons.flag_rounded,
+                            'Destination',
+                            _dropoffName,
                           ),
-                          _rowDetail(
-                            Icons.height_rounded,
-                            'Flight Altitude',
-                            _flightAltitude,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
+                          Builder(
+                            builder: (context) {
+                              final tel = ref.watch(deliveryTelemetryProvider(widget.deliveryId));
+                              final batteryDisplay = tel?.batteryLevel != null
+                                  ? '${tel!.batteryLevel!.round()}%'
+                                  : (activeDelivery.batteryLevel != null
+                                      ? '${activeDelivery.batteryLevel!.round()}%'
+                                      : _droneBatteryText);
+                              final speedDisplay = isDelivered
+                                  ? '0.0 km/h'
+                                  : (tel?.speed != null
+                                      ? '${tel!.speed!.toStringAsFixed(1)} km/h'
+                                      : ((activeDelivery.currentSpeed ?? 0.0) > 0
+                                          ? '${activeDelivery.currentSpeed!.toStringAsFixed(1)} km/h'
+                                          : '—'));
+                              final altDisplay = isDelivered
+                                  ? '0.0 m'
+                                  : (tel?.altitude != null
+                                      ? '${tel!.altitude!.toStringAsFixed(1)} m'
+                                      : ((activeDelivery.currentAltitude ?? 0.0) > 0
+                                          ? '${activeDelivery.currentAltitude!.toStringAsFixed(1)} m'
+                                          : '—'));
+                              final sigDisplay = tel?.signalStrength != null
+                                  ? '${tel!.signalStrength!.round()}%'
+                                  : _signalStrengthText;
+                              final headDisplay = tel?.heading != null
+                                  ? '${tel!.heading!.round()}°'
+                                  : _headingText;
 
-                    // Pilot info
-                    NeuCard(
-                      padding: const EdgeInsets.all(20),
-                      accent: AppColors.primary,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Pilot Telemetry Logs',
-                            style: AppTextStyles.title(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.primaryLight,
-                            ),
-                          ),
-                          Divider(color: AppColors.border, height: 24),
-                          _rowDetail(
-                            Icons.shield_rounded,
-                            'System Mode',
-                            'Prototype Telemetry (UCLM Autonomous Autopilot Core)',
-                          ),
-                          _rowDetail(
-                            Icons.wifi_rounded,
-                            'Signal Connection',
-                            'Excellent RSSI (-45dB)',
-                          ),
-                          _rowDetail(
-                            Icons.compass_calibration_rounded,
-                            'Telemetry Lock',
-                            '3D GPS Fix Locked',
+                              return Column(
+                                children: [
+                                  _rowDetail(
+                                    Icons.battery_charging_full_rounded,
+                                    'Battery Level',
+                                    batteryDisplay,
+                                  ),
+                                  _rowDetail(
+                                    Icons.speed_rounded,
+                                    'Flight Speed',
+                                    speedDisplay,
+                                  ),
+                                  _rowDetail(
+                                    Icons.height_rounded,
+                                    'Altitude',
+                                    altDisplay,
+                                  ),
+                                  _rowDetail(
+                                    Icons.wifi_rounded,
+                                    'Signal Strength',
+                                    sigDisplay,
+                                  ),
+                                  _rowDetail(
+                                    Icons.explore_rounded,
+                                    'Heading',
+                                    headDisplay,
+                                  ),
+                                ],
+                              );
+                            },
                           ),
                         ],
                       ),
@@ -426,7 +584,7 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Route Tracking',
+                            'Route Waypoints',
                             style: AppTextStyles.title(
                               fontSize: 15,
                               fontWeight: FontWeight.bold,
@@ -435,25 +593,38 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
                           ),
                           Divider(color: AppColors.border, height: 24),
                           _rowDetail(
-                            Icons.my_location_rounded,
-                            'From',
+                            Icons.storefront_rounded,
+                            'Pickup Point',
                             _pickupName,
                           ),
-                          _rowDetail(Icons.flag_rounded, 'To', _dropoffName),
+                          _rowDetail(
+                            Icons.place_rounded,
+                            'Drop-off Pad',
+                            _dropoffName,
+                          ),
+                          _rowDetail(
+                            Icons.shield_outlined,
+                            'Autopilot Mode',
+                            isDelivered
+                                ? 'Mission Complete (Landed)'
+                                : (isAssigning
+                                    ? 'Waypoints Engaged (Leg 1)'
+                                    : 'Autonomous Transit (Leg 2)'),
+                          ),
                         ],
                       ),
                     ),
 
-                    // Cancel Button
-                    if (delivery.status == DeliveryStatus.pending) ...[
+                    // Cancel Button (only when still pending approval)
+                    if (activeDelivery.status == DeliveryStatus.pending) ...[
                       const SizedBox(height: 24),
                       _DestructiveButton(
-                        text: 'Cancel Request',
+                        text: 'Cancel Delivery Request',
                         icon: Icons.cancel_outlined,
                         onPressed: () => _showCancelConfirmation(context, ref),
                       ),
                     ],
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 32),
                   ],
                 ),
               ),
@@ -466,7 +637,7 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
 
   Widget _rowDetail(IconData icon, String label, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         children: [
           Icon(icon, color: AppColors.textSecondary, size: 18),
@@ -550,7 +721,7 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             ),
             onPressed: () async {
-              Navigator.pop(context); // Close dialog
+              Navigator.pop(context);
               final error = await ref
                   .read(deliveryProvider.notifier)
                   .cancelDeliveryRequest(widget.deliveryId);
@@ -563,7 +734,7 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
                   'Delivery request cancelled.',
                   tone: NeuToneKind.success,
                 );
-                context.pop(); // Go back from tracking details
+                context.pop();
               } else {
                 showNeuSnack(context, error, tone: NeuToneKind.error);
               }

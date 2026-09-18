@@ -27,20 +27,10 @@ class AdminDronesScreen extends ConsumerWidget {
         .length;
 
     final lowBatteryAlerts = ref.watch(lowBatteryAlertsProvider);
-    final drone001 = drones.firstWhere(
-      (d) => d.id == 'DRN-001',
-      orElse: () => DroneModel(
-        id: 'DRN-001',
-        name: 'AeroCarrier Alpha',
-        batteryLevel: 100.0,
-        status: DroneStatus.available,
-        maxPayload: 0.5,
-        modelType: '001',
-        currentCoordinates: '10.3456,123.9478',
-      ),
-    );
+    final lowBatteryDrone =
+        drones.where((d) => d.batteryLevel < 10.0).firstOrNull;
     final showLowBatteryWarning =
-        lowBatteryAlerts && drone001.batteryLevel < 10.0;
+        lowBatteryAlerts && lowBatteryDrone != null;
 
     return Scaffold(
       backgroundColor: AppColors.bgDark,

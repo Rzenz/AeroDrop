@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 import '../../mock_data/cart_mock.dart';
 import '../services/supabase_service.dart';
 import '../models/order_model.dart';
@@ -21,22 +21,96 @@ class OrderState {
 
 class OrderNotifier extends StateNotifier<OrderState> {
   final Ref ref;
+  RealtimeChannel? _ordersSubscription;
+  RealtimeChannel? _deliveriesSubscription;
+
   OrderNotifier(this.ref) : super(OrderState.empty()) {
-    loadOrders();
+    final auth = ref.read(authProvider);
+    if (auth.sessionUnlocked && auth.user != null) {
+      loadOrders();
+      _subscribeToOrders();
+    }
+
+    ref.listen<AuthState>(authProvider, (previous, next) {
+      if (previous?.user?.id != next.user?.id ||
+          previous?.sessionUnlocked != next.sessionUnlocked) {
+        _unsubscribe();
+        if (next.user != null && next.sessionUnlocked) {
+          loadOrders();
+          _subscribeToOrders();
+        } else {
+          state = OrderState.empty();
+        }
+      }
+    });
+  }
+
+  void _unsubscribe() {
+    _ordersSubscription?.unsubscribe();
+    _ordersSubscription = null;
+    _deliveriesSubscription?.unsubscribe();
+    _deliveriesSubscription = null;
   }
 
   final _client = SupabaseService.client;
 
+  void _subscribeToOrders() {
+    if (!SupabaseService.isConfigured) return;
+    final auth = ref.read(authProvider);
+    final user = auth.user;
+    if (user == null || !auth.sessionUnlocked) return;
+
+    _unsubscribe();
+
+    try {
+      _ordersSubscription = _client
+          .channel('student_orders_${user.id}')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'orders',
+            filter: PostgresChangeFilter(
+              type: PostgresChangeFilterType.eq,
+              column: 'user_id',
+              value: user.id,
+            ),
+            callback: (payload) {
+              if (mounted) {
+                loadOrders();
+              }
+            },
+          )
+          .subscribe();
+
+      // Also listen for deliveries updates
+      _deliveriesSubscription = _client
+          .channel('student_deliveries_${user.id}')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'deliveries',
+            callback: (payload) {
+              if (mounted) {
+                loadOrders();
+              }
+            },
+          )
+          .subscribe();
+    } catch (e) {
+      debugPrint('Error subscribing to student orders realtime: $e');
+    }
+  }
+
   Future<void> loadOrders() async {
     final authUser = SupabaseService.client.auth.currentUser;
-    if (authUser == null) {
+    final auth = ref.read(authProvider);
+    if (authUser == null || !auth.sessionUnlocked || auth.user == null) {
       if (!mounted) return;
       state = OrderState(orders: []);
       return;
     }
 
-    final user = ref.read(authProvider).user;
-    if (user == null) return;
+    final user = auth.user!;
 
     state = OrderState(orders: state.orders, isLoading: true);
     try {
@@ -53,7 +127,8 @@ class OrderNotifier extends StateNotifier<OrderState> {
             '*, vendor:users!vendor_id(full_name, business_name), '
             'customer:users!user_id(full_name, phone_number), '
             'campus_locations!delivery_location_id(name), '
-            'order_items(product_name, quantity, unit_price)',
+            'order_items(product_name, quantity, unit_price), '
+            'deliveries(id, status, progress, drone_id, estimated_delivery_seconds, delivery_started_at, delivery_completed_at)',
           )
           .eq('user_id', user.id)
           .order('created_at', ascending: false);
@@ -77,6 +152,12 @@ class OrderNotifier extends StateNotifier<OrderState> {
     }
   }
 
+  @override
+  void dispose() {
+    _unsubscribe();
+    super.dispose();
+  }
+
   Future<bool> placeOrder({
     required String vendorId,
     required String dropoffLocationId,
@@ -85,6 +166,7 @@ class OrderNotifier extends StateNotifier<OrderState> {
     required double totalAmount,
     required String paymentMethod,
     required List<CartItem> items,
+    String? notes,
   }) async {
     final user = ref.read(authProvider).user;
     if (user == null) return false;
@@ -135,6 +217,7 @@ class OrderNotifier extends StateNotifier<OrderState> {
           'p_total_amount': totalAmount,
           'p_payment_method': paymentMethod,
           'p_items': itemsPayload,
+          'p_notes': notes,
         },
       );
 
@@ -167,18 +250,45 @@ final orderProvider = StateNotifierProvider<OrderNotifier, OrderState>((ref) {
 class VendorOrdersNotifier extends StateNotifier<OrderState> {
   final Ref ref;
   RealtimeChannel? _ordersSubscription;
+  RealtimeChannel? _deliveriesSubscription;
 
   VendorOrdersNotifier(this.ref) : super(OrderState.empty()) {
-    loadOrders();
-    _subscribeToOrders();
+    final auth = ref.read(authProvider);
+    if (auth.sessionUnlocked && auth.user != null) {
+      loadOrders();
+      _subscribeToOrders();
+    }
+
+    ref.listen<AuthState>(authProvider, (previous, next) {
+      if (previous?.user?.id != next.user?.id ||
+          previous?.sessionUnlocked != next.sessionUnlocked) {
+        _unsubscribe();
+        if (next.user != null && next.sessionUnlocked) {
+          loadOrders();
+          _subscribeToOrders();
+        } else {
+          state = OrderState.empty();
+        }
+      }
+    });
+  }
+
+  void _unsubscribe() {
+    _ordersSubscription?.unsubscribe();
+    _ordersSubscription = null;
+    _deliveriesSubscription?.unsubscribe();
+    _deliveriesSubscription = null;
   }
 
   final _client = SupabaseService.client;
 
   void _subscribeToOrders() {
     if (!SupabaseService.isConfigured) return;
-    final user = ref.read(authProvider).user;
-    if (user == null) return;
+    final auth = ref.read(authProvider);
+    final user = auth.user;
+    if (user == null || !auth.sessionUnlocked) return;
+
+    _unsubscribe();
 
     try {
       _ordersSubscription = _client
@@ -199,6 +309,21 @@ class VendorOrdersNotifier extends StateNotifier<OrderState> {
             },
           )
           .subscribe();
+
+      // Also listen for deliveries updates
+      _deliveriesSubscription = _client
+          .channel('vendor_deliveries_${user.id}')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'deliveries',
+            callback: (payload) {
+              if (mounted) {
+                loadOrders();
+              }
+            },
+          )
+          .subscribe();
     } catch (e) {
       debugPrint('Error subscribing to vendor orders realtime: $e');
     }
@@ -206,14 +331,14 @@ class VendorOrdersNotifier extends StateNotifier<OrderState> {
 
   Future<void> loadOrders() async {
     final authUser = SupabaseService.client.auth.currentUser;
-    if (authUser == null) {
+    final auth = ref.read(authProvider);
+    if (authUser == null || !auth.sessionUnlocked || auth.user == null) {
       if (!mounted) return;
       state = OrderState(orders: []);
       return;
     }
 
-    final user = ref.read(authProvider).user;
-    if (user == null) return;
+    final user = auth.user!;
 
     state = OrderState(orders: state.orders, isLoading: true);
 
@@ -231,7 +356,8 @@ class VendorOrdersNotifier extends StateNotifier<OrderState> {
           .select(
             '*, customer:users!user_id(full_name, phone_number), '
             'campus_locations!delivery_location_id(name), '
-            'order_items(product_name, quantity, unit_price)',
+            'order_items(product_name, quantity, unit_price), '
+            'deliveries(id, status, progress, drone_id, estimated_delivery_seconds, delivery_started_at, delivery_completed_at)',
           )
           .eq('vendor_id', user.id)
           .order('created_at', ascending: false);
@@ -277,32 +403,48 @@ class VendorOrdersNotifier extends StateNotifier<OrderState> {
     }
   }
 
-  /// Triggers the full drone assignment, weather check, and delivery workflow
-  /// using the secure vendor_mark_order_ready RPC. Returns an error message if failed.
-  Future<String?> markOrderReady(String orderId) async {
+  /// Triggers drone assignment / queueing workflow using vendor_mark_order_ready.
+  Future<({bool success, bool droneDispatched, String message})> markOrderReady(
+    String orderId,
+  ) async {
     try {
-      await _client.rpc(
+      final res = await _client.rpc(
         'vendor_mark_order_ready',
         params: {'p_order_id': orderId},
       );
 
-      if (!mounted) return null;
+      if (!mounted) {
+        return (
+          success: true,
+          droneDispatched: true,
+          message: 'Order marked ready.',
+        );
+      }
 
       await loadOrders();
       ref.read(orderProvider.notifier).loadOrders();
-      return null;
+
+      final data = res is Map
+          ? Map<String, dynamic>.from(res)
+          : <String, dynamic>{};
+      final dispatched = data['drone_dispatched'] == true;
+      final msg =
+          data['message']?.toString() ??
+          (dispatched
+              ? 'Order is ready for drone pickup! Drone dispatch initiated.'
+              : 'Drone currently unavailable. This order is ready and waiting for the next available drone.');
+
+      return (success: true, droneDispatched: dispatched, message: msg);
     } catch (e) {
       debugPrint('vendor_mark_order_ready failed: $e');
-      if (e is PostgrestException) {
-        return e.message;
-      }
-      return e.toString();
+      final errorMsg = e is PostgrestException ? e.message : e.toString();
+      return (success: false, droneDispatched: false, message: errorMsg);
     }
   }
 
   @override
   void dispose() {
-    _ordersSubscription?.unsubscribe();
+    _unsubscribe();
     super.dispose();
   }
 }

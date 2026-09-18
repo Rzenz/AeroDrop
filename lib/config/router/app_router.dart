@@ -42,6 +42,7 @@ import '../../features/admin/admin_settings_screen.dart';
 import '../../features/admin/admin_weather_screen.dart';
 import '../../features/admin/no_fly_zone_page.dart';
 import '../../features/admin/reports_page.dart';
+import '../../features/admin/admin_support_screen.dart';
 
 import '../../features/shared/about_page.dart';
 import '../../features/shared/help_support_page.dart';
@@ -81,26 +82,34 @@ final routerProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) {
       final authState = ref.read(authProvider);
       final user = authState.user;
-      final isLoggedIn = user != null;
       final isLoggingIn =
           state.uri.path == '/login' ||
           state.uri.path == '/register' ||
           state.uri.path == '/forgot-password' ||
+          state.uri.path == '/email-sent' ||
           state.uri.path == '/onboarding' ||
           state.uri.path == '/welcome' ||
+          state.uri.path == '/verification' ||
           state.uri.path == '/splash';
 
-      if (!isLoggedIn) {
+      if (user == null) {
         if (!isLoggingIn) {
-          return '/login';
+          return '/welcome';
         }
         return null;
       }
 
-      // Prioritize phone verification check
+      // Prioritize verification check
       if (authState.requiresVerification && !authState.isVerified) {
         if (state.uri.path != '/verification') {
           return '/verification';
+        }
+        return null;
+      }
+
+      if (!authState.sessionUnlocked) {
+        if (!isLoggingIn) {
+          return '/welcome';
         }
         return null;
       }
@@ -173,8 +182,18 @@ final routerProvider = Provider<GoRouter>((ref) {
         pageBuilder: (context, state) {
           final extra = state.extra as Map<String, String>? ?? {};
           final email = extra['email'] ?? '';
+          final phone = extra['phone'];
+          final role = extra['role'];
           final type = extra['type'] ?? 'verification';
-          return _fade(state, OtpEmailSentScreen(email: email, type: type));
+          return _fade(
+            state,
+            OtpEmailSentScreen(
+              email: email,
+              phone: phone,
+              role: role,
+              type: type,
+            ),
+          );
         },
       ),
       GoRoute(
@@ -352,6 +371,25 @@ final routerProvider = Provider<GoRouter>((ref) {
         pageBuilder: (context, state) =>
             _slide(state, const EditProfileScreen()),
       ),
+      GoRoute(
+        path: '/vendor/orders/:id',
+        pageBuilder: (context, state) {
+          final id = state.pathParameters['id'] ?? '';
+          return _slide(state, OrderDetailsScreen(orderId: id));
+        },
+      ),
+      GoRoute(
+        path: '/vendor/receipt',
+        pageBuilder: (context, state) =>
+            _fade(state, ReceiptScreen(data: state.extra! as ReceiptData)),
+      ),
+      GoRoute(
+        path: '/vendor/track/details',
+        pageBuilder: (context, state) {
+          final deliveryId = state.uri.queryParameters['id'] ?? '';
+          return _slide(state, TrackingDetailsPage(deliveryId: deliveryId));
+        },
+      ),
 
       // ─── Admin Shell (Drawer) ─────────────────────────────────────────────
       ShellRoute(
@@ -391,6 +429,11 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/admin/weather',
             pageBuilder: (context, state) =>
                 _fade(state, const AdminWeatherScreen()),
+          ),
+          GoRoute(
+            path: '/admin/support',
+            pageBuilder: (context, state) =>
+                _fade(state, const AdminSupportScreen()),
           ),
         ],
       ),
@@ -511,7 +554,17 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/shared/help',
-        pageBuilder: (context, state) => _slide(state, const HelpSupportPage()),
+        pageBuilder: (context, state) {
+          final orderId = state.uri.queryParameters['orderId'];
+          final deliveryId = state.uri.queryParameters['deliveryId'];
+          return _slide(
+            state,
+            HelpSupportPage(
+              orderId: orderId,
+              deliveryId: deliveryId,
+            ),
+          );
+        },
       ),
       GoRoute(
         path: '/shared/privacy-policy',

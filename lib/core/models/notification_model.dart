@@ -58,7 +58,10 @@ class NotificationModel {
       userId: map['user_id']?.toString() ?? '',
       title: map['title']?.toString() ?? '',
       message: map['message']?.toString() ?? '',
-      type: map['type']?.toString() ?? 'info',
+      type:
+          map['type']?.toString() ??
+          map['notification_type']?.toString() ??
+          'info',
       relatedDeliveryId: map['related_delivery_id']?.toString(),
       isRead: map['is_read'] == true,
       createdAt: map['created_at'] != null

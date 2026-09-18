@@ -82,11 +82,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           _rememberMe = true;
           _emailController.text = prefs.getString('saved_email') ?? '';
         });
-      } else {
-        // Invalidate old session on startup if Remember Me is unchecked
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          ref.read(authProvider.notifier).logout();
-        });
       }
     } catch (e) {
       debugPrint('Error loading remembered credentials: $e');
@@ -119,9 +114,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       FocusScope.of(context).unfocus();
 
       final emailText = _emailController.text.trim().toLowerCase();
+      final expectedRole = _asVendor ? 'vendor' : 'user';
       final success = await ref
           .read(authProvider.notifier)
-          .login(emailText, _passwordController.text);
+          .login(
+            emailText,
+            _passwordController.text,
+            expectedRole: expectedRole,
+          );
 
       if (success && mounted) {
         // Persist or clear credentials based on Remember Me check
@@ -142,10 +142,34 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         await Future.delayed(const Duration(milliseconds: 150));
         if (!mounted) return;
 
-        context.go('/verification');
+        final user = ref.read(authProvider).user;
+        if (user != null && user.isAdmin) {
+          context.go('/admin');
+        } else if (user != null && user.vendorStatus == 'pending') {
+          context.go('/account-pending');
+        } else {
+          context.go('/verification');
+        }
       } else if (!success && mounted) {
+        final authState = ref.read(authProvider);
+        if (authState.pendingEmail != null &&
+            authState.requiresVerification &&
+            authState.user == null) {
+          final message = authState.errorMessage ??
+              "Your email isn't verified yet. We sent you a new code.";
+          showNeuSnack(context, message, tone: NeuToneKind.info);
+          context.push(
+            '/email-sent',
+            extra: {
+              'email': authState.pendingEmail!,
+              'role': expectedRole,
+              'type': 'verification',
+            },
+          );
+          return;
+        }
         final errorMsg =
-            ref.read(authProvider).errorMessage ??
+            authState.errorMessage ??
             'Login failed. Please try again.';
         showNeuSnack(context, errorMsg, tone: NeuToneKind.error);
       }

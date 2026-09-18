@@ -17,13 +17,13 @@ import '../../core/widgets/neu_card.dart';
 import '../../core/widgets/neu_button.dart';
 import '../../core/widgets/neu_text_field.dart';
 import '../../core/providers/auth_provider.dart';
-import '../../core/models/user_model.dart';
 import '../../core/providers/location_provider.dart';
 import 'presentation/controllers/register_controller.dart';
 import 'widgets/password_strength_indicator.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/constants/vendor_categories.dart';
 import '../../core/widgets/neu_back_button.dart';
+import '../../core/utils/image_utils.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -91,11 +91,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
         imageQuality: 85,
       );
       if (image != null) {
-        final bytes = await image.readAsBytes();
-        if (bytes.length > 2 * 1024 * 1024) {
+        final validation = await ImageUtils.validateImage(image);
+        if (!validation.isValid) {
           _showErrorDialog(
-            'File Too Large',
-            'Please select an image smaller than 2MB.',
+            'Invalid Image',
+            validation.errorMessage ??
+                'Unsupported image format. Please choose a JPG, PNG, or WebP image.',
           );
           return;
         }
@@ -174,16 +175,17 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
       return false;
     }
     final email = _emailController.text.trim();
-    if (email.isEmpty ||
-        !RegExp(r'^[\w-\.]+@([\w-]+\.)+[a-zA-Z]{2,4}$').hasMatch(email)) {
+    if (!isValidEmail(email)) {
       _showErrorDialog('Invalid Email', 'Please enter a valid email address.');
       return false;
     }
     final phone = _phoneController.text.trim();
-    if (phone.length != 11) {
+    try {
+      normalizePhoneNumber(phone);
+    } catch (_) {
       _showErrorDialog(
         'Phone Number Format',
-        'Phone number must be exactly 11 digits.',
+        'Please enter a valid phone number (e.g. 09123456789 or +639123456789).',
       );
       return false;
     }
@@ -332,9 +334,15 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
       if (mounted) {
         setState(() => _vendorSubmitted = false);
         if (success) {
-          setState(() {
-            _vendorStep = 5; // Go to success view
-          });
+          context.push(
+            '/email-sent',
+            extra: {
+              'email': email,
+              'phone': phone,
+              'role': 'vendor',
+              'type': 'verification',
+            },
+          );
         } else {
           final errorMsg =
               ref.read(authProvider).errorMessage ?? 'Registration failed.';
@@ -357,35 +365,29 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
       }
 
       FocusScope.of(context).unfocus();
+      final emailText = _emailController.text.trim();
+      final phoneText = _phoneController.text.trim();
       final success = await ref
           .read(authProvider.notifier)
           .register(
             _nameController.text,
-            _emailController.text,
+            emailText,
             _passwordController.text,
             'user',
-            _phoneController.text,
+            phoneText,
           );
 
       if (mounted) {
         if (success) {
-          final isUserLoggedIn = ref.read(authProvider).user != null;
-          if (isUserLoggedIn) {
-            showNeuSnack(
-              context,
-              'Registration successful.',
-              tone: NeuToneKind.success,
-            );
-            context.go('/user');
-          } else {
-            showNeuSnack(
-              context,
-              'Registration successful. Please check your email to confirm your account.',
-              tone: NeuToneKind.info,
-              duration: const Duration(seconds: 8),
-            );
-            context.go('/login');
-          }
+          context.push(
+            '/email-sent',
+            extra: {
+              'email': emailText,
+              'phone': phoneText,
+              'role': 'user',
+              'type': 'verification',
+            },
+          );
         } else {
           final errorMsg =
               ref.read(authProvider).errorMessage ?? 'Registration failed.';
@@ -502,8 +504,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
             prefixIcon: Icons.email_outlined,
             controller: _emailController,
             keyboardType: TextInputType.emailAddress,
-            validator: (v) =>
-                RegisterController.validateEmail(v, UserRole.user),
+            validator: RegisterController.validateEmail,
             textInputAction: TextInputAction.next,
           ),
           const SizedBox(height: 18),

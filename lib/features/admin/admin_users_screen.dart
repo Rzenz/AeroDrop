@@ -75,58 +75,7 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
       } else {
         if (mounted) {
           setState(() {
-            _users = [
-              {
-                'id': 'usr_mock_1',
-                'name': 'Canteen Express',
-                'email': 'canteen@gmail.com',
-                'role': 'vendor',
-                'phone_number': '09123456789',
-                'account_status': 'active',
-              },
-              {
-                'id': 'usr_mock_2',
-                'name': 'UCLM Café Brews',
-                'email': 'brews@gmail.com',
-                'role': 'vendor',
-                'phone_number': '09123456788',
-                'account_status': 'active',
-              },
-              {
-                'id': 'usr_mock_5',
-                'name': 'Sweet Escape Delights',
-                'email': 'sweetescape@gmail.com',
-                'role': 'user',
-                'vendor_status': 'pending',
-                'phone_number': '09171112222',
-                'account_status': 'active',
-              },
-              {
-                'id': 'usr_mock_6',
-                'name': 'Quick Byte Canteen',
-                'email': 'quickbyte@gmail.com',
-                'role': 'user',
-                'vendor_status': 'pending',
-                'phone_number': '09172223333',
-                'account_status': 'active',
-              },
-              {
-                'id': 'usr_mock_3',
-                'name': 'Sarah Jenkins',
-                'email': 's.jenkins@gmail.com',
-                'role': 'admin',
-                'phone_number': '09123456787',
-                'account_status': 'active',
-              },
-              {
-                'id': 'usr_mock_4',
-                'name': 'John Doe',
-                'email': 'john.doe@gmail.com',
-                'role': 'user',
-                'phone_number': '09123456786',
-                'account_status': 'suspended',
-              },
-            ];
+            _users = [];
             _loading = false;
           });
         }
@@ -134,7 +83,10 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
     } catch (e) {
       debugPrint('Error fetching users: $e');
       if (mounted) {
-        setState(() => _loading = false);
+        setState(() {
+          _users = [];
+          _loading = false;
+        });
       }
     }
   }
@@ -190,20 +142,10 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
             onPressed: () async {
               Navigator.pop(ctx);
               if (!SupabaseService.isConfigured) {
-                setState(() {
-                  final idx = _users.indexWhere((u) => u['id'] == userId);
-                  if (idx != -1) {
-                    _users[idx] = {
-                      ..._users[idx],
-                      'account_status': 'active',
-                      'role': 'vendor',
-                    };
-                  }
-                });
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Vendor "$name" is now an Approved Partner!'),
-                    backgroundColor: AppColors.success,
+                  const SnackBar(
+                    content: Text('Supabase is not configured.'),
+                    backgroundColor: AppColors.danger,
                   ),
                 );
                 return;
@@ -470,16 +412,10 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
 
     if (confirm == true && mounted) {
       if (!SupabaseService.isConfigured) {
-        setState(() {
-          final idx = _users.indexWhere((u) => u['id'] == userId);
-          if (idx != -1) {
-            _users[idx] = {..._users[idx], 'account_status': 'suspended'};
-          }
-        });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('User account suspended.'),
-            backgroundColor: AppColors.success,
+            content: Text('Supabase is not configured.'),
+            backgroundColor: AppColors.danger,
           ),
         );
         return;
@@ -511,16 +447,10 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
 
   Future<void> _handleActivate(String userId) async {
     if (!SupabaseService.isConfigured) {
-      setState(() {
-        final idx = _users.indexWhere((u) => u['id'] == userId);
-        if (idx != -1) {
-          _users[idx] = {..._users[idx], 'account_status': 'active'};
-        }
-      });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('User account activated.'),
-          backgroundColor: AppColors.success,
+          content: Text('Supabase is not configured.'),
+          backgroundColor: AppColors.danger,
         ),
       );
       return;
@@ -592,16 +522,10 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
 
     if (confirm == true && mounted) {
       if (!SupabaseService.isConfigured) {
-        setState(() {
-          final idx = _users.indexWhere((u) => u['id'] == userId);
-          if (idx != -1) {
-            _users[idx] = {..._users[idx], 'account_status': 'deleted'};
-          }
-        });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('User account marked as deleted.'),
-            backgroundColor: AppColors.success,
+            content: Text('Supabase is not configured.'),
+            backgroundColor: AppColors.danger,
           ),
         );
         return;

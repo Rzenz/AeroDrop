@@ -11,11 +11,11 @@ import '../../core/widgets/neu_surface.dart';
 import '../../core/widgets/delivery_card.dart';
 import '../../core/widgets/section_header.dart';
 import '../../core/widgets/staggered_list.dart';
-import '../../core/widgets/status_chip.dart';
 import '../../core/widgets/drone_svg_painter.dart';
 import '../../core/providers/delivery_provider.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/models/delivery_model.dart';
+import '../../core/providers/order_provider.dart';
 
 import '../../core/providers/notification_provider.dart';
 import '../../core/providers/weather_provider.dart';
@@ -29,9 +29,10 @@ class UserDashboardScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authProvider).user;
     final deliveries = ref.watch(deliveryProvider);
-    final notifications = ref.watch(notificationProvider);
+    final orderState = ref.watch(orderProvider);
+    final orders = orderState.orders;
     final vendorState = ref.watch(vendorProvider);
-    final unreadCount = notifications.where((n) => !n.isRead).length;
+    final unreadCount = ref.watch(unreadNotificationCountProvider);
     final productState = ref.watch(productProvider);
     final popularProducts = productState.products
         .where((p) => p.stock > 0)
@@ -41,6 +42,7 @@ class UserDashboardScreen extends ConsumerWidget {
         .where(
           (d) =>
               d.status == DeliveryStatus.inTransit ||
+              d.status == DeliveryStatus.assigning ||
               d.status == DeliveryStatus.pending,
         )
         .toList();
@@ -60,6 +62,7 @@ class UserDashboardScreen extends ConsumerWidget {
         color: AppColors.accent,
         backgroundColor: AppColors.base,
         onRefresh: () async {
+          await ref.read(orderProvider.notifier).loadOrders();
           await ref
               .read(deliveryProvider.notifier)
               .loadDeliveriesFromSupabase();
@@ -437,7 +440,7 @@ class UserDashboardScreen extends ConsumerWidget {
                       ),
                       const SizedBox(height: 12),
 
-                      if (deliveries.isEmpty)
+                      if (orders.isEmpty)
                         NeuCard(
                           padding: const EdgeInsets.symmetric(
                             vertical: 36,
@@ -471,93 +474,164 @@ class UserDashboardScreen extends ConsumerWidget {
                         )
                       else
                         Column(
-                          children: List.generate(deliveries.take(3).length, (
-                            index,
-                          ) {
-                            final delivery = deliveries[index];
+                          children: orders.take(3).map((order) {
+                            final status = order.effectiveStatus;
+                            final statusColor = switch (status) {
+                              'pending' => AppColors.warning,
+                              'confirmed' || 'preparing' => AppColors.info,
+                              'ready_for_delivery' => AppColors.primaryLight,
+                              'in_transit' => AppColors.accent,
+                              'delivered' => AppColors.success,
+                              _ => AppColors.danger,
+                            };
 
-                            // Alternate between gradient-rimmed AnimatedCard (via DeliveryCard)
-                            // and a frosted NeuCard containing the delivery details.
-                            if (index % 2 == 0) {
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 12),
-                                child: DeliveryCard(
-                                  delivery: delivery,
-                                  onTap: () => context.push(
-                                    '/user/track/details?id=${delivery.id}',
-                                  ),
-                                ),
-                              );
-                            } else {
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 12),
-                                child: NeuCard(
-                                  onTap: () => context.push(
-                                    '/user/track/details?id=${delivery.id}',
-                                  ),
-                                  padding: const EdgeInsets.all(18),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Expanded(
-                                            child: Text(
-                                              delivery.id,
-                                              style: AppTextStyles.label(
-                                                fontSize: 11,
-                                                color: AppColors.accentLight,
+                            final itemsSummary = order.items.isNotEmpty
+                                ? order.items
+                                      .map(
+                                        (i) =>
+                                            '${i.productName} (x${i.quantity})',
+                                      )
+                                      .join(', ')
+                                : 'No items listed';
+
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: NeuCard(
+                                onTap: () =>
+                                    context.push('/user/orders/${order.id}'),
+                                padding: const EdgeInsets.all(16),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Expanded(
+                                          child: Row(
+                                            children: [
+                                              Container(
+                                                padding: const EdgeInsets.all(
+                                                  8,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color:
+                                                      AppColors.surfaceRaised,
+                                                  borderRadius:
+                                                      BorderRadius.circular(10),
+                                                ),
+                                                child: const Icon(
+                                                  Icons.receipt_outlined,
+                                                  color: AppColors.accent,
+                                                  size: 18,
+                                                ),
                                               ),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
+                                              const SizedBox(width: 10),
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      'AD-${order.id.substring(0, 8).toUpperCase()}',
+                                                      style:
+                                                          AppTextStyles.label(
+                                                            fontSize: 11,
+                                                            color: AppColors
+                                                                .accentLight,
+                                                          ),
+                                                      maxLines: 1,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                    ),
+                                                    Text(
+                                                      order.vendorName,
+                                                      style:
+                                                          AppTextStyles.subHead(
+                                                            fontSize: 14,
+                                                            fontWeight:
+                                                                FontWeight.bold,
+                                                            color: AppColors
+                                                                .textPrimary,
+                                                          ),
+                                                      maxLines: 1,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
                                           ),
-                                          const SizedBox(width: 8),
-                                          StatusChip.delivery(
-                                            delivery.status.name,
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 12),
-                                      Text(
-                                        delivery.packageName,
-                                        style: AppTextStyles.title(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                          color: AppColors.textPrimary,
                                         ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Text(
-                                            delivery.packageType,
-                                            style: AppTextStyles.body(
-                                              fontSize: 12.5,
-                                              color: AppColors.textSecondary,
+                                        const SizedBox(width: 8),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 10,
+                                            vertical: 4,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: statusColor.withValues(
+                                              alpha: 0.15,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              10,
+                                            ),
+                                            border: Border.all(
+                                              color: statusColor.withValues(
+                                                alpha: 0.3,
+                                              ),
                                             ),
                                           ),
-                                          Text(
-                                            '₱${(delivery.paymentAmount ?? 0).toStringAsFixed(2)}',
-                                            style: AppTextStyles.body(
-                                              fontSize: 12.5,
+                                          child: Text(
+                                            order.statusDisplay,
+                                            style: AppTextStyles.label(
+                                              fontSize: 11,
+                                              color: statusColor,
                                               fontWeight: FontWeight.bold,
-                                              color: AppColors.accent,
+                                              letterSpacing: 0,
                                             ),
                                           ),
-                                        ],
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      itemsSummary,
+                                      style: AppTextStyles.body(
+                                        fontSize: 13,
+                                        color: AppColors.textPrimary,
                                       ),
-                                    ],
-                                  ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          '${order.createdAt.month}/${order.createdAt.day} ${order.createdAt.hour.toString().padLeft(2, '0')}:${order.createdAt.minute.toString().padLeft(2, '0')}',
+                                          style: AppTextStyles.caption(
+                                            fontSize: 11.5,
+                                            color: AppColors.textSecondary,
+                                          ),
+                                        ),
+                                        Text(
+                                          '₱${order.totalAmount.toStringAsFixed(2)}',
+                                          style: AppTextStyles.subHead(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.bold,
+                                            color: AppColors.accent,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
                                 ),
-                              );
-                            }
-                          }),
+                              ),
+                            );
+                          }).toList(),
                         ),
                     ],
                   ),
@@ -640,10 +714,10 @@ class _QuickActions extends StatelessWidget {
         onTap: () => context.go('/user/shop'),
       ),
       _QuickActionData(
-        icon: Icons.radar_rounded,
-        label: 'Drone Radar',
+        icon: Icons.support_agent_rounded,
+        label: 'Help & Support',
         color: AppColors.primaryLight,
-        onTap: () => context.go('/user/track'),
+        onTap: () => context.push('/shared/help'),
       ),
       _QuickActionData(
         icon: Icons.receipt_long_rounded,

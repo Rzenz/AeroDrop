@@ -27,17 +27,20 @@ class _VendorProfileScreenState extends ConsumerState<VendorProfileScreen> {
   Future<void> _changeBusinessLogo() async {
     try {
       final image = await ImageUtils.pickAndCropImage(
+        context: context,
         source: ImageSource.gallery,
-        title: 'Crop Business Logo',
+        title: 'Adjust Store Logo',
+        isCircle: false,
       );
       if (image == null || !mounted) return;
 
-      final bytes = await image.readAsBytes();
-      if (bytes.length > 2 * 1024 * 1024) {
+      final validation = await ImageUtils.validateImage(image);
+      if (!validation.isValid) {
         if (mounted) {
           showNeuSnack(
             context,
-            'Image must be less than 2MB',
+            validation.errorMessage ??
+                'Unsupported image format. Please choose a JPG, PNG, or WebP image.',
             tone: NeuToneKind.error,
           );
         }
@@ -52,7 +55,10 @@ class _VendorProfileScreenState extends ConsumerState<VendorProfileScreen> {
         setState(() => _uploadingLogo = false);
         showNeuSnack(
           context,
-          success ? 'Store photo updated!' : 'Failed to upload store photo.',
+          success
+              ? 'Store photo updated!'
+              : (ref.read(authProvider).errorMessage ??
+                  'Failed to upload store photo.'),
           tone: success ? NeuToneKind.success : NeuToneKind.error,
         );
       }
@@ -60,6 +66,112 @@ class _VendorProfileScreenState extends ConsumerState<VendorProfileScreen> {
       debugPrint('Business logo change error: $e');
       if (mounted) setState(() => _uploadingLogo = false);
     }
+  }
+
+  Future<void> _removeBusinessLogo() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.base,
+        title: Text(
+          'Remove Store Logo',
+          style: AppTextStyles.body(color: AppColors.textPrimary),
+        ),
+        content: Text(
+          'Are you sure you want to remove your store logo?',
+          style: AppTextStyles.body(color: AppColors.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(
+              'Cancel',
+              style: AppTextStyles.body(color: Colors.grey),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(
+              'Remove',
+              style: AppTextStyles.body(color: AppColors.danger),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true && mounted) {
+      setState(() => _uploadingLogo = true);
+      final success = await ref
+          .read(authProvider.notifier)
+          .updateBusinessLogo(null);
+      if (mounted) {
+        setState(() => _uploadingLogo = false);
+        showNeuSnack(
+          context,
+          success ? 'Store logo removed.' : 'Failed to remove store logo.',
+          tone: success ? NeuToneKind.success : NeuToneKind.error,
+        );
+      }
+    }
+  }
+
+  void _showLogoOptions(bool hasLogo) {
+    HapticFeedback.lightImpact();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surfaceRaised,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(
+                Icons.photo_library_outlined,
+                color: Colors.white,
+              ),
+              title: const Text(
+                'Upload New Logo',
+                style: TextStyle(color: Colors.white),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                _changeBusinessLogo();
+              },
+            ),
+            if (hasLogo)
+              ListTile(
+                leading: const Icon(
+                  Icons.delete_outline_rounded,
+                  color: AppColors.danger,
+                ),
+                title: const Text(
+                  'Remove Store Logo',
+                  style: TextStyle(color: AppColors.danger),
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  _removeBusinessLogo();
+                },
+              ),
+            ListTile(
+              leading: Icon(
+                Icons.close_rounded,
+                color: AppColors.textSecondary,
+              ),
+              title: Text(
+                'Cancel',
+                style: TextStyle(color: AppColors.textSecondary),
+              ),
+              onTap: () => Navigator.pop(context),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _confirmLogout() async {
@@ -113,7 +225,10 @@ class _VendorProfileScreenState extends ConsumerState<VendorProfileScreen> {
             child: Column(
               children: [
                 GestureDetector(
-                  onTap: _changeBusinessLogo,
+                  onTap: () => _showLogoOptions(
+                    user.businessLogoUrl != null &&
+                        user.businessLogoUrl!.isNotEmpty,
+                  ),
                   child: Stack(
                     children: [
                       Container(

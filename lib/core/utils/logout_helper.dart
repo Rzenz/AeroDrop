@@ -27,6 +27,6 @@ Future<void> showLogoutConfirmation(BuildContext context, WidgetRef ref) async {
   );
 
   if (loggedOut && context.mounted) {
-    context.go('/login');
+    context.go('/welcome');
   }
 }

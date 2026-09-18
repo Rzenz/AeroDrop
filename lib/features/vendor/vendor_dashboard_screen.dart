@@ -11,6 +11,9 @@ import '../../core/models/order_model.dart';
 import '../../core/providers/order_provider.dart';
 import '../../core/providers/product_provider.dart';
 import '../../core/providers/auth_provider.dart';
+import '../../core/providers/notification_provider.dart';
+import '../../core/providers/delivery_provider.dart';
+import '../../core/widgets/neu_surface.dart';
 
 class VendorDashboardScreen extends ConsumerWidget {
   const VendorDashboardScreen({super.key});
@@ -20,6 +23,7 @@ class VendorDashboardScreen extends ConsumerWidget {
     final currentVendorAsync = ref.watch(currentVendorProvider);
     final vendorOrdersState = ref.watch(vendorOrdersProvider);
     final vendorProductsState = ref.watch(vendorProductsProvider);
+    final unreadCount = ref.watch(unreadNotificationCountProvider);
 
     final hour = DateTime.now().hour;
     final greeting = hour < 12
@@ -70,26 +74,30 @@ class VendorDashboardScreen extends ConsumerWidget {
           final vendorProducts = vendorProductsState.products;
 
           final pending = vendorOrders
-              .where((o) => o.orderStatus.toLowerCase() == 'pending')
+              .where((o) => o.effectiveStatus == 'pending')
               .length;
           final preparing = vendorOrders
-              .where((o) => o.orderStatus.toLowerCase() == 'preparing')
+              .where(
+                (o) =>
+                    o.effectiveStatus == 'preparing' ||
+                    o.effectiveStatus == 'confirmed',
+              )
               .length;
           final ready = vendorOrders
               .where(
                 (o) => [
                   'ready',
+                  'ready_for_delivery',
                   'ready_for_pickup',
-                  'ready for pickup',
-                ].contains(o.orderStatus.toLowerCase()),
+                ].contains(o.effectiveStatus),
               )
               .length;
           final completed = vendorOrders
-              .where((o) => o.orderStatus.toLowerCase() == 'delivered')
+              .where((o) => o.effectiveStatus == 'delivered')
               .length;
 
           final revenue = vendorOrders
-              .where((o) => o.orderStatus.toLowerCase() == 'delivered')
+              .where((o) => o.effectiveStatus == 'delivered')
               .fold<double>(0, (sum, o) => sum + o.totalAmount);
 
           final initials =
@@ -111,59 +119,78 @@ class VendorDashboardScreen extends ConsumerWidget {
               ref.invalidate(currentVendorProvider);
               await ref.read(vendorOrdersProvider.notifier).loadOrders();
               await ref.read(vendorProductsProvider.notifier).loadProducts();
+              await ref.read(notificationProvider.notifier).loadNotifications();
+              await ref
+                  .read(deliveryProvider.notifier)
+                  .loadDeliveriesFromSupabase();
             },
             child: CustomScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               slivers: [
                 SliverAppBar(
-                  expandedHeight: 110,
-                  floating: false,
                   pinned: true,
-                  stretch: true,
+                  toolbarHeight: 72,
                   backgroundColor: AppColors.base,
+                  surfaceTintColor: Colors.transparent,
+                  scrolledUnderElevation: 0,
                   elevation: 0,
-                  flexibleSpace: FlexibleSpaceBar(
-                    collapseMode: CollapseMode.parallax,
-                    background: Container(
-                      decoration: BoxDecoration(color: AppColors.base),
-                    ),
-                    titlePadding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 10,
-                    ),
-                    title: Row(
+                  automaticallyImplyLeading: false,
+                  titleSpacing: 0,
+                  title: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              greeting,
-                              style: AppTextStyles.label(
-                                fontSize: 10,
-                                color: AppColors.textSecondary,
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                greeting,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppTextStyles.label(
+                                  fontSize: 11,
+                                  color: AppColors.textSecondary,
+                                ),
                               ),
-                            ),
-                            Text(
-                              vendor['business_name']?.toString() ?? 'Vendor',
-                              style: AppTextStyles.title(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w900,
-                                color: AppColors.textPrimary,
+                              const SizedBox(height: 2),
+                              Text(
+                                vendor['business_name']?.toString() ?? 'Vendor',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppTextStyles.title(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w900,
+                                  color: AppColors.textPrimary,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                        CircleAvatar(
-                          radius: 16,
-                          backgroundColor: AppColors.accent,
-                          child: Text(
-                            initials,
-                            style: AppTextStyles.title(
-                              fontSize: 11,
-                              color: AppColors.bgDark,
-                              fontWeight: FontWeight.bold,
+                        const SizedBox(width: 8),
+                        NeuIconButton(
+                          icon: Icons.notifications_none_rounded,
+                          tooltip: 'Alerts',
+                          badgeCount: unreadCount,
+                          onPressed: () =>
+                              context.push('/vendor/notifications'),
+                        ),
+                        const SizedBox(width: 8),
+                        GestureDetector(
+                          onTap: () => context.go('/vendor/profile'),
+                          child: CircleAvatar(
+                            radius: 18,
+                            backgroundColor: AppColors.accent,
+                            child: Text(
+                              initials,
+                              style: AppTextStyles.title(
+                                fontSize: 12,
+                                color: AppColors.bgDark,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                         ),
@@ -399,18 +426,19 @@ class VendorDashboardScreen extends ConsumerWidget {
           children: [
             _AnalyticsRow(
               label: 'Average Order Value',
-              value:
-                  '₱${(totalRevenue / (orderCount == 0 ? 1 : orderCount)).toStringAsFixed(2)}',
+              value: orderCount > 0
+                  ? '₱${(totalRevenue / orderCount).toStringAsFixed(2)}'
+                  : '—',
             ),
             const SizedBox(height: 12),
-            const _AnalyticsRow(
+            _AnalyticsRow(
               label: 'Peak Ordering Hour',
-              value: '11:30 AM - 1:00 PM',
+              value: orderCount > 0 ? '11:30 AM - 1:00 PM' : '—',
             ),
             const SizedBox(height: 12),
-            const _AnalyticsRow(
+            _AnalyticsRow(
               label: 'Avg Preparation Time',
-              value: '8.5 mins',
+              value: orderCount > 0 ? '8.5 mins' : '—',
             ),
           ],
         ),
@@ -661,85 +689,95 @@ class _MiniOrderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final status = order.orderStatus.toLowerCase();
+    final status = order.effectiveStatus;
     final color = switch (status) {
       'pending' => AppColors.warning,
-      'preparing' => AppColors.info,
+      'preparing' || 'confirmed' => AppColors.info,
+      'ready_for_delivery' ||
       'ready' ||
-      'ready_for_pickup' ||
-      'ready for pickup' => AppColors.primaryLight,
-      'picked_up' ||
-      'picked up' ||
-      'in_transit' ||
-      'in transit' => AppColors.accent,
+      'ready_for_pickup' => AppColors.primaryLight,
+      'picked_up' || 'in_transit' => AppColors.accent,
       'delivered' => AppColors.success,
       _ => AppColors.danger,
     };
-    final statusLabel = status[0].toUpperCase() + status.substring(1);
+    final statusLabel = order.statusDisplay;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: AppColors.base,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    final customerTitle =
+        order.customerName.isNotEmpty && order.customerName != 'Me'
+        ? order.customerName
+        : 'Customer (${order.userId.substring(0, 8)})';
+
+    return GestureDetector(
+      onTap: () => context.push('/vendor/orders/${order.id}'),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: AppColors.base,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'AD-${order.id.substring(0, 8).toUpperCase()}',
+                    style: AppTextStyles.caption(
+                      fontSize: 11,
+                      color: AppColors.primaryLight,
+                    ),
+                  ),
+                  Text(
+                    customerTitle,
+                    style: AppTextStyles.body(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Text(
-                  'AD-${order.id.substring(0, 8).toUpperCase()}',
-                  style: AppTextStyles.caption(
-                    fontSize: 11,
-                    color: AppColors.primaryLight,
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    statusLabel,
+                    style: AppTextStyles.label(
+                      fontSize: 10,
+                      color: color,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0,
+                    ),
                   ),
                 ),
+                const SizedBox(height: 3),
                 Text(
-                  order.userId.substring(0, 8),
-                  style: AppTextStyles.body(
-                    fontSize: 13.5,
+                  '₱${order.totalAmount.toStringAsFixed(2)}',
+                  style: AppTextStyles.subHead(
+                    fontSize: 13,
+                    color: AppColors.accent,
                     fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
                   ),
                 ),
               ],
             ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  statusLabel,
-                  style: AppTextStyles.label(
-                    fontSize: 10,
-                    color: color,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 0,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 3),
-              Text(
-                '₱${order.totalAmount.toStringAsFixed(2)}',
-                style: AppTextStyles.subHead(
-                  fontSize: 13,
-                  color: AppColors.accent,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

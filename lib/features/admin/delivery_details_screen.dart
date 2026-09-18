@@ -13,6 +13,7 @@ import '../../core/providers/weather_provider.dart';
 import '../../core/models/drone_model.dart';
 import '../../core/models/delivery_model.dart';
 import '../../core/widgets/neu_back_button.dart';
+import '../../core/widgets/shared_drone_radar.dart';
 
 class DeliveryDetailsScreen extends ConsumerWidget {
   final String deliveryId;
@@ -63,9 +64,7 @@ class DeliveryDetailsScreen extends ConsumerWidget {
         delivery.packageName.isNotEmpty;
     final isDroneAvailable =
         delivery.droneId != null ||
-        drones.any(
-          (d) => d.name == 'DRN-001' && d.status == DroneStatus.available,
-        );
+        drones.any((d) => d.status == DroneStatus.available);
 
     final allPassed =
         isWeatherSafe &&
@@ -247,6 +246,20 @@ class DeliveryDetailsScreen extends ConsumerWidget {
                   ).animate(delay: 320.ms).fadeIn().slideY(begin: 0.05),
 
                   const SizedBox(height: 20),
+
+                  // Live Drone Radar for Active / Completed Flight
+                  if (delivery.status == DeliveryStatus.assigning ||
+                      delivery.status == DeliveryStatus.inTransit ||
+                      delivery.status == DeliveryStatus.delivered) ...[
+                    SharedDroneRadar(
+                      delivery: delivery,
+                      isCompact: false,
+                      title: delivery.droneId != null
+                          ? 'Live Drone Radar (${delivery.droneId})'
+                          : 'Live Drone Radar',
+                    ).animate(delay: 340.ms).fadeIn().slideY(begin: 0.05),
+                    const SizedBox(height: 20),
+                  ],
 
                   // Drone Assignment Info
                   if (drone != null) ...[
@@ -636,9 +649,7 @@ class _CargoVerificationCard extends ConsumerWidget {
 
     final isDroneAvailable =
         delivery.droneId != null ||
-        drones.any(
-          (d) => d.name == 'DRN-001' && d.status == DroneStatus.available,
-        );
+        drones.any((d) => d.status == DroneStatus.available);
 
     final allPassed =
         isWeatherSafe &&
@@ -729,9 +740,9 @@ class _CargoVerificationCard extends ConsumerWidget {
             'Carrier Drone Allocation',
             isDroneAvailable
                 ? (delivery.droneId != null
-                      ? 'Drone Assigned'
-                      : 'DRN-001 Available')
-                : 'DRN-001 Busy / Unavailable',
+                      ? 'Drone Assigned (${delivery.droneId})'
+                      : 'Carrier Drone Available')
+                : 'No Available Drones',
             isDroneAvailable,
           ),
         ],

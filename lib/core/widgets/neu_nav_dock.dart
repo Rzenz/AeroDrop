@@ -333,7 +333,7 @@ class _DockItem extends StatelessWidget {
             ),
             child: Center(
               child: Text(
-                count > 99 ? '99+' : '\$count',
+                count > 99 ? '99+' : count.toString(),
                 style: AppTextStyles.label(
                   fontSize: 9,
                   color: Colors.white,

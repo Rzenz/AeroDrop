@@ -21,6 +21,17 @@ class DeliveryModel {
   final int estimatedDeliverySeconds;
   final DateTime? deliveredAt;
 
+  // Authoritative physical locations & live telemetry
+  final String? pickupLocationId;
+  final String? dropoffLocationId;
+  final String? pickupLocationName;
+  final String? dropoffLocationName;
+  final double? currentLatitude;
+  final double? currentLongitude;
+  final double? currentAltitude;
+  final double? currentSpeed;
+  final double? batteryLevel;
+
   DeliveryModel({
     required this.id,
     required this.senderName,
@@ -40,6 +51,15 @@ class DeliveryModel {
     this.deliveryStartedAt,
     this.estimatedDeliverySeconds = 60,
     this.deliveredAt,
+    this.pickupLocationId,
+    this.dropoffLocationId,
+    this.pickupLocationName,
+    this.dropoffLocationName,
+    this.currentLatitude,
+    this.currentLongitude,
+    this.currentAltitude,
+    this.currentSpeed,
+    this.batteryLevel,
   });
 
   DeliveryModel copyWith({
@@ -61,6 +81,15 @@ class DeliveryModel {
     DateTime? deliveryStartedAt,
     int? estimatedDeliverySeconds,
     DateTime? deliveredAt,
+    String? pickupLocationId,
+    String? dropoffLocationId,
+    String? pickupLocationName,
+    String? dropoffLocationName,
+    double? currentLatitude,
+    double? currentLongitude,
+    double? currentAltitude,
+    double? currentSpeed,
+    double? batteryLevel,
   }) {
     return DeliveryModel(
       id: id ?? this.id,
@@ -82,6 +111,15 @@ class DeliveryModel {
       estimatedDeliverySeconds:
           estimatedDeliverySeconds ?? this.estimatedDeliverySeconds,
       deliveredAt: deliveredAt ?? this.deliveredAt,
+      pickupLocationId: pickupLocationId ?? this.pickupLocationId,
+      dropoffLocationId: dropoffLocationId ?? this.dropoffLocationId,
+      pickupLocationName: pickupLocationName ?? this.pickupLocationName,
+      dropoffLocationName: dropoffLocationName ?? this.dropoffLocationName,
+      currentLatitude: currentLatitude ?? this.currentLatitude,
+      currentLongitude: currentLongitude ?? this.currentLongitude,
+      currentAltitude: currentAltitude ?? this.currentAltitude,
+      currentSpeed: currentSpeed ?? this.currentSpeed,
+      batteryLevel: batteryLevel ?? this.batteryLevel,
     );
   }
 }

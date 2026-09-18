@@ -11,7 +11,9 @@ import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/neu_card.dart';
 import '../../core/providers/order_provider.dart';
 import '../../mock_data/cart_mock.dart';
+import '../../core/providers/auth_provider.dart';
 import '../../core/providers/location_provider.dart';
+import '../../core/providers/vendor_provider.dart';
 
 class CheckoutScreen extends ConsumerStatefulWidget {
   const CheckoutScreen({super.key});
@@ -24,6 +26,19 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   String? _selectedLocationId;
   String _paymentMethod = 'gcash';
   bool _placing = false;
+  late final TextEditingController _notesController;
+
+  @override
+  void initState() {
+    super.initState();
+    _notesController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _notesController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -179,6 +194,55 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                       ],
                     ),
                   ).animate().fadeIn(delay: 150.ms),
+                  const SizedBox(height: 16),
+
+                  // Order Note / Instructions for Vendor
+                  _SectionCard(
+                    title: 'Note for Vendor (Optional)',
+                    icon: Icons.note_alt_outlined,
+                    child: TextFormField(
+                      controller: _notesController,
+                      maxLines: 2,
+                      maxLength: 200,
+                      style: AppTextStyles.body(
+                        fontSize: 13,
+                        color: AppColors.textPrimary,
+                      ),
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: AppColors.bgDark,
+                        hintText:
+                            'e.g. Please pack extra utensils, call upon arrival...',
+                        hintStyle: AppTextStyles.caption(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                        ),
+                        counterStyle: AppTextStyles.caption(
+                          fontSize: 10,
+                          color: AppColors.textSecondary,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 12,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: AppColors.border),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: AppColors.border),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(
+                            color: AppColors.accent,
+                            width: 1.5,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ).animate().fadeIn(delay: 175.ms),
                   const SizedBox(height: 16),
 
                   // Order summary
@@ -340,6 +404,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         ? 'gcash_simulated'
         : 'cash_on_delivery';
 
+    final rawNotes = _notesController.text.trim();
+    final notes = rawNotes.isNotEmpty ? rawNotes : null;
+
     final success = await ref
         .read(orderProvider.notifier)
         .placeOrder(
@@ -350,6 +417,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
           totalAmount: totalAmount,
           paymentMethod: dbPaymentMethod,
           items: cart,
+          notes: notes,
         );
 
     if (!mounted) return;
@@ -391,14 +459,31 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   /// payment reference format the server would have used.
   ReceiptData _receiptFor(List<CartItem> cart, double totalAmount) {
     final placed = ref.read(orderProvider).orders;
+    final user = ref.read(authProvider).user;
+    final vendors = ref.read(vendorProvider).vendors;
+    final vendor = vendors
+        .where((v) => v.id == cart.first.vendorId)
+        .firstOrNull;
     final now = DateTime.now();
-    final ref0 = placed.isNotEmpty
-        ? 'ORD-${placed.first.id.replaceAll('-', '').substring(0, 8).toUpperCase()}'
+    final firstOrder = placed.isNotEmpty ? placed.first : null;
+    final ref0 = firstOrder != null
+        ? 'ORD-${firstOrder.id.replaceAll('-', '').substring(0, 8).toUpperCase()}'
         : 'ORD-${now.millisecondsSinceEpoch.toString().substring(6)}';
+
+    final totalWeightGrams = cart.fold<int>(
+      0,
+      (sum, item) => sum + ((item.weightKg * 1000).round() * item.quantity),
+    );
+
+    final rawNotes = _notesController.text.trim();
+    final note = rawNotes.isNotEmpty ? rawNotes : null;
 
     return ReceiptData(
       orderRef: ref0,
       vendorName: cart.first.vendorName,
+      vendorInfo: vendor?.building,
+      customerName: user?.fullName,
+      customerPhone: user?.phoneNumber,
       lines: [
         for (final item in cart)
           ReceiptLine(
@@ -410,9 +495,15 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       subtotal: cartNotifier.totalAmount,
       deliveryFee: 20.0,
       total: totalAmount,
-      paymentLabel: _paymentMethod == 'gcash' ? 'GCash' : 'Cash on delivery',
+      paymentLabel: _paymentMethod == 'gcash'
+          ? 'GCash (Simulated)'
+          : 'Cash on delivery',
       placedAt: now,
       dropoffName: _dropoffName(),
+      totalWeightGrams: totalWeightGrams,
+      customerNote: note,
+      orderStatus: 'Pending Confirmation',
+      deliveryId: firstOrder?.deliveryId,
     );
   }
 }

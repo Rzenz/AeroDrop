@@ -1,13 +1,16 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import '../../core/widgets/neu_feedback.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../core/constants/auth_constants.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/neu_button.dart';
 import '../../core/widgets/neu_card.dart';
+import '../../core/widgets/neu_feedback.dart';
 import '../../core/providers/auth_provider.dart';
 
 enum VerificationMethod { email, sms }
@@ -20,26 +23,53 @@ class VerificationPage extends ConsumerStatefulWidget {
 }
 
 class _VerificationPageState extends ConsumerState<VerificationPage> {
-  final VerificationMethod _method = VerificationMethod.sms;
+  late VerificationMethod _method;
   bool _isLoading = false;
   bool _resending = false;
-  int _timerSeconds = 59;
+  int _timerSeconds = 60;
   Timer? _timer;
+  bool _initialSent = false;
 
-  final List<TextEditingController> _controllers = [
-    TextEditingController(text: '1'),
-    TextEditingController(text: '2'),
-    TextEditingController(text: '3'),
-    TextEditingController(text: '4'),
-    TextEditingController(text: '5'),
-    TextEditingController(text: '6'),
-  ];
-  final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
+  final List<TextEditingController> _controllers = List.generate(
+    AuthConstants.otpLength,
+    (_) => TextEditingController(),
+  );
+  final List<FocusNode> _focusNodes = List.generate(
+    AuthConstants.otpLength,
+    (_) => FocusNode(),
+  );
 
   @override
   void initState() {
     super.initState();
+    // Email is always default on load; phone is never auto-selected.
+    _method = VerificationMethod.email;
+
     _startTimer();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _sendInitialOtp();
+    });
+  }
+
+  Future<void> _sendInitialOtp() async {
+    if (_initialSent) return;
+    _initialSent = true;
+    final viaSms = _method == VerificationMethod.sms;
+    final success = await ref
+        .read(authProvider.notifier)
+        .sendLoginOtp(viaSms: viaSms);
+    if (!mounted) return;
+    if (success) {
+      final destination = viaSms ? 'mobile number' : 'email address';
+      showNeuSnack(
+        context,
+        'Verification code sent to your $destination!',
+        tone: NeuToneKind.info,
+      );
+    } else {
+      final err = ref.read(authProvider).errorMessage ?? 'Failed to send code.';
+      showNeuSnack(context, err, tone: NeuToneKind.error);
+    }
   }
 
   @override
@@ -57,42 +87,67 @@ class _VerificationPageState extends ConsumerState<VerificationPage> {
   void _startTimer() {
     _timer?.cancel();
     setState(() {
-      _timerSeconds = 59;
+      _timerSeconds = 60;
     });
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
       if (_timerSeconds > 0) {
         setState(() {
           _timerSeconds--;
         });
       } else {
-        _timer?.cancel();
+        timer.cancel();
       }
     });
   }
 
   void _resendCode() async {
+    if (_resending || _timerSeconds > 0) return;
     setState(() => _resending = true);
-    await Future.delayed(const Duration(milliseconds: 1200));
+    final viaSms = _method == VerificationMethod.sms;
+    final success =
+        await ref.read(authProvider.notifier).sendLoginOtp(viaSms: viaSms);
     if (mounted) {
       setState(() => _resending = false);
-      _startTimer();
-      final destination = _method == VerificationMethod.email
-          ? 'email'
-          : 'phone number';
-      showNeuSnack(
-        context,
-        'Verification code resent to your $destination!',
-        tone: NeuToneKind.success,
-      );
+      if (success) {
+        _startTimer();
+        final destination = viaSms ? 'mobile number' : 'email address';
+        showNeuSnack(
+          context,
+          'Verification code resent to your $destination!',
+          tone: NeuToneKind.success,
+        );
+      } else {
+        final err =
+            ref.read(authProvider).errorMessage ?? 'Failed to resend code.';
+        showNeuSnack(context, err, tone: NeuToneKind.error);
+      }
     }
   }
 
+  void _switchMethod(VerificationMethod newMethod) async {
+    if (_method == newMethod || _isLoading || _resending) return;
+    setState(() {
+      _method = newMethod;
+      for (var c in _controllers) {
+        c.clear();
+      }
+    });
+    ref.read(authProvider.notifier).setOtpDeliveryMethod(
+          newMethod == VerificationMethod.sms ? 'sms' : 'email',
+        );
+    _resendCode();
+  }
+
   void _verifyCode() async {
-    final code = _controllers.map((c) => c.text).join();
-    if (code.length < 6) {
+    final code = _controllers.map((c) => c.text.trim()).join();
+    if (code.length < AuthConstants.otpLength) {
       showNeuSnack(
         context,
-        'Please enter the complete 6-digit code.',
+        'Please enter the complete ${AuthConstants.otpLength}-digit code.',
         tone: NeuToneKind.error,
       );
       return;
@@ -101,32 +156,53 @@ class _VerificationPageState extends ConsumerState<VerificationPage> {
     setState(() => _isLoading = true);
     HapticFeedback.mediumImpact();
 
-    try {
-      // Simulate verification check
-      await Future.delayed(const Duration(milliseconds: 1200));
-
-      if (!mounted) return;
-      setState(() => _isLoading = false);
-
-      // Complete verification session
-      ref.read(authProvider.notifier).completeVerification();
-
-      // GoRouter redirect automatically routes user to their correct dashboard
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isLoading = false);
-        showNeuSnack(
-          context,
-          'Unable to verify the code. Please try again.',
-          tone: NeuToneKind.error,
+    final viaSms = _method == VerificationMethod.sms;
+    final success = await ref.read(authProvider.notifier).verifyLoginOtp(
+          token: code,
+          viaSms: viaSms,
         );
+
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+
+    if (success) {
+      final user = ref.read(authProvider).user;
+      if (user?.isAdmin == true) {
+        context.go('/admin');
+      } else if (user?.isVendor == true) {
+        context.go('/vendor');
+      } else if (user?.vendorStatus == 'pending') {
+        context.go('/account-pending');
+      } else {
+        context.go('/user');
       }
+    } else {
+      final errorMsg = ref.read(authProvider).errorMessage ??
+          'Unable to verify the code. Please try again.';
+      showNeuSnack(
+        context,
+        errorMsg,
+        tone: NeuToneKind.error,
+      );
     }
+  }
+
+  String _maskEmail(String email) {
+    if (email.isEmpty) return 'your email';
+    final parts = email.split('@');
+    if (parts.length != 2) return email;
+    final name = parts[0];
+    final domain = parts[1];
+    if (name.length <= 2) {
+      return '${name[0]}•••@$domain';
+    }
+    final maskedName = '${name.substring(0, 2)}${'•' * (name.length - 2)}';
+    return '$maskedName@$domain';
   }
 
   String _maskPhoneNumber(String? phone) {
     if (phone == null || phone.trim().isEmpty) {
-      return 'No phone number is registered for this account.';
+      return 'No phone number registered';
     }
     final clean = phone.replaceAll(RegExp(r'[\s\-\(\)]'), '');
     if (clean.length >= 7) {
@@ -145,8 +221,10 @@ class _VerificationPageState extends ConsumerState<VerificationPage> {
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(authProvider).user;
-    final userEmail = user?.email ?? 'm***@gmail.com';
+    final userEmail = _maskEmail(user?.email ?? '');
     final userPhone = _maskPhoneNumber(user?.phoneNumber);
+    final hasPhone =
+        user?.phoneNumber != null && user!.phoneNumber!.trim().isNotEmpty;
 
     return Scaffold(
       backgroundColor: AppColors.base,
@@ -176,13 +254,13 @@ class _VerificationPageState extends ConsumerState<VerificationPage> {
                     child: Icon(
                       _method == VerificationMethod.email
                           ? Icons.mark_email_read_rounded
-                          : Icons.sms_failed_rounded,
+                          : Icons.sms_rounded,
                       color: AppColors.primary,
                       size: 40,
                     ),
                   ).animate().scale(curve: Curves.elasticOut, duration: 600.ms),
 
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 28),
 
                   Text(
                     'Security Verification',
@@ -193,17 +271,16 @@ class _VerificationPageState extends ConsumerState<VerificationPage> {
                     ),
                   ).animate().fadeIn(delay: 100.ms),
 
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 10),
 
                   AnimatedSwitcher(
                     duration: const Duration(milliseconds: 300),
                     child: Text(
                       _method == VerificationMethod.email
-                          ? 'We sent a 6-digit verification code to your email:\n$userEmail'
-                          : (user?.phoneNumber == null ||
-                                user!.phoneNumber!.trim().isEmpty)
-                          ? 'No phone number is registered for this account.'
-                          : 'We sent a 6-digit verification code to your registered mobile number:\n$userPhone',
+                          ? 'We sent a ${AuthConstants.otpLength}-digit verification code to your email:\n$userEmail'
+                          : (!hasPhone
+                              ? 'No phone number is registered for this account.'
+                              : 'We sent a ${AuthConstants.otpLength}-digit verification code to your registered mobile number:\n$userPhone'),
                       key: ValueKey(_method),
                       style: AppTextStyles.body(
                         fontSize: 14,
@@ -213,12 +290,61 @@ class _VerificationPageState extends ConsumerState<VerificationPage> {
                     ),
                   ).animate().fadeIn(delay: 200.ms),
 
-                  const SizedBox(height: 36),
+                  const SizedBox(height: 16),
+
+                  // Option to toggle between Email and SMS if phone is available
+                  if (hasPhone)
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        ChoiceChip(
+                          label: const Text('Email Code'),
+                          selected: _method == VerificationMethod.email,
+                          onSelected: (selected) {
+                            if (selected) {
+                              _switchMethod(VerificationMethod.email);
+                            }
+                          },
+                          selectedColor: AppColors.primary.withValues(alpha: 0.2),
+                          backgroundColor: const Color(0xFF101926),
+                          labelStyle: AppTextStyles.body(
+                            fontSize: 12,
+                            fontWeight: _method == VerificationMethod.email
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                            color: _method == VerificationMethod.email
+                                ? AppColors.primaryLight
+                                : AppColors.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        ChoiceChip(
+                          label: const Text('Send code to phone instead'),
+                          selected: _method == VerificationMethod.sms,
+                          onSelected: (selected) {
+                            if (selected) _switchMethod(VerificationMethod.sms);
+                          },
+                          selectedColor: AppColors.primary.withValues(alpha: 0.2),
+                          backgroundColor: const Color(0xFF101926),
+                          labelStyle: AppTextStyles.body(
+                            fontSize: 12,
+                            fontWeight: _method == VerificationMethod.sms
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                            color: _method == VerificationMethod.sms
+                                ? AppColors.primaryLight
+                                : AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+
+                  const SizedBox(height: 24),
 
                   // OTP Boxes
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: List.generate(6, (index) {
+                    children: List.generate(AuthConstants.otpLength, (index) {
                       return SizedBox(
                         width: 42,
                         height: 52,
@@ -257,7 +383,7 @@ class _VerificationPageState extends ConsumerState<VerificationPage> {
                           ),
                           onChanged: (value) {
                             if (value.length == 1) {
-                              if (index < 5) {
+                              if (index < AuthConstants.otpLength - 1) {
                                 _focusNodes[index + 1].requestFocus();
                               } else {
                                 _focusNodes[index].unfocus();
@@ -323,6 +449,27 @@ class _VerificationPageState extends ConsumerState<VerificationPage> {
                       ],
                     ),
                   ).animate().fadeIn(delay: 400.ms).slideY(begin: 0.05),
+
+                  const SizedBox(height: 24),
+
+                  // Back to Login / Sign out option
+                  TextButton.icon(
+                    onPressed: () async {
+                      await ref.read(authProvider.notifier).logout();
+                      if (context.mounted) {
+                        context.go('/login');
+                      }
+                    },
+                    icon: Icon(Icons.logout_rounded,
+                        size: 16, color: AppColors.textTertiary),
+                    label: Text(
+                      'Sign out and use another account',
+                      style: AppTextStyles.body(
+                        fontSize: 13,
+                        color: AppColors.textTertiary,
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),

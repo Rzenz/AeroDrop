@@ -141,12 +141,14 @@ class AeroDropUser {
     String? role,
     String? accountStatus,
     String? avatarUrl,
+    bool clearAvatar = false,
     String? businessName,
     String? businessCategory,
     String? businessDescription,
     String? campusLocationId,
     String? vendorStatus,
     String? businessLogoUrl,
+    bool clearBusinessLogo = false,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -157,13 +159,15 @@ class AeroDropUser {
       phoneNumber: phoneNumber ?? this.phoneNumber,
       role: role ?? this.role,
       accountStatus: accountStatus ?? this.accountStatus,
-      avatarUrl: avatarUrl ?? this.avatarUrl,
+      avatarUrl: clearAvatar ? null : (avatarUrl ?? this.avatarUrl),
       businessName: businessName ?? this.businessName,
       businessCategory: businessCategory ?? this.businessCategory,
       businessDescription: businessDescription ?? this.businessDescription,
       campusLocationId: campusLocationId ?? this.campusLocationId,
       vendorStatus: vendorStatus ?? this.vendorStatus,
-      businessLogoUrl: businessLogoUrl ?? this.businessLogoUrl,
+      businessLogoUrl: clearBusinessLogo
+          ? null
+          : (businessLogoUrl ?? this.businessLogoUrl),
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

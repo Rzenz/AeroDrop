@@ -1,114 +1,87 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/glass_card.dart';
 import '../../core/widgets/status_chip.dart';
 import '../../core/widgets/drone_svg_painter.dart';
 import '../../core/widgets/neu_back_button.dart';
+import '../../core/widgets/empty_state_widget.dart';
+import '../../core/services/supabase_service.dart';
+import '../../core/providers/delivery_provider.dart';
+import '../../core/models/delivery_model.dart';
 
-class ReportsPage extends StatefulWidget {
+class ReportsPage extends ConsumerStatefulWidget {
   const ReportsPage({super.key});
 
   @override
-  State<ReportsPage> createState() => _ReportsPageState();
+  ConsumerState<ReportsPage> createState() => _ReportsPageState();
 }
 
-class _ReportsPageState extends State<ReportsPage>
+class _ReportsPageState extends ConsumerState<ReportsPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-
-  final List<Map<String, String>> _deliveryLogs = [
-    {
-      'id': '#1004',
-      'time': '10 Mins Ago',
-      'target': 'Gymnasium Dome',
-      'weight': '0.45kg',
-      'drone': 'DRN-001',
-      'status': 'Delivered',
-    },
-    {
-      'id': '#1003',
-      'time': '1 Hour Ago',
-      'target': 'Canteen Courtyard',
-      'weight': '0.22kg',
-      'drone': 'DRN-001',
-      'status': 'Delivered',
-    },
-    {
-      'id': '#1002',
-      'time': '3 Hours Ago',
-      'target': 'Library Wing',
-      'weight': '0.80kg',
-      'drone': 'DRN-001',
-      'status': 'Returned',
-    },
-    {
-      'id': '#1001',
-      'time': 'Yesterday',
-      'target': 'Science Lab',
-      'weight': '0.50kg',
-      'drone': 'DRN-001',
-      'status': 'Delivered',
-    },
-  ];
-
-  final List<Map<String, String>> _droneLogs = [
-    {
-      'event': 'Drone DRN-001 compass & IMU calibration success.',
-      'time': '5 Mins Ago',
-      'level': 'INFO',
-    },
-    {
-      'event': 'Recharge queue: DRN-001 battery restored to 100%.',
-      'time': '20 Mins Ago',
-      'level': 'SUCCESS',
-    },
-    {
-      'event': 'Low battery alert: DRN-001 capacity dropped to 9%.',
-      'time': '40 Mins Ago',
-      'level': 'WARNING',
-    },
-    {
-      'event': 'Takeoff check: cargo clamp safety lock engaged.',
-      'time': '2 Hours Ago',
-      'level': 'INFO',
-    },
-  ];
-
-  final List<Map<String, String>> _userLogs = [
-    {
-      'action': 'Merchant "Sweet Escape Delights" approved.',
-      'time': '15 Mins Ago',
-      'user': 'Admin',
-    },
-    {
-      'action': 'User account "John Doe" suspended (Policy).',
-      'time': '2 Hours Ago',
-      'user': 'Admin',
-    },
-    {
-      'action': 'Store onboarding requested: "Quick Byte Canteen".',
-      'time': '3 Hours Ago',
-      'user': 'System',
-    },
-    {
-      'action': 'Admin account sign-in verified.',
-      'time': 'Yesterday',
-      'user': 'Admin.Portal',
-    },
-  ];
+  bool _loading = false;
+  List<Map<String, dynamic>> _droneLogs = [];
+  List<Map<String, dynamic>> _userLogs = [];
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _fetchSystemLogs();
   }
 
   @override
   void dispose() {
     _tabController.dispose();
     super.dispose();
+  }
+
+  Future<void> _fetchSystemLogs() async {
+    if (!SupabaseService.isConfigured) return;
+    setState(() => _loading = true);
+    try {
+      // 1. Fetch Drone Safety Logs
+      try {
+        final checks = await SupabaseService.client
+            .from('delivery_safety_checks')
+            .select()
+            .order('checked_at', ascending: false)
+            .limit(10);
+        _droneLogs = List<Map<String, dynamic>>.from(checks);
+      } catch (_) {
+        _droneLogs = [];
+      }
+
+      // 2. Fetch User audit logs / recent registrations
+      try {
+        final users = await SupabaseService.client
+            .from('users')
+            .select('id, full_name, email, role, created_at, account_status')
+            .order('created_at', ascending: false)
+            .limit(10);
+        _userLogs = List<Map<String, dynamic>>.from(users);
+      } catch (_) {
+        _userLogs = [];
+      }
+    } catch (e) {
+      debugPrint('Error loading system diagnostics logs: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
+  }
+
+  String _formatRelativeTime(DateTime? date) {
+    if (date == null) return '—';
+    final diff = DateTime.now().toUtc().difference(date.toUtc());
+    if (diff.inMinutes < 1) return 'Just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    return '${diff.inDays}d ago';
   }
 
   @override
@@ -174,14 +147,20 @@ class _ReportsPageState extends State<ReportsPage>
 
                 // Tab views
                 Expanded(
-                  child: TabBarView(
-                    controller: _tabController,
-                    children: [
-                      _buildDeliveriesTab(),
-                      _buildDroneTelemetryTab(),
-                      _buildUserActivityTab(),
-                    ],
-                  ),
+                  child: _loading
+                      ? const Center(
+                          child: CircularProgressIndicator(
+                            color: AppColors.accent,
+                          ),
+                        )
+                      : TabBarView(
+                          controller: _tabController,
+                          children: [
+                            _buildDeliveriesTab(),
+                            _buildDroneTelemetryTab(),
+                            _buildUserActivityTab(),
+                          ],
+                        ),
                 ),
               ],
             ),
@@ -192,105 +171,137 @@ class _ReportsPageState extends State<ReportsPage>
   }
 
   Widget _buildDeliveriesTab() {
-    return ListView.builder(
-      itemCount: _deliveryLogs.length,
-      physics: const BouncingScrollPhysics(),
-      itemBuilder: (context, idx) {
-        final log = _deliveryLogs[idx];
-        final status = log['status']!;
-        final isSuccess = status == 'Delivered';
+    final deliveries = ref.watch(deliveryProvider);
+    if (deliveries.isEmpty) {
+      return const EmptyStateWidget(
+        icon: Icons.local_shipping_outlined,
+        title: 'No Delivery Logs',
+        subtitle: 'Delivery records and logs will appear here once dispatched.',
+      );
+    }
 
-        return Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          child: GlassCard(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: (isSuccess ? AppColors.success : AppColors.danger)
-                        .withValues(alpha: 0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: isSuccess
-                      ? SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CustomPaint(
-                            size: const Size(20, 20),
-                            painter: DroneSvgPainter(
-                              animationValue: 0.0,
-                              lineColor: AppColors.success,
-                              accentColor: const Color(0xFF4F46E5),
+    return RefreshIndicator(
+      color: AppColors.accent,
+      backgroundColor: AppColors.cardDark,
+      onRefresh: () => ref
+          .read(deliveryProvider.notifier)
+          .loadAdminDeliveriesFromSupabase(),
+      child: ListView.builder(
+        itemCount: deliveries.length,
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: BouncingScrollPhysics(),
+        ),
+        itemBuilder: (context, idx) {
+          final delivery = deliveries[idx];
+          final isDelivered = delivery.status == DeliveryStatus.delivered;
+          final statusLabel = delivery.status.name.toUpperCase();
+
+          return Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            child: GlassCard(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: (isDelivered
+                              ? AppColors.success
+                              : AppColors.primary)
+                          .withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: isDelivered
+                        ? SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CustomPaint(
+                              size: const Size(20, 20),
+                              painter: DroneSvgPainter(
+                                animationValue: 0.0,
+                                lineColor: AppColors.success,
+                                accentColor: const Color(0xFF4F46E5),
+                              ),
                             ),
+                          )
+                        : const Icon(
+                            Icons.flight_takeoff_rounded,
+                            color: AppColors.primary,
+                            size: 20,
                           ),
-                        )
-                      : const Icon(
-                          Icons.assignment_return_rounded,
-                          color: AppColors.danger,
-                          size: 20,
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Delivery #${delivery.id.substring(0, delivery.id.length > 8 ? 8 : delivery.id.length)}',
+                          style: AppTextStyles.title(
+                            fontSize: 14,
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                        const SizedBox(height: 4),
+                        Text(
+                          'Target: ${delivery.dropoffLocationName} • Drone: ${delivery.droneId ?? "—"}',
+                          style: TextStyle(
+                            color: AppColors.textSecondaryDark,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      Text(
-                        'Order ${log['id']!} • ${log['weight']!}',
-                        style: AppTextStyles.title(
-                          fontSize: 14,
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
+                      StatusChip(
+                        label: statusLabel,
+                        color: isDelivered
+                            ? AppColors.success
+                            : AppColors.primary,
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Target: ${log['target']!} • Drone: ${log['drone']!}',
-                        style: TextStyle(
-                          color: AppColors.textSecondaryDark,
-                          fontSize: 11,
+                        _formatRelativeTime(delivery.createdAt),
+                        style: const TextStyle(
+                          color: Colors.white30,
+                          fontSize: 9,
                         ),
                       ),
                     ],
                   ),
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    StatusChip(
-                      label: status.toUpperCase(),
-                      color: isSuccess ? AppColors.success : AppColors.danger,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      log['time']!,
-                      style: const TextStyle(
-                        color: Colors.white30,
-                        fontSize: 9,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 
   Widget _buildDroneTelemetryTab() {
+    if (_droneLogs.isEmpty) {
+      return const EmptyStateWidget(
+        icon: Icons.sensors_off_rounded,
+        title: 'No Telemetry Logs',
+        subtitle: 'Safety checks and telemetry diagnostic logs are clear.',
+      );
+    }
+
     return ListView.builder(
       itemCount: _droneLogs.length,
       physics: const BouncingScrollPhysics(),
       itemBuilder: (context, idx) {
         final log = _droneLogs[idx];
-        final level = log['level']!;
-        Color levelColor = AppColors.primary;
-        if (level == 'WARNING') levelColor = AppColors.warning;
-        if (level == 'SUCCESS') levelColor = AppColors.success;
+        final passed = log['passed'] == true;
+        final checkType = log['check_type']?.toString() ?? 'Safety Check';
+        final details = log['notes']?.toString() ?? 'Routine check passed';
+        final recordedAt = log['checked_at'] != null
+            ? DateTime.tryParse(log['checked_at'].toString())
+            : null;
 
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
@@ -303,13 +314,14 @@ class _ReportsPageState extends State<ReportsPage>
                   margin: const EdgeInsets.only(top: 2),
                   padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
-                    color: levelColor.withValues(alpha: 0.12),
+                    color: (passed ? AppColors.success : AppColors.warning)
+                        .withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
-                    level,
+                    passed ? 'PASS' : 'WARN',
                     style: TextStyle(
-                      color: levelColor,
+                      color: passed ? AppColors.success : AppColors.warning,
                       fontSize: 8,
                       fontWeight: FontWeight.bold,
                     ),
@@ -321,7 +333,7 @@ class _ReportsPageState extends State<ReportsPage>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        log['event']!,
+                        '$checkType: $details',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 12.5,
@@ -330,7 +342,7 @@ class _ReportsPageState extends State<ReportsPage>
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        log['time']!,
+                        _formatRelativeTime(recordedAt),
                         style: const TextStyle(
                           color: Colors.white30,
                           fontSize: 9,
@@ -348,11 +360,27 @@ class _ReportsPageState extends State<ReportsPage>
   }
 
   Widget _buildUserActivityTab() {
+    if (_userLogs.isEmpty) {
+      return const EmptyStateWidget(
+        icon: Icons.history_rounded,
+        title: 'No User Activity',
+        subtitle: 'User registrations and activity will appear here.',
+      );
+    }
+
     return ListView.builder(
       itemCount: _userLogs.length,
       physics: const BouncingScrollPhysics(),
       itemBuilder: (context, idx) {
-        final log = _userLogs[idx];
+        final user = _userLogs[idx];
+        final name = user['full_name']?.toString() ??
+            user['email']?.toString() ??
+            'User';
+        final role = user['role']?.toString().toUpperCase() ?? 'USER';
+        final createdAt = user['created_at'] != null
+            ? DateTime.tryParse(user['created_at'].toString())
+            : null;
+
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
           child: GlassCard(
@@ -360,7 +388,7 @@ class _ReportsPageState extends State<ReportsPage>
             child: Row(
               children: [
                 const Icon(
-                  Icons.history_toggle_off_rounded,
+                  Icons.person_outline_rounded,
                   color: AppColors.accent,
                   size: 20,
                 ),
@@ -370,7 +398,7 @@ class _ReportsPageState extends State<ReportsPage>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        log['action']!,
+                        '$name registered as $role',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 13,
@@ -379,7 +407,7 @@ class _ReportsPageState extends State<ReportsPage>
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'By: ${log['user']!} • ${log['time']!}',
+                        'Status: ${user['account_status'] ?? "active"} • ${_formatRelativeTime(createdAt)}',
                         style: TextStyle(
                           color: AppColors.textSecondaryDark,
                           fontSize: 10,

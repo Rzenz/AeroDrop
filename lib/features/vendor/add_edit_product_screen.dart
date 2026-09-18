@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/widgets/neu_feedback.dart';
 import '../../core/widgets/custom_app_bar.dart';
 import '../../core/widgets/spring_switch.dart';
@@ -9,8 +11,10 @@ import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../mock_data/products_mock.dart';
+import '../../core/providers/auth_provider.dart';
 import '../../core/providers/product_provider.dart';
 import '../../core/services/supabase_service.dart';
+import '../../core/utils/image_utils.dart';
 
 class AddEditProductScreen extends ConsumerStatefulWidget {
   final String? productId; // null = add, non-null = edit
@@ -27,6 +31,7 @@ class _AddEditProductScreenState extends ConsumerState<AddEditProductScreen> {
   String _category = 'Food';
   bool _available = true;
   bool _saving = false;
+  bool _uploadingImage = false;
   String _imageUrl = '';
 
   bool get _isEdit => widget.productId != null;
@@ -113,6 +118,114 @@ class _AddEditProductScreenState extends ConsumerState<AddEditProductScreen> {
     super.dispose();
   }
 
+  Future<void> _pickAndCropImage() async {
+    try {
+      final image = await ImageUtils.pickAndCropImage(
+        context: context,
+        source: ImageSource.gallery,
+        title: 'Adjust Product Image',
+        isCircle: false,
+      );
+
+      if (image == null || !mounted) return;
+
+      final validation = await ImageUtils.validateImage(image);
+      if (!validation.isValid) {
+        if (!mounted) return;
+        showNeuSnack(
+          context,
+          validation.errorMessage ??
+              'Unsupported image format. Please choose a JPG, PNG, or WebP image.',
+          tone: NeuToneKind.error,
+        );
+        return;
+      }
+
+      final bytes = await image.readAsBytes();
+
+      setState(() => _uploadingImage = true);
+
+      final user = ref.read(authProvider).user;
+      final userId = user?.id ?? SupabaseService.client.auth.currentUser?.id;
+      if (userId == null) {
+        setState(() => _uploadingImage = false);
+        return;
+      }
+
+      final ext = validation.fileExtension ?? '.png';
+      final fileName =
+          '$userId/prod_${DateTime.now().millisecondsSinceEpoch}$ext';
+
+      await SupabaseService.client.storage
+          .from('product-images')
+          .uploadBinary(
+            fileName,
+            bytes,
+            fileOptions: FileOptions(
+              contentType: validation.mimeType,
+              upsert: true,
+            ),
+          );
+
+      final publicUrl = SupabaseService.client.storage
+          .from('product-images')
+          .getPublicUrl(fileName);
+
+      if (!mounted) return;
+      setState(() {
+        _imageUrl = publicUrl;
+        _uploadingImage = false;
+      });
+
+      showNeuSnack(
+        context,
+        'Product image adjusted and uploaded!',
+        tone: NeuToneKind.success,
+      );
+    } catch (e) {
+      debugPrint('Product image upload error: $e');
+      if (mounted) {
+        setState(() => _uploadingImage = false);
+        showNeuSnack(
+          context,
+          'Failed to upload image: $e',
+          tone: NeuToneKind.error,
+        );
+      }
+    }
+  }
+
+  void _removeImage() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.cardDark,
+        title: Text(
+          'Remove Product Image?',
+          style: AppTextStyles.heading(fontSize: 16, color: AppColors.textPrimary),
+        ),
+        content: Text(
+          'This will clear the product image. You can add a new one later.',
+          style: AppTextStyles.body(fontSize: 13, color: AppColors.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _imageUrl = '');
+    showNeuSnack(context, 'Product image removed.');
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -126,67 +239,280 @@ class _AddEditProductScreenState extends ConsumerState<AddEditProductScreen> {
           physics: const BouncingScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
           children: [
-            // Showcase Image Placeholder
-            Container(
-              height: 160,
-              decoration: BoxDecoration(
-                color: AppColors.base,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: AppColors.border,
-                  style: BorderStyle.solid,
-                  width: 1.5,
+            // Product Photo Section
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Product Photo',
+                      style: AppTextStyles.body(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: _imageUrl.isNotEmpty
+                            ? AppColors.success.withValues(alpha: 0.15)
+                            : AppColors.warning.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        _imageUrl.isNotEmpty ? 'Photo Added' : 'No Photo',
+                        style: AppTextStyles.caption(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: _imageUrl.isNotEmpty
+                              ? AppColors.success
+                              : AppColors.warning,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              child: _imageUrl.isNotEmpty
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(20),
-                      child: Image.network(
-                        _imageUrl,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) =>
-                            const Icon(
+                const SizedBox(height: 8),
+
+                if (_uploadingImage)
+                  Container(
+                    height: 180,
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceRaised,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            color: AppColors.accent,
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'Processing and uploading image...',
+                            style: AppTextStyles.caption(
+                              fontSize: 12,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                else if (_imageUrl.isNotEmpty) ...[
+                  // Existing Photo Preview Container
+                  GestureDetector(
+                    onTap: _pickAndCropImage,
+                    child: Container(
+                      height: 180,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            Image.network(
+                              _imageUrl,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) =>
+                                  Container(
+                                color: AppColors.surfaceRaised,
+                                child: Center(
+                                  child: Icon(
+                                    Icons.broken_image_rounded,
+                                    color: AppColors.textSecondary,
+                                    size: 36,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Container(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [
+                                    Colors.black.withValues(alpha: 0.1),
+                                    Colors.black.withValues(alpha: 0.5),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            Positioned(
+                              top: 10,
+                              right: 10,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 5,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withValues(alpha: 0.7),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.touch_app_rounded,
+                                      color: AppColors.accent,
+                                      size: 14,
+                                    ),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      'Tap to edit',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  // Dedicated Button Controls for Published Photo
+                  Row(
+                    children: [
+                      Expanded(
+                        child: FilledButton.icon(
+                          onPressed: _pickAndCropImage,
+                          icon: const Icon(
+                            Icons.photo_camera_rounded,
+                            size: 16,
+                          ),
+                          label: const Text(
+                            'Change Photo',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
+                          ),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: AppColors.accent,
+                            foregroundColor: AppColors.primaryDark,
+                            minimumSize: const Size(0, 44),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _removeImage,
+                          icon: const Icon(
+                            Icons.delete_outline_rounded,
+                            size: 16,
+                          ),
+                          label: const Text(
+                            'Remove Photo',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.danger,
+                            side: const BorderSide(color: AppColors.danger, width: 1.2),
+                            minimumSize: const Size(0, 44),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ] else ...[
+                  // Add Photo Container (When No Image Attached)
+                  GestureDetector(
+                    onTap: _pickAndCropImage,
+                    child: Container(
+                      height: 170,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceRaised.withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: AppColors.border,
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: AppColors.accent.withValues(alpha: 0.15),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
                               Icons.add_photo_alternate_rounded,
                               color: AppColors.accent,
-                              size: 32,
+                              size: 30,
                             ),
+                          ),
+                          const SizedBox(height: 10),
+                          FilledButton.icon(
+                            onPressed: _pickAndCropImage,
+                            icon: const Icon(
+                              Icons.add_a_photo_rounded,
+                              size: 16,
+                            ),
+                            label: const Text(
+                              'Add Photo',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
+                            ),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: AppColors.accent,
+                              foregroundColor: AppColors.primaryDark,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                                vertical: 10,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Supports PNG, JPG (Pinch to zoom, pan & crop)',
+                            style: AppTextStyles.caption(
+                              fontSize: 11,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
                       ),
-                    )
-                  : Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withValues(alpha: 0.12),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.add_photo_alternate_rounded,
-                            color: AppColors.accent,
-                            size: 32,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          'Upload Product Showcase Image',
-                          style: AppTextStyles.subHead(
-                            fontSize: 13,
-                            color: AppColors.textPrimary,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Supports PNG, JPG up to 5MB',
-                          style: AppTextStyles.caption(
-                            fontSize: 11,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
                     ),
-            ).animate().fadeIn(duration: 400.ms),
+                  ),
+                ],
+              ],
+            ).animate().fadeIn(duration: 300.ms),
             const SizedBox(height: 24),
 
             _Field(
@@ -374,6 +700,24 @@ class _AddEditProductScreenState extends ConsumerState<AddEditProductScreen> {
                       ),
                     ),
             ).animate().fadeIn(delay: 160.ms),
+            const SizedBox(height: 12),
+
+            // Cancel button
+            OutlinedButton(
+              onPressed: _saving ? null : () => context.pop(),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.textSecondary,
+                side: BorderSide(color: AppColors.border),
+                minimumSize: const Size(double.infinity, 50),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+              ),
+            ).animate().fadeIn(delay: 180.ms),
           ],
         ),
       ),
@@ -391,9 +735,7 @@ class _AddEditProductScreenState extends ConsumerState<AddEditProductScreen> {
     final stock = int.tryParse(_stock.text) ?? 0;
     final weightGrams = double.tryParse(_weight.text) ?? 0.0;
     final weightKg = weightGrams / 1000.0;
-    final imgUrl = _imageUrl.isNotEmpty
-        ? _imageUrl
-        : 'https://images.unsplash.com/photo-1569050467447-ce54b3bbc37d?w=400';
+    final imgUrl = _imageUrl.trim();
 
     bool success;
     if (_isEdit) {

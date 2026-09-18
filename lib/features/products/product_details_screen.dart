@@ -139,9 +139,7 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
             stock: (res['stock_quantity'] as num?)?.toInt() ?? 0,
             category: cat,
             weightKg: (((res['weight_grams'] as num?) ?? 0) / 1000.0),
-            imageUrl: res['image_url']?.toString().isNotEmpty == true
-                ? res['image_url'].toString()
-                : 'https://images.unsplash.com/photo-1569050467447-ce54b3bbc37d?w=400',
+            imageUrl: res['image_url']?.toString() ?? '',
             isAvailable: res['is_active'] as bool? ?? true,
           );
         });
@@ -239,19 +237,31 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
             flexibleSpace: FlexibleSpaceBar(
               // Keyed so the add-to-cart flight can start from the product
               // itself rather than from the button that was pressed.
-              background: Image.network(
-                key: _heroKey,
-                product.imageUrl,
-                fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => Container(
-                  color: AppColors.base,
-                  child: Icon(
-                    Icons.image_outlined,
-                    color: AppColors.textSecondary,
-                    size: 60,
-                  ),
-                ),
-              ),
+              background: product.imageUrl.isNotEmpty
+                  ? Image.network(
+                      key: _heroKey,
+                      product.imageUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, _, _) => Container(
+                        color: AppColors.base,
+                        child: Icon(
+                          Icons.image_outlined,
+                          color: AppColors.textSecondary,
+                          size: 60,
+                        ),
+                      ),
+                    )
+                  : Container(
+                      key: _heroKey,
+                      color: AppColors.base,
+                      child: Center(
+                        child: Icon(
+                          Icons.inventory_2_outlined,
+                          color: AppColors.textSecondary,
+                          size: 60,
+                        ),
+                      ),
+                    ),
             ),
           ),
 

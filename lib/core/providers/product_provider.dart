@@ -117,9 +117,7 @@ class ProductNotifier extends StateNotifier<ProductState> {
             stock: (p['stock_quantity'] as num?)?.toInt() ?? 0,
             category: cat,
             weightKg: (((p['weight_grams'] as num?) ?? 0) / 1000.0),
-            imageUrl: p['image_url']?.toString().isNotEmpty == true
-                ? p['image_url'].toString()
-                : 'https://images.unsplash.com/photo-1569050467447-ce54b3bbc37d?w=400',
+            imageUrl: p['image_url']?.toString() ?? '',
             isAvailable: p['is_active'] as bool? ?? true,
           ),
         );
@@ -172,19 +170,31 @@ final currentVendorProvider = FutureProvider<Map<String, dynamic>?>((
 class VendorProductsNotifier extends StateNotifier<ProductState> {
   final Ref ref;
   VendorProductsNotifier(this.ref) : super(ProductState.empty()) {
-    loadProducts();
+    ref.listen<AuthState>(authProvider, (previous, next) {
+      if (next.user == null || !next.sessionUnlocked) {
+        state = ProductState.empty();
+      } else if (previous?.user?.id != next.user?.id ||
+          previous?.sessionUnlocked != next.sessionUnlocked) {
+        loadProducts();
+      }
+    });
+
+    final auth = ref.read(authProvider);
+    if (auth.sessionUnlocked && auth.user != null) {
+      loadProducts();
+    }
   }
 
   Future<void> loadProducts() async {
     final authUser = SupabaseService.client.auth.currentUser;
-    if (authUser == null) {
+    final auth = ref.read(authProvider);
+    if (authUser == null || !auth.sessionUnlocked || auth.user == null) {
       if (!mounted) return;
       state = ProductState(products: [], categories: ['All']);
       return;
     }
 
-    final user = ref.read(authProvider).user;
-    if (user == null) return;
+    final user = auth.user!;
 
     state = ProductState(
       products: state.products,
@@ -273,7 +283,7 @@ class VendorProductsNotifier extends StateNotifier<ProductState> {
         'stock_quantity': stock,
         'category': categoryName,
         'weight_grams': (weightKg * 1000).toInt(),
-        'image_url': imageUrl,
+        'image_url': imageUrl.isEmpty ? null : imageUrl,
         'is_active': true,
       });
 
@@ -299,6 +309,9 @@ class VendorProductsNotifier extends StateNotifier<ProductState> {
     required String imageUrl,
     required bool isAvailable,
   }) async {
+    final user = ref.read(authProvider).user;
+    if (user == null) return false;
+
     try {
       await SupabaseService.client
           .from('products')
@@ -309,11 +322,12 @@ class VendorProductsNotifier extends StateNotifier<ProductState> {
             'stock_quantity': stock,
             'category': categoryName,
             'weight_grams': (weightKg * 1000).toInt(),
-            'image_url': imageUrl,
+            'image_url': imageUrl.isEmpty ? null : imageUrl,
             'is_active': isAvailable,
             'updated_at': DateTime.now().toUtc().toIso8601String(),
           })
-          .eq('id', id);
+          .eq('id', id)
+          .eq('vendor_id', user.id);
 
       if (!mounted) return false;
 
@@ -327,8 +341,15 @@ class VendorProductsNotifier extends StateNotifier<ProductState> {
   }
 
   Future<bool> deleteProduct(String id) async {
+    final user = ref.read(authProvider).user;
+    if (user == null) return false;
+
     try {
-      await SupabaseService.client.from('products').delete().eq('id', id);
+      await SupabaseService.client
+          .from('products')
+          .delete()
+          .eq('id', id)
+          .eq('vendor_id', user.id);
 
       if (!mounted) return false;
 

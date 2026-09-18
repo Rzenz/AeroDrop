@@ -20,15 +20,16 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen>
   late TabController _tab;
 
   static const _tabs = [
+    (label: 'All', statusKeys: <String>[]),
     (label: 'Pending', statusKeys: ['pending']),
-    (label: 'Preparing', statusKeys: ['preparing']),
+    (label: 'Preparing', statusKeys: ['preparing', 'confirmed']),
     (
-      label: 'Ready',
-      statusKeys: ['ready', 'ready_for_pickup', 'ready for pickup'],
+      label: 'Ready for Delivery',
+      statusKeys: ['ready_for_delivery', 'ready', 'ready_for_pickup'],
     ),
     (
-      label: 'Picked Up',
-      statusKeys: ['picked_up', 'in_transit', 'picked up', 'in transit'],
+      label: 'In Transit',
+      statusKeys: ['in_transit', 'out_for_delivery', 'picked_up'],
     ),
     (label: 'Delivered', statusKeys: ['delivered']),
     (label: 'Cancelled', statusKeys: ['cancelled', 'rejected', 'failed']),
@@ -50,9 +51,8 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen>
     List<OrderModel> orders,
     List<String> statusKeys,
   ) {
-    return orders
-        .where((o) => statusKeys.contains(o.orderStatus.toLowerCase()))
-        .toList();
+    if (statusKeys.isEmpty) return orders;
+    return orders.where((o) => statusKeys.contains(o.effectiveStatus)).toList();
   }
 
   @override
@@ -197,10 +197,11 @@ class _EmptyOrders extends StatelessWidget {
 
   IconData _statusIcon(String label) {
     return switch (label) {
+      'All' => Icons.receipt_long_outlined,
       'Pending' => Icons.hourglass_empty_rounded,
       'Preparing' => Icons.restaurant_outlined,
-      'Ready' => Icons.check_circle_outline_rounded,
-      'Picked Up' => Icons.flight_takeoff_rounded,
+      'Ready for Delivery' || 'Ready' => Icons.check_circle_outline_rounded,
+      'In Transit' || 'Picked Up' => Icons.flight_takeoff_rounded,
       'Delivered' => Icons.check_circle_rounded,
       'Cancelled' => Icons.cancel_outlined,
       _ => Icons.receipt_long_outlined,
@@ -216,8 +217,8 @@ class _OrderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final statusColor = _statusColor(order.orderStatus);
-    final statusLabel = _statusLabel(order.orderStatus);
+    final statusColor = _statusColor(order.effectiveStatus);
+    final statusLabel = order.statusDisplay;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -340,45 +341,26 @@ class _OrderCard extends StatelessWidget {
     if (s == 'pending') {
       return AppColors.warning;
     }
-    if (s == 'preparing') {
+    if (s == 'preparing' || s == 'confirmed') {
       return AppColors.info;
     }
-    if (s == 'ready' || s == 'ready_for_pickup' || s == 'ready for pickup') {
+    if (s == 'ready_for_delivery' ||
+        s == 'ready' ||
+        s == 'ready_for_pickup' ||
+        s == 'ready for pickup') {
       return AppColors.primaryLight;
     }
     if (s == 'picked_up' ||
         s == 'picked up' ||
         s == 'in_transit' ||
-        s == 'in transit') {
+        s == 'in transit' ||
+        s == 'out_for_delivery') {
       return AppColors.accent;
     }
     if (s == 'delivered') {
       return AppColors.success;
     }
     return AppColors.danger;
-  }
-
-  String _statusLabel(String status) {
-    final s = status.toLowerCase();
-    if (s == 'pending') {
-      return 'Pending';
-    }
-    if (s == 'preparing') {
-      return 'Preparing';
-    }
-    if (s == 'ready' || s == 'ready_for_pickup' || s == 'ready for pickup') {
-      return 'Ready';
-    }
-    if (s == 'picked_up' ||
-        s == 'picked up' ||
-        s == 'in_transit' ||
-        s == 'in transit') {
-      return 'In Transit';
-    }
-    if (s == 'delivered') {
-      return 'Delivered';
-    }
-    return 'Cancelled';
   }
 
   String _formatDate(DateTime dt) {

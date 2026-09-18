@@ -1,27 +1,19 @@
-import '../../../../core/models/user_model.dart';
+import '../../../../core/providers/auth_provider.dart';
 
 class RegisterController {
   static String? validateName(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'Display name is required';
-    }
-    if (value.length < 2) {
-      return 'Name must be at least 2 characters';
+    if (value == null || value.trim().isEmpty) {
+      return 'Name is required';
     }
     return null;
   }
 
-  static String? validateEmail(String? value, UserRole role) {
+  static String? validateEmail(String? value) {
     if (value == null || value.trim().isEmpty) {
       return 'Email is required';
     }
-    final trimmed = value.trim();
-    if (trimmed.contains(' ')) {
-      return 'Email must not contain spaces';
-    }
-    final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[a-zA-Z]{2,4}$');
-    if (!emailRegex.hasMatch(trimmed)) {
-      return 'Enter a valid email address';
+    if (!isValidEmail(value.trim())) {
+      return 'Please enter a valid email address';
     }
     return null;
   }
@@ -37,6 +29,9 @@ class RegisterController {
   }
 
   static String? validateConfirmPassword(String? value, String password) {
+    if (value == null || value.isEmpty) {
+      return 'Please confirm your password';
+    }
     if (value != password) {
       return 'Passwords do not match';
     }
@@ -47,10 +42,11 @@ class RegisterController {
     if (value == null || value.trim().isEmpty) {
       return 'Phone number is required';
     }
-    final trimmed = value.trim();
-    if (trimmed.length != 11) {
-      return 'Phone number must be exactly 11 digits.';
+    try {
+      normalizePhoneNumber(value);
+      return null;
+    } catch (_) {
+      return 'Please enter a valid phone number (e.g. 09123456789 or +639123456789)';
     }
-    return null;
   }
 }

@@ -274,7 +274,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                 title: hasActiveDelivery
                     ? 'Active Mission • ${activeDelivery.droneId ?? (drones.isNotEmpty ? drones.first.name : "Active Flight")}'
                     : (drones.isNotEmpty
-                        ? 'Campus Drone Radar • ${drones.first.status.name[0].toUpperCase()}${drones.first.status.name.substring(1)}'
+                        ? 'Campus Drone Radar • ${drones.first.status == DroneStatus.returning ? "Returning to Base" : "${drones.first.status.name[0].toUpperCase()}${drones.first.status.name.substring(1)}"}'
                         : 'Campus Drone Radar • Standby'),
                 onTapDetails: () {
                   if (hasActiveDelivery) {

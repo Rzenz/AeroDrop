@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../core/widgets/neu_feedback.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_text_styles.dart';
@@ -911,13 +909,13 @@ class AeroDropWeatherWidget extends ConsumerWidget {
         status = 'GROUNDED';
         statusColor = AppColors.danger;
         weatherIcon = Icons.thunderstorm_rounded;
-        iconColor = AppColors.primaryLight;
+        iconColor = AppColors.danger;
         break;
       case 'caution':
         status = 'CAUTION';
         statusColor = AppColors.warning;
         weatherIcon = Icons.air_rounded;
-        iconColor = Colors.cyanAccent;
+        iconColor = AppColors.warning;
         break;
       default:
         status = 'SAFE';
@@ -945,32 +943,12 @@ class AeroDropWeatherWidget extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Text(
-                        'UCLM Campus Weather',
-                        style: AppTextStyles.subHead(
-                          fontSize: 15,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      GestureDetector(
-                        onTap: () => _showWeatherSimulationDialog(context, ref),
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.08),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.edit_rounded,
-                            color: AppColors.accent,
-                            size: 14,
-                          ),
-                        ),
-                      ),
-                    ],
+                  Text(
+                    'UCLM Campus Weather',
+                    style: AppTextStyles.subHead(
+                      fontSize: 15,
+                      color: AppColors.textPrimary,
+                    ),
                   ),
                   const SizedBox(height: 2),
                   Text(
@@ -1074,180 +1052,6 @@ class AeroDropWeatherWidget extends ConsumerWidget {
           ),
         ],
       ],
-    );
-  }
-
-  void _showWeatherSimulationDialog(BuildContext context, WidgetRef ref) {
-    showDialog(
-      context: context,
-      builder: (dialogContext) {
-        bool isLoading = false;
-        String? error;
-
-        return StatefulBuilder(
-          builder: (context, setState) {
-            Future<void> selectStatus(String status) async {
-              setState(() {
-                isLoading = true;
-                error = null;
-              });
-
-              try {
-                final success = await ref
-                    .read(weatherProvider.notifier)
-                    .setSimulatedWeather(status);
-                if (!success) {
-                  throw Exception('Failed status update from provider.');
-                }
-
-                if (dialogContext.mounted) {
-                  Navigator.of(dialogContext).pop();
-                }
-
-                if (context.mounted) {
-                  final statusDisplay = status == 'safe'
-                      ? 'Safe'
-                      : (status == 'caution' ? 'Caution' : 'Grounded');
-                  showNeuSnack(
-                    context,
-                    'Weather updated to $statusDisplay.',
-                    tone: NeuToneKind.success,
-                  );
-                }
-              } on PostgrestException catch (pe) {
-                debugPrint('Weather simulation PostgrestException: $pe');
-                setState(() {
-                  isLoading = false;
-                  error = 'Unable to update weather.';
-                });
-              } catch (e) {
-                debugPrint('Weather simulation update failed: $e');
-                setState(() {
-                  isLoading = false;
-                  error = 'Unable to update weather.';
-                });
-              }
-            }
-
-            return AlertDialog(
-              backgroundColor: AppColors.base,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-              ),
-              title: Text(
-                'Change Campus Weather Simulation',
-                style: AppTextStyles.subHead(
-                  fontSize: 16,
-                  color: AppColors.textPrimary,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    'This is an intentional prototype simulation feature.',
-                    style: AppTextStyles.caption(
-                      fontSize: 12,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  if (error != null) ...[
-                    Text(
-                      error!,
-                      style: AppTextStyles.caption(
-                        fontSize: 12,
-                        color: AppColors.danger,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                  ],
-                  if (isLoading)
-                    const Center(
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(vertical: 20),
-                        child: CircularProgressIndicator(
-                          color: AppColors.accent,
-                        ),
-                      ),
-                    )
-                  else ...[
-                    _buildDialogOption(
-                      title: 'Excellent (Clear & Safe)',
-                      color: AppColors.success,
-                      icon: Icons.wb_sunny_rounded,
-                      onTap: () => selectStatus('safe'),
-                    ),
-                    const SizedBox(height: 10),
-                    _buildDialogOption(
-                      title: 'Caution (High Winds)',
-                      color: AppColors.warning,
-                      icon: Icons.air_rounded,
-                      onTap: () => selectStatus('caution'),
-                    ),
-                    const SizedBox(height: 10),
-                    _buildDialogOption(
-                      title: 'Grounded (Heavy Rain/Storm)',
-                      color: AppColors.danger,
-                      icon: Icons.thunderstorm_rounded,
-                      onTap: () => selectStatus('grounded'),
-                    ),
-                  ],
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: isLoading
-                      ? null
-                      : () => Navigator.of(dialogContext).pop(),
-                  child: Text(
-                    'Cancel',
-                    style: AppTextStyles.body(color: Colors.grey),
-                  ),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildDialogOption({
-    required String title,
-    required Color color,
-    required IconData icon,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withValues(alpha: 0.3)),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, color: color, size: 20),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                title,
-                style: AppTextStyles.subHead(
-                  fontSize: 13,
-                  color: color,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../models/drone_model.dart';
 import '../services/supabase_service.dart';
 
@@ -10,11 +12,53 @@ import '../services/supabase_service.dart';
 class DroneNotifier extends StateNotifier<List<DroneModel>> {
   final Ref? ref;
   String? _resolvedDroneId;
+  RealtimeChannel? _dronesChannel;
 
   DroneNotifier(this.ref) : super([]) {
     Future.microtask(() {
-      if (mounted) loadDronesFromSupabase();
+      if (mounted) {
+        loadDronesFromSupabase();
+        _subscribeRealtime();
+      }
     });
+  }
+
+  void _subscribeRealtime() {
+    if (!SupabaseService.isConfigured) return;
+    _dronesChannel?.unsubscribe();
+    try {
+      _dronesChannel = SupabaseService.client
+          .channel('public:drones_sync')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'drones',
+            callback: (payload) {
+              final rec = payload.newRecord;
+              if (rec.isNotEmpty && mounted) {
+                final statusName = rec['status']?.toString();
+                final battery = _toDouble(rec['battery_level'], 100.0);
+                final droneCode = rec['drone_code']?.toString() ?? 'DRN-001';
+                final dbId = rec['id']?.toString() ?? '80000000-0000-0000-0000-000000000001';
+                state = state.map((d) {
+                  if (d.id == droneCode || d.dbId == dbId) {
+                    return d.copyWith(
+                      status: statusName != null
+                          ? _parseDroneStatus(statusName)
+                          : d.status,
+                      batteryLevel: battery,
+                    );
+                  }
+                  return d;
+                }).toList();
+              }
+              if (mounted) loadDronesFromSupabase();
+            },
+          )
+          .subscribe();
+    } catch (e) {
+      debugPrint('Error subscribing to drones realtime: $e');
+    }
   }
 
   double _toDouble(dynamic value, [double fallback = 0.0]) {
@@ -30,6 +74,7 @@ class DroneNotifier extends StateNotifier<List<DroneModel>> {
     'charging' => DroneStatus.charging,
     'maintenance' => DroneStatus.maintenance,
     'offline' => DroneStatus.offline,
+    'returning' => DroneStatus.returning,
     _ => DroneStatus.available,
   };
 
@@ -97,7 +142,8 @@ class DroneNotifier extends StateNotifier<List<DroneModel>> {
 
       state = [
         DroneModel(
-          id: 'DRN-001',
+          id: data['drone_code']?.toString() ?? 'DRN-001',
+          dbId: data['id']?.toString() ?? droneId,
           name: data['drone_name']?.toString() ?? 'AeroCarrier Alpha',
           batteryLevel: _toDouble(data['battery_level'], 100.0),
           status: _parseDroneStatus(statusName),
@@ -116,13 +162,15 @@ class DroneNotifier extends StateNotifier<List<DroneModel>> {
   }
 
   Future<String?> editDroneInSupabase(DroneModel drone) async {
-    if (drone.id != 'DRN-001') return 'Editing other drones is not permitted.';
+    if (drone.id != 'DRN-001' && drone.dbId != await _resolveDroneId()) {
+      return 'Editing other drones is not permitted.';
+    }
     if (!SupabaseService.isConfigured) return 'Supabase is not configured.';
     final authUser = SupabaseService.client.auth.currentUser;
     if (authUser == null) return 'You must be logged in.';
 
     try {
-      final droneId = await _resolveDroneId();
+      final droneId = drone.dbId.isNotEmpty ? drone.dbId : await _resolveDroneId();
       if (!mounted) return 'Notifier disposed';
 
       await SupabaseService.client
@@ -174,7 +222,7 @@ class DroneNotifier extends StateNotifier<List<DroneModel>> {
       if (!mounted) return null;
       state = state
           .map(
-            (d) => d.id == droneId
+            (d) => (d.id == droneId || d.dbId == droneId)
                 ? d.copyWith(batteryLevel: 100.0, status: DroneStatus.available)
                 : d,
           )
@@ -192,16 +240,24 @@ class DroneNotifier extends StateNotifier<List<DroneModel>> {
 
   void updateBattery(String id, double level) {
     state = state
-        .map((d) => d.id == id ? d.copyWith(batteryLevel: level) : d)
+        .map(
+          (d) => (d.id == id || d.dbId == id || state.length == 1)
+              ? d.copyWith(batteryLevel: level)
+              : d,
+        )
         .toList();
   }
 
   void updateStatus(String id, DroneStatus status) {
     state = state
-        .map((d) => d.id == id ? d.copyWith(status: status) : d)
+        .map(
+          (d) => (d.id == id || d.dbId == id || state.length == 1)
+              ? d.copyWith(status: status)
+              : d,
+        )
         .toList();
 
-    if (SupabaseService.isConfigured && id == 'DRN-001') {
+    if (SupabaseService.isConfigured) {
       _resolveDroneId().then((droneId) {
         SupabaseService.client
             .from('drones')
@@ -220,8 +276,18 @@ class DroneNotifier extends StateNotifier<List<DroneModel>> {
 
   void updateCoordinates(String id, String coords) {
     state = state
-        .map((d) => d.id == id ? d.copyWith(currentCoordinates: coords) : d)
+        .map(
+          (d) => (d.id == id || d.dbId == id || state.length == 1)
+              ? d.copyWith(currentCoordinates: coords)
+              : d,
+        )
         .toList();
+  }
+
+  @override
+  void dispose() {
+    _dronesChannel?.unsubscribe();
+    super.dispose();
   }
 }
 

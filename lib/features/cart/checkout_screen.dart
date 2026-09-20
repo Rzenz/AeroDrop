@@ -14,6 +14,7 @@ import '../../core/models/cart_model.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/providers/location_provider.dart';
 import '../../core/providers/vendor_provider.dart';
+import '../../core/providers/weather_provider.dart';
 
 class CheckoutScreen extends ConsumerStatefulWidget {
   const CheckoutScreen({super.key});
@@ -51,6 +52,8 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     final isOverweight = totalWeightGrams > 500;
     final totalWeightKg = (totalWeightGrams / 1000.0).toStringAsFixed(2);
     final locationsAsync = ref.watch(campusLocationsProvider);
+    final weather = ref.watch(weatherProvider);
+    final isGrounded = weather.isGrounded;
 
     return Scaffold(
       backgroundColor: AppColors.base,
@@ -289,6 +292,44 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                     ),
                   ).animate().fadeIn(delay: 200.ms),
 
+                  // Grounded weather warning banner
+                  if (isGrounded) ...[
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.danger.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: AppColors.danger.withValues(alpha: 0.5),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.thunderstorm_rounded,
+                            color: AppColors.danger,
+                            size: 24,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              weather.message != null &&
+                                      weather.message!.isNotEmpty
+                                  ? weather.message!
+                                  : 'Weather is currently unsafe for drone delivery. Please try again later.',
+                              style: const TextStyle(
+                                color: AppColors.danger,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+
                   // Overweight warning banner
                   if (isOverweight) ...[
                     const SizedBox(height: 16),
@@ -328,11 +369,13 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
 
                   // Confirm button
                   FilledButton(
-                    onPressed: (_placing || isOverweight) ? null : _placeOrder,
+                    onPressed: (_placing || isOverweight || isGrounded)
+                        ? null
+                        : _placeOrder,
                     style: FilledButton.styleFrom(
                       backgroundColor: AppColors.accent,
                       foregroundColor: AppColors.bgDark,
-                      disabledBackgroundColor: isOverweight
+                      disabledBackgroundColor: (isOverweight || isGrounded)
                           ? AppColors.cardDark
                           : null,
                       minimumSize: const Size(double.infinity, 56),
@@ -350,11 +393,17 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                             ),
                           )
                         : Text(
-                            isOverweight ? 'Payload Exceeded' : 'Confirm Order',
+                            isOverweight
+                                ? 'Payload Exceeded'
+                                : (isGrounded
+                                    ? 'Flight Grounded'
+                                    : 'Confirm Order'),
                             style: AppTextStyles.subHead(
                               fontSize: 17,
                               fontWeight: FontWeight.bold,
-                              color: isOverweight ? Colors.grey : null,
+                              color: (isOverweight || isGrounded)
+                                  ? Colors.grey
+                                  : null,
                             ),
                           ),
                   ).animate().fadeIn(delay: 250.ms),
@@ -371,6 +420,19 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     final cart = cartNotifier.value;
     if (cart.isEmpty) {
       setState(() => _placing = false);
+      return;
+    }
+
+    final weather = ref.read(weatherProvider);
+    if (weather.isGrounded) {
+      setState(() => _placing = false);
+      showNeuSnack(
+        context,
+        weather.message != null && weather.message!.isNotEmpty
+            ? weather.message!
+            : 'Weather is currently unsafe for drone delivery. Please try again later.',
+        tone: NeuToneKind.error,
+      );
       return;
     }
 

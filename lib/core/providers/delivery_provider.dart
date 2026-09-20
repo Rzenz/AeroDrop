@@ -10,13 +10,20 @@ import '../services/supabase_service.dart';
 import 'notification_provider.dart';
 import 'auth_provider.dart';
 import 'order_provider.dart';
+import 'weather_provider.dart';
 
 class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
   final Ref ref;
   Timer? _simulationTimer;
   final Map<String, double> _deliveryStartBatteries = {};
+  final Map<String, double> _leg3StartBatteries = {};
   final Set<String> _confirmingPickupDeliveryIds = {};
   final Set<String> _completingDeliveryIds = {};
+  final Set<String> _completingReturnDroneIds = {};
+  final Map<String, double> _leg3Progress = {};
+  final Map<String, (double, double)> _leg3Origin = {};
+  final Map<String, String> _lastDeliveryIdForDrone = {};
+  final Map<String, DateTime> _leaseWriteFailures = {};
   RealtimeChannel? _deliveriesSubscription;
   RealtimeChannel? _telemetrySubscription;
   DateTime? _lastTelemetryWriteTime;
@@ -91,7 +98,7 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
 
   void _handleRealtimeTelemetry(Map<String, dynamic> record) {
     final deliveryId = record['delivery_id']?.toString();
-    if (deliveryId == null) return;
+    final droneId = record['drone_id']?.toString();
 
     final lat = _toDoubleOrNull(record['latitude']);
     final lng = _toDoubleOrNull(record['longitude']);
@@ -99,26 +106,37 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
     final speed = _toDoubleOrNull(record['speed']);
     final battery = _toDoubleOrNull(record['battery_level']);
     final progress = _toDoubleOrNull(record['progress']);
+    final eventType = record['event_type']?.toString();
 
     if (battery != null) {
       try {
-        ref.read(droneProvider.notifier).updateBattery('DRN-001', battery);
+        ref.read(droneProvider.notifier).updateBattery(droneId ?? 'DRN-001', battery);
       } catch (_) {}
     }
 
-    state = state.map((del) {
-      if (del.id == deliveryId) {
-        return del.copyWith(
-          currentLatitude: lat ?? del.currentLatitude,
-          currentLongitude: lng ?? del.currentLongitude,
-          currentAltitude: alt ?? del.currentAltitude,
-          currentSpeed: speed ?? del.currentSpeed,
-          batteryLevel: battery ?? del.batteryLevel,
-          progress: progress ?? del.progress,
-        );
-      }
-      return del;
-    }).toList();
+    if (lat != null && lng != null) {
+      try {
+        ref.read(droneProvider.notifier).updateCoordinates(droneId ?? 'DRN-001', '$lat,$lng');
+      } catch (_) {}
+    }
+
+    if (deliveryId != null) {
+      state = state.map((del) {
+        if (del.id == deliveryId) {
+          return del.copyWith(
+            currentLatitude: lat ?? del.currentLatitude,
+            currentLongitude: lng ?? del.currentLongitude,
+            currentAltitude: alt ?? del.currentAltitude,
+            currentSpeed: speed ?? del.currentSpeed,
+            batteryLevel: battery ?? del.batteryLevel,
+            progress: (eventType == 'returning_to_base' && del.status == DeliveryStatus.delivered)
+                ? del.progress
+                : (progress ?? del.progress),
+          );
+        }
+        return del;
+      }).toList();
+    }
   }
 
   @override
@@ -180,8 +198,13 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
         : null;
     if (startedAt == null) return data['eta']?.toString() ?? 'TBD';
 
+    final weather = ref.read(weatherProvider);
+    final speedFactor = weather.isCaution ? 0.7 : 1.0;
+
     final totalSecs =
-        (data['estimated_delivery_seconds'] as num?)?.toInt() ?? 60;
+        (((data['estimated_delivery_seconds'] as num?)?.toInt() ?? 60) /
+                speedFactor)
+            .round();
     final elapsed = DateTime.now().difference(startedAt).inSeconds;
     final remaining = (totalSecs - elapsed).clamp(0, totalSecs);
     if (remaining <= 0) return '0 mins';
@@ -562,7 +585,18 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
           )
           .toList();
 
-      if (activeDeliveries.isEmpty) return;
+      final dronesList = ref.read(droneProvider);
+      _completingReturnDroneIds.removeWhere((id) => dronesList.any(
+            (d) => (d.id == id || d.dbId == id) && d.status != DroneStatus.returning,
+          ));
+      final returningDrone = dronesList
+          .where((d) =>
+              d.status == DroneStatus.returning &&
+              !_completingReturnDroneIds.contains(d.dbId) &&
+              !_completingReturnDroneIds.contains(d.id))
+          .firstOrNull;
+
+      if (activeDeliveries.isEmpty && returningDrone == null) return;
 
       // Single-writer coordination: avoid competing write loops
       if (_lastTelemetryWriteTime != null &&
@@ -572,8 +606,20 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
       }
       _lastTelemetryWriteTime = DateTime.now();
 
+      final weatherState = ref.read(weatherProvider);
+      final isCaution = weatherState.isCaution;
+      final speed = isCaution ? 3.5 : 5.0;
+      final stepLeg1 = isCaution ? 0.07 : 0.12;
+      final stepLeg2 = isCaution ? 0.07 : 0.10;
+      final stepLeg3 = isCaution ? 0.07 : 0.10;
+      final batteryDrainPerLeg = isCaution ? 8.5 : 6.0;
+
       String droneUuid = '80000000-0000-0000-0000-000000000001';
-      if (SupabaseService.isConfigured) {
+      if (returningDrone != null && returningDrone.dbId.isNotEmpty) {
+        droneUuid = returningDrone.dbId;
+      } else if (dronesList.isNotEmpty && dronesList.first.dbId.isNotEmpty) {
+        droneUuid = dronesList.first.dbId;
+      } else if (SupabaseService.isConfigured) {
         try {
           final res = await SupabaseService.client
               .from('drones')
@@ -606,6 +652,12 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
       final hub = (10.3168, 123.9010);
 
       for (final delivery in activeDeliveries) {
+        if (_completingDeliveryIds.contains(delivery.id) ||
+            delivery.status == DeliveryStatus.delivered ||
+            delivery.progress >= 1.0) {
+          continue;
+        }
+
         final pickupQuery = (delivery.pickupLocationName ?? 'old building')
             .toLowerCase();
         final dropoffQuery =
@@ -632,19 +684,21 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
 
         if (delivery.status == DeliveryStatus.assigning) {
           // ── PHASE 1: PICKUP (Hub -> Vendor) ──
-          // Leg 1 progress: 0.0 to 1.0
           final currentLegProgress = delivery.progress.clamp(0.0, 1.0);
-          final newLegProgress = (currentLegProgress + 0.12).clamp(0.0, 1.0);
+          final newLegProgress = (currentLegProgress + stepLeg1).clamp(0.0, 1.0);
 
           final lat = hub.$1 + (vendorLoc.$1 - hub.$1) * newLegProgress;
           final lng = hub.$2 + (vendorLoc.$2 - hub.$2) * newLegProgress;
           final alt = newLegProgress > 0.85 ? 1.5 : 15.0;
 
           final startBattery = _deliveryStartBatteries[delivery.id] ?? 98.0;
-          final newBattery = (startBattery - (6.0 * newLegProgress)).clamp(
+          final newBattery = (startBattery - (batteryDrainPerLeg * newLegProgress)).clamp(
             0.0,
             100.0,
           );
+
+          _lastDeliveryIdForDrone[droneUuid] = delivery.id;
+          _leg3Origin[droneUuid] = (lat, lng);
 
           if (SupabaseService.isConfigured) {
             SupabaseService.client
@@ -655,7 +709,7 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
                     'p_latitude': lat,
                     'p_longitude': lng,
                     'p_altitude': alt,
-                    'p_speed': 5.0,
+                    'p_speed': speed,
                     'p_battery_level': newBattery,
                     'p_signal_strength': 98.0,
                     'p_heading': 90.0,
@@ -723,7 +777,7 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
                           currentLatitude: lat,
                           currentLongitude: lng,
                           currentAltitude: alt,
-                          currentSpeed: 5.0,
+                          currentSpeed: speed,
                           batteryLevel: newBattery,
                         )
                       : d,
@@ -732,9 +786,8 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
           }
         } else if (delivery.status == DeliveryStatus.inTransit) {
           // ── PHASE 2: TRANSIT (Vendor -> Customer) ──
-          // Leg 2 progress: 0.0 to 1.0
           final currentLegProgress = delivery.progress.clamp(0.0, 1.0);
-          final newLegProgress = (currentLegProgress + 0.10).clamp(0.0, 1.0);
+          final newLegProgress = (currentLegProgress + stepLeg2).clamp(0.0, 1.0);
 
           final lat =
               vendorLoc.$1 + (customerLoc.$1 - vendorLoc.$1) * newLegProgress;
@@ -742,47 +795,24 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
               vendorLoc.$2 + (customerLoc.$2 - vendorLoc.$2) * newLegProgress;
           final alt = newLegProgress > 0.85 ? 0.5 : 15.0;
 
-          final startBattery = _deliveryStartBatteries[delivery.id] ?? 92.0;
-          final newBattery = (startBattery - (6.0 * newLegProgress)).clamp(
+          final startBattery = _deliveryStartBatteries[delivery.id] ?? (98.0 - batteryDrainPerLeg);
+          final newBattery = (startBattery - (batteryDrainPerLeg * newLegProgress)).clamp(
             0.0,
             100.0,
           );
 
-          if (SupabaseService.isConfigured) {
-            SupabaseService.client
-                .rpc(
-                  'record_simulated_telemetry',
-                  params: {
-                    'p_delivery_id': delivery.id,
-                    'p_latitude': lat,
-                    'p_longitude': lng,
-                    'p_altitude': alt,
-                    'p_speed': 5.0,
-                    'p_battery_level': newBattery,
-                    'p_signal_strength': 98.0,
-                    'p_heading': 90.0,
-                    'p_event_type': 'in_flight',
-                    'p_progress': newLegProgress,
-                  },
-                )
-                .catchError(
-                  (e) => debugPrint('Transit telemetry RPC error: $e'),
-                );
-
-            SupabaseService.client
-                .from('drones')
-                .update({'battery_level': newBattery})
-                .eq('id', droneUuid)
-                .catchError(
-                  (e) => debugPrint('Drone battery update error: $e'),
-                );
-          }
+          _lastDeliveryIdForDrone[droneUuid] = delivery.id;
+          _leg3Origin[droneUuid] = (lat, lng);
 
           if (newLegProgress >= 1.0) {
             // Drone arrived at customer dropoff! Idempotently complete delivery
             if (!_completingDeliveryIds.contains(delivery.id)) {
               _completingDeliveryIds.add(delivery.id);
               _deliveryStartBatteries.remove(delivery.id);
+              _lastDeliveryIdForDrone[droneUuid] = delivery.id;
+              _leg3Origin[droneUuid] = customerLoc;
+              _leg3Progress[droneUuid] = 0.0;
+              _leg3StartBatteries[droneUuid] = newBattery;
 
               // Optimistically transition to delivered with progress 1.0
               state = state
@@ -816,11 +846,43 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
                 ref.read(vendorOrdersProvider.notifier).loadOrders();
                 ref
                     .read(droneProvider.notifier)
-                    .updateStatus('DRN-001', DroneStatus.available);
+                    .updateStatus('DRN-001', DroneStatus.returning);
                 loadDeliveriesFromSupabase();
               } catch (_) {}
             }
           } else {
+            // Only send in-flight telemetry while still active and uncompleted
+            if (SupabaseService.isConfigured &&
+                !_completingDeliveryIds.contains(delivery.id)) {
+              SupabaseService.client
+                  .rpc(
+                    'record_simulated_telemetry',
+                    params: {
+                      'p_delivery_id': delivery.id,
+                      'p_latitude': lat,
+                      'p_longitude': lng,
+                      'p_altitude': alt,
+                      'p_speed': speed,
+                      'p_battery_level': newBattery,
+                      'p_signal_strength': 98.0,
+                      'p_heading': 90.0,
+                      'p_event_type': 'in_flight',
+                      'p_progress': newLegProgress,
+                    },
+                  )
+                  .catchError(
+                    (e) => debugPrint('Transit telemetry RPC error: $e'),
+                  );
+
+              SupabaseService.client
+                  .from('drones')
+                  .update({'battery_level': newBattery})
+                  .eq('id', droneUuid)
+                  .catchError(
+                    (e) => debugPrint('Drone battery update error: $e'),
+                  );
+            }
+
             state = state
                 .map(
                   (d) => d.id == delivery.id
@@ -829,12 +891,209 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
                           currentLatitude: lat,
                           currentLongitude: lng,
                           currentAltitude: alt,
-                          currentSpeed: 5.0,
+                          currentSpeed: speed,
                           batteryLevel: newBattery,
                         )
                       : d,
                 )
                 .toList();
+          }
+        }
+      }
+
+      // ── PHASE 3: LEG 3 DRIVER (Customer/Aborted Position -> Base Hub) ──
+      if (returningDrone != null) {
+        final dUuid = returningDrone.dbId.isNotEmpty
+            ? returningDrone.dbId
+            : droneUuid;
+        String? deliveryIdForTelemetry = _lastDeliveryIdForDrone[dUuid];
+
+        if (deliveryIdForTelemetry == null) {
+          // Find the most recently updated delivery for THIS drone with status 'delivered' OR 'cancelled'
+          final matchingDeliveries = state.where((d) {
+            final matchesDrone = d.droneId == dUuid ||
+                d.droneId == returningDrone.id ||
+                d.droneId == returningDrone.dbId ||
+                d.droneId == returningDrone.name ||
+                d.droneId == 'DRN-001';
+            final isDeliveredOrCancelled =
+                d.status == DeliveryStatus.delivered ||
+                d.status == DeliveryStatus.cancelled;
+            return matchesDrone && isDeliveredOrCancelled;
+          }).toList();
+
+          if (matchingDeliveries.isNotEmpty) {
+            matchingDeliveries.sort((a, b) {
+              final timeA = a.deliveredAt ?? a.createdAt;
+              final timeB = b.deliveredAt ?? b.createdAt;
+              return timeB.compareTo(timeA);
+            });
+            deliveryIdForTelemetry = matchingDeliveries.first.id;
+          } else if (SupabaseService.isConfigured) {
+            try {
+              final res = await SupabaseService.client
+                  .from('deliveries')
+                  .select('id')
+                  .eq('drone_id', dUuid)
+                  .inFilter('status', ['delivered', 'cancelled'])
+                  .order('updated_at', ascending: false)
+                  .limit(1)
+                  .maybeSingle();
+              if (res != null) {
+                deliveryIdForTelemetry = res['id']?.toString();
+              }
+            } catch (_) {}
+          }
+        }
+
+        // If none is found, skip writing telemetry this tick.
+        if (deliveryIdForTelemetry == null) return;
+
+        // Check if current user is authorized to write telemetry for this delivery
+        final authUser = ref.read(authProvider).user;
+        final isAdmin = authUser?.role == 'admin';
+        final isCustomer = ref.read(orderProvider).orders.any(
+              (o) =>
+                  o.deliveryId == deliveryIdForTelemetry ||
+                  o.id == deliveryIdForTelemetry,
+            );
+        final isVendor = ref.read(vendorOrdersProvider).orders.any(
+              (o) =>
+                  o.deliveryId == deliveryIdForTelemetry ||
+                  o.id == deliveryIdForTelemetry,
+            );
+
+        final isAuthorized = isAdmin || isCustomer || isVendor;
+
+        final lastFailure = _leaseWriteFailures[dUuid];
+        final isBackoffActive = lastFailure != null &&
+            DateTime.now().difference(lastFailure).inSeconds < 15;
+
+        bool hasLease = false;
+        // Only try to claim/renew lease if authorized and not in 15s failure backoff
+        if (isAuthorized &&
+            !isBackoffActive &&
+            SupabaseService.isConfigured) {
+          try {
+            final leaseRes = await SupabaseService.client.rpc(
+              'claim_drone_sim_lease',
+              params: {'p_drone_id': dUuid},
+            );
+            hasLease = leaseRes == true;
+          } catch (e) {
+            debugPrint('claim_drone_sim_lease RPC error: $e');
+          }
+        }
+
+        if (hasLease) {
+          final leg3Start = _leg3Origin[dUuid] ??
+              (returningDrone.currentCoordinates.contains(',')
+                  ? (
+                      double.tryParse(
+                            returningDrone.currentCoordinates
+                                .split(',')[0]
+                                .trim(),
+                          ) ??
+                          10.3156,
+                      double.tryParse(
+                            returningDrone.currentCoordinates
+                                .split(',')[1]
+                                .trim(),
+                          ) ??
+                          123.9016,
+                    )
+                  : (10.3156, 123.9016));
+
+          final currentLeg3Progress =
+              (_leg3Progress[dUuid] ?? 0.0).clamp(0.0, 1.0);
+          final newLeg3Progress =
+              (currentLeg3Progress + stepLeg3).clamp(0.0, 1.0);
+          _leg3Progress[dUuid] = newLeg3Progress;
+
+          final lat =
+              leg3Start.$1 + (hub.$1 - leg3Start.$1) * newLeg3Progress;
+          final lng =
+              leg3Start.$2 + (hub.$2 - leg3Start.$2) * newLeg3Progress;
+          final alt = newLeg3Progress > 0.85 ? 0.0 : 15.0;
+
+          final startBattery = _leg3StartBatteries[dUuid] ?? returningDrone.batteryLevel;
+          if (!_leg3StartBatteries.containsKey(dUuid)) {
+            _leg3StartBatteries[dUuid] = startBattery;
+          }
+          final newBattery = (startBattery -
+                  (batteryDrainPerLeg * newLeg3Progress))
+              .clamp(0.0, 100.0);
+
+          if (SupabaseService.isConfigured) {
+            try {
+              await SupabaseService.client.rpc(
+                'record_simulated_telemetry',
+                params: {
+                  'p_delivery_id': deliveryIdForTelemetry,
+                  'p_latitude': lat,
+                  'p_longitude': lng,
+                  'p_altitude': alt,
+                  'p_speed': speed,
+                  'p_battery_level': newBattery,
+                  'p_signal_strength': 98.0,
+                  'p_heading': 270.0,
+                  'p_event_type': 'returning_to_base',
+                  'p_progress': newLeg3Progress,
+                },
+              );
+              // Telemetry write succeeded: clear failure backoff
+              _leaseWriteFailures.remove(dUuid);
+            } catch (e) {
+              debugPrint('Leg 3 telemetry RPC error: $e');
+              // Record failure time: stop renewing lease for 15s to allow other clients or safety net to take over
+              _leaseWriteFailures[dUuid] = DateTime.now();
+            }
+
+            SupabaseService.client
+                .from('drones')
+                .update({'battery_level': newBattery})
+                .eq('id', dUuid)
+                .catchError(
+                  (e) => debugPrint('Drone battery update error: $e'),
+                );
+          }
+
+          ref
+              .read(droneProvider.notifier)
+              .updateBattery(returningDrone.id, newBattery);
+
+          if (newLeg3Progress >= 1.0) {
+            // Drone arrived back at Campus Base Hub!
+            _completingReturnDroneIds.add(dUuid);
+            _completingReturnDroneIds.add(returningDrone.id);
+            _leg3Progress.remove(dUuid);
+            _leg3Origin.remove(dUuid);
+            _lastDeliveryIdForDrone.remove(dUuid);
+            _leaseWriteFailures.remove(dUuid);
+            _leg3StartBatteries.remove(dUuid);
+
+            // Optimistically set available status so display updates and no more leg 3 ticks write
+            ref
+                .read(droneProvider.notifier)
+                .updateStatus(returningDrone.id, DroneStatus.available);
+
+            if (SupabaseService.isConfigured) {
+              try {
+                await SupabaseService.client.rpc(
+                  'complete_drone_return',
+                  params: {'p_drone_id': dUuid},
+                );
+              } catch (e) {
+                debugPrint('complete_drone_return RPC error: $e');
+              }
+            }
+
+            try {
+              ref.read(droneProvider.notifier).loadDronesFromSupabase();
+              ref.read(orderProvider.notifier).loadOrders();
+              ref.read(vendorOrdersProvider.notifier).loadOrders();
+              loadDeliveriesFromSupabase();
+            } catch (_) {}
           }
         }
       }
@@ -1310,6 +1569,19 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
           ''')
           .single();
 
+      final orderId = updatedResponse['order_id']?.toString() ??
+          updatedResponse['orders']?['id']?.toString();
+      if (orderId != null) {
+        await SupabaseService.client
+            .from('orders')
+            .update({
+              'order_status': 'cancelled',
+              'cancellation_reason': 'vendor',
+              'updated_at': nowStr,
+            })
+            .eq('id', orderId);
+      }
+
       await _insertStatusLog(
         deliveryId: deliveryId,
         status: 'cancelled',
@@ -1380,6 +1652,19 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
             )
           ''')
           .single();
+
+      final orderId = updatedResponse['order_id']?.toString() ??
+          updatedResponse['orders']?['id']?.toString();
+      if (orderId != null) {
+        await SupabaseService.client
+            .from('orders')
+            .update({
+              'order_status': 'cancelled',
+              'cancellation_reason': 'customer',
+              'updated_at': nowStr,
+            })
+            .eq('id', orderId);
+      }
 
       await _insertStatusLog(
         deliveryId: deliveryId,

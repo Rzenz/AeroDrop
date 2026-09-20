@@ -45,6 +45,7 @@ class StatusChip extends StatelessWidget {
       'charging' => (AppColors.info, 'CHARGING'),
       'maintenance' => (AppColors.warning, 'MAINTENANCE'),
       'offline' => (AppColors.danger, 'OFFLINE'),
+      'returning' => (AppColors.warning, 'RETURNING TO BASE'),
       _ => (AppColors.textTertiary, statusStr.toUpperCase()),
     };
     return StatusChip(label: label, color: color);

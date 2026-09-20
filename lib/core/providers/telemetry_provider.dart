@@ -140,7 +140,7 @@ class FleetTelemetryNotifier extends StateNotifier<TelemetryModel?> {
             callback: (payload) {
               final rec = payload.newRecord;
               if (rec.isNotEmpty) {
-                loadFleetTelemetry();
+                state = TelemetryModel.fromMap(rec);
               }
             },
           )
@@ -154,7 +154,30 @@ class FleetTelemetryNotifier extends StateNotifier<TelemetryModel?> {
     if (!SupabaseService.isConfigured) return;
 
     try {
-      // Find currently active delivery first (assigning or in_transit)
+      // 1. Check if drone is returning to base
+      final returningDrone = await SupabaseService.client
+          .from('drones')
+          .select('id, status')
+          .eq('status', 'returning')
+          .limit(1)
+          .maybeSingle();
+
+      if (returningDrone != null && returningDrone['id'] != null) {
+        final res = await SupabaseService.client
+            .from('drone_telemetry')
+            .select()
+            .eq('drone_id', returningDrone['id'])
+            .order('recorded_at', ascending: false)
+            .limit(1)
+            .maybeSingle();
+
+        if (res != null) {
+          state = TelemetryModel.fromMap(Map<String, dynamic>.from(res));
+          return;
+        }
+      }
+
+      // 2. Find currently active delivery (assigning or in_transit)
       final activeDel = await SupabaseService.client
           .from('deliveries')
           .select('id, status, progress')

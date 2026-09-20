@@ -46,6 +46,9 @@ class DroneCard extends StatelessWidget {
       case DroneStatus.offline:
         statusColor = AppColors.danger;
         break;
+      case DroneStatus.returning:
+        statusColor = AppColors.warning;
+        break;
     }
 
     // AnimatedCard already draws the surface; the inner Container used to
@@ -209,6 +212,8 @@ class DroneCard extends StatelessWidget {
                         ? 'Battery too low for delivery'
                         : drone.status == DroneStatus.available
                         ? 'Ready for delivery'
+                        : drone.status == DroneStatus.returning
+                        ? 'Returning to Base'
                         : 'Drone not available',
                     style: AppTextStyles.body(
                       fontSize: 11,

@@ -263,13 +263,21 @@ class _VendorOrdersScreenState extends ConsumerState<VendorOrdersScreen>
     );
   }
 
-  Future<void> _handleUpdate(String orderId, String nextStatus) async {
+  Future<void> _handleUpdate(
+    String orderId,
+    String nextStatus, {
+    String? cancellationReason,
+  }) async {
     if (_updatingOrderIds.contains(orderId)) return;
     setState(() => _updatingOrderIds.add(orderId));
     HapticFeedback.mediumImpact();
     final success = await ref
         .read(vendorOrdersProvider.notifier)
-        .updateOrderStatus(orderId, nextStatus);
+        .updateOrderStatus(
+          orderId,
+          nextStatus,
+          cancellationReason: cancellationReason ?? 'vendor',
+        );
     if (mounted) {
       setState(() => _updatingOrderIds.remove(orderId));
       showNeuSnack(

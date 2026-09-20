@@ -239,6 +239,29 @@ class OrderNotifier extends StateNotifier<OrderState> {
       return false;
     }
   }
+
+  Future<bool> cancelOrder(
+    String orderId, {
+    String cancellationReason = 'customer',
+  }) async {
+    try {
+      await _client
+          .from('orders')
+          .update({
+            'order_status': 'cancelled',
+            'cancellation_reason': cancellationReason,
+            'updated_at': DateTime.now().toUtc().toIso8601String(),
+          })
+          .eq('id', orderId);
+
+      if (!mounted) return false;
+      await loadOrders();
+      return true;
+    } catch (e) {
+      debugPrint('Cancel order failed: $e');
+      return false;
+    }
+  }
 }
 
 final orderProvider = StateNotifierProvider<OrderNotifier, OrderState>((ref) {
@@ -381,15 +404,23 @@ class VendorOrdersNotifier extends StateNotifier<OrderState> {
     }
   }
 
-  Future<bool> updateOrderStatus(String orderId, String statusName) async {
+  Future<bool> updateOrderStatus(
+    String orderId,
+    String statusName, {
+    String? cancellationReason,
+  }) async {
     try {
-      // Plain text status — no UUID lookup needed.
+      final payload = <String, dynamic>{
+        'order_status': statusName,
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      };
+      if (statusName == 'cancelled' || statusName == 'rejected') {
+        payload['cancellation_reason'] = cancellationReason ?? 'vendor';
+      }
+
       await _client
           .from('orders')
-          .update({
-            'order_status': statusName,
-            'updated_at': DateTime.now().toUtc().toIso8601String(),
-          })
+          .update(payload)
           .eq('id', orderId);
 
       if (!mounted) return false;

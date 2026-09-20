@@ -1,7 +1,8 @@
-enum DroneStatus { available, assigned, busy, charging, maintenance, offline }
+enum DroneStatus { available, assigned, busy, charging, maintenance, offline, returning }
 
 class DroneModel {
   final String id;
+  final String dbId;
   final String name;
   final double batteryLevel; // 0.0 to 100.0
   final DroneStatus status;
@@ -11,6 +12,7 @@ class DroneModel {
 
   DroneModel({
     required this.id,
+    this.dbId = '80000000-0000-0000-0000-000000000001',
     required this.name,
     required this.batteryLevel,
     required this.status,
@@ -21,6 +23,7 @@ class DroneModel {
 
   DroneModel copyWith({
     String? id,
+    String? dbId,
     String? name,
     double? batteryLevel,
     DroneStatus? status,
@@ -30,6 +33,7 @@ class DroneModel {
   }) {
     return DroneModel(
       id: id ?? this.id,
+      dbId: dbId ?? this.dbId,
       name: name ?? this.name,
       batteryLevel: batteryLevel ?? this.batteryLevel,
       status: status ?? this.status,

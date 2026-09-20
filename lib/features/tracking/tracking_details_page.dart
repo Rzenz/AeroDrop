@@ -13,6 +13,7 @@ import '../../core/providers/delivery_provider.dart';
 import '../../core/providers/telemetry_provider.dart';
 import '../../core/models/delivery_model.dart';
 import '../../core/services/supabase_service.dart';
+import '../../core/providers/weather_provider.dart';
 
 class TrackingDetailsPage extends ConsumerStatefulWidget {
   final String deliveryId;
@@ -148,9 +149,12 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
         if (status == DeliveryStatus.delivered) {
           etaStr = '0 mins';
         } else if (status == DeliveryStatus.inTransit) {
+          final weather = ref.read(weatherProvider);
+          final cautionFactor = weather.isCaution ? (1.0 / 0.7) : 1.0;
           final totalSecs =
               (data['estimated_delivery_seconds'] as num?)?.toInt() ?? 60;
-          final remaining = ((1.0 - progress) * totalSecs).round();
+          final remaining =
+              ((1.0 - progress) * totalSecs * cautionFactor).round();
           etaStr = remaining <= 0
               ? '0 mins'
               : remaining < 60

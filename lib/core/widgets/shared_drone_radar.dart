@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../services/supabase_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../theme/app_radii.dart';
@@ -9,6 +11,7 @@ import '../models/drone_model.dart';
 import '../models/telemetry_model.dart';
 import '../providers/telemetry_provider.dart';
 import '../providers/drone_provider.dart';
+import '../providers/delivery_provider.dart';
 import '../widgets/neu_card.dart';
 
 /// Reusable authoritative Drone Radar widget for Customer, Vendor, and Admin.
@@ -35,6 +38,8 @@ class SharedDroneRadar extends ConsumerStatefulWidget {
 class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
     with SingleTickerProviderStateMixin {
   late AnimationController _radarController;
+  Timer? _staleCheckTimer;
+  Timer? _livePollTimer;
 
   static const _campusLocations = [
     {'name': 'Old Building (Main)', 'code': 'MAIN', 'x': 0.50, 'y': 0.43},
@@ -60,13 +65,57 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
     if (!isDelivered) {
       _radarController.repeat();
     }
+    _staleCheckTimer = Timer.periodic(
+      const Duration(seconds: 15),
+      (_) => _checkStaleDrone(),
+    );
+    _livePollTimer = Timer.periodic(
+      const Duration(seconds: 3),
+      (_) {
+        if (!mounted) return;
+        final d = widget.delivery;
+        if (d != null) {
+          try {
+            ref.read(deliveryTelemetryProvider(d.id).notifier).loadLatestTelemetry();
+          } catch (_) {}
+        }
+        try {
+          ref.read(fleetTelemetryProvider.notifier).loadFleetTelemetry();
+          ref.read(droneProvider.notifier).loadDronesFromSupabase();
+        } catch (_) {}
+      },
+    );
+  }
+
+  void _checkStaleDrone() async {
+    if (!mounted || !SupabaseService.isConfigured) return;
+    try {
+      final drones = ref.read(droneProvider);
+      final returningDrone = drones
+          .where((d) => d.status == DroneStatus.returning)
+          .firstOrNull;
+      if (returningDrone != null) {
+        final droneUuid = returningDrone.dbId.isNotEmpty
+            ? returningDrone.dbId
+            : '80000000-0000-0000-0000-000000000001';
+        final res = await SupabaseService.client.rpc(
+          'recover_stale_returning_drone',
+          params: {'p_drone_id': droneUuid},
+        );
+        if (res != null && (res as Map)['recovered'] == true) {
+          ref.read(droneProvider.notifier).loadDronesFromSupabase();
+        }
+      }
+    } catch (_) {}
   }
 
   @override
   void didUpdateWidget(covariant SharedDroneRadar oldWidget) {
     super.didUpdateWidget(oldWidget);
     final isDelivered = widget.delivery?.status == DeliveryStatus.delivered;
-    if (isDelivered) {
+    final drones = ref.read(droneProvider);
+    final isReturning = drones.any((d) => d.status == DroneStatus.returning);
+    if (isDelivered && !isReturning) {
       if (_radarController.isAnimating) {
         _radarController.stop();
       }
@@ -79,8 +128,34 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
 
   @override
   void dispose() {
+    _staleCheckTimer?.cancel();
+    _livePollTimer?.cancel();
     _radarController.dispose();
     super.dispose();
+  }
+
+  (double, double) _coordinatesForBuilding(String? nameOrCode) {
+    if (nameOrCode == null || nameOrCode.isEmpty) {
+      return (10.3156, 123.9016);
+    }
+    final query = nameOrCode.toLowerCase();
+    if (query.contains('annex 1') ||
+        query.contains('annex1') ||
+        query.contains('annex-1')) {
+      return (10.3159, 123.9019);
+    }
+    if (query.contains('annex 2') ||
+        query.contains('annex2') ||
+        query.contains('annex-2')) {
+      return (10.3154, 123.9021);
+    }
+    if (query.contains('basic')) {
+      return (10.3148, 123.9014);
+    }
+    if (query.contains('maritime')) {
+      return (10.3163, 123.9025);
+    }
+    return (10.3156, 123.9016);
   }
 
   Offset _offsetForBuilding(String? nameOrCode, Size size) {
@@ -127,27 +202,83 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
   @override
   Widget build(BuildContext context) {
     final d = widget.delivery;
-    final telemetry = d != null ? _safeWatchTelemetry(ref, d.id) : null;
+    final telemetry = d != null
+        ? _safeWatchTelemetry(ref, d.id)
+        : ref.watch(fleetTelemetryProvider);
+    final dronesList = ref.watch(droneProvider);
+    final fallbackDrone = dronesList.firstOrNull;
+    final droneDbStatus = fallbackDrone?.status;
 
     final bool isAssigning = d?.status == DeliveryStatus.assigning;
     final bool isInTransit = d?.status == DeliveryStatus.inTransit;
     final bool isDelivered = d?.status == DeliveryStatus.delivered;
-    final bool isStandby = d == null || (!isAssigning && !isInTransit && !isDelivered);
+    final bool isReturning = telemetry?.eventType == 'returning_to_base' ||
+        (d?.status != DeliveryStatus.assigning &&
+            d?.status != DeliveryStatus.inTransit &&
+            droneDbStatus == DroneStatus.returning);
+    final bool isStandby = !isReturning &&
+        (d == null || (!isAssigning && !isInTransit && !isDelivered));
 
     final hubOffsetRatio = const Offset(0.50, 0.33); // Drone Hub at top center
 
-    final legProgress = isDelivered
-        ? 1.0
-        : (isStandby
-            ? 0.0
-            : (telemetry?.progress != null && telemetry!.progress > 0
-                ? telemetry.progress.clamp(0.0, 1.0)
-                : d.progress.clamp(0.0, 1.0)));
+    final allDeliveries = ref.watch(deliveryProvider);
+    final DeliveryModel? activeOrRecentDel = isReturning
+        ? (d ??
+            (telemetry?.deliveryId != null
+                ? allDeliveries
+                    .where((del) => del.id == telemetry!.deliveryId)
+                    .firstOrNull
+                : null))
+        : d;
 
-    // ponytail: derive standby label from actual drones.status, not hardcoded
-    final dronesList = ref.watch(droneProvider);
-    final fallbackDrone = dronesList.firstOrNull;
-    final droneDbStatus = fallbackDrone?.status;
+    final String pickupName =
+        activeOrRecentDel?.pickupLocationName ?? 'Vendor Shop';
+    final String dropoffName = activeOrRecentDel?.dropoffLocationName ??
+        activeOrRecentDel?.deliveryAddress ??
+        'Campus';
+
+    // Compute live return progress from coordinates or telemetry
+    double returnProgressCalc = 0.0;
+    if (isReturning) {
+      if (telemetry != null &&
+          telemetry.latitude != 0.0 &&
+          telemetry.longitude != 0.0) {
+        final originCoords = _coordinatesForBuilding(dropoffName);
+        const baseLat = 10.3168;
+        const baseLng = 123.9010;
+        final originLat = originCoords.$1;
+        final originLng = originCoords.$2;
+
+        final distTotal = math.sqrt(
+          math.pow(baseLat - originLat, 2) + math.pow(baseLng - originLng, 2),
+        );
+        final distTraveled = math.sqrt(
+          math.pow(telemetry.latitude - originLat, 2) +
+              math.pow(telemetry.longitude - originLng, 2),
+        );
+
+        if (distTotal > 0.00001) {
+          returnProgressCalc = (distTraveled / distTotal).clamp(0.0, 1.0);
+        }
+      }
+      if (telemetry?.progress != null && telemetry!.progress > 0) {
+        returnProgressCalc =
+            math.max(returnProgressCalc, telemetry.progress.clamp(0.0, 1.0));
+      }
+    }
+
+    final legProgress = isReturning
+        ? returnProgressCalc
+        : isDelivered
+            ? 1.0
+            : (isStandby
+                ? 0.0
+                : (telemetry?.progress != null && telemetry!.progress > 0
+                    ? telemetry.progress.clamp(0.0, 1.0)
+                    : (d?.progress != null
+                        ? d!.progress.clamp(0.0, 1.0)
+                        : 0.0)));
+
     final String dbStatusLabel = switch (droneDbStatus) {
       DroneStatus.available => 'Available',
       DroneStatus.assigned => 'Assigned',
@@ -155,11 +286,14 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
       DroneStatus.charging => 'Charging',
       DroneStatus.maintenance => 'Maintenance',
       DroneStatus.offline => 'Offline',
+      DroneStatus.returning => 'Returning to Base',
       null => 'Available',
     };
 
     // Status formatting
-    final String statusBadgeText = isAssigning
+    final String statusBadgeText = isReturning
+        ? 'Returning to Base'
+        : isAssigning
         ? 'Heading to Pickup'
         : isInTransit
         ? 'In Flight / In Transit'
@@ -167,7 +301,9 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
         ? 'Delivered'
         : '$dbStatusLabel — At Base';
 
-    final Color statusColor = isAssigning
+    final Color statusColor = isReturning
+        ? AppColors.warning
+        : isAssigning
         ? AppColors.primaryLight
         : isInTransit
         ? AppColors.accent
@@ -175,15 +311,16 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
         ? AppColors.success
         : AppColors.accent;
 
-    final String pickupName = d?.pickupLocationName ?? 'Vendor Shop';
-    final String dropoffName = d?.dropoffLocationName ?? d?.deliveryAddress ?? 'Campus';
-
     final String droneCodeDisplay = telemetry?.droneCode ??
         (d != null && d.droneId != null && d.droneId!.isNotEmpty
             ? d.droneId!
             : (fallbackDrone?.id ?? '—'));
 
-    final String legDescription = isAssigning
+    final String legDescription = isReturning
+        ? (legProgress >= 1.0
+              ? 'Arrived at Campus Drone Hub Base'
+              : 'Drone $droneCodeDisplay returning to Base Hub')
+        : isAssigning
         ? (legProgress >= 1.0
               ? 'Package Picked Up • Switching to Delivery'
               : 'Drone $droneCodeDisplay flying to $pickupName for pickup')
@@ -319,7 +456,17 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
                     Offset endPoint;
                     Offset dronePoint;
 
-                    if (isAssigning) {
+                    if (isReturning) {
+                      // Leg 3: Customer -> Hub (Return to Base)
+                      startPoint = customerPoint;
+                      endPoint = hubPoint;
+                      dronePoint = Offset(
+                        startPoint.dx +
+                            (endPoint.dx - startPoint.dx) * legProgress,
+                        startPoint.dy +
+                            (endPoint.dy - startPoint.dy) * legProgress,
+                      );
+                    } else if (isAssigning) {
                       // Leg 1: Hub -> Vendor
                       startPoint = hubPoint;
                       endPoint = vendorPoint;
@@ -410,7 +557,7 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
                               return _buildDroneMarker(
                                 radarVal: _radarController.value,
                                 color: statusColor,
-                                isDelivered: isDelivered,
+                                isDelivered: isDelivered && !isReturning,
                               );
                             },
                           ),
@@ -455,23 +602,27 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
                     _buildTelemetryItem(
                       icon: Icons.speed_rounded,
                       label: 'Speed',
-                      value: isDelivered || isStandby
+                      value: (!isReturning && (isDelivered || isStandby))
                           ? '0.0 km/h'
                           : (telemetry?.speed != null
                               ? '${telemetry!.speed!.toStringAsFixed(1)} km/h'
-                              : ((d.currentSpeed ?? 0) > 0
-                                  ? '${d.currentSpeed!.toStringAsFixed(1)} km/h'
-                                  : '—')),
+                              : ((d?.currentSpeed ?? 0) > 0
+                                  ? '${d!.currentSpeed!.toStringAsFixed(1)} km/h'
+                                  : (isReturning ? '18.0 km/h' : '—'))),
                       color: AppColors.info,
                     ),
                     _buildTelemetryItem(
                       icon: Icons.alt_route_rounded,
-                      label: isStandby
-                          ? 'Status'
-                          : (isAssigning
-                              ? 'Pickup Progress'
-                              : 'Delivery Progress'),
-                      value: isStandby ? dbStatusLabel : '${(legProgress * 100).round()}%',
+                      label: isReturning
+                          ? 'Return Progress'
+                          : (isStandby
+                              ? 'Status'
+                              : (isAssigning
+                                  ? 'Pickup Progress'
+                                  : 'Delivery Progress')),
+                      value: (isStandby && !isReturning)
+                          ? dbStatusLabel
+                          : '${(legProgress * 100).round()}%',
                       color: statusColor,
                     ),
                   ],

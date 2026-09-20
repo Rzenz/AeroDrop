@@ -21,7 +21,9 @@ class AdminDronesScreen extends ConsumerWidget {
     final available = drones
         .where((d) => d.status == DroneStatus.available)
         .length;
-    final active = drones.where((d) => d.status == DroneStatus.busy).length;
+    final active = drones
+        .where((d) => d.status == DroneStatus.busy || d.status == DroneStatus.returning)
+        .length;
     final maintenance = drones
         .where((d) => d.status == DroneStatus.maintenance)
         .length;
@@ -271,62 +273,65 @@ class AdminDronesScreen extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(height: 10),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
                     children: DroneStatus.values.map((status) {
                       final isSelected = drone.status == status;
                       Color btnColor = AppColors.primary;
                       if (status == DroneStatus.available) {
                         btnColor = AppColors.success;
                       }
-                      if (status == DroneStatus.maintenance) {
+                      if (status == DroneStatus.maintenance ||
+                          status == DroneStatus.returning) {
                         btnColor = AppColors.warning;
                       }
                       if (status == DroneStatus.offline) {
                         btnColor = AppColors.danger;
                       }
 
-                      return Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 4),
-                          child: GestureDetector(
-                            onTap: () {
-                              ref
-                                  .read(droneProvider.notifier)
-                                  .updateStatus(drone.id, status);
-                              Navigator.pop(ctx);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    'Drone status updated to ${status.name.toUpperCase()}',
-                                  ),
-                                  backgroundColor: AppColors.success,
-                                ),
-                              );
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 8),
-                              decoration: BoxDecoration(
-                                color: isSelected
-                                    ? btnColor.withValues(alpha: 0.2)
-                                    : AppColors.cardDark,
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
-                                  color: isSelected
-                                      ? btnColor
-                                      : AppColors.borderDark,
-                                ),
+                      final label = status == DroneStatus.returning
+                          ? 'Returning'
+                          : status.name.substring(0, 1).toUpperCase() +
+                              status.name.substring(1);
+
+                      return GestureDetector(
+                        onTap: () {
+                          ref
+                              .read(droneProvider.notifier)
+                              .updateStatus(drone.id, status);
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Drone status updated to ${status.name.toUpperCase()}',
                               ),
-                              alignment: Alignment.center,
-                              child: Text(
-                                status.name.substring(0, 1).toUpperCase() +
-                                    status.name.substring(1),
-                                style: TextStyle(
-                                  color: isSelected ? btnColor : Colors.white60,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
+                              backgroundColor: AppColors.success,
+                            ),
+                          );
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? btnColor.withValues(alpha: 0.2)
+                                : AppColors.cardDark,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: isSelected
+                                  ? btnColor
+                                  : AppColors.borderDark,
+                            ),
+                          ),
+                          child: Text(
+                            label,
+                            style: TextStyle(
+                              color: isSelected ? btnColor : Colors.white60,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
                         ),

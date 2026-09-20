@@ -52,7 +52,6 @@ import '../../features/shared/terms_conditions_page.dart';
 // Marketplace
 import '../../features/vendors/vendors_screen.dart';
 import '../../features/vendors/vendor_details_screen.dart';
-import '../../features/products/products_screen.dart';
 import '../../features/products/product_details_screen.dart';
 import '../../features/cart/cart_screen.dart';
 import '../../features/cart/checkout_screen.dart';
@@ -218,7 +217,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/user/shop',
             pageBuilder: (context, state) =>
-                _fade(state, const ProductsScreen()),
+                _fade(state, const VendorsScreen()),
           ),
           GoRoute(
             path: '/user/vendors',

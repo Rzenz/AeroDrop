@@ -1271,12 +1271,6 @@ class _PaymentPage extends StatelessWidget {
         color: AppColors.primaryLight,
       ),
       (
-        name: 'Cash',
-        icon: Icons.payments_rounded,
-        subtitle: 'Pending until package arrival',
-        color: AppColors.success,
-      ),
-      (
         name: 'Credit / Debit Card',
         icon: Icons.credit_card_rounded,
         subtitle: 'Simulated card payment',

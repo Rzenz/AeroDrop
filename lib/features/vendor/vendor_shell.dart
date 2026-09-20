@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/widgets/neu_nav_dock.dart';
 import '../../core/providers/notification_provider.dart';
+import '../../core/providers/order_provider.dart';
 
 /// Navigation shell for the vendor role.
 ///
@@ -39,11 +40,16 @@ class VendorShell extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final unreadCount = ref.watch(unreadNotificationCountProvider);
+    final actionOrdersCount = ref.watch(vendorActionOrdersCountProvider);
 
     final items = [
       const NeuNavItem(icon: Icons.dashboard_rounded, label: 'Home'),
       const NeuNavItem(icon: Icons.inventory_2_rounded, label: 'Products'),
-      const NeuNavItem(icon: Icons.receipt_long_rounded, label: 'Orders'),
+      NeuNavItem(
+        icon: Icons.receipt_long_rounded,
+        label: 'Orders',
+        badge: actionOrdersCount > 0 ? actionOrdersCount : null,
+      ),
       NeuNavItem(
         icon: Icons.notifications_rounded,
         label: 'Alerts',

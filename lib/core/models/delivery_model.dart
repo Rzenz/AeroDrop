@@ -32,6 +32,22 @@ class DeliveryModel {
   final double? currentSpeed;
   final double? batteryLevel;
 
+  // Order link & pre-dispatch cancellation tracking
+  final String? orderId;
+  final String? cancellationReason;
+  final bool noDroneDispatched;
+  final String? orderStatus;
+
+  String get cancellationReasonDisplay {
+    final r = cancellationReason?.toLowerCase().trim() ?? '';
+    return switch (r) {
+      'weather_grounded' => 'Weather Grounded',
+      'vendor' => 'Cancelled by Vendor',
+      'customer' => 'Cancelled by Customer',
+      _ => r.isNotEmpty ? r : 'Cancelled by Customer',
+    };
+  }
+
   DeliveryModel({
     required this.id,
     required this.senderName,
@@ -60,6 +76,10 @@ class DeliveryModel {
     this.currentAltitude,
     this.currentSpeed,
     this.batteryLevel,
+    this.orderId,
+    this.cancellationReason,
+    this.noDroneDispatched = false,
+    this.orderStatus,
   });
 
   DeliveryModel copyWith({
@@ -90,6 +110,10 @@ class DeliveryModel {
     double? currentAltitude,
     double? currentSpeed,
     double? batteryLevel,
+    String? orderId,
+    String? cancellationReason,
+    bool? noDroneDispatched,
+    String? orderStatus,
   }) {
     return DeliveryModel(
       id: id ?? this.id,
@@ -120,6 +144,10 @@ class DeliveryModel {
       currentAltitude: currentAltitude ?? this.currentAltitude,
       currentSpeed: currentSpeed ?? this.currentSpeed,
       batteryLevel: batteryLevel ?? this.batteryLevel,
+      orderId: orderId ?? this.orderId,
+      cancellationReason: cancellationReason ?? this.cancellationReason,
+      noDroneDispatched: noDroneDispatched ?? this.noDroneDispatched,
+      orderStatus: orderStatus ?? this.orderStatus,
     );
   }
 }

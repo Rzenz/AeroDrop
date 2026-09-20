@@ -124,9 +124,62 @@ class DeliveryDetailsScreen extends ConsumerWidget {
                           ],
                         ),
                       ),
-                      StatusChip.delivery(delivery.status.name),
+                      StatusChip.delivery(
+                        delivery.status.name,
+                        noDroneDispatched: delivery.noDroneDispatched,
+                      ),
                     ],
                   ).animate().fadeIn().slideX(begin: -0.1),
+
+                  if (delivery.noDroneDispatched ||
+                      delivery.status == DeliveryStatus.cancelled) ...[
+                    const SizedBox(height: 20),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppColors.danger.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: AppColors.danger.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.cancel_outlined,
+                            color: AppColors.danger,
+                            size: 24,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  delivery.noDroneDispatched
+                                      ? 'Cancelled — no drone dispatched'
+                                      : 'Order / Delivery Cancelled',
+                                  style: AppTextStyles.title(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.danger,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Reason: ${delivery.cancellationReasonDisplay}',
+                                  style: AppTextStyles.body(
+                                    fontSize: 12,
+                                    color: AppColors.textSecondaryDark,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
 
                   const SizedBox(height: 28),
 

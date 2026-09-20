@@ -13,7 +13,9 @@ import '../../core/models/delivery_model.dart';
 import '../../core/providers/order_provider.dart';
 import '../../core/providers/delivery_provider.dart';
 import '../../core/services/supabase_service.dart';
+import '../../core/widgets/neu_feedback.dart';
 import 'receipt_screen.dart';
+import 'widgets/order_review_dialog.dart';
 
 final orderDetailsProvider = FutureProvider.family<OrderModel?, String>((
   ref,
@@ -30,7 +32,7 @@ final orderDetailsProvider = FutureProvider.family<OrderModel?, String>((
           vendor:users!vendor_id(full_name, business_name),
           customer:users!user_id(full_name, phone_number),
           campus_locations!delivery_location_id(name),
-          order_items(product_name, quantity, unit_price),
+          order_items(product_id, product_name, quantity, unit_price),
           deliveries(id, status, progress, drone_id, estimated_delivery_seconds, delivery_started_at, delivery_completed_at, created_at)
         ''')
         .eq('id', id)
@@ -437,6 +439,19 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
                 // 2. Contact Support (with associated orderId & deliveryId)
                 // 3. Track My Order / Track Delivery
 
+                // Rate Order / Write Review Button (Customer Delivered orders only)
+                if (isDelivered && !isVendor) ...[
+                  NeuButton(
+                    text: 'Rate Order / Review',
+                    icon: Icons.star_rounded,
+                    variant: NeuButtonVariant.accent,
+                    onPressed: () {
+                      OrderReviewDialog.show(context, order: order);
+                    },
+                  ).animate().fadeIn(delay: 225.ms),
+                  const SizedBox(height: 12),
+                ],
+
                 // View Official Receipt Button
                 NeuButton(
                   text: 'View Official Receipt',
@@ -479,6 +494,47 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
                   },
                 ).animate().fadeIn(delay: 250.ms),
                 const SizedBox(height: 12),
+
+                // Customer Order Cancellation Action
+                if (!isVendor) ...[
+                  if (order.effectiveStatus.toLowerCase() == 'pending' ||
+                      order.effectiveStatus.toLowerCase() == 'confirmed' ||
+                      order.effectiveStatus.toLowerCase() == 'preparing') ...[
+                    NeuButton(
+                      text: 'Cancel Order',
+                      icon: Icons.cancel_outlined,
+                      variant: NeuButtonVariant.neutral,
+                      onPressed: () => _showCancelOrderDialog(context, order),
+                    ).animate().fadeIn(delay: 260.ms),
+                    const SizedBox(height: 12),
+                  ] else if (order.effectiveStatus.toLowerCase() == 'ready_for_delivery' ||
+                      order.effectiveStatus.toLowerCase() == 'in_transit') ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: AppColors.cardDark,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.info_outline_rounded, size: 16, color: AppColors.textSecondary),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Order is packed or in flight and cannot be cancelled.',
+                              style: AppTextStyles.caption(
+                                fontSize: 11,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ).animate().fadeIn(delay: 260.ms),
+                    const SizedBox(height: 12),
+                  ],
+                ],
 
                 // Contact Support Button
                 NeuButton(
@@ -529,11 +585,102 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
     );
   }
 
+  void _showCancelOrderDialog(BuildContext context, OrderModel order) {
+    showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.bgDark,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(color: AppColors.border),
+        ),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.danger.withValues(alpha: 0.15),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.cancel_rounded, color: AppColors.danger, size: 24),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              'Cancel Order?',
+              style: AppTextStyles.title(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'Are you sure you want to cancel this order?\n\n'
+          'Since payment was simulated digitally, a full simulated refund of ₱${order.totalAmount.toStringAsFixed(2)} will be credited back immediately.',
+          style: AppTextStyles.body(
+            fontSize: 13,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(
+              'Keep Order',
+              style: AppTextStyles.body(color: AppColors.textSecondary),
+            ),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.danger,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(
+              'Yes, Cancel',
+              style: AppTextStyles.body(color: Colors.white, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    ).then((confirmed) async {
+      if (confirmed == true && mounted) {
+        final success = await ref
+            .read(orderProvider.notifier)
+            .cancelOrder(
+              order.id,
+              cancellationReason: 'Customer cancelled from order details',
+            );
+        if (mounted) {
+          if (success) {
+            ref.invalidate(orderDetailsProvider(order.id));
+            if (context.mounted) {
+              showNeuSnack(
+                context,
+                'Order cancelled successfully. Refund processed.',
+                tone: NeuToneKind.success,
+              );
+            }
+          } else {
+            if (context.mounted) {
+              showNeuSnack(
+                context,
+                'Unable to cancel order. It may have already been dispatched.',
+                tone: NeuToneKind.error,
+              );
+            }
+          }
+        }
+      }
+    });
+  }
+
   static String _methodLabel(String method) {
     return switch (method.toLowerCase()) {
-      'cash' => 'Cash on Delivery',
+      'cash' || 'cash_on_delivery' => 'Cash on Delivery',
       'gcash_simulated' => 'GCash (Digital Payment)',
-      'card' => 'Credit / Debit Card',
+      'card' || 'card_simulated' => 'Credit / Debit Card',
       _ => method,
     };
   }

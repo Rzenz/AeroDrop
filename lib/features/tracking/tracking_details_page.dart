@@ -610,7 +610,7 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
                             Icons.shield_outlined,
                             'Autopilot Mode',
                             isDelivered
-                                ? 'Mission Complete (Landed)'
+                                ? 'Delivery Complete (Landed)'
                                 : (isAssigning
                                     ? 'Waypoints Engaged (Leg 1)'
                                     : 'Autonomous Transit (Leg 2)'),

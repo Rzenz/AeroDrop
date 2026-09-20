@@ -1,9 +1,11 @@
 class OrderItemModel {
+  final String productId;
   final String productName;
   final int quantity;
   final double unitPrice;
 
   OrderItemModel({
+    this.productId = '',
     required this.productName,
     required this.quantity,
     this.unitPrice = 0,
@@ -151,6 +153,7 @@ class OrderModel {
         (map['order_items'] as List?)
             ?.map(
               (i) => OrderItemModel(
+                productId: i['product_id']?.toString() ?? '',
                 productName: i['product_name']?.toString() ?? 'Item',
                 quantity: (i['quantity'] as num?)?.toInt() ?? 1,
                 unitPrice: (i['unit_price'] as num?)?.toDouble() ?? 0.0,

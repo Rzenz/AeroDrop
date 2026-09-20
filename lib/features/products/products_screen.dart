@@ -282,12 +282,39 @@ class _ProductGridCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    product.vendorName,
-                    style: AppTextStyles.caption(fontSize: 11),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          product.vendorName,
+                          style: AppTextStyles.caption(fontSize: 11),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(
+                        product.hasReviews
+                            ? Icons.star_rounded
+                            : Icons.star_border_rounded,
+                        color: product.hasReviews
+                            ? AppColors.warning
+                            : AppColors.textSecondary,
+                        size: 11,
+                      ),
+                      const SizedBox(width: 2),
+                      Text(
+                        product.hasReviews
+                            ? product.rating.toStringAsFixed(1)
+                            : 'New',
+                        style: AppTextStyles.caption(
+                          fontSize: 9.5,
+                          color: product.hasReviews
+                              ? AppColors.textPrimary
+                              : AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
                   ),
                   const Spacer(),
                   // Wrap, not Row: at a large text scale a long price and a

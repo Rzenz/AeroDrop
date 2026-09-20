@@ -21,7 +21,13 @@ class StatusChip extends StatelessWidget {
   final Color color;
   final bool dense;
 
-  factory StatusChip.delivery(String statusStr) {
+  factory StatusChip.delivery(String statusStr, {bool noDroneDispatched = false}) {
+    if (noDroneDispatched) {
+      return const StatusChip(
+        label: 'Cancelled — no drone dispatched',
+        color: AppColors.danger,
+      );
+    }
     final key = statusStr.toLowerCase();
     final (Color color, String label) = switch (key) {
       'pending' => (AppColors.warning, 'PENDING'),

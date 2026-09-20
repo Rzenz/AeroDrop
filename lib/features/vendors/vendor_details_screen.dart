@@ -11,6 +11,8 @@ import '../../core/models/product_model.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/widgets/neu_back_button.dart';
 import '../../core/widgets/cart_button.dart';
+import '../../core/providers/review_provider.dart';
+import '../shared/widgets/reviews_list_sheet.dart';
 
 class VendorDetailsScreen extends ConsumerStatefulWidget {
   final String vendorId;
@@ -79,11 +81,27 @@ class _VendorDetailsScreenState extends ConsumerState<VendorDetailsScreen>
           .eq('vendor_id', widget.vendorId)
           .eq('is_active', true);
 
+      // Fetch dynamic product ratings summaries
+      final Map<String, (double, int)> productRatingsMap = {};
+      try {
+        final prodSummaries = await SupabaseService.client.from('product_ratings_summary').select();
+        for (final s in prodSummaries) {
+          final pId = s['product_id']?.toString();
+          if (pId != null) {
+            final avg = (s['average_rating'] as num?)?.toDouble() ?? 0.0;
+            final cnt = (s['review_count'] as num?)?.toInt() ?? 0;
+            productRatingsMap[pId] = (avg, cnt);
+          }
+        }
+      } catch (_) {}
+
       final List<ProductModel> products = [];
       for (final p in productsRes) {
+        final pId = p['id'].toString();
+        final r = productRatingsMap[pId] ?? (0.0, 0);
         products.add(
           ProductModel(
-            id: p['id'].toString(),
+            id: pId,
             vendorId: p['vendor_id'].toString(),
             vendorName: vendor.businessName,
             name: p['name'].toString(),
@@ -94,6 +112,8 @@ class _VendorDetailsScreenState extends ConsumerState<VendorDetailsScreen>
             weightKg: (((p['weight_grams'] as num?) ?? 0) / 1000.0),
             imageUrl: p['image_url']?.toString() ?? '',
             isAvailable: p['is_active'] as bool? ?? true,
+            rating: r.$1,
+            reviewCount: r.$2,
           ),
         );
       }
@@ -251,28 +271,86 @@ class _VendorDetailsScreenState extends ConsumerState<VendorDetailsScreen>
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: vendor.isOpen
-                            ? AppColors.success.withValues(alpha: 0.2)
-                            : AppColors.danger.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        vendor.isOpen ? '● Open Now' : '● Closed',
-                        style: AppTextStyles.label(
-                          fontSize: 12,
-                          color: vendor.isOpen
-                              ? AppColors.success
-                              : AppColors.danger,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 0,
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: vendor.isOpen
+                                ? AppColors.success.withValues(alpha: 0.2)
+                                : AppColors.danger.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            vendor.isOpen ? '● Open Now' : '● Closed',
+                            style: AppTextStyles.label(
+                              fontSize: 11,
+                              color: vendor.isOpen
+                                  ? AppColors.success
+                                  : AppColors.danger,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0,
+                            ),
+                          ),
                         ),
-                      ),
+                        const SizedBox(width: 8),
+                        Consumer(
+                          builder: (context, ref, _) {
+                            final summaryAsync = ref.watch(vendorRatingsSummaryProvider(widget.vendorId));
+                            final summary = summaryAsync.valueOrNull;
+                            final hasReviews = summary != null && summary.totalReviews > 0;
+                            return GestureDetector(
+                              onTap: hasReviews
+                                  ? () => ReviewsListSheet.showForVendor(
+                                        context,
+                                        vendorId: widget.vendorId,
+                                        vendorName: vendor.businessName,
+                                      )
+                                  : null,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppColors.warning.withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: AppColors.warning.withValues(alpha: 0.4),
+                                    width: 0.8,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(
+                                      Icons.star_rounded,
+                                      color: AppColors.warning,
+                                      size: 14,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      hasReviews
+                                          ? '${summary.averageRating.toStringAsFixed(1)} (${summary.totalReviews} ${summary.totalReviews == 1 ? 'review' : 'reviews'})'
+                                          : 'No reviews yet',
+                                      style: AppTextStyles.label(
+                                        fontSize: 11,
+                                        color: AppColors.warning,
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: 0,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -285,7 +363,7 @@ class _VendorDetailsScreenState extends ConsumerState<VendorDetailsScreen>
               unselectedLabelColor: AppColors.textSecondary,
               tabs: const [
                 Tab(text: 'Products'),
-                Tab(text: 'About'),
+                Tab(text: 'About & Reviews'),
               ],
             ),
           ),
@@ -351,31 +429,80 @@ class _VendorDetailsScreenState extends ConsumerState<VendorDetailsScreen>
                   label: 'Email',
                   value: vendor.email,
                 ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.star_rounded,
-                      color: AppColors.accent,
-                      size: 18,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      '${vendor.rating}',
-                      style: AppTextStyles.subHead(
-                        fontSize: 14,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      '(${vendor.totalOrders} orders)',
-                      style: AppTextStyles.body(
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
+                const SizedBox(height: 20),
+                Divider(color: AppColors.border),
+                const SizedBox(height: 12),
+                Consumer(
+                  builder: (context, ref, _) {
+                    final summaryAsync = ref.watch(vendorRatingsSummaryProvider(widget.vendorId));
+                    final summary = summaryAsync.valueOrNull;
+                    final hasReviews = summary != null && summary.totalReviews > 0;
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Customer Reviews',
+                              style: AppTextStyles.subHead(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            if (hasReviews)
+                              TextButton(
+                                onPressed: () => ReviewsListSheet.showForVendor(
+                                  context,
+                                  vendorId: widget.vendorId,
+                                  vendorName: vendor.businessName,
+                                ),
+                                child: Text(
+                                  'View All',
+                                  style: AppTextStyles.label(
+                                    fontSize: 12,
+                                    color: AppColors.accent,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Icon(
+                              hasReviews ? Icons.star_rounded : Icons.star_border_rounded,
+                              color: hasReviews ? AppColors.warning : AppColors.textSecondary,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              hasReviews
+                                  ? '${summary.averageRating.toStringAsFixed(1)} out of 5.0'
+                                  : 'No reviews yet',
+                              style: AppTextStyles.subHead(
+                                fontSize: 14,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              hasReviews
+                                  ? '(${summary.totalReviews} ${summary.totalReviews == 1 ? 'review' : 'reviews'})'
+                                  : '',
+                              style: AppTextStyles.body(
+                                fontSize: 12,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ],
             ),
@@ -489,6 +616,7 @@ class _ProductCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Container(
                       padding: const EdgeInsets.symmetric(
@@ -514,6 +642,31 @@ class _ProductCard extends StatelessWidget {
                           letterSpacing: 0,
                         ),
                       ),
+                    ),
+                    Row(
+                      children: [
+                        Icon(
+                          product.hasReviews
+                              ? Icons.star_rounded
+                              : Icons.star_border_rounded,
+                          color: product.hasReviews
+                              ? AppColors.warning
+                              : AppColors.textSecondary,
+                          size: 11,
+                        ),
+                        const SizedBox(width: 2),
+                        Text(
+                          product.hasReviews
+                              ? product.rating.toStringAsFixed(1)
+                              : 'New',
+                          style: AppTextStyles.caption(
+                            fontSize: 9,
+                            color: product.hasReviews
+                                ? AppColors.textPrimary
+                                : AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),

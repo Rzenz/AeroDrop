@@ -14,6 +14,8 @@ import '../../core/theme/app_spacing.dart';
 import '../../core/widgets/neu_back_button.dart';
 import '../../core/widgets/cart_button.dart';
 import '../../core/widgets/neu_feedback.dart';
+import '../../core/providers/review_provider.dart';
+import '../shared/widgets/reviews_list_sheet.dart';
 
 class ProductDetailsScreen extends ConsumerStatefulWidget {
   final String productId;
@@ -128,6 +130,23 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
             res['vendor_name']?.toString() ??
             'Campus Vendor';
         final cat = res['category']?.toString() ?? 'Other';
+
+        double directRating = 0.0;
+        int directReviewCount = 0;
+        try {
+          final summaryRes = await SupabaseService.client
+              .from('product_ratings_summary')
+              .select()
+              .eq('product_id', widget.productId)
+              .maybeSingle();
+          if (summaryRes != null) {
+            directRating =
+                (summaryRes['average_rating'] as num?)?.toDouble() ?? 0.0;
+            directReviewCount =
+                (summaryRes['review_count'] as num?)?.toInt() ?? 0;
+          }
+        } catch (_) {}
+
         setState(() {
           _directProduct = ProductModel(
             id: res!['id'].toString(),
@@ -141,6 +160,8 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
             weightKg: (((res['weight_grams'] as num?) ?? 0) / 1000.0),
             imageUrl: res['image_url']?.toString() ?? '',
             isAvailable: res['is_active'] as bool? ?? true,
+            rating: directRating,
+            reviewCount: directReviewCount,
           );
         });
       }
@@ -302,37 +323,80 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
                     ),
                   ).animate().fadeIn(delay: 50.ms),
 
-                  // Vendor
+                  // Vendor & Reviews row
                   const SizedBox(height: 6),
-                  GestureDetector(
-                    onTap: () {
-                      if (product.vendorId.isNotEmpty) {
-                        context.push('/user/vendors/${product.vendorId}');
-                      }
-                    },
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.storefront_outlined,
-                          color: AppColors.primaryLight,
-                          size: 14,
+                  Row(
+                    children: [
+                      GestureDetector(
+                        onTap: () {
+                          if (product.vendorId.isNotEmpty) {
+                            context.push('/user/vendors/${product.vendorId}');
+                          }
+                        },
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.storefront_outlined,
+                              color: AppColors.primaryLight,
+                              size: 14,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              product.vendorName,
+                              style: AppTextStyles.body(
+                                fontSize: 13,
+                                color: AppColors.primaryLight,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            const Icon(
+                              Icons.chevron_right_rounded,
+                              color: AppColors.primaryLight,
+                              size: 14,
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 6),
-                        Text(
-                          product.vendorName,
-                          style: AppTextStyles.body(
-                            fontSize: 13,
-                            color: AppColors.primaryLight,
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        const Icon(
-                          Icons.chevron_right_rounded,
-                          color: AppColors.primaryLight,
-                          size: 14,
-                        ),
-                      ],
-                    ),
+                      ),
+                      const Spacer(),
+                      Consumer(
+                        builder: (context, ref, _) {
+                          final summaryAsync = ref.watch(productRatingsSummaryProvider(product.id));
+                          final summary = summaryAsync.valueOrNull;
+                          final hasReviews = summary != null && summary.totalReviews > 0;
+
+                          return GestureDetector(
+                            onTap: hasReviews
+                                ? () => ReviewsListSheet.showForProduct(
+                                      context,
+                                      productId: product.id,
+                                      productName: product.name,
+                                    )
+                                : null,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  hasReviews ? Icons.star_rounded : Icons.star_border_rounded,
+                                  color: hasReviews ? AppColors.warning : AppColors.textSecondary.withValues(alpha: 0.6),
+                                  size: 16,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  hasReviews
+                                      ? '${summary.averageRating.toStringAsFixed(1)} (${summary.totalReviews} ${summary.totalReviews == 1 ? 'review' : 'reviews'})'
+                                      : 'No reviews yet',
+                                  style: AppTextStyles.caption(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: hasReviews ? AppColors.warning : AppColors.textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ],
                   ).animate().fadeIn(delay: 80.ms),
 
                   const SizedBox(height: 20),

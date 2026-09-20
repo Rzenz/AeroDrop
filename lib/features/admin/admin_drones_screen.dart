@@ -401,7 +401,7 @@ class AdminDronesScreen extends ConsumerWidget {
                                     style: TextStyle(color: Colors.white),
                                   ),
                                   content: const Text(
-                                    'This drone is currently on an active flight delivery mission and cannot be decommissioned.',
+                                    'This drone is currently on an active flight delivery and cannot be decommissioned.',
                                     style: TextStyle(color: Colors.white70),
                                   ),
                                   actions: [

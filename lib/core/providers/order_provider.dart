@@ -245,18 +245,14 @@ class OrderNotifier extends StateNotifier<OrderState> {
     String cancellationReason = 'customer',
   }) async {
     try {
-      await _client
-          .from('orders')
-          .update({
-            'order_status': 'cancelled',
-            'cancellation_reason': cancellationReason,
-            'updated_at': DateTime.now().toUtc().toIso8601String(),
-          })
-          .eq('id', orderId);
+      final res = await _client.rpc(
+        'customer_cancel_order',
+        params: {'p_order_id': orderId},
+      );
 
       if (!mounted) return false;
       await loadOrders();
-      return true;
+      return res == true;
     } catch (e) {
       debugPrint('Cancel order failed: $e');
       return false;
@@ -484,3 +480,29 @@ final vendorOrdersProvider =
     StateNotifierProvider<VendorOrdersNotifier, OrderState>((ref) {
       return VendorOrdersNotifier(ref);
     });
+
+/// Live count of customer active orders (pending, confirmed, preparing, ready_for_delivery, in_transit)
+/// for displaying badges on the customer navigation dock.
+final customerActiveOrdersCountProvider = Provider<int>((ref) {
+  final orders = ref.watch(orderProvider).orders;
+  return orders.where((o) {
+    final status = o.effectiveStatus.toLowerCase();
+    return status == 'pending' ||
+        status == 'confirmed' ||
+        status == 'preparing' ||
+        status == 'ready_for_delivery' ||
+        status == 'in_transit';
+  }).length;
+});
+
+/// Live count of vendor orders needing action (pending, confirmed, preparing)
+/// for displaying badges on the vendor navigation dock.
+final vendorActionOrdersCountProvider = Provider<int>((ref) {
+  final orders = ref.watch(vendorOrdersProvider).orders;
+  return orders.where((o) {
+    final status = o.effectiveStatus.toLowerCase();
+    return status == 'pending' ||
+        status == 'confirmed' ||
+        status == 'preparing';
+  }).length;
+});

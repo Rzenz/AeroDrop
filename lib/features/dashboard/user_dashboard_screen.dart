@@ -333,24 +333,41 @@ class UserDashboardScreen extends ConsumerWidget {
                                                 const SizedBox(height: 4),
                                                 Row(
                                                   children: [
-                                                    const Icon(
-                                                      Icons.star_rounded,
-                                                      color: AppColors.accent,
+                                                    Icon(
+                                                      vendor.hasReviews
+                                                          ? Icons.star_rounded
+                                                          : Icons.star_border_rounded,
+                                                      color: vendor.hasReviews
+                                                          ? AppColors.warning
+                                                          : AppColors.textSecondaryDark,
                                                       size: 14,
                                                     ),
                                                     const SizedBox(width: 4),
                                                     Text(
-                                                      '${vendor.rating}',
+                                                      vendor.hasReviews
+                                                          ? vendor.rating.toStringAsFixed(1)
+                                                          : 'New',
                                                       style:
                                                           AppTextStyles.label(
                                                             fontSize: 11,
-                                                            color: AppColors
-                                                                .textSecondary,
+                                                            color: vendor.hasReviews
+                                                                ? AppColors.textPrimary
+                                                                : AppColors.textSecondaryDark,
                                                             fontWeight:
                                                                 FontWeight.bold,
                                                             letterSpacing: 0,
                                                           ),
                                                     ),
+                                                    if (vendor.hasReviews) ...[
+                                                      const SizedBox(width: 3),
+                                                      Text(
+                                                        '(${vendor.reviewCount})',
+                                                        style: AppTextStyles.caption(
+                                                          fontSize: 10,
+                                                          color: AppColors.textSecondaryDark,
+                                                        ),
+                                                      ),
+                                                    ],
                                                   ],
                                                 ),
                                               ],
@@ -435,14 +452,45 @@ class UserDashboardScreen extends ConsumerWidget {
                                               overflow: TextOverflow.ellipsis,
                                             ),
                                             const SizedBox(height: 4),
-                                            Text(
-                                              '₱${product.price.toStringAsFixed(2)}',
-                                              style: AppTextStyles.label(
-                                                fontSize: 11,
-                                                color: AppColors.accent,
-                                                fontWeight: FontWeight.bold,
-                                                letterSpacing: 0,
-                                              ),
+                                            Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.spaceBetween,
+                                              children: [
+                                                Text(
+                                                  '₱${product.price.toStringAsFixed(2)}',
+                                                  style: AppTextStyles.label(
+                                                    fontSize: 11,
+                                                    color: AppColors.accent,
+                                                    fontWeight: FontWeight.bold,
+                                                    letterSpacing: 0,
+                                                  ),
+                                                ),
+                                                Row(
+                                                  children: [
+                                                    Icon(
+                                                      product.hasReviews
+                                                          ? Icons.star_rounded
+                                                          : Icons.star_border_rounded,
+                                                      color: product.hasReviews
+                                                          ? AppColors.warning
+                                                          : AppColors.textSecondary,
+                                                      size: 11,
+                                                    ),
+                                                    const SizedBox(width: 2),
+                                                    Text(
+                                                      product.hasReviews
+                                                          ? product.rating.toStringAsFixed(1)
+                                                          : 'New',
+                                                      style: AppTextStyles.caption(
+                                                        fontSize: 9,
+                                                        color: product.hasReviews
+                                                            ? AppColors.textPrimary
+                                                            : AppColors.textSecondary,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ],
                                             ),
                                           ],
                                         ),

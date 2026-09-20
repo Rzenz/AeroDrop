@@ -12,6 +12,8 @@ import '../../core/models/order_model.dart';
 import '../../core/providers/order_provider.dart';
 import '../../core/services/supabase_service.dart';
 
+import 'widgets/simulated_card_dialog.dart';
+
 class PaymentScreen extends ConsumerStatefulWidget {
   final String? orderId;
   const PaymentScreen({super.key, this.orderId});
@@ -267,16 +269,6 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
             ).animate().fadeIn(delay: 80.ms),
             const SizedBox(height: 10),
             _MethodCard(
-              id: 'cash',
-              selected: _method == 'cash',
-              icon: Icons.payments_outlined,
-              label: 'Cash on Delivery',
-              subtitle: 'Pay cash when order arrives',
-              color: AppColors.success,
-              onTap: () => setState(() => _method = 'cash'),
-            ).animate().fadeIn(delay: 120.ms),
-            const SizedBox(height: 10),
-            _MethodCard(
               id: 'card',
               selected: _method == 'card',
               icon: Icons.credit_card_rounded,
@@ -284,7 +276,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
               subtitle: 'Visa, Mastercard accepted',
               color: const Color(0xFFA855F7),
               onTap: () => setState(() => _method = 'card'),
-            ).animate().fadeIn(delay: 160.ms),
+            ).animate().fadeIn(delay: 120.ms),
             const SizedBox(height: 24),
             FilledButton(
               onPressed: _processing ? null : _processPayment,
@@ -312,7 +304,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-            ).animate().fadeIn(delay: 200.ms),
+            ).animate().fadeIn(delay: 160.ms),
           ],
 
           // Receipt after payment
@@ -329,19 +321,16 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   }
 
   Future<void> _processPayment() async {
+    if (_method == 'card' && _order != null) {
+      final cardRes = await SimulatedCardDialog.show(context, amount: _order!.totalAmount);
+      if (cardRes == null) return;
+    }
+
     HapticFeedback.mediumImpact();
     setState(() => _processing = true);
 
     try {
       if (SupabaseService.isConfigured && widget.orderId != null) {
-        await SupabaseService.client
-            .from('orders')
-            .update({
-              'payment_status': 'paid',
-              'updated_at': DateTime.now().toUtc().toIso8601String(),
-            })
-            .eq('id', widget.orderId!);
-
         // Refresh local orders cache
         await ref.read(orderProvider.notifier).loadOrders();
       }

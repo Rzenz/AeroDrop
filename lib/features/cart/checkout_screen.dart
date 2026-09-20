@@ -15,6 +15,8 @@ import '../../core/providers/auth_provider.dart';
 import '../../core/providers/location_provider.dart';
 import '../../core/providers/vendor_provider.dart';
 import '../../core/providers/weather_provider.dart';
+import '../payment/widgets/simulated_card_dialog.dart';
+import 'widgets/order_confirmation_dialog.dart';
 
 class CheckoutScreen extends ConsumerStatefulWidget {
   const CheckoutScreen({super.key});
@@ -176,14 +178,6 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                           icon: Icons.phone_android_rounded,
                           label: 'GCash',
                           color: const Color(0xFF007DC5),
-                          onChanged: (v) => setState(() => _paymentMethod = v!),
-                        ),
-                        _PaymentOption(
-                          value: 'cash',
-                          groupValue: _paymentMethod,
-                          icon: Icons.payments_outlined,
-                          label: 'Cash on Delivery',
-                          color: AppColors.success,
                           onChanged: (v) => setState(() => _paymentMethod = v!),
                         ),
                         _PaymentOption(
@@ -462,9 +456,35 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     }
 
     final totalAmount = cartNotifier.totalAmount + 20.0;
+    final dropoffName = _dropoffName() ?? 'Selected Campus Pad';
+    final paymentLabel = _paymentMethod == 'gcash' ? 'GCash' : 'Credit / Debit Card';
+
+    // 1. Show Pre-payment Confirmation Dialog (explaining cancellation rules)
+    final confirmed = await OrderConfirmationDialog.show(
+      context,
+      totalAmount: totalAmount,
+      paymentMethodLabel: paymentLabel,
+      dropoffName: dropoffName,
+    );
+
+    if (confirmed != true) {
+      if (mounted) setState(() => _placing = false);
+      return;
+    }
+
+    // 2. If Card is selected, open Simulated Card Entry Dialog
+    if (_paymentMethod == 'card') {
+      if (!mounted) return;
+      final cardResult = await SimulatedCardDialog.show(context, amount: totalAmount);
+      if (cardResult == null) {
+        if (mounted) setState(() => _placing = false);
+        return;
+      }
+    }
+
     final dbPaymentMethod = _paymentMethod == 'gcash'
         ? 'gcash_simulated'
-        : 'cash_on_delivery';
+        : 'card_simulated';
 
     final rawNotes = _notesController.text.trim();
     final notes = rawNotes.isNotEmpty ? rawNotes : null;

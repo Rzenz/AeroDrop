@@ -242,6 +242,16 @@ class _AdminDeliveriesScreenState extends ConsumerState<AdminDeliveriesScreen> {
                                                 maxLines: 1,
                                                 overflow: TextOverflow.ellipsis,
                                               ),
+                                              if (d.status == DeliveryStatus.cancelled) ...[
+                                                const SizedBox(height: 3),
+                                                Text(
+                                                  'Reason: ${d.cancellationReasonDisplay}',
+                                                  style: AppTextStyles.caption(
+                                                    fontSize: 11,
+                                                    color: AppColors.danger,
+                                                  ),
+                                                ),
+                                              ],
                                             ],
                                           ),
                                         ),
@@ -249,6 +259,7 @@ class _AdminDeliveriesScreenState extends ConsumerState<AdminDeliveriesScreen> {
                                           d.status == DeliveryStatus.pending
                                               ? 'Pending Admin Approval'
                                               : d.status.name,
+                                          noDroneDispatched: d.noDroneDispatched,
                                         ),
                                       ],
                                     ),

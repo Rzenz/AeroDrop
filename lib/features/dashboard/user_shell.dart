@@ -7,6 +7,7 @@ import 'widgets/aerodrop_bottom_navigation.dart';
 import '../../core/models/cart_model.dart';
 import '../../core/services/supabase_service.dart';
 import '../../core/providers/auth_provider.dart';
+import '../../core/providers/order_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_radii.dart';
 import '../../core/theme/app_spacing.dart';
@@ -222,6 +223,7 @@ class _UserShellState extends ConsumerState<UserShell>
   @override
   Widget build(BuildContext context) {
     final selected = _selectedIndex(context);
+    final activeOrdersCount = ref.watch(customerActiveOrdersCountProvider);
 
     return Scaffold(
       extendBody: true,
@@ -237,6 +239,7 @@ class _UserShellState extends ConsumerState<UserShell>
             builder: (context, cart, _) => AeroDropBottomNavigation(
               selectedIndex: selected,
               cartCount: cart.fold<int>(0, (sum, i) => sum + i.quantity),
+              ordersCount: activeOrdersCount,
               onTap: (index) => _onTap(index, context),
               onFabPressed: () {
                 _checkAccountStatus(); // Check account status

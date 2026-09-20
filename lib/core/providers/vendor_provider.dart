@@ -22,10 +22,18 @@ class VendorViewModel {
   final bool isActive;
   final List<String> categories;
   final double rating;
+  final int reviewCount;
   final int totalOrders;
 
   String get phone => phoneNumber;
   String get description => businessDescription ?? '';
+  bool get hasReviews => reviewCount > 0;
+  String get ratingDisplay => hasReviews ? rating.toStringAsFixed(1) : 'No reviews yet';
+  String get ratingLabel => hasReviews
+      ? '${rating.toStringAsFixed(1)} ($reviewCount ${reviewCount == 1 ? 'review' : 'reviews'})'
+      : 'No reviews yet';
+  String get shortRatingDisplay =>
+      hasReviews ? rating.toStringAsFixed(1) : 'New';
 
   const VendorViewModel({
     required this.id,
@@ -44,11 +52,12 @@ class VendorViewModel {
     this.isOpen = true,
     this.isActive = true,
     this.categories = const ['Food', 'Drinks', 'Snacks'],
-    this.rating = 4.5,
+    this.rating = 0.0,
+    this.reviewCount = 0,
     this.totalOrders = 0,
   });
 
-  factory VendorViewModel.fromMap(Map<String, dynamic> v) {
+  factory VendorViewModel.fromMap(Map<String, dynamic> v, {double rating = 0.0, int reviewCount = 0}) {
     final bizName = v['business_name']?.toString() ?? 'Vendor';
     final initials = bizName.length >= 2
         ? bizName.substring(0, 2).toUpperCase()
@@ -71,6 +80,8 @@ class VendorViewModel {
       campusLocationId: v['campus_location_id']?.toString(),
       building: locName,
       logoInitials: initials,
+      rating: rating,
+      reviewCount: reviewCount,
     );
   }
 }
@@ -123,9 +134,25 @@ class VendorNotifier extends StateNotifier<VendorState> {
 
       if (!mounted) return;
 
+      // Fetch dynamic ratings summaries
+      final Map<String, (double, int)> ratingsMap = {};
+      try {
+        final summaries = await _client.from('vendor_ratings_summary').select();
+        for (final s in summaries) {
+          final vId = s['vendor_id']?.toString();
+          if (vId != null) {
+            final avg = (s['average_rating'] as num?)?.toDouble() ?? 0.0;
+            final cnt = (s['review_count'] as num?)?.toInt() ?? 0;
+            ratingsMap[vId] = (avg, cnt);
+          }
+        }
+      } catch (_) {}
+
       final List<VendorViewModel> loaded = [];
       for (final v in vendorsRes) {
-        loaded.add(VendorViewModel.fromMap(v));
+        final vId = v['id'].toString();
+        final r = ratingsMap[vId] ?? (0.0, 0);
+        loaded.add(VendorViewModel.fromMap(v, rating: r.$1, reviewCount: r.$2));
       }
 
       state = VendorState(vendors: loaded, isLoading: false);

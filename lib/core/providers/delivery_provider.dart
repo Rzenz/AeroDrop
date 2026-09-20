@@ -393,6 +393,10 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
       currentAltitude: currentAlt,
       currentSpeed: currentSpd,
       batteryLevel: battLvl,
+      orderId: data['order_id']?.toString() ?? order['id']?.toString(),
+      cancellationReason: order['cancellation_reason']?.toString(),
+      noDroneDispatched: false,
+      orderStatus: order['order_status']?.toString(),
     );
   }
 
@@ -445,6 +449,103 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
             return _mapToDeliveryModel(data);
           })
           .toList();
+
+      if (isAdmin) {
+        try {
+          final deliveryOrderIds = deliveries
+              .map((d) => d.orderId)
+              .whereType<String>()
+              .toSet();
+
+          final cancelledOrdersRes = await SupabaseService.client
+              .from('orders')
+              .select('''
+                *,
+                vendor:users!vendor_id(full_name, business_name),
+                customer:users!user_id(full_name, phone_number),
+                campus_locations!delivery_location_id(name),
+                order_items(product_name, quantity, weight_grams)
+              ''')
+              .inFilter('order_status', ['cancelled', 'rejected'])
+              .order('created_at', ascending: false);
+
+          for (final ord in cancelledOrdersRes) {
+            final orderId = ord['id']?.toString();
+            if (orderId != null && !deliveryOrderIds.contains(orderId)) {
+              final customer =
+                  ord['customer'] as Map<String, dynamic>? ?? {};
+              final vendor = ord['vendor'] as Map<String, dynamic>? ?? {};
+              final location =
+                  ord['campus_locations'] as Map<String, dynamic>? ?? {};
+              final items = ord['order_items'] as List? ?? [];
+
+              String packageName = 'AeroDrop Package';
+              double packageWeight = 0.0;
+              if (items.isNotEmpty) {
+                final names = items
+                    .map(
+                      (i) =>
+                          '${i['product_name'] ?? ''} (x${i['quantity'] ?? 1})',
+                    )
+                    .where((n) => n.isNotEmpty)
+                    .toList();
+                packageName = names.join(', ');
+                int totalWeightGrams = 0;
+                for (final i in items) {
+                  final w = (i['weight_grams'] as num?)?.toInt() ?? 0;
+                  final q = (i['quantity'] as num?)?.toInt() ?? 1;
+                  totalWeightGrams += w * q;
+                }
+                packageWeight = totalWeightGrams / 1000.0;
+              }
+
+              final senderName =
+                  vendor['business_name']?.toString() ??
+                  vendor['full_name']?.toString() ??
+                  'Unknown Vendor';
+              final recipientName =
+                  customer['full_name']?.toString() ?? 'Unknown Customer';
+              final recipientPhone =
+                  customer['phone_number']?.toString() ?? '';
+              final deliveryAddress =
+                  location['name']?.toString() ?? 'UCLM Campus';
+              final cancellationReason =
+                  ord['cancellation_reason']?.toString() ?? 'customer';
+
+              deliveries.add(
+                DeliveryModel(
+                  id: orderId,
+                  orderId: orderId,
+                  senderName: senderName,
+                  recipientName: recipientName,
+                  recipientPhone: recipientPhone,
+                  deliveryAddress: deliveryAddress,
+                  packageName: packageName,
+                  packageWeight: packageWeight,
+                  packageType: 'Food',
+                  status: DeliveryStatus.cancelled,
+                  noDroneDispatched: true,
+                  cancellationReason: cancellationReason,
+                  orderStatus: ord['order_status']?.toString(),
+                  eta: 'N/A',
+                  createdAt: ord['created_at'] != null
+                      ? DateTime.tryParse(ord['created_at'].toString()) ??
+                          DateTime.now()
+                      : DateTime.now(),
+                  progress: 0.0,
+                  paymentAmount: (ord['total_amount'] as num?)?.toDouble(),
+                  pickupLocationName: senderName,
+                  dropoffLocationName: deliveryAddress,
+                ),
+              );
+            }
+          }
+        } catch (e) {
+          debugPrint('Error loading cancelled orders without delivery: $e');
+        }
+
+        deliveries.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      }
 
       state = deliveries;
     } catch (error) {
@@ -562,6 +663,100 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
       debugPrint('Fix cancel notification error: $e');
     }
   }
+  Future<void> _confirmPickup({
+    required DeliveryModel delivery,
+    required (double, double) vendorLoc,
+    required double batteryLevel,
+  }) async {
+    if (_confirmingPickupDeliveryIds.contains(delivery.id)) return;
+    _confirmingPickupDeliveryIds.add(delivery.id);
+
+    // Optimistically transition to inTransit with progress 0.0 immediately
+    state = state
+        .map(
+          (d) => d.id == delivery.id
+              ? d.copyWith(
+                  status: DeliveryStatus.inTransit,
+                  progress: 0.0,
+                  currentLatitude: vendorLoc.$1,
+                  currentLongitude: vendorLoc.$2,
+                  currentAltitude: 1.5,
+                  batteryLevel: batteryLevel,
+                )
+              : d,
+        )
+        .toList();
+
+    if (SupabaseService.isConfigured) {
+      try {
+        await SupabaseService.client.rpc(
+          'confirm_package_pickup',
+          params: {'p_delivery_id': delivery.id},
+        );
+      } catch (e) {
+        debugPrint('confirm_package_pickup RPC error: $e');
+        _confirmingPickupDeliveryIds.remove(delivery.id);
+      }
+    }
+
+    try {
+      ref.read(orderProvider.notifier).loadOrders();
+      ref.read(vendorOrdersProvider.notifier).loadOrders();
+      loadDeliveriesFromSupabase();
+    } catch (_) {}
+  }
+
+  Future<void> _completeDelivery({
+    required DeliveryModel delivery,
+    required (double, double) customerLoc,
+    required double batteryLevel,
+    required String droneUuid,
+  }) async {
+    if (_completingDeliveryIds.contains(delivery.id)) return;
+    _completingDeliveryIds.add(delivery.id);
+    _deliveryStartBatteries.remove(delivery.id);
+    _lastDeliveryIdForDrone[droneUuid] = delivery.id;
+    _leg3Origin[droneUuid] = customerLoc;
+    _leg3Progress[droneUuid] = 0.0;
+    _leg3StartBatteries[droneUuid] = batteryLevel;
+
+    // Optimistically transition to delivered with progress 1.0
+    state = state
+        .map(
+          (d) => d.id == delivery.id
+              ? d.copyWith(
+                  status: DeliveryStatus.delivered,
+                  progress: 1.0,
+                  currentLatitude: customerLoc.$1,
+                  currentLongitude: customerLoc.$2,
+                  currentAltitude: 0.0,
+                  batteryLevel: batteryLevel,
+                )
+              : d,
+        )
+        .toList();
+
+    if (SupabaseService.isConfigured) {
+      try {
+        await SupabaseService.client.rpc(
+          'complete_delivery_order',
+          params: {'p_delivery_id': delivery.id},
+        );
+      } catch (e) {
+        debugPrint('complete_delivery_order RPC error: $e');
+        _completingDeliveryIds.remove(delivery.id);
+      }
+    }
+
+    try {
+      ref.read(orderProvider.notifier).loadOrders();
+      ref.read(vendorOrdersProvider.notifier).loadOrders();
+      ref
+          .read(droneProvider.notifier)
+          .updateStatus('DRN-001', DroneStatus.returning);
+      loadDeliveriesFromSupabase();
+    } catch (_) {}
+  }
 
   void _startSimulation() {
     _simulationTimer?.cancel();
@@ -589,6 +784,10 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
       _completingReturnDroneIds.removeWhere((id) => dronesList.any(
             (d) => (d.id == id || d.dbId == id) && d.status != DroneStatus.returning,
           ));
+      _confirmingPickupDeliveryIds.removeWhere((id) =>
+          state.any((d) => d.id == id && d.status != DeliveryStatus.assigning));
+      _completingDeliveryIds.removeWhere((id) =>
+          state.any((d) => d.id == id && d.status == DeliveryStatus.delivered));
       final returningDrone = dronesList
           .where((d) =>
               d.status == DroneStatus.returning &&
@@ -654,7 +853,7 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
       for (final delivery in activeDeliveries) {
         if (_completingDeliveryIds.contains(delivery.id) ||
             delivery.status == DeliveryStatus.delivered ||
-            delivery.progress >= 1.0) {
+            delivery.status == DeliveryStatus.cancelled) {
           continue;
         }
 
@@ -684,219 +883,174 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
 
         if (delivery.status == DeliveryStatus.assigning) {
           // ── PHASE 1: PICKUP (Hub -> Vendor) ──
-          final currentLegProgress = delivery.progress.clamp(0.0, 1.0);
-          final newLegProgress = (currentLegProgress + stepLeg1).clamp(0.0, 1.0);
+          if (delivery.progress >= 1.0) {
+            // Recovery case: already reached 1.0, confirm pickup immediately without sending telemetry
+            await _confirmPickup(
+              delivery: delivery,
+              vendorLoc: vendorLoc,
+              batteryLevel: delivery.batteryLevel ?? 92.0,
+            );
+          } else {
+            final currentLegProgress = delivery.progress.clamp(0.0, 1.0);
+            final newLegProgress =
+                (currentLegProgress + stepLeg1).clamp(0.0, 1.0);
 
-          final lat = hub.$1 + (vendorLoc.$1 - hub.$1) * newLegProgress;
-          final lng = hub.$2 + (vendorLoc.$2 - hub.$2) * newLegProgress;
-          final alt = newLegProgress > 0.85 ? 1.5 : 15.0;
+            final lat = hub.$1 + (vendorLoc.$1 - hub.$1) * newLegProgress;
+            final lng = hub.$2 + (vendorLoc.$2 - hub.$2) * newLegProgress;
+            final alt = newLegProgress > 0.85 ? 1.5 : 15.0;
 
-          final startBattery = _deliveryStartBatteries[delivery.id] ?? 98.0;
-          final newBattery = (startBattery - (batteryDrainPerLeg * newLegProgress)).clamp(
-            0.0,
-            100.0,
-          );
+            final startBattery = _deliveryStartBatteries[delivery.id] ?? 98.0;
+            final newBattery =
+                (startBattery - (batteryDrainPerLeg * newLegProgress))
+                    .clamp(0.0, 100.0);
 
-          _lastDeliveryIdForDrone[droneUuid] = delivery.id;
-          _leg3Origin[droneUuid] = (lat, lng);
+            _lastDeliveryIdForDrone[droneUuid] = delivery.id;
+            _leg3Origin[droneUuid] = (lat, lng);
 
-          if (SupabaseService.isConfigured) {
-            SupabaseService.client
-                .rpc(
-                  'record_simulated_telemetry',
-                  params: {
-                    'p_delivery_id': delivery.id,
-                    'p_latitude': lat,
-                    'p_longitude': lng,
-                    'p_altitude': alt,
-                    'p_speed': speed,
-                    'p_battery_level': newBattery,
-                    'p_signal_strength': 98.0,
-                    'p_heading': 90.0,
-                    'p_event_type': 'traveling_to_pickup',
-                    'p_progress': newLegProgress,
-                  },
-                )
-                .catchError(
-                  (e) => debugPrint('Pickup telemetry RPC error: $e'),
-                );
+            if (newLegProgress >= 1.0) {
+              await _confirmPickup(
+                delivery: delivery,
+                vendorLoc: vendorLoc,
+                batteryLevel: newBattery,
+              );
+            } else {
+              if (SupabaseService.isConfigured) {
+                SupabaseService.client
+                    .rpc(
+                      'record_simulated_telemetry',
+                      params: {
+                        'p_delivery_id': delivery.id,
+                        'p_latitude': lat,
+                        'p_longitude': lng,
+                        'p_altitude': alt,
+                        'p_speed': speed,
+                        'p_battery_level': newBattery,
+                        'p_signal_strength': 98.0,
+                        'p_heading': 90.0,
+                        'p_event_type': 'traveling_to_pickup',
+                        'p_progress': newLegProgress,
+                      },
+                    )
+                    .catchError(
+                      (e) => debugPrint('Pickup telemetry RPC error: $e'),
+                    );
 
-            SupabaseService.client
-                .from('drones')
-                .update({'battery_level': newBattery})
-                .eq('id', droneUuid)
-                .catchError(
-                  (e) => debugPrint('Drone battery update error: $e'),
-                );
-          }
+                SupabaseService.client
+                    .from('drones')
+                    .update({'battery_level': newBattery})
+                    .eq('id', droneUuid)
+                    .catchError(
+                      (e) => debugPrint('Drone battery update error: $e'),
+                    );
+              }
 
-          if (newLegProgress >= 1.0) {
-            // Drone arrived at vendor! Idempotently confirm package pickup
-            if (!_confirmingPickupDeliveryIds.contains(delivery.id)) {
-              _confirmingPickupDeliveryIds.add(delivery.id);
-
-              // Optimistically transition to inTransit with progress 0.0 immediately
               state = state
                   .map(
                     (d) => d.id == delivery.id
                         ? d.copyWith(
-                            status: DeliveryStatus.inTransit,
-                            progress: 0.0,
-                            currentLatitude: vendorLoc.$1,
-                            currentLongitude: vendorLoc.$2,
-                            currentAltitude: 1.5,
+                            progress: newLegProgress,
+                            currentLatitude: lat,
+                            currentLongitude: lng,
+                            currentAltitude: alt,
+                            currentSpeed: speed,
                             batteryLevel: newBattery,
                           )
                         : d,
                   )
                   .toList();
-
-              if (SupabaseService.isConfigured) {
-                try {
-                  await SupabaseService.client.rpc(
-                    'confirm_package_pickup',
-                    params: {'p_delivery_id': delivery.id},
-                  );
-                } catch (e) {
-                  debugPrint('confirm_package_pickup RPC error: $e');
-                }
-              }
-
-              try {
-                ref.read(orderProvider.notifier).loadOrders();
-                ref.read(vendorOrdersProvider.notifier).loadOrders();
-                loadDeliveriesFromSupabase();
-              } catch (_) {}
             }
-          } else {
-            state = state
-                .map(
-                  (d) => d.id == delivery.id
-                      ? d.copyWith(
-                          progress: newLegProgress,
-                          currentLatitude: lat,
-                          currentLongitude: lng,
-                          currentAltitude: alt,
-                          currentSpeed: speed,
-                          batteryLevel: newBattery,
-                        )
-                      : d,
-                )
-                .toList();
           }
         } else if (delivery.status == DeliveryStatus.inTransit) {
           // ── PHASE 2: TRANSIT (Vendor -> Customer) ──
-          final currentLegProgress = delivery.progress.clamp(0.0, 1.0);
-          final newLegProgress = (currentLegProgress + stepLeg2).clamp(0.0, 1.0);
+          if (delivery.progress >= 1.0) {
+            // Recovery case: already reached 1.0, complete delivery immediately without sending telemetry
+            final fallbackStartBattery =
+                _deliveryStartBatteries[delivery.id] ??
+                    (98.0 - batteryDrainPerLeg);
+            final fallbackEndBattery =
+                (fallbackStartBattery - batteryDrainPerLeg).clamp(0.0, 100.0);
+            await _completeDelivery(
+              delivery: delivery,
+              customerLoc: customerLoc,
+              batteryLevel: delivery.batteryLevel ?? fallbackEndBattery,
+              droneUuid: droneUuid,
+            );
+          } else {
+            final currentLegProgress = delivery.progress.clamp(0.0, 1.0);
+            final newLegProgress =
+                (currentLegProgress + stepLeg2).clamp(0.0, 1.0);
 
-          final lat =
-              vendorLoc.$1 + (customerLoc.$1 - vendorLoc.$1) * newLegProgress;
-          final lng =
-              vendorLoc.$2 + (customerLoc.$2 - vendorLoc.$2) * newLegProgress;
-          final alt = newLegProgress > 0.85 ? 0.5 : 15.0;
+            final lat =
+                vendorLoc.$1 + (customerLoc.$1 - vendorLoc.$1) * newLegProgress;
+            final lng =
+                vendorLoc.$2 + (customerLoc.$2 - vendorLoc.$2) * newLegProgress;
+            final alt = newLegProgress > 0.85 ? 0.5 : 15.0;
 
-          final startBattery = _deliveryStartBatteries[delivery.id] ?? (98.0 - batteryDrainPerLeg);
-          final newBattery = (startBattery - (batteryDrainPerLeg * newLegProgress)).clamp(
-            0.0,
-            100.0,
-          );
+            final startBattery =
+                _deliveryStartBatteries[delivery.id] ??
+                    (98.0 - batteryDrainPerLeg);
+            final newBattery =
+                (startBattery - (batteryDrainPerLeg * newLegProgress))
+                    .clamp(0.0, 100.0);
 
-          _lastDeliveryIdForDrone[droneUuid] = delivery.id;
-          _leg3Origin[droneUuid] = (lat, lng);
+            _lastDeliveryIdForDrone[droneUuid] = delivery.id;
+            _leg3Origin[droneUuid] = (lat, lng);
 
-          if (newLegProgress >= 1.0) {
-            // Drone arrived at customer dropoff! Idempotently complete delivery
-            if (!_completingDeliveryIds.contains(delivery.id)) {
-              _completingDeliveryIds.add(delivery.id);
-              _deliveryStartBatteries.remove(delivery.id);
-              _lastDeliveryIdForDrone[droneUuid] = delivery.id;
-              _leg3Origin[droneUuid] = customerLoc;
-              _leg3Progress[droneUuid] = 0.0;
-              _leg3StartBatteries[droneUuid] = newBattery;
+            if (newLegProgress >= 1.0) {
+              await _completeDelivery(
+                delivery: delivery,
+                customerLoc: customerLoc,
+                batteryLevel: newBattery,
+                droneUuid: droneUuid,
+              );
+            } else {
+              // Only send in-flight telemetry while still active and uncompleted (newLegProgress < 1.0)
+              if (SupabaseService.isConfigured &&
+                  !_completingDeliveryIds.contains(delivery.id)) {
+                SupabaseService.client
+                    .rpc(
+                      'record_simulated_telemetry',
+                      params: {
+                        'p_delivery_id': delivery.id,
+                        'p_latitude': lat,
+                        'p_longitude': lng,
+                        'p_altitude': alt,
+                        'p_speed': speed,
+                        'p_battery_level': newBattery,
+                        'p_signal_strength': 98.0,
+                        'p_heading': 90.0,
+                        'p_event_type': 'in_flight',
+                        'p_progress': newLegProgress,
+                      },
+                    )
+                    .catchError(
+                      (e) => debugPrint('Transit telemetry RPC error: $e'),
+                    );
 
-              // Optimistically transition to delivered with progress 1.0
+                SupabaseService.client
+                    .from('drones')
+                    .update({'battery_level': newBattery})
+                    .eq('id', droneUuid)
+                    .catchError(
+                      (e) => debugPrint('Drone battery update error: $e'),
+                    );
+              }
+
               state = state
                   .map(
                     (d) => d.id == delivery.id
                         ? d.copyWith(
-                            status: DeliveryStatus.delivered,
-                            progress: 1.0,
-                            currentLatitude: customerLoc.$1,
-                            currentLongitude: customerLoc.$2,
-                            currentAltitude: 0.0,
+                            progress: newLegProgress,
+                            currentLatitude: lat,
+                            currentLongitude: lng,
+                            currentAltitude: alt,
+                            currentSpeed: speed,
                             batteryLevel: newBattery,
                           )
                         : d,
                   )
                   .toList();
-
-              if (SupabaseService.isConfigured) {
-                try {
-                  await SupabaseService.client.rpc(
-                    'complete_delivery_order',
-                    params: {'p_delivery_id': delivery.id},
-                  );
-                } catch (e) {
-                  debugPrint('complete_delivery_order RPC error: $e');
-                }
-              }
-
-              try {
-                ref.read(orderProvider.notifier).loadOrders();
-                ref.read(vendorOrdersProvider.notifier).loadOrders();
-                ref
-                    .read(droneProvider.notifier)
-                    .updateStatus('DRN-001', DroneStatus.returning);
-                loadDeliveriesFromSupabase();
-              } catch (_) {}
             }
-          } else {
-            // Only send in-flight telemetry while still active and uncompleted
-            if (SupabaseService.isConfigured &&
-                !_completingDeliveryIds.contains(delivery.id)) {
-              SupabaseService.client
-                  .rpc(
-                    'record_simulated_telemetry',
-                    params: {
-                      'p_delivery_id': delivery.id,
-                      'p_latitude': lat,
-                      'p_longitude': lng,
-                      'p_altitude': alt,
-                      'p_speed': speed,
-                      'p_battery_level': newBattery,
-                      'p_signal_strength': 98.0,
-                      'p_heading': 90.0,
-                      'p_event_type': 'in_flight',
-                      'p_progress': newLegProgress,
-                    },
-                  )
-                  .catchError(
-                    (e) => debugPrint('Transit telemetry RPC error: $e'),
-                  );
-
-              SupabaseService.client
-                  .from('drones')
-                  .update({'battery_level': newBattery})
-                  .eq('id', droneUuid)
-                  .catchError(
-                    (e) => debugPrint('Drone battery update error: $e'),
-                  );
-            }
-
-            state = state
-                .map(
-                  (d) => d.id == delivery.id
-                      ? d.copyWith(
-                          progress: newLegProgress,
-                          currentLatitude: lat,
-                          currentLongitude: lng,
-                          currentAltitude: alt,
-                          currentSpeed: speed,
-                          batteryLevel: newBattery,
-                        )
-                      : d,
-                )
-                .toList();
           }
         }
       }
@@ -1656,14 +1810,14 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
       final orderId = updatedResponse['order_id']?.toString() ??
           updatedResponse['orders']?['id']?.toString();
       if (orderId != null) {
-        await SupabaseService.client
-            .from('orders')
-            .update({
-              'order_status': 'cancelled',
-              'cancellation_reason': 'customer',
-              'updated_at': nowStr,
-            })
-            .eq('id', orderId);
+        try {
+          await SupabaseService.client.rpc(
+            'customer_cancel_order',
+            params: {'p_order_id': orderId},
+          );
+        } catch (e) {
+          debugPrint('customer_cancel_order RPC in cancelDeliveryRequest error: $e');
+        }
       }
 
       await _insertStatusLog(
@@ -1728,6 +1882,101 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
         return _mapToDeliveryModel(data);
       }).toList();
 
+      try {
+        final deliveryOrderIds = deliveries
+            .map((d) => d.orderId)
+            .whereType<String>()
+            .toSet();
+
+        final cancelledOrdersRes = await SupabaseService.client
+            .from('orders')
+            .select('''
+              *,
+              vendor:users!vendor_id(full_name, business_name),
+              customer:users!user_id(full_name, phone_number),
+              campus_locations!delivery_location_id(name),
+              order_items(product_name, quantity, weight_grams)
+            ''')
+            .inFilter('order_status', ['cancelled', 'rejected'])
+            .order('created_at', ascending: false);
+
+        for (final ord in cancelledOrdersRes) {
+          final orderId = ord['id']?.toString();
+          if (orderId != null && !deliveryOrderIds.contains(orderId)) {
+            final customer =
+                ord['customer'] as Map<String, dynamic>? ?? {};
+            final vendor = ord['vendor'] as Map<String, dynamic>? ?? {};
+            final location =
+                ord['campus_locations'] as Map<String, dynamic>? ?? {};
+            final items = ord['order_items'] as List? ?? [];
+
+            String packageName = 'AeroDrop Package';
+            double packageWeight = 0.0;
+            if (items.isNotEmpty) {
+              final names = items
+                  .map(
+                    (i) =>
+                        '${i['product_name'] ?? ''} (x${i['quantity'] ?? 1})',
+                  )
+                  .where((n) => n.isNotEmpty)
+                  .toList();
+              packageName = names.join(', ');
+              int totalWeightGrams = 0;
+              for (final i in items) {
+                final w = (i['weight_grams'] as num?)?.toInt() ?? 0;
+                final q = (i['quantity'] as num?)?.toInt() ?? 1;
+                totalWeightGrams += w * q;
+              }
+              packageWeight = totalWeightGrams / 1000.0;
+            }
+
+            final senderName =
+                vendor['business_name']?.toString() ??
+                vendor['full_name']?.toString() ??
+                'Unknown Vendor';
+            final recipientName =
+                customer['full_name']?.toString() ?? 'Unknown Customer';
+            final recipientPhone =
+                customer['phone_number']?.toString() ?? '';
+            final deliveryAddress =
+                location['name']?.toString() ?? 'UCLM Campus';
+            final cancellationReason =
+                ord['cancellation_reason']?.toString() ?? 'customer';
+
+            deliveries.add(
+              DeliveryModel(
+                id: orderId,
+                orderId: orderId,
+                senderName: senderName,
+                recipientName: recipientName,
+                recipientPhone: recipientPhone,
+                deliveryAddress: deliveryAddress,
+                packageName: packageName,
+                packageWeight: packageWeight,
+                packageType: 'Food',
+                status: DeliveryStatus.cancelled,
+                noDroneDispatched: true,
+                cancellationReason: cancellationReason,
+                orderStatus: ord['order_status']?.toString(),
+                eta: 'N/A',
+                createdAt: ord['created_at'] != null
+                    ? DateTime.tryParse(ord['created_at'].toString()) ??
+                        DateTime.now()
+                    : DateTime.now(),
+                progress: 0.0,
+                paymentAmount: (ord['total_amount'] as num?)?.toDouble(),
+                pickupLocationName: senderName,
+                dropoffLocationName: deliveryAddress,
+              ),
+            );
+          }
+        }
+      } catch (e) {
+        debugPrint('Error loading cancelled orders without delivery: $e');
+      }
+
+      deliveries.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
       state = deliveries;
       await refreshPendingDeliveriesCount();
     } catch (error) {
@@ -1736,26 +1985,7 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
   }
 
   Future<void> refreshPendingDeliveriesCount() async {
-    if (!SupabaseService.isConfigured) return;
-    final currentUser = SupabaseService.client.auth.currentUser;
-    if (currentUser == null) {
-      debugPrint('Refresh pending count skipped: no logged in user.');
-      ref.read(pendingDeliveriesCountProvider.notifier).state = 0;
-      return;
-    }
-
-    try {
-      final response = await SupabaseService.client
-          .from('deliveries')
-          .select('id')
-          .eq('status', 'pending');
-
-      if (!mounted) return;
-      final count = (response as List).length;
-      ref.read(pendingDeliveriesCountProvider.notifier).state = count;
-    } catch (e) {
-      debugPrint('Error refreshing pending deliveries count: $e');
-    }
+    // Computed reactively via pendingDeliveriesCountProvider from deliveryProvider.
   }
 
   void clearDeliveries() {
@@ -1763,9 +1993,17 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
   }
 }
 
-final pendingDeliveriesCountProvider = StateProvider<int>((ref) => 0);
+final pendingDeliveriesCountProvider = Provider<int>((ref) {
+  final deliveries = ref.watch(deliveryProvider);
+  return deliveries.where((d) =>
+    d.status == DeliveryStatus.pending ||
+    d.status == DeliveryStatus.assigning ||
+    d.status == DeliveryStatus.inTransit
+  ).length;
+});
 
 final deliveryProvider =
     StateNotifierProvider<DeliveryNotifier, List<DeliveryModel>>((ref) {
       return DeliveryNotifier(ref);
     });
+

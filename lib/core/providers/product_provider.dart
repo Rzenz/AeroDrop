@@ -75,6 +75,20 @@ class ProductNotifier extends StateNotifier<ProductState> {
 
       if (!mounted) return;
 
+      // Fetch dynamic product ratings summaries
+      final Map<String, (double, int)> ratingsMap = {};
+      try {
+        final summaries = await _client.from('product_ratings_summary').select();
+        for (final s in summaries) {
+          final pId = s['product_id']?.toString();
+          if (pId != null) {
+            final avg = (s['average_rating'] as num?)?.toDouble() ?? 0.0;
+            final cnt = (s['review_count'] as num?)?.toInt() ?? 0;
+            ratingsMap[pId] = (avg, cnt);
+          }
+        }
+      } catch (_) {}
+
       final List<ProductModel> loaded = [];
       final Set<String> catSet = {};
       for (final p in productsRes) {
@@ -106,9 +120,12 @@ class ProductNotifier extends StateNotifier<ProductState> {
             'Campus Vendor';
         final cat = p['category']?.toString() ?? 'Other';
         catSet.add(cat);
+        final pId = p['id'].toString();
+        final r = ratingsMap[pId] ?? (0.0, 0);
+
         loaded.add(
           ProductModel(
-            id: p['id'].toString(),
+            id: pId,
             vendorId: p['vendor_id']?.toString() ?? '',
             vendorName: vendorName,
             name: p['name']?.toString() ?? 'Item',
@@ -119,6 +136,8 @@ class ProductNotifier extends StateNotifier<ProductState> {
             weightKg: (((p['weight_grams'] as num?) ?? 0) / 1000.0),
             imageUrl: p['image_url']?.toString() ?? '',
             isAvailable: p['is_active'] as bool? ?? true,
+            rating: r.$1,
+            reviewCount: r.$2,
           ),
         );
       }

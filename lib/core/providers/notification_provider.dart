@@ -2,8 +2,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 import '../models/notification_model.dart';
-import '../config/simulation_config.dart';
-import '../../providers/mock/notification_mock_provider.dart';
 import '../services/supabase_service.dart';
 
 import 'auth_provider.dart';
@@ -26,29 +24,20 @@ class NotificationNotifier extends StateNotifier<List<NotificationModel>> {
       });
     }
 
-    if (kSimulationMode && ref != null) {
-      ref!.listen<List<NotificationModel>>(notificationMockProvider, (
-        previous,
-        next,
-      ) {
-        state = next;
-      }, fireImmediately: true);
-    } else {
-      if (SupabaseService.isConfigured) {
-        Future.microtask(() {
-          final u = SupabaseService.client.auth.currentUser;
-          if (u != null) {
-            _subscribeRealtime(u.id);
-          }
-          if (mounted) loadNotifications();
-        });
-      }
+    if (SupabaseService.isConfigured) {
+      Future.microtask(() {
+        final u = SupabaseService.client.auth.currentUser;
+        if (u != null) {
+          _subscribeRealtime(u.id);
+        }
+        if (mounted) loadNotifications();
+      });
     }
   }
 
   void _subscribeRealtime(String userId) {
     _unsubscribe();
-    if (!SupabaseService.isConfigured || kSimulationMode) return;
+    if (!SupabaseService.isConfigured) return;
 
     try {
       _subscription = SupabaseService.client
@@ -90,7 +79,6 @@ class NotificationNotifier extends StateNotifier<List<NotificationModel>> {
   }
 
   Future<void> loadNotifications() async {
-    if (kSimulationMode) return;
     if (!SupabaseService.isConfigured) return;
 
     final currentUser = SupabaseService.client.auth.currentUser;
@@ -122,11 +110,6 @@ class NotificationNotifier extends StateNotifier<List<NotificationModel>> {
   }
 
   Future<void> markAllAsRead() async {
-    if (kSimulationMode && ref != null) {
-      ref!.read(notificationMockProvider.notifier).markAllAsRead();
-      return;
-    }
-
     if (!SupabaseService.isConfigured) return;
     final currentUser = SupabaseService.client.auth.currentUser;
     if (currentUser == null) return;
@@ -151,11 +134,6 @@ class NotificationNotifier extends StateNotifier<List<NotificationModel>> {
   }
 
   Future<void> markOneAsRead(String notificationId) async {
-    if (kSimulationMode && ref != null) {
-      ref!.read(notificationMockProvider.notifier).markAsRead(notificationId);
-      return;
-    }
-
     if (!SupabaseService.isConfigured) return;
     final currentUser = SupabaseService.client.auth.currentUser;
     if (currentUser == null) return;
@@ -193,12 +171,7 @@ class NotificationNotifier extends StateNotifier<List<NotificationModel>> {
     state = [];
   }
 
-  // Support legacy manual add for mock data
   void addNotification(String title, String body) {
-    if (kSimulationMode && ref != null) {
-      ref!.read(notificationMockProvider.notifier).addNotification(title, body);
-      return;
-    }
     final newNtf = NotificationModel(
       id: 'ntf-${DateTime.now().millisecondsSinceEpoch}',
       userId: SupabaseService.client.auth.currentUser?.id ?? '',

@@ -68,6 +68,7 @@ class UserDashboardScreen extends ConsumerWidget {
               .loadDeliveriesFromSupabase();
           await ref.read(notificationProvider.notifier).loadNotifications();
           await ref.read(productProvider.notifier).loadProducts();
+          await ref.read(vendorProvider.notifier).loadVendors();
         },
         child: CustomScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -126,14 +127,37 @@ class UserDashboardScreen extends ConsumerWidget {
                       alignment: Alignment.center,
                       semanticLabel: 'Your profile',
                       onTap: () => context.go('/user/profile'),
-                      child: Text(
-                        firstName.isNotEmpty ? firstName[0].toUpperCase() : 'P',
-                        style: AppTextStyles.title(
-                          fontSize: 16,
-                          color: AppColors.bgDark,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
+                      child: user?.avatarUrl != null &&
+                              user!.avatarUrl!.isNotEmpty
+                          ? ClipRRect(
+                              borderRadius: BorderRadius.circular(22),
+                              child: Image.network(
+                                user.avatarUrl!,
+                                width: 44,
+                                height: 44,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, _, _) => Text(
+                                  firstName.isNotEmpty
+                                      ? firstName[0].toUpperCase()
+                                      : 'P',
+                                  style: AppTextStyles.title(
+                                    fontSize: 16,
+                                    color: AppColors.bgDark,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                            )
+                          : Text(
+                              firstName.isNotEmpty
+                                  ? firstName[0].toUpperCase()
+                                  : 'P',
+                              style: AppTextStyles.title(
+                                fontSize: 16,
+                                color: AppColors.bgDark,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
                     ),
                   ],
                 ),
@@ -243,16 +267,35 @@ class UserDashboardScreen extends ConsumerWidget {
                                               color: vendor.logoColor,
                                               borderRadius:
                                                   BorderRadius.circular(12),
+                                              image: vendor.businessLogoUrl !=
+                                                          null &&
+                                                      vendor.businessLogoUrl!
+                                                          .isNotEmpty
+                                                  ? DecorationImage(
+                                                      image: NetworkImage(
+                                                        vendor.businessLogoUrl!,
+                                                      ),
+                                                      fit: BoxFit.cover,
+                                                    )
+                                                  : null,
                                             ),
                                             alignment: Alignment.center,
-                                            child: Text(
-                                              vendor.logoInitials,
-                                              style: AppTextStyles.subHead(
-                                                fontSize: 15,
-                                                color: AppColors.textPrimary,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
+                                            child: vendor.businessLogoUrl !=
+                                                        null &&
+                                                    vendor.businessLogoUrl!
+                                                        .isNotEmpty
+                                                ? null
+                                                : Text(
+                                                    vendor.logoInitials,
+                                                    style: AppTextStyles
+                                                        .subHead(
+                                                      fontSize: 15,
+                                                      color: AppColors
+                                                          .textPrimary,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
+                                                  ),
                                           ),
                                           const SizedBox(width: 12),
                                           Expanded(

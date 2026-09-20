@@ -234,11 +234,20 @@ class _OtpEmailSentScreenState extends ConsumerState<OtpEmailSentScreen> {
         return;
       }
 
-      showNeuSnack(
-        context,
-        'Account verified successfully!',
-        tone: NeuToneKind.success,
-      );
+      final authError = ref.read(authProvider).errorMessage;
+      if (authError != null && authError.isNotEmpty) {
+        showNeuSnack(
+          context,
+          authError,
+          tone: NeuToneKind.info,
+        );
+      } else {
+        showNeuSnack(
+          context,
+          'Account verified successfully!',
+          tone: NeuToneKind.success,
+        );
+      }
 
       final user = ref.read(authProvider).user;
       final requestedRole = widget.role ?? ref.read(authProvider).pendingRole;

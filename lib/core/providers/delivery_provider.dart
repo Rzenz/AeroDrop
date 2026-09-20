@@ -6,8 +6,6 @@ import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 import '../models/delivery_model.dart';
 import 'drone_provider.dart';
 import '../models/drone_model.dart';
-import '../config/simulation_config.dart';
-import '../../providers/mock/delivery_mock_provider.dart';
 import '../services/supabase_service.dart';
 import 'notification_provider.dart';
 import 'auth_provider.dart';
@@ -39,20 +37,14 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
       }
     });
 
-    if (kSimulationMode) {
-      ref.listen<List<DeliveryModel>>(deliveryMockProvider, (previous, next) {
-        state = next;
-      }, fireImmediately: true);
-    } else {
-      Future.microtask(() {
-        if (mounted) loadDeliveriesFromSupabase();
-      });
-      Future.microtask(() {
-        if (mounted) refreshPendingDeliveriesCount();
-      });
-      _subscribeRealtime();
-      _startSimulation();
-    }
+    Future<void>.microtask(() {
+      if (mounted) loadDeliveriesFromSupabase();
+    });
+    Future<void>.microtask(() {
+      if (mounted) refreshPendingDeliveriesCount();
+    });
+    _subscribeRealtime();
+    _startSimulation();
   }
 
   void _subscribeRealtime() {
@@ -382,7 +374,6 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
   }
 
   Future<void> loadDeliveriesFromSupabase() async {
-    if (kSimulationMode) return;
     if (!SupabaseService.isConfigured) return;
 
     final currentUser = SupabaseService.client.auth.currentUser;
@@ -869,21 +860,6 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
     double? dropoffLongitude,
     double estimatedDistanceKm = 0.0,
   }) async {
-    if (kSimulationMode) {
-      ref
-          .read(deliveryMockProvider.notifier)
-          .createDelivery(
-            senderName: senderName,
-            recipientName: recipientName,
-            recipientPhone: recipientPhone,
-            deliveryAddress: deliveryAddress,
-            packageName: packageName,
-            packageWeight: packageWeight,
-            packageType: packageType,
-          );
-      return null;
-    }
-
     if (packageWeight <= 0) {
       return 'Please enter a valid package weight.';
     }
@@ -1102,13 +1078,6 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
     DeliveryStatus status, {
     String? droneId,
   }) {
-    if (kSimulationMode) {
-      ref
-          .read(deliveryMockProvider.notifier)
-          .updateDeliveryStatus(id, status, droneId: droneId);
-      return;
-    }
-
     state = state.map((delivery) {
       if (delivery.id == id) {
         return delivery.copyWith(
@@ -1368,16 +1337,6 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
     String deliveryId, {
     String reason = 'Cancelled by user',
   }) async {
-    if (kSimulationMode) {
-      state = state.map((d) {
-        if (d.id == deliveryId) {
-          return d.copyWith(status: DeliveryStatus.cancelled);
-        }
-        return d;
-      }).toList();
-      return null;
-    }
-
     if (!SupabaseService.isConfigured) return 'Supabase is not configured';
 
     final currentUser = SupabaseService.client.auth.currentUser;
@@ -1452,7 +1411,6 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
   }
 
   Future<void> loadAdminDeliveriesFromSupabase() async {
-    if (kSimulationMode) return;
     if (!SupabaseService.isConfigured) return;
     final currentUser = SupabaseService.client.auth.currentUser;
     if (currentUser == null) {
@@ -1493,13 +1451,6 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
   }
 
   Future<void> refreshPendingDeliveriesCount() async {
-    if (kSimulationMode) {
-      final count = state
-          .where((d) => d.status == DeliveryStatus.pending)
-          .length;
-      ref.read(pendingDeliveriesCountProvider.notifier).state = count;
-      return;
-    }
     if (!SupabaseService.isConfigured) return;
     final currentUser = SupabaseService.client.auth.currentUser;
     if (currentUser == null) {

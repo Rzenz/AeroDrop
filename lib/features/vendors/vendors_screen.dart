@@ -162,15 +162,25 @@ class _VendorCard extends StatelessWidget {
               decoration: BoxDecoration(
                 color: vendor.logoColor,
                 borderRadius: BorderRadius.circular(14),
+                image: vendor.businessLogoUrl != null &&
+                        vendor.businessLogoUrl!.isNotEmpty
+                    ? DecorationImage(
+                        image: NetworkImage(vendor.businessLogoUrl!),
+                        fit: BoxFit.cover,
+                      )
+                    : null,
               ),
               alignment: Alignment.center,
-              child: Text(
-                vendor.logoInitials,
-                style: AppTextStyles.heading(
-                  fontSize: 20,
-                  color: AppColors.textPrimary,
-                ),
-              ),
+              child: vendor.businessLogoUrl != null &&
+                      vendor.businessLogoUrl!.isNotEmpty
+                  ? null
+                  : Text(
+                      vendor.logoInitials,
+                      style: AppTextStyles.heading(
+                        fontSize: 20,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
             ),
             const SizedBox(width: 14),
 

@@ -7,7 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/neu_card.dart';
-import '../../mock_data/products_mock.dart';
+import '../../core/models/product_model.dart';
 import '../../core/providers/product_provider.dart';
 
 class VendorProductsScreen extends ConsumerStatefulWidget {
@@ -22,7 +22,7 @@ class _VendorProductsScreenState extends ConsumerState<VendorProductsScreen> {
   String _search = '';
   String _category = 'All';
 
-  List<MockProduct> _getFiltered(List<MockProduct> products) {
+  List<ProductModel> _getFiltered(List<ProductModel> products) {
     return products.where((p) {
       final matchSearch =
           _search.isEmpty ||
@@ -247,7 +247,7 @@ class _VendorProductsScreenState extends ConsumerState<VendorProductsScreen> {
     );
   }
 
-  void _showDeleteDialog(BuildContext context, MockProduct product) {
+  void _showDeleteDialog(BuildContext context, ProductModel product) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -299,7 +299,7 @@ class _VendorProductsScreenState extends ConsumerState<VendorProductsScreen> {
 }
 
 class VendorProductCard extends StatelessWidget {
-  final MockProduct product;
+  final ProductModel product;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 

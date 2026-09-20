@@ -4,20 +4,20 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:image_picker/image_picker.dart';
 
 void main() {
-  group('validateImageBytes & validateImage format tests', () {
+  group('checkImageBytes & checkImageFile format tests', () {
     test('accepts valid JPEG bytes and returns image/jpeg with .jpg', () async {
       final jpegBytes = Uint8List.fromList([
         0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0x01,
       ]);
 
-      final syncResult = validateImageBytes(jpegBytes);
+      final syncResult = checkImageBytes(jpegBytes);
       expect(syncResult.isValid, isTrue);
       expect(syncResult.mimeType, 'image/jpeg');
       expect(syncResult.fileExtension, '.jpg');
       expect(syncResult.errorMessage, isNull);
 
       final file = XFile.fromData(jpegBytes, name: 'photo.jpeg');
-      final asyncResult = await validateImage(file);
+      final asyncResult = await checkImageFile(file);
       expect(asyncResult.isValid, isTrue);
       expect(asyncResult.mimeType, 'image/jpeg');
       expect(asyncResult.fileExtension, '.jpg');
@@ -28,14 +28,14 @@ void main() {
         0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D,
       ]);
 
-      final syncResult = validateImageBytes(pngBytes);
+      final syncResult = checkImageBytes(pngBytes);
       expect(syncResult.isValid, isTrue);
       expect(syncResult.mimeType, 'image/png');
       expect(syncResult.fileExtension, '.png');
       expect(syncResult.errorMessage, isNull);
 
       final file = XFile.fromData(pngBytes, name: 'graphic.png');
-      final asyncResult = await validateImage(file);
+      final asyncResult = await checkImageFile(file);
       expect(asyncResult.isValid, isTrue);
       expect(asyncResult.mimeType, 'image/png');
     });
@@ -48,14 +48,14 @@ void main() {
         0x56, 0x50, 0x38, 0x20, // 'VP8 '
       ]);
 
-      final syncResult = validateImageBytes(webpBytes);
+      final syncResult = checkImageBytes(webpBytes);
       expect(syncResult.isValid, isTrue);
       expect(syncResult.mimeType, 'image/webp');
       expect(syncResult.fileExtension, '.webp');
       expect(syncResult.errorMessage, isNull);
 
       final file = XFile.fromData(webpBytes, name: 'banner.webp');
-      final asyncResult = await validateImage(file);
+      final asyncResult = await checkImageFile(file);
       expect(asyncResult.isValid, isTrue);
       expect(asyncResult.mimeType, 'image/webp');
     });
@@ -65,7 +65,7 @@ void main() {
         0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0x01, 0x00, 0x01, 0x00, 0x80, 0x00,
       ]);
 
-      final syncResult = validateImageBytes(gifBytes);
+      final syncResult = checkImageBytes(gifBytes);
       expect(syncResult.isValid, isFalse);
       expect(
         syncResult.errorMessage,
@@ -74,7 +74,7 @@ void main() {
 
       // Even if disguised as .jpg or .png extension, magic bytes detect and reject GIF
       final file = XFile.fromData(gifBytes, name: 'disguised_animation.jpg');
-      final asyncResult = await validateImage(file);
+      final asyncResult = await checkImageFile(file);
       expect(asyncResult.isValid, isFalse);
       expect(
         asyncResult.errorMessage,
@@ -87,7 +87,7 @@ void main() {
         0x47, 0x49, 0x46, 0x38, 0x37, 0x61, 0x01, 0x00, 0x01, 0x00,
       ]);
 
-      final result = validateImageBytes(gif87Bytes);
+      final result = checkImageBytes(gif87Bytes);
       expect(result.isValid, isFalse);
       expect(
         result.errorMessage,
@@ -101,7 +101,7 @@ void main() {
       final bmpBytes = Uint8List.fromList([0x42, 0x4D, 0x36, 0x00, 0x00, 0x00]); // BM
 
       for (final bytes in [randomBytes, pdfBytes, bmpBytes, Uint8List(0)]) {
-        final result = validateImageBytes(bytes);
+        final result = checkImageBytes(bytes);
         expect(result.isValid, isFalse);
         expect(
           result.errorMessage,
@@ -115,11 +115,48 @@ void main() {
       const maxAllowed = 5 * 1024 * 1024;
       final oversizedBytes = Uint8List(maxAllowed + 1);
 
-      final result = validateImageBytes(oversizedBytes);
+      final result = checkImageBytes(oversizedBytes);
       expect(result.isValid, isFalse);
       expect(
         result.errorMessage,
         'Image is too large. Please choose an image under 5 MB.',
+      );
+    });
+  });
+
+  group('ImageUtils static wrapper delegation tests', () {
+    test('ImageUtils.validateImageBytes delegates correctly without recursion', () {
+      final jpegBytes = Uint8List.fromList([
+        0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0x01,
+      ]);
+      final result = ImageUtils.validateImageBytes(jpegBytes);
+      expect(result.isValid, isTrue);
+      expect(result.mimeType, 'image/jpeg');
+      expect(result.fileExtension, '.jpg');
+
+      final invalid = ImageUtils.validateImageBytes(Uint8List.fromList([1, 2, 3]));
+      expect(invalid.isValid, isFalse);
+    });
+
+    test('ImageUtils.validateImage delegates correctly without recursion', () async {
+      final pngBytes = Uint8List.fromList([
+        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D,
+      ]);
+      final file = XFile.fromData(pngBytes, name: 'test.png');
+      final result = await ImageUtils.validateImage(file);
+      expect(result.isValid, isTrue);
+      expect(result.mimeType, 'image/png');
+      expect(result.fileExtension, '.png');
+
+      final invalidFile = XFile.fromData(
+        Uint8List.fromList([0x47, 0x49, 0x46, 0x38]),
+        name: 'test.gif',
+      );
+      final invalidResult = await ImageUtils.validateImage(invalidFile);
+      expect(invalidResult.isValid, isFalse);
+      expect(
+        invalidResult.errorMessage,
+        "GIF images aren't supported. Please choose a JPG, PNG, or WebP image.",
       );
     });
   });

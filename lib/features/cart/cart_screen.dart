@@ -8,7 +8,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/neu_card.dart';
-import '../../mock_data/cart_mock.dart';
+import '../../core/models/cart_model.dart';
 import '../../core/providers/product_provider.dart';
 
 class CartScreen extends ConsumerWidget {

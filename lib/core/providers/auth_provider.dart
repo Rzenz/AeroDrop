@@ -28,15 +28,15 @@ bool isValidEmail(String email) {
   try {
     normalizeEmail(email);
     return true;
-  } on FormatException {
+  } catch (_) {
     return false;
   }
 }
 
 String normalizePhoneNumber(String phone) {
-  final clean = phone.trim().replaceAll(RegExp(r'[\s\-\(\)\.]'), '');
+  final clean = phone.replaceAll(RegExp(r'[\s\-()]'), '');
   if (clean.isEmpty) {
-    throw const FormatException('Phone number cannot be empty');
+    throw const FormatException('Phone number cannot be empty.');
   }
   if (clean.startsWith('+')) {
     if (clean.length < 10 || clean.length > 16) {
@@ -144,6 +144,7 @@ class AuthState {
   final String? pendingEmail;
   final String? pendingPhone;
   final String? pendingRole;
+  final XFile? pendingLogoFile;
 
   const AuthState({
     this.user,
@@ -156,6 +157,7 @@ class AuthState {
     this.pendingEmail,
     this.pendingPhone,
     this.pendingRole,
+    this.pendingLogoFile,
   });
 
   AuthState copyWith({
@@ -169,6 +171,8 @@ class AuthState {
     String? pendingEmail,
     String? pendingPhone,
     String? pendingRole,
+    XFile? pendingLogoFile,
+    bool clearPendingLogo = false,
     bool clearErrorMessage = false,
   }) {
     return AuthState(
@@ -182,6 +186,7 @@ class AuthState {
       pendingEmail: pendingEmail ?? this.pendingEmail,
       pendingPhone: pendingPhone ?? this.pendingPhone,
       pendingRole: pendingRole ?? this.pendingRole,
+      pendingLogoFile: clearPendingLogo ? null : (pendingLogoFile ?? this.pendingLogoFile),
     );
   }
 }
@@ -590,7 +595,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final sessionCreated = response.session != null;
       if (sessionCreated && logoFile != null) {
         try {
-          final validation = await validateImage(logoFile);
+          final validation = await ImageUtils.validateImage(logoFile);
           if (validation.isValid) {
             final bytes = await logoFile.readAsBytes();
             final ext = validation.fileExtension ?? '.png';
@@ -607,14 +612,17 @@ class AuthNotifier extends StateNotifier<AuthState> {
                   ),
                 );
 
-            final logoUrl = SupabaseService.client.storage
+            final baseLogoUrl = SupabaseService.client.storage
                 .from('vendor-logos')
                 .getPublicUrl(storagePath);
+            final logoUrl =
+                '$baseLogoUrl?v=${DateTime.now().millisecondsSinceEpoch}';
 
             await SupabaseService.client
                 .from('users')
                 .update({'business_logo_url': logoUrl})
-                .eq('id', authUser.id);
+                .eq('id', authUser.id)
+                .select();
           }
         } catch (storageError) {
           debugPrint(
@@ -632,6 +640,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         pendingEmail: normalizedEmail,
         pendingPhone: normalizedPhone,
         pendingRole: requestedRole,
+        pendingLogoFile: logoFile,
         errorMessage: null,
       );
 
@@ -738,6 +747,55 @@ class AuthNotifier extends StateNotifier<AuthState> {
         throw const AuthException('Invalid verification code.');
       }
 
+      String? uploadedLogoUrl;
+      String? logoUploadWarning;
+
+      final pendingLogo = state.pendingLogoFile;
+      if (pendingLogo != null) {
+        try {
+          final validation = await ImageUtils.validateImage(pendingLogo);
+          if (validation.isValid) {
+            final bytes = await pendingLogo.readAsBytes();
+            final ext = validation.fileExtension ?? '.png';
+            final storagePath = '${authUser.id}/business_logo$ext';
+
+            await SupabaseService.client.storage
+                .from('vendor-logos')
+                .uploadBinary(
+                  storagePath,
+                  bytes,
+                  fileOptions: FileOptions(
+                    contentType: validation.mimeType,
+                    upsert: true,
+                  ),
+                );
+
+            final baseLogoUrl = SupabaseService.client.storage
+                .from('vendor-logos')
+                .getPublicUrl(storagePath);
+            uploadedLogoUrl =
+                '$baseLogoUrl?v=${DateTime.now().millisecondsSinceEpoch}';
+
+            final updateRes = await SupabaseService.client
+                .from('users')
+                .update({'business_logo_url': uploadedLogoUrl})
+                .eq('id', authUser.id)
+                .select();
+
+            if (updateRes.isEmpty) {
+              debugPrint('Warning: business_logo_url update returned empty result');
+            }
+          } else {
+            logoUploadWarning =
+                "Account verified, but your store logo couldn't be uploaded. You can add it from your store profile.";
+          }
+        } catch (logoErr) {
+          debugPrint('Error uploading pending registration business logo: $logoErr');
+          logoUploadWarning =
+              "Account verified, but your store logo couldn't be uploaded. You can add it from your store profile.";
+        }
+      }
+
       // Fetch public.users record
       final userRow = await SupabaseService.client
           .from('users')
@@ -745,7 +803,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
           .eq('id', authUser.id)
           .maybeSingle();
 
-      final aeroUser = userRow != null
+      var aeroUser = userRow != null
           ? AeroDropUser.fromMap(Map<String, dynamic>.from(userRow))
           : AeroDropUser(
               id: authUser.id,
@@ -754,14 +812,20 @@ class AuthNotifier extends StateNotifier<AuthState> {
               role: state.pendingRole ?? 'user',
             );
 
+      if (uploadedLogoUrl != null) {
+        aeroUser = aeroUser.copyWith(businessLogoUrl: uploadedLogoUrl);
+      }
+
       state = state.copyWith(
         user: aeroUser,
         isLoading: false,
         requiresVerification: false,
         isVerified: true,
         sessionUnlocked: true,
-        errorMessage: null,
+        clearPendingLogo: true,
+        errorMessage: logoUploadWarning,
       );
+
       return true;
     } catch (e) {
       debugPrint('Registration verifyOTP failed: $e');
@@ -989,7 +1053,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       String? avatarUrl;
 
       if (logoFile != null) {
-        final validation = await validateImage(logoFile);
+        final validation = await ImageUtils.validateImage(logoFile);
         if (!validation.isValid) {
           state = state.copyWith(
             isLoading: false,
@@ -1014,18 +1078,29 @@ class AuthNotifier extends StateNotifier<AuthState> {
               ),
             );
 
-        avatarUrl = SupabaseService.client.storage
+        final baseAvatarUrl = SupabaseService.client.storage
             .from('avatars')
             .getPublicUrl(storagePath);
+        avatarUrl = '$baseAvatarUrl?v=${DateTime.now().millisecondsSinceEpoch}';
       }
 
-      await SupabaseService.client
+      final updateRes = await SupabaseService.client
           .from('users')
           .update({
             'avatar_url': avatarUrl,
             'updated_at': DateTime.now().toUtc().toIso8601String(),
           })
-          .eq('id', userId);
+          .eq('id', userId)
+          .select();
+
+      if (updateRes.isEmpty) {
+        state = state.copyWith(
+          isLoading: false,
+          errorMessage:
+              'Unable to update profile photo. Permission denied or account not found.',
+        );
+        return false;
+      }
 
       state = state.copyWith(
         user: logoFile == null
@@ -1034,6 +1109,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         isLoading: false,
         errorMessage: null,
       );
+
       return true;
     } catch (error) {
       debugPrint('Avatar update failed: $error');
@@ -1058,7 +1134,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       String? logoUrl;
 
       if (logoFile != null) {
-        final validation = await validateImage(logoFile);
+        final validation = await ImageUtils.validateImage(logoFile);
         if (!validation.isValid) {
           state = state.copyWith(
             isLoading: false,
@@ -1083,18 +1159,29 @@ class AuthNotifier extends StateNotifier<AuthState> {
               ),
             );
 
-        logoUrl = SupabaseService.client.storage
+        final baseLogoUrl = SupabaseService.client.storage
             .from('vendor-logos')
             .getPublicUrl(storagePath);
+        logoUrl = '$baseLogoUrl?v=${DateTime.now().millisecondsSinceEpoch}';
       }
 
-      await SupabaseService.client
+      final updateRes = await SupabaseService.client
           .from('users')
           .update({
             'business_logo_url': logoUrl,
             'updated_at': DateTime.now().toUtc().toIso8601String(),
           })
-          .eq('id', userId);
+          .eq('id', userId)
+          .select();
+
+      if (updateRes.isEmpty) {
+        state = state.copyWith(
+          isLoading: false,
+          errorMessage:
+              'Unable to update store logo. Permission denied or account not found.',
+        );
+        return false;
+      }
 
       state = state.copyWith(
         user: logoFile == null
@@ -1103,6 +1190,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         isLoading: false,
         errorMessage: null,
       );
+
       return true;
     } catch (error) {
       debugPrint('Business logo update failed: $error');

@@ -7,7 +7,7 @@ import 'package:flutter/services.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_radii.dart';
 import '../theme/app_shadows.dart';
-import '../../mock_data/cart_mock.dart';
+import '../models/cart_model.dart';
 import 'neu_surface.dart';
 
 /// Where an item should fly to when it is added.

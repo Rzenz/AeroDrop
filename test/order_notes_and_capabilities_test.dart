@@ -291,6 +291,45 @@ void main() {
       },
     );
   });
+
+  group('Vendor Logo & AuthState Registration Logo Tests', () {
+    test('AuthState preserves and clears pendingLogoFile properly', () {
+      final state1 = const AuthState();
+      expect(state1.pendingLogoFile, isNull);
+
+      final state2 = state1.copyWith(
+        pendingEmail: 'vendor@example.com',
+        pendingRole: 'vendor',
+      );
+      expect(state2.pendingEmail, 'vendor@example.com');
+      expect(state2.pendingRole, 'vendor');
+      expect(state2.pendingLogoFile, isNull);
+
+      final state3 = state2.copyWith(clearPendingLogo: true);
+      expect(state3.pendingLogoFile, isNull);
+    });
+
+    test('UserModel deserializes business_logo_url and supports cache query params', () {
+      final map = {
+        'id': 'v-123',
+        'email': 'vendor@shop.com',
+        'full_name': 'Vendor Shop',
+        'role': 'vendor',
+        'vendor_status': 'active',
+        'account_status': 'active',
+        'business_logo_url': 'https://storage.supabase.co/vendor-logos/v-123/logo.png?v=1700000000',
+      };
+
+      final user = UserModel.fromMap(map);
+      expect(user.businessLogoUrl, 'https://storage.supabase.co/vendor-logos/v-123/logo.png?v=1700000000');
+
+      final updated = user.copyWith(businessLogoUrl: 'https://storage.supabase.co/vendor-logos/v-123/logo.png?v=1700000001');
+      expect(updated.businessLogoUrl, 'https://storage.supabase.co/vendor-logos/v-123/logo.png?v=1700000001');
+
+      final cleared = updated.copyWith(clearBusinessLogo: true);
+      expect(cleared.businessLogoUrl, isNull);
+    });
+  });
 }
 
 class _FakeAuthNotifier extends AuthNotifier {

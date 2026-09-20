@@ -7,7 +7,7 @@ import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/neu_card.dart';
 import '../../core/providers/vendor_provider.dart';
 import '../../core/services/supabase_service.dart';
-import '../../mock_data/products_mock.dart';
+import '../../core/models/product_model.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/widgets/neu_back_button.dart';
 import '../../core/widgets/cart_button.dart';
@@ -25,7 +25,7 @@ class _VendorDetailsScreenState extends ConsumerState<VendorDetailsScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tab;
   VendorViewModel? _vendor;
-  List<MockProduct> _products = [];
+  List<ProductModel> _products = [];
   bool _loading = true;
   String? _error;
 
@@ -79,10 +79,10 @@ class _VendorDetailsScreenState extends ConsumerState<VendorDetailsScreen>
           .eq('vendor_id', widget.vendorId)
           .eq('is_active', true);
 
-      final List<MockProduct> products = [];
+      final List<ProductModel> products = [];
       for (final p in productsRes) {
         products.add(
-          MockProduct(
+          ProductModel(
             id: p['id'].toString(),
             vendorId: p['vendor_id'].toString(),
             vendorName: vendor.businessName,
@@ -432,7 +432,7 @@ class _InfoRow extends StatelessWidget {
 }
 
 class _ProductCard extends StatelessWidget {
-  final MockProduct product;
+  final ProductModel product;
   final VoidCallback onTap;
 
   const _ProductCard({required this.product, required this.onTap});

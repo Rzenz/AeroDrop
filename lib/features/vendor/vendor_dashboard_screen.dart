@@ -184,14 +184,28 @@ class VendorDashboardScreen extends ConsumerWidget {
                           child: CircleAvatar(
                             radius: 18,
                             backgroundColor: AppColors.accent,
-                            child: Text(
-                              initials,
-                              style: AppTextStyles.title(
-                                fontSize: 12,
-                                color: AppColors.bgDark,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
+                            backgroundImage: vendor['business_logo_url'] !=
+                                        null &&
+                                    vendor['business_logo_url']
+                                        .toString()
+                                        .isNotEmpty
+                                ? NetworkImage(
+                                    vendor['business_logo_url'].toString(),
+                                  )
+                                : null,
+                            child: vendor['business_logo_url'] != null &&
+                                    vendor['business_logo_url']
+                                        .toString()
+                                        .isNotEmpty
+                                ? null
+                                : Text(
+                                    initials,
+                                    style: AppTextStyles.title(
+                                      fontSize: 12,
+                                      color: AppColors.bgDark,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
                           ),
                         ),
                       ],

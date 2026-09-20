@@ -6,8 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
-import '../../mock_data/products_mock.dart';
-import '../../mock_data/cart_mock.dart';
+import '../../core/models/product_model.dart';
+import '../../core/models/cart_model.dart';
 import '../../core/providers/product_provider.dart';
 import '../../core/services/supabase_service.dart';
 import '../../core/theme/app_spacing.dart';
@@ -37,7 +37,7 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
   ///
   /// When the hero has scrolled out from under the pinned bar there is no box
   /// to measure and the flight is skipped — the toast still appears.
-  void _flyProduct(MockProduct product) {
+  void _flyProduct(ProductModel product) {
     final box = _heroKey.currentContext?.findRenderObject() as RenderBox?;
     final origin = box == null || !box.hasSize
         ? null
@@ -78,7 +78,7 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
     );
   }
 
-  MockProduct? _directProduct;
+  ProductModel? _directProduct;
   bool _fetching = false;
 
   @override
@@ -129,7 +129,7 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
             'Campus Vendor';
         final cat = res['category']?.toString() ?? 'Other';
         setState(() {
-          _directProduct = MockProduct(
+          _directProduct = ProductModel(
             id: res!['id'].toString(),
             vendorId: res['vendor_id']?.toString() ?? '',
             vendorName: vendorName,

@@ -14,6 +14,7 @@ import '../../core/widgets/custom_app_bar.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/providers/location_provider.dart';
 import '../../core/providers/vendor_provider.dart';
+import '../../core/providers/product_provider.dart';
 import '../../core/utils/image_utils.dart';
 import '../auth/presentation/controllers/register_controller.dart';
 import '../../core/constants/vendor_categories.dart';
@@ -62,6 +63,14 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         final success = await ref
             .read(authProvider.notifier)
             .updateAvatar(image);
+        if (success) {
+          try {
+            ref.invalidate(vendorProvider);
+            ref.invalidate(productProvider);
+          } catch (e) {
+            debugPrint('Provider refresh failed after avatar update: $e');
+          }
+        }
         setState(() => _uploadingAvatar = false);
 
         if (mounted) {
@@ -116,6 +125,14 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     if (confirm == true && mounted) {
       setState(() => _uploadingAvatar = true);
       final success = await ref.read(authProvider.notifier).updateAvatar(null);
+      if (success) {
+        try {
+          ref.invalidate(vendorProvider);
+          ref.invalidate(productProvider);
+        } catch (e) {
+          debugPrint('Provider refresh failed after avatar removal: $e');
+        }
+      }
       setState(() => _uploadingAvatar = false);
 
       if (mounted) {
@@ -279,7 +296,11 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       );
 
       if (success) {
-        ref.invalidate(vendorProvider);
+        try {
+          ref.invalidate(vendorProvider);
+        } catch (e) {
+          debugPrint('Provider refresh failed after profile update: $e');
+        }
         if (context.mounted) {
           context.pop(true);
         }

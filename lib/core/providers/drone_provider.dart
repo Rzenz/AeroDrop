@@ -2,9 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../config/simulation_config.dart';
 import '../models/drone_model.dart';
-import '../../providers/mock/drone_mock_provider.dart';
 import '../services/supabase_service.dart';
 
 // ── Notifier ──────────────────────────────────────────────────────────────────
@@ -14,15 +12,9 @@ class DroneNotifier extends StateNotifier<List<DroneModel>> {
   String? _resolvedDroneId;
 
   DroneNotifier(this.ref) : super([]) {
-    if (kSimulationMode && ref != null) {
-      ref!.listen<List<DroneModel>>(droneMockProvider, (previous, next) {
-        state = next;
-      }, fireImmediately: true);
-    } else {
-      Future.microtask(() {
-        if (mounted) loadDronesFromSupabase();
-      });
-    }
+    Future.microtask(() {
+      if (mounted) loadDronesFromSupabase();
+    });
   }
 
   double _toDouble(dynamic value, [double fallback = 0.0]) {
@@ -62,7 +54,6 @@ class DroneNotifier extends StateNotifier<List<DroneModel>> {
   }
 
   Future<void> loadDronesFromSupabase() async {
-    if (kSimulationMode) return;
     if (!SupabaseService.isConfigured) return;
     final authUser = SupabaseService.client.auth.currentUser;
     if (authUser == null) {
@@ -126,10 +117,6 @@ class DroneNotifier extends StateNotifier<List<DroneModel>> {
 
   Future<String?> editDroneInSupabase(DroneModel drone) async {
     if (drone.id != 'DRN-001') return 'Editing other drones is not permitted.';
-    if (kSimulationMode) {
-      state = [drone];
-      return null;
-    }
     if (!SupabaseService.isConfigured) return 'Supabase is not configured.';
     final authUser = SupabaseService.client.auth.currentUser;
     if (authUser == null) return 'You must be logged in.';
@@ -167,16 +154,6 @@ class DroneNotifier extends StateNotifier<List<DroneModel>> {
   }
 
   Future<String?> rechargeDrone(String droneId) async {
-    if (kSimulationMode) {
-      state = state
-          .map(
-            (d) => d.id == droneId
-                ? d.copyWith(batteryLevel: 100.0, status: DroneStatus.available)
-                : d,
-          )
-          .toList();
-      return null;
-    }
     if (!SupabaseService.isConfigured) return 'Supabase is not configured.';
     final authUser = SupabaseService.client.auth.currentUser;
     if (authUser == null) return 'You must be logged in.';
@@ -214,20 +191,12 @@ class DroneNotifier extends StateNotifier<List<DroneModel>> {
   void deleteDrone(String id) => deleteDroneFromSupabase(id);
 
   void updateBattery(String id, double level) {
-    if (kSimulationMode && ref != null) {
-      ref!.read(droneMockProvider.notifier).updateBattery(id, level);
-      return;
-    }
     state = state
         .map((d) => d.id == id ? d.copyWith(batteryLevel: level) : d)
         .toList();
   }
 
   void updateStatus(String id, DroneStatus status) {
-    if (kSimulationMode && ref != null) {
-      ref!.read(droneMockProvider.notifier).updateStatus(id, status);
-      return;
-    }
     state = state
         .map((d) => d.id == id ? d.copyWith(status: status) : d)
         .toList();
@@ -250,10 +219,6 @@ class DroneNotifier extends StateNotifier<List<DroneModel>> {
   }
 
   void updateCoordinates(String id, String coords) {
-    if (kSimulationMode && ref != null) {
-      ref!.read(droneMockProvider.notifier).updateCoordinates(id, coords);
-      return;
-    }
     state = state
         .map((d) => d.id == id ? d.copyWith(currentCoordinates: coords) : d)
         .toList();

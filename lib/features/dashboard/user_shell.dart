@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'widgets/aerodrop_bottom_navigation.dart';
-import '../../mock_data/cart_mock.dart';
+import '../../core/models/cart_model.dart';
 import '../../core/services/supabase_service.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/theme/app_colors.dart';

@@ -40,7 +40,7 @@ class ImageValidationResult {
       );
 }
 
-ImageValidationResult validateImageBytes(Uint8List bytes) {
+ImageValidationResult checkImageBytes(Uint8List bytes) {
   const maxBytes = 5 * 1024 * 1024; // 5 MB
   if (bytes.length > maxBytes) {
     return ImageValidationResult.invalid(
@@ -107,10 +107,10 @@ ImageValidationResult validateImageBytes(Uint8List bytes) {
   );
 }
 
-Future<ImageValidationResult> validateImage(XFile file) async {
+Future<ImageValidationResult> checkImageFile(XFile file) async {
   try {
     final bytes = await file.readAsBytes();
-    return validateImageBytes(bytes);
+    return checkImageBytes(bytes);
   } catch (e) {
     return ImageValidationResult.invalid(
       'Unsupported image format. Please choose a JPG, PNG, or WebP image.',
@@ -120,10 +120,10 @@ Future<ImageValidationResult> validateImage(XFile file) async {
 
 class ImageUtils {
   static ImageValidationResult validateImageBytes(Uint8List bytes) =>
-      validateImageBytes(bytes);
+      checkImageBytes(bytes);
 
   static Future<ImageValidationResult> validateImage(XFile file) =>
-      validateImage(file);
+      checkImageFile(file);
 
   static Future<XFile?> pickAndCropImage({
     BuildContext? context,
@@ -146,7 +146,7 @@ class ImageUtils {
 
     if (picked == null) return null;
 
-    final initialValidation = await validateImage(picked);
+    final initialValidation = await checkImageFile(picked);
     if (!initialValidation.isValid) {
       if (context != null && context.mounted) {
         showNeuSnack(
@@ -175,7 +175,7 @@ class ImageUtils {
 
       if (croppedBytes == null) return null;
 
-      final cropValidation = validateImageBytes(croppedBytes);
+      final cropValidation = checkImageBytes(croppedBytes);
       if (!cropValidation.isValid) {
         if (context.mounted) {
           showNeuSnack(

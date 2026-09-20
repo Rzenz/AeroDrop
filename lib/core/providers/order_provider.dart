@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
-import '../../mock_data/cart_mock.dart';
+import '../models/cart_model.dart';
 import '../services/supabase_service.dart';
 import '../models/order_model.dart';
 import 'auth_provider.dart';

@@ -1,11 +1,11 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../mock_data/products_mock.dart';
+import '../models/product_model.dart';
 import '../services/supabase_service.dart';
 import 'auth_provider.dart';
 
 class ProductState {
-  final List<MockProduct> products;
+  final List<ProductModel> products;
   final List<String> categories;
   final bool isLoading;
   final String? errorMessage;
@@ -75,7 +75,7 @@ class ProductNotifier extends StateNotifier<ProductState> {
 
       if (!mounted) return;
 
-      final List<MockProduct> loaded = [];
+      final List<ProductModel> loaded = [];
       final Set<String> catSet = {};
       for (final p in productsRes) {
         final vendorMap = p['users'] as Map<String, dynamic>?;
@@ -107,7 +107,7 @@ class ProductNotifier extends StateNotifier<ProductState> {
         final cat = p['category']?.toString() ?? 'Other';
         catSet.add(cat);
         loaded.add(
-          MockProduct(
+          ProductModel(
             id: p['id'].toString(),
             vendorId: p['vendor_id']?.toString() ?? '',
             vendorName: vendorName,
@@ -222,13 +222,13 @@ class VendorProductsNotifier extends StateNotifier<ProductState> {
 
       if (!mounted) return;
 
-      final List<MockProduct> loaded = [];
+      final List<ProductModel> loaded = [];
       final Set<String> catSet = {};
       for (final p in productsRes) {
         final cat = p['category']?.toString() ?? 'Other';
         catSet.add(cat);
         loaded.add(
-          MockProduct(
+          ProductModel(
             id: p['id'].toString(),
             vendorId: p['vendor_id'].toString(),
             vendorName: user.businessName ?? user.fullName,

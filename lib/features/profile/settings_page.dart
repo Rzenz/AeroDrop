@@ -12,7 +12,6 @@ import '../../core/widgets/neu_list_tile.dart';
 import '../../core/widgets/neu_text_field.dart';
 import '../../core/widgets/custom_app_bar.dart';
 import '../../core/widgets/spring_switch.dart';
-import '../../core/config/simulation_config.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/providers/settings_provider.dart';
 
@@ -46,10 +45,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             AppSpacing.xxl,
           ),
           children: [
-            if (kSimulationMode) ...[
-              _buildRoleSwitcherTile(),
-              const SizedBox(height: AppSpacing.lg),
-            ],
             NeuTileGroup(
               label: 'Preferences',
               children: [
@@ -143,39 +138,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ],
         ),
       ),
-    );
-  }
-
-  /// Developer-only role switch, shown when the app runs in simulation mode.
-  Widget _buildRoleSwitcherTile() {
-    final user = ref.watch(authProvider).user;
-    final isAdmin = user?.isAdmin == true;
-
-    return NeuTileGroup(
-      label: 'Simulation controls',
-      children: [
-        NeuListTile(
-          icon: isAdmin
-              ? Icons.admin_panel_settings_outlined
-              : Icons.person_outline_rounded,
-          title: 'Switch developer role',
-          subtitle: 'Current role: ${isAdmin ? "Admin" : "User"}',
-          iconColor: AppColors.accentText,
-          trailing: Text(
-            isAdmin ? 'To user' : 'To admin',
-            style: AppTextStyles.label(
-              fontSize: 12,
-              color: AppColors.primaryText,
-            ),
-          ),
-          onTap: () {
-            HapticFeedback.mediumImpact();
-            final target = isAdmin ? 'user' : 'admin';
-            ref.read(authProvider.notifier).switchRole(target);
-            context.go(target == 'admin' ? '/admin' : '/user');
-          },
-        ),
-      ],
     );
   }
 

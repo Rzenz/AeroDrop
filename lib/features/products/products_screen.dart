@@ -9,7 +9,7 @@ import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/custom_app_bar.dart';
 import '../../core/widgets/neu_card.dart';
-import '../../mock_data/products_mock.dart';
+import '../../core/models/product_model.dart';
 import '../../core/providers/product_provider.dart';
 import '../../core/widgets/cart_button.dart';
 
@@ -24,7 +24,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
   String _search = '';
   String _category = 'All';
 
-  List<MockProduct> _getFiltered(List<MockProduct> products) {
+  List<ProductModel> _getFiltered(List<ProductModel> products) {
     return products.where((p) {
       final matchSearch =
           _search.isEmpty ||
@@ -174,7 +174,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
 class _ProductGridCard extends StatelessWidget {
   const _ProductGridCard({required this.product, required this.onTap});
 
-  final MockProduct product;
+  final ProductModel product;
   final VoidCallback onTap;
 
   static const double _imageHeight = 118;

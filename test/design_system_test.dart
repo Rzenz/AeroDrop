@@ -29,7 +29,7 @@ import 'package:aerodrop/features/auth/register_screen.dart';
 import 'package:aerodrop/features/auth/welcome_screen.dart';
 import 'package:aerodrop/core/widgets/cart_button.dart';
 import 'package:aerodrop/core/widgets/receipt_printer.dart';
-import 'package:aerodrop/mock_data/cart_mock.dart';
+import 'package:aerodrop/core/models/cart_model.dart';
 import 'package:aerodrop/features/orders/receipt_screen.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/material.dart';

@@ -6,6 +6,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/glass_card.dart';
+import '../../core/widgets/neu_back_button.dart';
 import '../../core/providers/settings_provider.dart';
 
 class AdminSettingsScreen extends ConsumerStatefulWidget {
@@ -37,22 +38,40 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Screen Title
-            Text(
-              'System Settings',
-              style: AppTextStyles.title(
-                fontSize: 22,
-                fontWeight: FontWeight.w900,
-                color: isDark ? Colors.white : AppColors.textPrimaryLight,
-              ),
-            ),
-            Text(
-              'Configure global parameters and fleet defaults',
-              style: AppTextStyles.body(
-                fontSize: 13,
-                color: isDark
-                    ? AppColors.textSecondaryDark
-                    : AppColors.textSecondaryLight,
-              ),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const NeuBackButton(
+                  fallbackRoute: '/admin',
+                  color: AppColors.cardDark,
+                  iconColor: Colors.white,
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'System Settings',
+                        style: AppTextStyles.title(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w900,
+                          color: isDark ? Colors.white : AppColors.textPrimaryLight,
+                        ),
+                      ),
+                      Text(
+                        'Configure global parameters and fleet defaults',
+                        style: AppTextStyles.body(
+                          fontSize: 13,
+                          color: isDark
+                              ? AppColors.textSecondaryDark
+                              : AppColors.textSecondaryLight,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 24),
 

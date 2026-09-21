@@ -248,7 +248,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                   TextButton.icon(
                     onPressed: () {
                       if (hasActiveDelivery) {
-                        context.go(
+                        context.push(
                           '/admin/deliveries/details?id=${activeDelivery.id}',
                         );
                       } else {
@@ -278,7 +278,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                         : 'Campus Drone Radar • Standby'),
                 onTapDetails: () {
                   if (hasActiveDelivery) {
-                    context.go(
+                    context.push(
                       '/admin/deliveries/details?id=${activeDelivery.id}',
                     );
                   } else {
@@ -503,7 +503,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
               ...deliveries.take(3).toList().asMap().entries.map((e) {
                 return DeliveryCard(
                       delivery: e.value,
-                      onTap: () => context.go(
+                      onTap: () => context.push(
                         '/admin/deliveries/details?id=${e.value.id}',
                       ),
                     )

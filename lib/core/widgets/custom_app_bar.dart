@@ -17,6 +17,9 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.action,
     this.showBackButton = true,
     this.onBackPressed,
+    this.fallbackRoute,
+    this.color,
+    this.iconColor,
   });
 
   final String title;
@@ -24,15 +27,15 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   final Widget? action;
   final bool showBackButton;
   final VoidCallback? onBackPressed;
+  final String? fallbackRoute;
+  final Color? color;
+  final Color? iconColor;
 
   @override
   Size get preferredSize => Size.fromHeight(subtitle == null ? 68 : 78);
 
   @override
   Widget build(BuildContext context) {
-    final canPop =
-        showBackButton && (onBackPressed != null || Navigator.canPop(context));
-
     return SafeArea(
       bottom: false,
       child: Padding(
@@ -42,8 +45,13 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
         ),
         child: Row(
           children: [
-            if (canPop) ...[
-              NeuBackButton(onPressed: onBackPressed),
+            if (showBackButton) ...[
+              NeuBackButton(
+                onPressed: onBackPressed,
+                fallbackRoute: fallbackRoute,
+                color: color,
+                iconColor: iconColor,
+              ),
               const SizedBox(width: AppSpacing.sm),
             ],
             Expanded(

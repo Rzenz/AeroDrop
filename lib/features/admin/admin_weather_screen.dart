@@ -6,6 +6,7 @@ import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/custom_text_field.dart';
 import '../../core/widgets/glass_card.dart';
 import '../../core/widgets/custom_button.dart';
+import '../../core/widgets/neu_back_button.dart';
 import '../../core/providers/weather_provider.dart';
 
 class AdminWeatherScreen extends ConsumerStatefulWidget {
@@ -254,6 +255,11 @@ class _AdminWeatherScreenState extends ConsumerState<AdminWeatherScreen> {
       appBar: AppBar(
         backgroundColor: AppColors.bgDark,
         elevation: 0,
+        leading: const NeuBackButton(
+          fallbackRoute: '/admin',
+          color: AppColors.cardDark,
+          iconColor: Colors.white,
+        ),
         title: Text(
           'Campus Weather Controls',
           style: AppTextStyles.subHead(fontSize: 18, color: Colors.white),

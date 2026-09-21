@@ -11,6 +11,7 @@ import '../../core/widgets/glass_card.dart';
 import '../../core/models/drone_model.dart';
 import '../../core/providers/drone_provider.dart';
 import '../../core/providers/settings_provider.dart';
+import '../../core/widgets/neu_back_button.dart';
 
 class AdminDronesScreen extends ConsumerWidget {
   const AdminDronesScreen({super.key});
@@ -57,20 +58,38 @@ class AdminDronesScreen extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Fleet Management',
-                      style: AppTextStyles.title(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.white,
-                      ),
-                    ),
-                    Text(
-                      'Control and monitor the AeroDrop drone network',
-                      style: AppTextStyles.body(
-                        fontSize: 13,
-                        color: AppColors.textSecondaryDark,
-                      ),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const NeuBackButton(
+                          fallbackRoute: '/admin',
+                          color: AppColors.cardDark,
+                          iconColor: Colors.white,
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Fleet Management',
+                                style: AppTextStyles.title(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w900,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              Text(
+                                'Control and monitor the AeroDrop drone network',
+                                style: AppTextStyles.body(
+                                  fontSize: 13,
+                                  color: AppColors.textSecondaryDark,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 20),
                     // Dashboard cards row

@@ -8,6 +8,7 @@ import '../../core/widgets/loading_skeleton.dart';
 import '../../core/widgets/status_chip.dart';
 import '../../core/providers/delivery_provider.dart';
 import '../../core/models/delivery_model.dart';
+import '../../core/widgets/neu_back_button.dart';
 import 'package:go_router/go_router.dart';
 
 class AdminDeliveriesScreen extends ConsumerStatefulWidget {
@@ -112,12 +113,52 @@ class _AdminDeliveriesScreenState extends ConsumerState<AdminDeliveriesScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.bgDark,
-      body: Column(
-        children: [
-          // Filter chips
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+              child: Row(
+                children: [
+                  const NeuBackButton(
+                    fallbackRoute: '/admin',
+                    color: AppColors.cardDark,
+                    iconColor: Colors.white,
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Deliveries Dispatch',
+                          style: AppTextStyles.title(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                          ),
+                        ),
+                        Text(
+                          'Active flight missions and delivery assignments',
+                          style: AppTextStyles.body(
+                            fontSize: 13,
+                            color: AppColors.textSecondaryDark,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ).animate().fadeIn(),
+
+            // Filter chips
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
             child: Row(
               children: [
                 _filterChip(
@@ -349,8 +390,9 @@ class _AdminDeliveriesScreenState extends ConsumerState<AdminDeliveriesScreen> {
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 }
 
 Widget _filterChip(String label, bool sel, VoidCallback onTap, Color color) {

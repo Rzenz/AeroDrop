@@ -70,10 +70,24 @@ class NeuBackButton extends StatelessWidget {
       context.pop();
       return;
     }
-    if (fallback != null) {
+    if (fallback != null && fallback.isNotEmpty) {
       context.go(fallback);
       return;
     }
-    Navigator.maybePop(context);
+    try {
+      final path = GoRouterState.of(context).uri.path;
+      if (path.startsWith('/admin')) {
+        context.go('/admin');
+        return;
+      } else if (path.startsWith('/vendor')) {
+        context.go('/vendor');
+        return;
+      }
+    } catch (_) {}
+    try {
+      context.go('/user');
+    } catch (_) {
+      Navigator.maybePop(context);
+    }
   }
 }

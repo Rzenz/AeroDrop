@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -6,10 +8,13 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/analytics_card.dart';
 import '../../core/widgets/glass_card.dart';
+import '../../core/widgets/neu_back_button.dart';
+import '../../core/widgets/neu_feedback.dart';
 import '../../core/providers/delivery_provider.dart';
 import '../../core/providers/drone_provider.dart';
 import '../../core/models/delivery_model.dart';
 import '../../core/services/supabase_service.dart';
+import '../../core/services/analytics_export_service.dart';
 
 class AdminAnalyticsScreen extends ConsumerStatefulWidget {
   const AdminAnalyticsScreen({super.key});
@@ -214,21 +219,41 @@ class _AdminAnalyticsScreenState extends ConsumerState<AdminAnalyticsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Performance Analytics',
-                style: AppTextStyles.title(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white,
-                ),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const NeuBackButton(
+                    fallbackRoute: '/admin',
+                    color: AppColors.cardDark,
+                    iconColor: Colors.white,
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Performance Analytics',
+                          style: AppTextStyles.title(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                          ),
+                        ),
+                        Text(
+                          'Real-time system telemetry and dispatch metrics',
+                          style: AppTextStyles.body(
+                            fontSize: 13,
+                            color: AppColors.textSecondaryDark,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  _buildExportButton(context),
+                ],
               ).animate().fadeIn(),
-              Text(
-                'Real-time system telemetry and dispatch metrics',
-                style: AppTextStyles.body(
-                  fontSize: 13,
-                  color: AppColors.textSecondaryDark,
-                ),
-              ).animate().fadeIn(delay: 100.ms),
 
               const SizedBox(height: 24),
 
@@ -634,5 +659,516 @@ class _AdminAnalyticsScreenState extends ConsumerState<AdminAnalyticsScreen> {
       return AppColors.danger;
     }
     return AppColors.success;
+  }
+
+  Widget _buildExportButton(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.accent,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.accent.withValues(alpha: 0.25),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _showExportDialog(context),
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.file_download_outlined,
+                  size: 18,
+                  color: AppColors.bgDark,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'Export',
+                  style: AppTextStyles.body(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.bgDark,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showExportDialog(BuildContext context) {
+    AnalyticsDateRange selectedRange = AnalyticsDateRange.last30Days();
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (dialogCtx, setDialogState) {
+            return AlertDialog(
+              backgroundColor: AppColors.cardDark,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+                side: const BorderSide(color: AppColors.borderDark),
+              ),
+              title: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.accent.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.analytics_outlined,
+                      color: AppColors.accent,
+                      size: 22,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Export Analytics Report',
+                          style: AppTextStyles.heading(
+                            fontSize: 18,
+                            color: Colors.white,
+                          ),
+                        ),
+                        Text(
+                          'Select date range and format',
+                          style: AppTextStyles.caption(
+                            fontSize: 11,
+                            color: AppColors.textSecondaryDark,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Date Range Filter',
+                      style: AppTextStyles.label(
+                        fontSize: 12,
+                        color: Colors.white70,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+
+                    // Preset chips
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _presetChip(
+                          label: 'Today',
+                          isSelected:
+                              selectedRange.preset == DateRangePreset.today,
+                          onTap: () {
+                            setDialogState(() {
+                              selectedRange = AnalyticsDateRange.today();
+                            });
+                          },
+                        ),
+                        _presetChip(
+                          label: 'Last 7 Days',
+                          isSelected:
+                              selectedRange.preset == DateRangePreset.last7Days,
+                          onTap: () {
+                            setDialogState(() {
+                              selectedRange = AnalyticsDateRange.last7Days();
+                            });
+                          },
+                        ),
+                        _presetChip(
+                          label: 'Last 30 Days',
+                          isSelected: selectedRange.preset ==
+                              DateRangePreset.last30Days,
+                          onTap: () {
+                            setDialogState(() {
+                              selectedRange = AnalyticsDateRange.last30Days();
+                            });
+                          },
+                        ),
+                        _presetChip(
+                          label: 'This Month',
+                          isSelected:
+                              selectedRange.preset == DateRangePreset.thisMonth,
+                          onTap: () {
+                            setDialogState(() {
+                              selectedRange = AnalyticsDateRange.thisMonth();
+                            });
+                          },
+                        ),
+                        _presetChip(
+                          label: selectedRange.preset == DateRangePreset.custom
+                              ? 'Custom: ${selectedRange.formattedRange}'
+                              : 'Custom...',
+                          isSelected:
+                              selectedRange.preset == DateRangePreset.custom,
+                          onTap: () async {
+                            final picked = await showDateRangePicker(
+                              context: context,
+                              firstDate: DateTime(2020),
+                              lastDate: DateTime.now().add(
+                                const Duration(days: 1),
+                              ),
+                              initialDateRange: DateTimeRange(
+                                start: selectedRange.startDate,
+                                end: selectedRange.endDate,
+                              ),
+                              builder: (context, child) {
+                                return Theme(
+                                  data: ThemeData.dark().copyWith(
+                                    colorScheme: const ColorScheme.dark(
+                                      primary: AppColors.accent,
+                                      onPrimary: AppColors.bgDark,
+                                      surface: AppColors.cardDark,
+                                      onSurface: Colors.white,
+                                    ),
+                                  ),
+                                  child: child!,
+                                );
+                              },
+                            );
+                            if (picked != null) {
+                              setDialogState(() {
+                                selectedRange = AnalyticsDateRange.custom(
+                                  picked.start,
+                                  picked.end,
+                                );
+                              });
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.bgDark.withValues(alpha: 0.6),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppColors.borderDark),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.calendar_today_rounded,
+                            size: 14,
+                            color: AppColors.accent,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Coverage: ${selectedRange.formattedRange}',
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 24),
+                    Text(
+                      'Choose Export Format',
+                      style: AppTextStyles.label(
+                        fontSize: 12,
+                        color: Colors.white70,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+
+                    // CSV Button
+                    InkWell(
+                      onTap: () {
+                        Navigator.of(dialogCtx).pop();
+                        _handleExport(context, selectedRange, isPdf: false);
+                      },
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.cardDark,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: AppColors.success.withValues(alpha: 0.5),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: AppColors.success.withValues(
+                                  alpha: 0.15,
+                                ),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(
+                                Icons.table_chart_rounded,
+                                color: AppColors.success,
+                                size: 20,
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Export CSV (.csv)',
+                                    style: AppTextStyles.title(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  Text(
+                                    'Summary, vendor split, and orders registry (UTF-8)',
+                                    style: AppTextStyles.caption(
+                                      fontSize: 10.5,
+                                      color: AppColors.textSecondaryDark,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const Icon(
+                              Icons.arrow_forward_ios_rounded,
+                              size: 14,
+                              color: Colors.white38,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 10),
+
+                    // PDF Button
+                    InkWell(
+                      onTap: () {
+                        Navigator.of(dialogCtx).pop();
+                        _handleExport(context, selectedRange, isPdf: true);
+                      },
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.cardDark,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: AppColors.accent.withValues(alpha: 0.5),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: AppColors.accent.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(
+                                Icons.picture_as_pdf_rounded,
+                                color: AppColors.accent,
+                                size: 20,
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Export PDF Document (.pdf)',
+                                    style: AppTextStyles.title(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  Text(
+                                    'Branded report with KPI cards, vendor metrics & tables',
+                                    style: AppTextStyles.caption(
+                                      fontSize: 10.5,
+                                      color: AppColors.textSecondaryDark,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const Icon(
+                              Icons.arrow_forward_ios_rounded,
+                              size: 14,
+                              color: Colors.white38,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogCtx).pop(),
+                  child: const Text(
+                    'Cancel',
+                    style: TextStyle(color: Colors.white60),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _presetChip({
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppColors.accent.withValues(alpha: 0.2)
+              : AppColors.bgDark,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isSelected ? AppColors.accent : AppColors.borderDark,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            color: isSelected ? AppColors.accent : Colors.white70,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _handleExport(
+    BuildContext context,
+    AnalyticsDateRange range, {
+    required bool isPdf,
+  }) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          backgroundColor: AppColors.cardDark,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          content: Row(
+            children: [
+              const SizedBox(
+                width: 28,
+                height: 28,
+                child: CircularProgressIndicator(
+                  color: AppColors.accent,
+                  strokeWidth: 2.5,
+                ),
+              ),
+              const SizedBox(width: 20),
+              Expanded(
+                child: Text(
+                  isPdf
+                      ? 'Compiling PDF analytics report...'
+                      : 'Generating CSV export...',
+                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    try {
+      final reportData = await AnalyticsExportService.fetchAnalyticsData(range);
+      final ext = isPdf ? 'pdf' : 'csv';
+      final fileName = 'aerodrop_analytics_${range.fileDateString}.$ext';
+      final mimeType = isPdf ? 'application/pdf' : 'text/csv';
+
+      Uint8List fileBytes;
+      if (isPdf) {
+        fileBytes = await AnalyticsExportService.generatePdf(reportData);
+      } else {
+        fileBytes = AnalyticsExportService.generateCsv(reportData);
+      }
+      if (!context.mounted) return;
+
+      Navigator.of(context, rootNavigator: true).pop(); // dismiss loading
+
+      final savedResult = await AnalyticsExportService.saveOrShareFile(
+        bytes: fileBytes,
+        fileName: fileName,
+        mimeType: mimeType,
+        context: context,
+      );
+
+      if (!context.mounted) return;
+
+      if (savedResult != null) {
+        final shortName = savedResult.contains(Platform.pathSeparator)
+            ? savedResult.split(Platform.pathSeparator).last
+            : savedResult;
+        showNeuSnack(
+          context,
+          'Analytics report saved: $shortName',
+          tone: NeuToneKind.success,
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        Navigator.of(context, rootNavigator: true).pop(); // dismiss loading
+        showNeuSnack(
+          context,
+          'Export failed: $e',
+          tone: NeuToneKind.error,
+        );
+      }
+    }
   }
 }

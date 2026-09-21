@@ -6,6 +6,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/glass_card.dart';
 import '../../core/widgets/neu_feedback.dart';
+import '../../core/widgets/neu_back_button.dart';
 import '../../core/services/supabase_service.dart';
 
 class AdminSupportScreen extends ConsumerStatefulWidget {
@@ -222,28 +223,36 @@ class _AdminSupportScreenState extends ConsumerState<AdminSupportScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Support & Inquiries',
-                                style: AppTextStyles.title(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.w900,
-                                  color: Colors.white,
+                          const NeuBackButton(
+                            fallbackRoute: '/admin',
+                            color: AppColors.cardDark,
+                            iconColor: Colors.white,
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Support & Inquiries',
+                                  style: AppTextStyles.title(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.w900,
+                                    color: Colors.white,
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                '$openCount open issue${openCount == 1 ? '' : 's'} needing attention',
-                                style: AppTextStyles.body(
-                                  fontSize: 13,
-                                  color: AppColors.textSecondaryDark,
+                                const SizedBox(height: 4),
+                                Text(
+                                  '$openCount open issue${openCount == 1 ? '' : 's'} needing attention',
+                                  style: AppTextStyles.body(
+                                    fontSize: 13,
+                                    color: AppColors.textSecondaryDark,
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),

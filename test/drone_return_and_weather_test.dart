@@ -142,12 +142,12 @@ void main() {
     });
 
     test('Return percentage from position calculation matches distance formula', () {
-      // Origin: (10.3156, 123.9016) [Dropoff point]
-      // Base Hub: (10.3168, 123.9010)
-      const originLat = 10.3156;
-      const originLng = 123.9016;
-      const baseLat = 10.3168;
-      const baseLng = 123.9010;
+      // Origin: (10.325633, 123.953770) [Dropoff point]
+      // Base Hub: (10.325152, 123.953046)
+      const originLat = 10.325633;
+      const originLng = 123.953770;
+      const baseLat = 10.325152;
+      const baseLng = 123.953046;
 
       final totalDist = (baseLat - originLat) * (baseLat - originLat) +
           (baseLng - originLng) * (baseLng - originLng);

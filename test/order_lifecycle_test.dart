@@ -247,7 +247,7 @@ void main() {
           'full_name': 'Erickson Doe',
           'phone_number': '09123456789',
         },
-        'campus_locations': {'name': 'Annex 1 Building'},
+        'campus_locations': {'name': 'Annex 2 Building'},
         'order_items': [
           {'product_name': 'Iced Latte', 'quantity': 2, 'unit_price': 60.0},
         ],
@@ -268,7 +268,7 @@ void main() {
       expect(order.id, 'b0000000-0000-0000-0000-000000000001');
       expect(order.vendorName, 'Aero Cafe');
       expect(order.customerName, 'Erickson Doe');
-      expect(order.dropoffLocationName, 'Annex 1 Building');
+      expect(order.dropoffLocationName, 'Annex 2 Building');
       expect(order.items.length, 1);
       expect(order.items.first.productName, 'Iced Latte');
       expect(order.items.first.quantity, 2);

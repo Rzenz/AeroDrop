@@ -53,7 +53,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     );
     final isOverweight = totalWeightGrams > 500;
     final totalWeightKg = (totalWeightGrams / 1000.0).toStringAsFixed(2);
-    final locationsAsync = ref.watch(campusLocationsProvider);
+    final locationsAsync = ref.watch(dropoffLocationsProvider);
     final weather = ref.watch(weatherProvider);
     final isGrounded = weather.isGrounded;
 
@@ -525,7 +525,8 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   /// through a transitive export, not a declared dependency, and would break
   /// the build the day that package stops re-exporting it.
   String? _dropoffName() {
-    final locations = ref.read(campusLocationsProvider).value;
+    final locations = ref.read(dropoffLocationsProvider).value ??
+        ref.read(campusLocationsProvider).value;
     if (locations == null) return null;
     for (final l in locations) {
       if (l.id == _selectedLocationId) return l.name;

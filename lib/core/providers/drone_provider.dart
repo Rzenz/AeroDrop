@@ -135,7 +135,7 @@ class DroneNotifier extends StateNotifier<List<DroneModel>> {
 
       if (!mounted) return;
 
-      String coords = '10.3156,123.9016';
+      String coords = '10.325152,123.953046';
       if (telemetryRes != null) {
         coords = '${telemetryRes['latitude']},${telemetryRes['longitude']}';
       }

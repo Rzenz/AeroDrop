@@ -38,41 +38,41 @@ final campusLocationsProvider = FutureProvider<List<CampusLocation>>((
       CampusLocation(
         id: '10000000-0000-0000-0000-000000000001',
         name: 'UCLM Main Building',
-        locationCode: 'OLD_MAIN',
-        latitude: 10.3456,
-        longitude: 123.9478,
+        locationCode: 'MAIN',
+        latitude: 10.325210,
+        longitude: 123.953201,
         isActive: true,
       ),
       CampusLocation(
         id: '10000000-0000-0000-0000-000000000002',
-        name: 'UCLM Annex 1',
-        locationCode: 'ANNEX_1',
-        latitude: 10.3460,
-        longitude: 123.9480,
+        name: 'UCLM Annex 2',
+        locationCode: 'ANNEX-2',
+        latitude: 10.325633,
+        longitude: 123.953770,
         isActive: true,
       ),
       CampusLocation(
         id: '10000000-0000-0000-0000-000000000003',
-        name: 'UCLM Annex 2',
-        locationCode: 'ANNEX_2',
-        latitude: 10.3452,
-        longitude: 123.9475,
+        name: 'UCLM Basic Education',
+        locationCode: 'BASIC-ED',
+        latitude: 10.325133,
+        longitude: 123.953853,
         isActive: true,
       ),
       CampusLocation(
         id: '10000000-0000-0000-0000-000000000004',
-        name: 'UCLM Basic Education',
-        locationCode: 'BASIC_ED',
-        latitude: 10.3465,
-        longitude: 123.9485,
+        name: 'UCLM Maritime Building',
+        locationCode: 'MARITIME',
+        latitude: 10.326184,
+        longitude: 123.954843,
         isActive: true,
       ),
       CampusLocation(
         id: '10000000-0000-0000-0000-000000000005',
-        name: 'UCLM Maritime Building',
-        locationCode: 'MARITIME',
-        latitude: 10.3448,
-        longitude: 123.9470,
+        name: 'Campus Base Hub',
+        locationCode: 'BASE-HUB',
+        latitude: 10.325152,
+        longitude: 123.953046,
         isActive: true,
       ),
     ];
@@ -85,4 +85,41 @@ final campusLocationsProvider = FutureProvider<List<CampusLocation>>((
   return (response as List)
       .map((item) => CampusLocation.fromMap(Map<String, dynamic>.from(item)))
       .toList();
+});
+
+/// Drop-off locations available to customers (excludes BASE-HUB as it is an operational hub).
+final dropoffLocationsProvider = FutureProvider<List<CampusLocation>>((
+  ref,
+) async {
+  final allLocations = await ref.watch(campusLocationsProvider.future);
+  return allLocations
+      .where(
+        (loc) =>
+            loc.isActive &&
+            loc.locationCode.toUpperCase() != 'BASE-HUB' &&
+            loc.locationCode.toUpperCase() != 'BASE_HUB' &&
+            !loc.name.toLowerCase().contains('base hub'),
+      )
+      .toList();
+});
+
+/// Resolves the campus Base Hub location from database, falling back safely to 10.325152, 123.953046.
+final baseHubLocationProvider = FutureProvider<CampusLocation>((
+  ref,
+) async {
+  final allLocations = await ref.watch(campusLocationsProvider.future);
+  return allLocations.firstWhere(
+    (loc) =>
+        loc.locationCode.toUpperCase() == 'BASE-HUB' ||
+        loc.locationCode.toUpperCase() == 'BASE_HUB' ||
+        loc.name.toLowerCase().contains('base hub'),
+    orElse: () => CampusLocation(
+      id: '10000000-0000-0000-0000-000000000005',
+      name: 'Campus Base Hub',
+      locationCode: 'BASE-HUB',
+      latitude: 10.325152,
+      longitude: 123.953046,
+      isActive: true,
+    ),
+  );
 });

@@ -23,6 +23,7 @@ import '../../core/utils/phone_input_formatter.dart';
 class CampusLocation {
   final String id;
   final String name;
+  final String locationCode;
   final String type;
   final String? building;
   final double latitude;
@@ -31,6 +32,7 @@ class CampusLocation {
   CampusLocation({
     required this.id,
     required this.name,
+    this.locationCode = '',
     required this.type,
     required this.latitude,
     required this.longitude,
@@ -41,6 +43,7 @@ class CampusLocation {
     return CampusLocation(
       id: map['id'].toString(),
       name: map['name']?.toString() ?? '',
+      locationCode: map['location_code']?.toString() ?? '',
       type: map['type']?.toString() ?? '',
       building: map['building']?.toString(),
       latitude: _toDouble(map['latitude']),
@@ -131,7 +134,14 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
           .toList();
 
       final pickups = locations;
-      final dropoffs = locations;
+      final dropoffs = locations
+          .where(
+            (loc) =>
+                loc.locationCode.toUpperCase() != 'BASE-HUB' &&
+                loc.locationCode.toUpperCase() != 'BASE_HUB' &&
+                !loc.name.toLowerCase().contains('base hub'),
+          )
+          .toList();
 
       if (!mounted) return;
 
@@ -216,36 +226,36 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
     final key = pId.compareTo(dId) < 0 ? '${pId}_$dId' : '${dId}_$pId';
 
     switch (key) {
-      case 'OLD_MAIN_ANNEX_1':
-      case 'ANNEX_1_OLD_MAIN':
-        return 0.04;
-      case 'OLD_MAIN_ANNEX_2':
-      case 'ANNEX_2_OLD_MAIN':
+      case 'MAIN_ANNEX_2':
+      case 'ANNEX_2_MAIN':
         return 0.075;
-      case 'OLD_MAIN_BASIC_ED':
-      case 'BASIC_ED_OLD_MAIN':
-        return 0.10;
-      case 'OLD_MAIN_MARITIME':
-      case 'MARITIME_OLD_MAIN':
-        return 0.125;
-      case 'ANNEX_1_ANNEX_2':
-      case 'ANNEX_2_ANNEX_1':
-        return 0.035;
-      case 'ANNEX_1_BASIC_ED':
-      case 'BASIC_ED_ANNEX_1':
-        return 0.08;
-      case 'ANNEX_1_MARITIME':
-      case 'MARITIME_ANNEX_1':
-        return 0.105;
+      case 'MAIN_BASIC_ED':
+      case 'BASIC_ED_MAIN':
+        return 0.072;
+      case 'MAIN_MARITIME':
+      case 'MARITIME_MAIN':
+        return 0.210;
+      case 'MAIN_BASE_HUB':
+      case 'BASE_HUB_MAIN':
+        return 0.020;
       case 'ANNEX_2_BASIC_ED':
       case 'BASIC_ED_ANNEX_2':
-        return 0.06;
+        return 0.056;
       case 'ANNEX_2_MARITIME':
       case 'MARITIME_ANNEX_2':
-        return 0.085;
+        return 0.132;
+      case 'ANNEX_2_BASE_HUB':
+      case 'BASE_HUB_ANNEX_2':
+        return 0.095;
       case 'BASIC_ED_MARITIME':
       case 'MARITIME_BASIC_ED':
-        return 0.07;
+        return 0.157;
+      case 'BASIC_ED_BASE_HUB':
+      case 'BASE_HUB_BASIC_ED':
+        return 0.088;
+      case 'MARITIME_BASE_HUB':
+      case 'BASE_HUB_MARITIME':
+        return 0.228;
       default:
         final pNorm = _normalizeLocId(pId);
         final dNorm = _normalizeLocId(dId);
@@ -256,26 +266,26 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
             ? '${pNorm}_$dNorm'
             : '${dNorm}_$pNorm';
         switch (normKey) {
-          case 'OLD_MAIN_ANNEX_1':
-            return 0.04;
-          case 'OLD_MAIN_ANNEX_2':
+          case 'MAIN_ANNEX_2':
             return 0.075;
-          case 'OLD_MAIN_BASIC_ED':
-            return 0.10;
-          case 'OLD_MAIN_MARITIME':
-            return 0.125;
-          case 'ANNEX_1_ANNEX_2':
-            return 0.035;
-          case 'ANNEX_1_BASIC_ED':
-            return 0.08;
-          case 'ANNEX_1_MARITIME':
-            return 0.105;
+          case 'MAIN_BASIC_ED':
+            return 0.072;
+          case 'MAIN_MARITIME':
+            return 0.210;
+          case 'MAIN_BASE_HUB':
+            return 0.020;
           case 'ANNEX_2_BASIC_ED':
-            return 0.06;
+            return 0.056;
           case 'ANNEX_2_MARITIME':
-            return 0.085;
+            return 0.132;
+          case 'ANNEX_2_BASE_HUB':
+            return 0.095;
           case 'BASIC_ED_MARITIME':
-            return 0.07;
+            return 0.157;
+          case 'BASIC_ED_BASE_HUB':
+            return 0.088;
+          case 'MARITIME_BASE_HUB':
+            return 0.228;
         }
         return 0.05;
     }
@@ -283,11 +293,15 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
 
   String _normalizeLocId(String id) {
     final raw = id.toUpperCase();
-    if (raw.contains('OLD') || raw.contains('MAIN')) return 'OLD_MAIN';
-    if (raw.contains('ANNEX_1') || raw.contains('ANNEX1')) return 'ANNEX_1';
-    if (raw.contains('ANNEX_2') || raw.contains('ANNEX2')) return 'ANNEX_2';
+    if (raw.contains('OLD') || raw.contains('MAIN')) return 'MAIN';
+    if (raw.contains('ANNEX_2') ||
+        raw.contains('ANNEX2') ||
+        raw.contains('ANNEX-2')) {
+      return 'ANNEX_2';
+    }
     if (raw.contains('BASIC') || raw.contains('ED')) return 'BASIC_ED';
     if (raw.contains('MARITIME')) return 'MARITIME';
+    if (raw.contains('HUB') || raw.contains('BASE')) return 'BASE_HUB';
     return raw;
   }
 

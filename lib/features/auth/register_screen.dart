@@ -70,8 +70,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
 
   // Vendor Step 3: Location Info
   CampusLocation? _selectedCampusLocation;
-  final _latController = TextEditingController(text: '10.354215');
-  final _lngController = TextEditingController(text: '123.912844');
+  final _latController = TextEditingController(text: '10.325210');
+  final _lngController = TextEditingController(text: '123.953201');
   bool _gettingLocation = false;
 
   @override
@@ -1264,7 +1264,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
             Expanded(
               child: NeuTextField(
                 labelText: 'Latitude *',
-                hintText: '10.3541',
+                hintText: '10.3252',
                 prefixIcon: Icons.pin_drop_outlined,
                 controller: _latController,
                 keyboardType: TextInputType.number,
@@ -1274,7 +1274,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
             Expanded(
               child: NeuTextField(
                 labelText: 'Longitude *',
-                hintText: '123.9124',
+                hintText: '123.9532',
                 prefixIcon: Icons.pin_drop_outlined,
                 controller: _lngController,
                 keyboardType: TextInputType.number,
@@ -1372,8 +1372,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
     if (mounted) {
       setState(() {
         _gettingLocation = false;
-        _latController.text = '10.354188';
-        _lngController.text = '123.912351';
+        _latController.text = '10.325210';
+        _lngController.text = '123.953201';
       });
       showNeuSnack(
         context,

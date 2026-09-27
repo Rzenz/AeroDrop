@@ -24,11 +24,13 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
   final Map<String, (double, double)> _leg3Origin = {};
   final Map<String, String> _lastDeliveryIdForDrone = {};
   final Map<String, DateTime> _leaseWriteFailures = {};
+  (double, double) _baseHubCoords = (10.325152, 123.953046);
   RealtimeChannel? _deliveriesSubscription;
   RealtimeChannel? _telemetrySubscription;
   DateTime? _lastTelemetryWriteTime;
 
   DeliveryNotifier(this.ref) : super([]) {
+    _loadBaseHubLocation();
     ref.listen<AuthState>(authProvider, (previous, next) {
       if (next.user == null || !next.sessionUnlocked) {
         _simulationTimer?.cancel();
@@ -37,6 +39,7 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
         state = [];
       } else if (previous?.user?.id != next.user?.id ||
           previous?.sessionUnlocked != next.sessionUnlocked) {
+        _loadBaseHubLocation();
         loadDeliveriesFromSupabase();
         refreshPendingDeliveriesCount();
         _subscribeRealtime();
@@ -45,13 +48,34 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
     });
 
     Future<void>.microtask(() {
-      if (mounted) loadDeliveriesFromSupabase();
+      if (mounted) {
+        _loadBaseHubLocation();
+        loadDeliveriesFromSupabase();
+      }
     });
     Future<void>.microtask(() {
       if (mounted) refreshPendingDeliveriesCount();
     });
     _subscribeRealtime();
     _startSimulation();
+  }
+
+  Future<void> _loadBaseHubLocation() async {
+    if (!SupabaseService.isConfigured) return;
+    try {
+      final res = await SupabaseService.client
+          .from('campus_locations')
+          .select('latitude, longitude')
+          .eq('location_code', 'BASE-HUB')
+          .maybeSingle();
+      if (res != null) {
+        final lat = (res['latitude'] as num?)?.toDouble();
+        final lng = (res['longitude'] as num?)?.toDouble();
+        if (lat != null && lng != null) {
+          _baseHubCoords = (lat, lng);
+        }
+      }
+    } catch (_) {}
   }
 
   void _subscribeRealtime() {
@@ -608,8 +632,8 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
         'record_simulated_telemetry',
         params: {
           'p_delivery_id': deliveryId,
-          'p_latitude': 10.32800,
-          'p_longitude': 123.95000,
+          'p_latitude': _baseHubCoords.$1,
+          'p_longitude': _baseHubCoords.$2,
           'p_altitude': 0.0,
           'p_speed': 0.0,
           'p_battery_level': batteryLevel,
@@ -837,18 +861,22 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
       }
 
       final coords = {
-        'old building': (10.3156, 123.9016),
-        'main': (10.3156, 123.9016),
-        'annex 1 building': (10.3159, 123.9019),
-        'annex-1': (10.3159, 123.9019),
-        'annex 2 building': (10.3154, 123.9021),
-        'annex-2': (10.3154, 123.9021),
-        'basic education building': (10.3148, 123.9014),
-        'basic-ed': (10.3148, 123.9014),
-        'maritime building': (10.3163, 123.9025),
-        'maritime': (10.3163, 123.9025),
+        'old building': (10.325210, 123.953201),
+        'main': (10.325210, 123.953201),
+        'uclm main': (10.325210, 123.953201),
+        'annex 2 building': (10.325633, 123.953770),
+        'annex-2': (10.325633, 123.953770),
+        'annex 2': (10.325633, 123.953770),
+        'basic education building': (10.325133, 123.953853),
+        'basic-ed': (10.325133, 123.953853),
+        'basic education': (10.325133, 123.953853),
+        'basic ed': (10.325133, 123.953853),
+        'maritime building': (10.326184, 123.954843),
+        'maritime': (10.326184, 123.954843),
+        'base hub': _baseHubCoords,
+        'base-hub': _baseHubCoords,
       };
-      final hub = (10.3168, 123.9010);
+      final hub = _baseHubCoords;
 
       for (final delivery in activeDeliveries) {
         if (_completingDeliveryIds.contains(delivery.id) ||
@@ -863,7 +891,7 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
             (delivery.dropoffLocationName ?? delivery.deliveryAddress)
                 .toLowerCase();
 
-        (double, double) vendorLoc = (10.3156, 123.9016);
+        (double, double) vendorLoc = (10.325210, 123.953201);
         for (final entry in coords.entries) {
           if (pickupQuery.contains(entry.key) ||
               entry.key.contains(pickupQuery)) {
@@ -872,7 +900,7 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
           }
         }
 
-        (double, double) customerLoc = (10.3156, 123.9016);
+        (double, double) customerLoc = (10.325210, 123.953201);
         for (final entry in coords.entries) {
           if (dropoffQuery.contains(entry.key) ||
               entry.key.contains(dropoffQuery)) {
@@ -1148,15 +1176,15 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
                                 .split(',')[0]
                                 .trim(),
                           ) ??
-                          10.3156,
+                          10.325210,
                       double.tryParse(
                             returningDrone.currentCoordinates
                                 .split(',')[1]
                                 .trim(),
                           ) ??
-                          123.9016,
+                          123.953201,
                     )
-                  : (10.3156, 123.9016));
+                  : (10.325210, 123.953201));
 
           final currentLeg3Progress =
               (_leg3Progress[dUuid] ?? 0.0).clamp(0.0, 1.0);

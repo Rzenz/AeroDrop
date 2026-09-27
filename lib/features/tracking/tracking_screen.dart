@@ -20,16 +20,20 @@ import '../../core/services/supabase_service.dart';
 Offset _displayOffset(String locationName, Size size) {
   final n = locationName.toLowerCase();
   double x, y;
-  if (n.contains('old') || n.contains('main')) {
+  if (n.contains('hub') || n.contains('base')) {
+    x = 0.50;
+    y = 0.33;
+  } else if (n.contains('old') || n.contains('main')) {
     x = 0.50;
     y = 0.43;
-  } else if (n.contains('annex 1') || n.contains('annex1')) {
-    x = 0.43;
-    y = 0.49;
-  } else if (n.contains('annex 2') || n.contains('annex2')) {
+  } else if (n.contains('annex 2') ||
+      n.contains('annex2') ||
+      n.contains('annex-2')) {
     x = 0.57;
     y = 0.49;
-  } else if (n.contains('basic ed') || n.contains('basic education')) {
+  } else if (n.contains('basic ed') ||
+      n.contains('basic education') ||
+      n.contains('basic-ed')) {
     x = 0.40;
     y = 0.58;
   } else if (n.contains('maritime')) {
@@ -44,16 +48,20 @@ Offset _displayOffset(String locationName, Size size) {
 
 String _shortLabel(String name) {
   final n = name.toLowerCase();
+  if (n.contains('hub') || n.contains('base')) {
+    return 'Base Hub';
+  }
   if (n.contains('old') || n.contains('main')) {
-    return 'Old';
+    return 'Main';
   }
-  if (n.contains('annex 1') || n.contains('annex1')) {
-    return 'Annex 1';
-  }
-  if (n.contains('annex 2') || n.contains('annex2')) {
+  if (n.contains('annex 2') ||
+      n.contains('annex2') ||
+      n.contains('annex-2')) {
     return 'Annex 2';
   }
-  if (n.contains('basic ed') || n.contains('basic education')) {
+  if (n.contains('basic ed') ||
+      n.contains('basic education') ||
+      n.contains('basic-ed')) {
     return 'Basic Ed';
   }
   if (n.contains('maritime')) {

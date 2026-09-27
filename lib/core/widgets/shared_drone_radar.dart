@@ -41,9 +41,10 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
   Timer? _staleCheckTimer;
   Timer? _livePollTimer;
 
+  (double, double) _baseHubCoords = (10.325152, 123.953046);
+
   static const _campusLocations = [
-    {'name': 'Old Building (Main)', 'code': 'MAIN', 'x': 0.50, 'y': 0.43},
-    {'name': 'Annex 1 Building', 'code': 'ANNEX-1', 'x': 0.43, 'y': 0.49},
+    {'name': 'Main Building', 'code': 'MAIN', 'x': 0.50, 'y': 0.43},
     {'name': 'Annex 2 Building', 'code': 'ANNEX-2', 'x': 0.57, 'y': 0.49},
     {
       'name': 'Basic Education Building',
@@ -57,6 +58,7 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
   @override
   void initState() {
     super.initState();
+    _loadBaseHubLocation();
     _radarController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 3),
@@ -85,6 +87,26 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
         } catch (_) {}
       },
     );
+  }
+
+  void _loadBaseHubLocation() async {
+    if (!SupabaseService.isConfigured) return;
+    try {
+      final res = await SupabaseService.client
+          .from('campus_locations')
+          .select('latitude, longitude')
+          .eq('location_code', 'BASE-HUB')
+          .maybeSingle();
+      if (res != null && mounted) {
+        final lat = (res['latitude'] as num?)?.toDouble();
+        final lng = (res['longitude'] as num?)?.toDouble();
+        if (lat != null && lng != null) {
+          setState(() {
+            _baseHubCoords = (lat, lng);
+          });
+        }
+      }
+    } catch (_) {}
   }
 
   void _checkStaleDrone() async {
@@ -136,26 +158,27 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
 
   (double, double) _coordinatesForBuilding(String? nameOrCode) {
     if (nameOrCode == null || nameOrCode.isEmpty) {
-      return (10.3156, 123.9016);
+      return (10.325210, 123.953201);
     }
     final query = nameOrCode.toLowerCase();
-    if (query.contains('annex 1') ||
-        query.contains('annex1') ||
-        query.contains('annex-1')) {
-      return (10.3159, 123.9019);
+    if (query.contains('hub') || query.contains('base')) {
+      return _baseHubCoords;
     }
     if (query.contains('annex 2') ||
         query.contains('annex2') ||
         query.contains('annex-2')) {
-      return (10.3154, 123.9021);
+      return (10.325633, 123.953770);
     }
     if (query.contains('basic')) {
-      return (10.3148, 123.9014);
+      return (10.325133, 123.953853);
     }
     if (query.contains('maritime')) {
-      return (10.3163, 123.9025);
+      return (10.326184, 123.954843);
     }
-    return (10.3156, 123.9016);
+    if (query.contains('main') || query.contains('old')) {
+      return (10.325210, 123.953201);
+    }
+    return (10.325210, 123.953201);
   }
 
   Offset _offsetForBuilding(String? nameOrCode, Size size) {
@@ -163,6 +186,9 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
       return Offset(0.50 * size.width, 0.43 * size.height);
     }
     final query = nameOrCode.toLowerCase();
+    if (query.contains('hub') || query.contains('base')) {
+      return Offset(0.50 * size.width, 0.33 * size.height);
+    }
     for (final loc in _campusLocations) {
       final locName = (loc['name'] as String).toLowerCase();
       final locCode = (loc['code'] as String).toLowerCase();
@@ -174,9 +200,6 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
           (loc['y'] as double) * size.height,
         );
       }
-    }
-    if (query.contains('annex 1') || query.contains('annex1')) {
-      return Offset(0.43 * size.width, 0.49 * size.height);
     }
     if (query.contains('annex 2') || query.contains('annex2')) {
       return Offset(0.57 * size.width, 0.49 * size.height);
@@ -244,8 +267,8 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
           telemetry.latitude != 0.0 &&
           telemetry.longitude != 0.0) {
         final originCoords = _coordinatesForBuilding(dropoffName);
-        const baseLat = 10.3168;
-        const baseLng = 123.9010;
+        final baseLat = _baseHubCoords.$1;
+        final baseLng = _baseHubCoords.$2;
         final originLat = originCoords.$1;
         final originLng = originCoords.$2;
 

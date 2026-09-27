@@ -61,7 +61,7 @@ void main() {
           senderName: 'Vendor A',
           recipientName: 'Student A',
           recipientPhone: '09111111111',
-          deliveryAddress: 'Annex 1',
+          deliveryAddress: 'Annex 2',
           packageName: 'Meal',
           packageWeight: 0.5,
           packageType: 'Food',
@@ -127,7 +127,7 @@ void main() {
         senderName: 'UCLM Canteen',
         recipientName: 'Erickson',
         recipientPhone: '09123456789',
-        deliveryAddress: 'Annex 1 Building',
+        deliveryAddress: 'Annex 2 Building',
         packageName: 'Engineering Kit',
         packageWeight: 1.2,
         packageType: 'Electronics',
@@ -136,7 +136,7 @@ void main() {
         createdAt: DateTime.now(),
         progress: 0.65,
         pickupLocationName: 'Main Canteen',
-        dropoffLocationName: 'Annex 1 Building',
+        dropoffLocationName: 'Annex 2 Building',
       );
 
       await tester.pumpWidget(

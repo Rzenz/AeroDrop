@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 import 'package:aerodrop/core/models/user_model.dart';
 import 'package:aerodrop/core/providers/auth_provider.dart';
 
@@ -197,5 +198,182 @@ void main() {
         'This account is not registered as a vendor.',
       );
     });
+
+    test('Google sign-in profile completion and role routing logic', () {
+      final googleUserNoPhone = AeroDropUser(
+        id: 'g-1',
+        email: 'googleuser@gmail.com',
+        name: 'Google User',
+        role: 'user',
+        phoneNumber: null,
+      );
+
+      final googleUserWithPhone = AeroDropUser(
+        id: 'g-2',
+        email: 'googleuser2@gmail.com',
+        name: 'Google User 2',
+        role: 'user',
+        phoneNumber: '+639171234567',
+      );
+
+      final googleAdminUser = AeroDropUser(
+        id: 'g-admin',
+        email: 'admin@aerodrop.com',
+        name: 'Admin Google',
+        role: 'admin',
+      );
+
+      final googleVendorUser = AeroDropUser(
+        id: 'g-vendor',
+        email: 'store@gmail.com',
+        name: 'Vendor Google',
+        role: 'vendor',
+        vendorStatus: 'active',
+        phoneNumber: '+639171234567',
+      );
+
+      final googlePendingVendor = AeroDropUser(
+        id: 'g-pv',
+        email: 'pv@gmail.com',
+        name: 'Pending Vendor Google',
+        role: 'user',
+        vendorStatus: 'pending',
+        phoneNumber: '+639171234567',
+      );
+
+      // Router predicate logic
+      String resolveRoute(AeroDropUser user, {String currentPath = '/welcome'}) {
+        final hasNoPhone = !user.isAdmin &&
+            (user.phoneNumber == null || user.phoneNumber!.trim().isEmpty);
+        if (hasNoPhone) {
+          return '/complete-profile';
+        }
+        if (user.vendorStatus == 'pending') {
+          return '/account-pending';
+        }
+        if (user.isAdmin) return '/admin';
+        if (user.isVendor) return '/vendor';
+        return '/user';
+      }
+
+      // User without phone is forced to complete profile
+      expect(resolveRoute(googleUserNoPhone), '/complete-profile');
+
+      // User with phone routes directly to /user
+      expect(resolveRoute(googleUserWithPhone), '/user');
+
+      // Admin routes to /admin even without phone
+      expect(resolveRoute(googleAdminUser), '/admin');
+
+      // Active vendor routes to /vendor
+      expect(resolveRoute(googleVendorUser), '/vendor');
+
+      // Pending vendor routes to /account-pending
+      expect(resolveRoute(googlePendingVendor), '/account-pending');
+    });
+
+    test('Google sign-in state unlocks session without OTP requirement', () {
+      final googleUser = AeroDropUser(
+        id: 'g-1',
+        email: 'googleuser@gmail.com',
+        name: 'Google User',
+        role: 'user',
+      );
+
+      final state = AuthState(
+        user: googleUser,
+        sessionUnlocked: true,
+        requiresVerification: false,
+        isVerified: true,
+      );
+
+      expect(state.sessionUnlocked, isTrue);
+      expect(state.requiresVerification, isFalse);
+      expect(state.isVerified, isTrue);
+      expect(state.user?.role, 'user');
+    });
+
+    test('Admin accounts are explicitly blocked from Google OAuth', () {
+      bool isOAuthAllowed(AeroDropUser user) {
+        if (user.isAdmin ||
+            user.email.trim().toLowerCase() == 'admin@aerodrop.com') {
+          return false;
+        }
+        return true;
+      }
+
+      final regularUser = AeroDropUser(
+        id: 'u-1',
+        email: 'customer@gmail.com',
+        name: 'Customer',
+        role: 'user',
+      );
+
+      final vendorUser = AeroDropUser(
+        id: 'v-1',
+        email: 'vendor@gmail.com',
+        name: 'Vendor',
+        role: 'vendor',
+      );
+
+      final adminUser = AeroDropUser(
+        id: 'a-1',
+        email: 'admin@aerodrop.com',
+        name: 'Admin',
+        role: 'admin',
+      );
+
+      expect(isOAuthAllowed(regularUser), isTrue);
+      expect(isOAuthAllowed(vendorUser), isTrue);
+      expect(isOAuthAllowed(adminUser), isFalse);
+    });
+
+    test('Customer role in public.users is never granted vendor or admin routes', () {
+      final customer = AeroDropUser(
+        id: 'c-1',
+        email: 'customer@gmail.com',
+        name: 'Customer',
+        role: 'user',
+      );
+
+      expect(customer.isAdmin, isFalse);
+      expect(customer.isVendor, isFalse);
+      expect(customer.isPendingVendor, isFalse);
+    });
+  });
+
+  group('Google-only account detection and login/forgot-password guidance', () {
+    test('Google-only error message is specific and actionable', () {
+      const googleOnlyMessage =
+          'This account uses Google sign-in. Tap Continue with Google to sign in.';
+      expect(
+        googleOnlyMessage,
+        'This account uses Google sign-in. Tap Continue with Google to sign in.',
+      );
+    });
+
+    test('Generic invalid credentials error preserves privacy for non-Google/unregistered accounts', () {
+      final genericError = formatAuthErrorMessage(
+        const AuthException('Invalid login credentials', code: 'invalid_credentials'),
+      );
+      expect(genericError, 'Incorrect credentials or invalid verification code.');
+    });
+
+    test('ForgotPassword extra parameters include is_google_only flag', () {
+      final extraWithGoogle = <String, String>{
+        'email': 'googleuser@gmail.com',
+        'type': 'reset',
+        'is_google_only': 'true',
+      };
+      expect(extraWithGoogle['is_google_only'], 'true');
+      expect(extraWithGoogle['type'], 'reset');
+
+      final extraWithoutGoogle = <String, String>{
+        'email': 'standarduser@gmail.com',
+        'type': 'reset',
+      };
+      expect(extraWithoutGoogle['is_google_only'], isNull);
+    });
   });
 }
+

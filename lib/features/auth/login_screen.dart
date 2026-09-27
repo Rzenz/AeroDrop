@@ -96,15 +96,55 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     super.dispose();
   }
 
-  void _continueWithGoogle() {
-    // Same honest stop as the welcome screen: no OAuth provider is wired to
-    // Supabase, so the button says so instead of opening a sheet that cannot
-    // finish. See WelcomeScreen._continueWithGoogle.
-    showNeuSnack(
-      context,
-      'Google sign-in is not connected yet. Use your email and password.',
-      tone: NeuToneKind.info,
-    );
+  Future<void> _continueWithGoogle() async {
+    HapticFeedback.lightImpact();
+    if (_asVendor) {
+      showNeuSnack(
+        context,
+        'Google sign-in creates a customer account. To sell on AeroDrop, register a vendor account with your store details.',
+        tone: NeuToneKind.info,
+      );
+      return;
+    }
+
+    final authState = ref.read(authProvider);
+    if (authState.isLoading) return;
+
+    try {
+      final success = await ref.read(authProvider.notifier).signInWithGoogle();
+      if (!mounted) return;
+
+      if (!success) {
+        final err = ref.read(authProvider).errorMessage;
+        if (err != null && err.isNotEmpty) {
+          showNeuSnack(context, err, tone: NeuToneKind.error);
+        }
+      } else {
+        final user = ref.read(authProvider).user;
+        if (user != null) {
+          if (user.phoneNumber == null || user.phoneNumber!.trim().isEmpty) {
+            context.go('/complete-profile');
+          } else if (user.isAdmin) {
+            context.go('/admin');
+          } else if (user.isVendor) {
+            context.go('/vendor');
+          } else if (user.isPendingVendor) {
+            context.go('/account-pending');
+          } else {
+            context.go('/user');
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error during Google sign-in: $e');
+      if (mounted) {
+        showNeuSnack(
+          context,
+          formatAuthErrorMessage(e),
+          tone: NeuToneKind.error,
+        );
+      }
+    }
   }
 
   void _handleLogin() async {
@@ -158,7 +198,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           showNeuSnack(context, message, tone: NeuToneKind.info);
           context.push(
             '/email-sent',
-            extra: {
+            extra: <String, String>{
               'email': authState.pendingEmail!,
               'role': expectedRole,
               'type': 'verification',

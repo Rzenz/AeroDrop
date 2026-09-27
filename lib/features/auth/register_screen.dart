@@ -24,6 +24,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../core/constants/vendor_categories.dart';
 import '../../core/widgets/neu_back_button.dart';
 import '../../core/utils/image_utils.dart';
+import '../../core/utils/phone_input_formatter.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -80,6 +81,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
       vsync: this,
       duration: const Duration(milliseconds: 900),
     );
+    _phoneController.addListener(() {
+      if (mounted) setState(() {});
+    });
   }
 
   Future<void> _pickLogo() async {
@@ -336,7 +340,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
         if (success) {
           context.push(
             '/email-sent',
-            extra: {
+            extra: <String, String>{
               'email': email,
               'phone': phone,
               'role': 'vendor',
@@ -381,7 +385,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
         if (success) {
           context.push(
             '/email-sent',
-            extra: {
+            extra: <String, String>{
               'email': emailText,
               'phone': phoneText,
               'role': 'user',
@@ -517,9 +521,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
             keyboardType: TextInputType.phone,
             validator: RegisterController.validatePhone,
             textInputAction: TextInputAction.next,
-            inputFormatters: [
-              FilteringTextInputFormatter.digitsOnly,
-              LengthLimitingTextInputFormatter(11),
+            inputFormatters: const [
+              PhoneInputFormatter(),
             ],
           ),
           const SizedBox(height: 18),
@@ -605,7 +608,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
           NeuButton(
             text: 'Register Account',
             isLoading: isLoading,
-            onPressed: _handleRegister,
+            onPressed:
+                !isValidPhoneNumber(_phoneController.text) || isLoading
+                    ? null
+                    : _handleRegister,
             icon: Icons.rocket_launch_rounded,
           ),
         ],
@@ -738,15 +744,18 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
                     )
                   : NeuButton(
                       text: 'Continue',
-                      onPressed: () {
-                        if (_vendorStep == 1 && _validateStep1()) {
-                          setState(() => _vendorStep = 2);
-                        } else if (_vendorStep == 2 && _validateStep2()) {
-                          setState(() => _vendorStep = 3);
-                        } else if (_vendorStep == 3 && _validateStep3()) {
-                          setState(() => _vendorStep = 4);
-                        }
-                      },
+                      onPressed: (_vendorStep == 2 &&
+                              !isValidPhoneNumber(_phoneController.text))
+                          ? null
+                          : () {
+                              if (_vendorStep == 1 && _validateStep1()) {
+                                setState(() => _vendorStep = 2);
+                              } else if (_vendorStep == 2 && _validateStep2()) {
+                                setState(() => _vendorStep = 3);
+                              } else if (_vendorStep == 3 && _validateStep3()) {
+                                setState(() => _vendorStep = 4);
+                              }
+                            },
                       icon: Icons.arrow_forward_rounded,
                     ),
             ),
@@ -1067,9 +1076,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
           controller: _phoneController,
           keyboardType: TextInputType.phone,
           textInputAction: TextInputAction.next,
-          inputFormatters: [
-            FilteringTextInputFormatter.digitsOnly,
-            LengthLimitingTextInputFormatter(11),
+          inputFormatters: const [
+            PhoneInputFormatter(),
           ],
         ),
         const SizedBox(height: 18),

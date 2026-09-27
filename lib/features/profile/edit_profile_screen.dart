@@ -18,6 +18,7 @@ import '../../core/providers/product_provider.dart';
 import '../../core/utils/image_utils.dart';
 import '../auth/presentation/controllers/register_controller.dart';
 import '../../core/constants/vendor_categories.dart';
+import '../../core/utils/phone_input_formatter.dart';
 
 class EditProfileScreen extends ConsumerStatefulWidget {
   const EditProfileScreen({super.key});
@@ -225,6 +226,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       _customCategoryController = TextEditingController();
     }
     _selectedLocationId = user?.campusLocationId;
+    _phoneController.addListener(() {
+      if (mounted) setState(() {});
+    });
   }
 
   @override
@@ -475,9 +479,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                           keyboardType: TextInputType.phone,
                           readOnly: user?.isAdmin == true,
                           validator: RegisterController.validatePhone,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly,
-                            LengthLimitingTextInputFormatter(11),
+                          inputFormatters: const [
+                            PhoneInputFormatter(),
                           ],
                         ),
                       ],
@@ -690,7 +693,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                     const SizedBox(height: 24),
                     NeuButton(
                       text: 'Save Changes',
-                      onPressed: _handleSave,
+                      onPressed: isValidPhoneNumber(_phoneController.text)
+                          ? _handleSave
+                          : null,
                       icon: Icons.check_circle_outline_rounded,
                     ).animate().fadeIn(delay: 250.ms),
                   ],

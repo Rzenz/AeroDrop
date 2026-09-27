@@ -15,6 +15,7 @@ import '../../features/auth/register_screen.dart';
 import '../../features/auth/forgot_password_screen.dart';
 import '../../features/auth/otp_email_sent_screen.dart';
 import '../../features/auth/verification_page.dart';
+import '../../features/auth/complete_profile_screen.dart';
 import '../../features/auth/presentation/pages/account_pending_page.dart';
 
 import '../../features/dashboard/user_shell.dart';
@@ -89,6 +90,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           state.uri.path == '/onboarding' ||
           state.uri.path == '/welcome' ||
           state.uri.path == '/verification' ||
+          state.uri.path == '/complete-profile' ||
           state.uri.path == '/splash';
 
       if (user == null) {
@@ -113,6 +115,22 @@ final routerProvider = Provider<GoRouter>((ref) {
         return null;
       }
 
+      // If user profile has no phone number, prompt to complete profile
+      final hasNoPhone = !user.isAdmin &&
+          (user.phoneNumber == null || user.phoneNumber!.trim().isEmpty);
+      if (hasNoPhone) {
+        if (state.uri.path != '/complete-profile') {
+          return '/complete-profile';
+        }
+        return null;
+      }
+      if (state.uri.path == '/complete-profile' && !hasNoPhone) {
+        if (user.isAdmin) return '/admin';
+        if (user.isVendor) return '/vendor';
+        if (user.isPendingVendor) return '/account-pending';
+        return '/user';
+      }
+
       // Handle vendor pending state redirection
       final isPending = user.vendorStatus == 'pending';
       if (isPending) {
@@ -124,7 +142,8 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       if (isLoggingIn ||
           state.uri.path == '/account-pending' ||
-          state.uri.path == '/verification') {
+          state.uri.path == '/verification' ||
+          state.uri.path == '/complete-profile') {
         if (user.isAdmin) return '/admin';
         if (user.isVendor) return '/vendor';
         return '/user';
@@ -179,11 +198,21 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/email-sent',
         pageBuilder: (context, state) {
-          final extra = state.extra as Map<String, String>? ?? {};
+          final rawExtra = state.extra;
+          final extra = rawExtra is Map
+              ? rawExtra.map(
+                  (k, v) => MapEntry(k.toString(), v?.toString() ?? ''),
+                )
+              : <String, String>{};
           final email = extra['email'] ?? '';
-          final phone = extra['phone'];
+          final phone = (extra['phone'] != null && extra['phone']!.isNotEmpty)
+              ? extra['phone']
+              : null;
           final role = extra['role'];
-          final type = extra['type'] ?? 'verification';
+          final type = extra['type']?.isNotEmpty == true
+              ? extra['type']!
+              : 'verification';
+          final isGoogleOnly = extra['is_google_only'] == 'true';
           return _fade(
             state,
             OtpEmailSentScreen(
@@ -191,6 +220,7 @@ final routerProvider = Provider<GoRouter>((ref) {
               phone: phone,
               role: role,
               type: type,
+              isGoogleOnly: isGoogleOnly,
             ),
           );
         },
@@ -198,6 +228,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/verification',
         pageBuilder: (context, state) => _fade(state, const VerificationPage()),
+      ),
+      GoRoute(
+        path: '/complete-profile',
+        pageBuilder: (context, state) =>
+            _fade(state, const CompleteProfileScreen()),
       ),
       GoRoute(
         path: '/account-pending',

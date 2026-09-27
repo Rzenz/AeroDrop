@@ -3,9 +3,11 @@ import 'dart:ui' show ImageFilter, PathMetric, Tangent;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/providers/auth_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_text_styles.dart';
@@ -24,14 +26,14 @@ import '../../core/widgets/neu_feedback.dart';
 /// crossing the sky above it. Photography of the actual place beats an
 /// invented graphic: it tells a student where this app runs before they read
 /// a word of it.
-class WelcomeScreen extends StatefulWidget {
+class WelcomeScreen extends ConsumerStatefulWidget {
   const WelcomeScreen({super.key});
 
   @override
-  State<WelcomeScreen> createState() => _WelcomeScreenState();
+  ConsumerState<WelcomeScreen> createState() => _WelcomeScreenState();
 }
 
-class _WelcomeScreenState extends State<WelcomeScreen>
+class _WelcomeScreenState extends ConsumerState<WelcomeScreen>
     with TickerProviderStateMixin {
   /// One controller for the whole screen. Every beat below is an [Interval] on
   /// it, which keeps the choreography readable in one place and costs a single
@@ -94,17 +96,46 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     context.push(location);
   }
 
-  void _continueWithGoogle() {
+  Future<void> _continueWithGoogle() async {
     HapticFeedback.lightImpact();
-    // Deliberately not a silent no-op. The app has no OAuth provider wired to
-    // Supabase yet, so the honest thing is to say so rather than open a sheet
-    // that cannot finish. Replace this body with the real call once
-    // `signInWithOAuth(OAuthProvider.google)` is configured.
-    showNeuSnack(
-      context,
-      'Google sign-in is not connected yet. Use your email and password.',
-      tone: NeuToneKind.info,
-    );
+    final authState = ref.read(authProvider);
+    if (authState.isLoading) return;
+
+    try {
+      final success = await ref.read(authProvider.notifier).signInWithGoogle();
+      if (!mounted) return;
+
+      if (!success) {
+        final err = ref.read(authProvider).errorMessage;
+        if (err != null && err.isNotEmpty) {
+          showNeuSnack(context, err, tone: NeuToneKind.error);
+        }
+      } else {
+        final user = ref.read(authProvider).user;
+        if (user != null) {
+          if (user.phoneNumber == null || user.phoneNumber!.trim().isEmpty) {
+            context.go('/complete-profile');
+          } else if (user.isAdmin) {
+            context.go('/admin');
+          } else if (user.isVendor) {
+            context.go('/vendor');
+          } else if (user.isPendingVendor) {
+            context.go('/account-pending');
+          } else {
+            context.go('/user');
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error during Google sign-in: $e');
+      if (mounted) {
+        showNeuSnack(
+          context,
+          formatAuthErrorMessage(e),
+          tone: NeuToneKind.error,
+        );
+      }
+    }
   }
 
   @override

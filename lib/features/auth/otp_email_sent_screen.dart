@@ -20,6 +20,7 @@ class OtpEmailSentScreen extends ConsumerStatefulWidget {
   final String? phone;
   final String? role;
   final String type; // 'verification' or 'reset'
+  final bool isGoogleOnly;
 
   const OtpEmailSentScreen({
     super.key,
@@ -27,6 +28,7 @@ class OtpEmailSentScreen extends ConsumerStatefulWidget {
     this.phone,
     this.role,
     this.type = 'verification',
+    this.isGoogleOnly = false,
   });
 
   @override
@@ -122,55 +124,67 @@ class _OtpEmailSentScreenState extends ConsumerState<OtpEmailSentScreen> {
     if (_isResending || _timerSeconds > 0) return;
 
     setState(() => _isResending = true);
-    final viaSms = _method == RegistrationOtpMethod.sms;
+    try {
+      final viaSms = _method == RegistrationOtpMethod.sms;
 
-    final targetEmail = widget.email.isNotEmpty
-        ? widget.email
-        : (ref.read(authProvider).pendingEmail ?? '');
-    final targetPhone = widget.phone ?? ref.read(authProvider).pendingPhone;
+      final targetEmail = widget.email.isNotEmpty
+          ? widget.email
+          : (ref.read(authProvider).pendingEmail ?? '');
+      final targetPhone = widget.phone ?? ref.read(authProvider).pendingPhone;
 
-    bool success = false;
-    if (widget.type == 'reset') {
-      success = await ref
-          .read(authProvider.notifier)
-          .sendPasswordReset(targetEmail);
-    } else {
-      success = await ref
-          .read(authProvider.notifier)
-          .resendRegistrationOtp(
-            email: targetEmail,
-            phone: targetPhone,
-            viaSms: viaSms,
-          );
-    }
+      bool success = false;
+      if (widget.type == 'reset') {
+        success = await ref
+            .read(authProvider.notifier)
+            .sendPasswordReset(targetEmail);
+      } else {
+        success = await ref
+            .read(authProvider.notifier)
+            .resendRegistrationOtp(
+              email: targetEmail,
+              phone: targetPhone,
+              viaSms: viaSms,
+            );
+      }
 
-    if (!mounted) return;
-    setState(() => _isResending = false);
+      if (!mounted) return;
+      setState(() => _isResending = false);
 
-    if (success) {
-      _startTimer();
-      final destination = viaSms ? 'phone number' : 'email';
-      showNeuSnack(
-        context,
-        'Verification code resent to your $destination!',
-        tone: NeuToneKind.success,
-      );
-    } else {
-      final error = ref.read(authProvider).errorMessage ??
-          'Failed to resend verification code. Please try again.';
-      final isRateLimit = error.toLowerCase().contains('too many attempts') ||
-          error.toLowerCase().contains('rate limit') ||
-          error.toLowerCase().contains('wait') ||
-          error.toLowerCase().contains('seconds');
-      if (isRateLimit) {
+      if (success) {
         _startTimer();
+        final destination = viaSms ? 'phone number' : 'email';
         showNeuSnack(
           context,
-          'Please wait for the timer before requesting a new code.',
-          tone: NeuToneKind.info,
+          'Verification code resent to your $destination!',
+          tone: NeuToneKind.success,
         );
       } else {
-        showNeuSnack(context, error, tone: NeuToneKind.error);
+        final error = ref.read(authProvider).errorMessage ??
+            'Failed to resend verification code. Please try again.';
+        final isRateLimit = error.toLowerCase().contains('too many attempts') ||
+            error.toLowerCase().contains('rate limit') ||
+            error.toLowerCase().contains('wait') ||
+            error.toLowerCase().contains('seconds');
+        if (isRateLimit) {
+          _startTimer();
+          showNeuSnack(
+            context,
+            'Please wait for the timer before requesting a new code.',
+            tone: NeuToneKind.info,
+          );
+        } else {
+          showNeuSnack(context, error, tone: NeuToneKind.error);
+        }
+      }
+    } catch (e) {
+      debugPrint('Error resending verification code: $e');
+      if (mounted) {
+        setState(() => _isResending = false);
+        showNeuSnack(
+          context,
+          formatAuthErrorMessage(e),
+          tone: NeuToneKind.error,
+        );
       }
     }
   }
@@ -200,73 +214,85 @@ class _OtpEmailSentScreenState extends ConsumerState<OtpEmailSentScreen> {
     setState(() => _isVerifying = true);
     HapticFeedback.mediumImpact();
 
-    final targetEmail = widget.email.isNotEmpty
-        ? widget.email
-        : (ref.read(authProvider).pendingEmail ?? '');
-    final targetPhone = widget.phone ?? ref.read(authProvider).pendingPhone;
-    final viaSms = _method == RegistrationOtpMethod.sms;
-    bool success = false;
-    if (widget.type == 'reset') {
-      success = await ref.read(authProvider.notifier).verifyPasswordResetOtp(
-            token: code,
-            email: targetEmail,
-          );
-    } else {
-      success = await ref.read(authProvider.notifier).verifyRegistrationOtp(
-            token: code,
-            email: targetEmail,
-            phone: targetPhone,
-            viaSms: viaSms,
-          );
-    }
-
-    if (!mounted) return;
-    setState(() => _isVerifying = false);
-
-    if (success) {
+    try {
+      final targetEmail = widget.email.isNotEmpty
+          ? widget.email
+          : (ref.read(authProvider).pendingEmail ?? '');
+      final targetPhone = widget.phone ?? ref.read(authProvider).pendingPhone;
+      final viaSms = _method == RegistrationOtpMethod.sms;
+      bool success = false;
       if (widget.type == 'reset') {
-        showNeuSnack(
-          context,
-          'Recovery code verified. Please set your new password.',
-          tone: NeuToneKind.success,
-        );
-        context.go('/user/profile/change-password');
-        return;
-      }
-
-      final authError = ref.read(authProvider).errorMessage;
-      if (authError != null && authError.isNotEmpty) {
-        showNeuSnack(
-          context,
-          authError,
-          tone: NeuToneKind.info,
-        );
+        success = await ref.read(authProvider.notifier).verifyPasswordResetOtp(
+              token: code,
+              email: targetEmail,
+            );
       } else {
+        success = await ref.read(authProvider.notifier).verifyRegistrationOtp(
+              token: code,
+              email: targetEmail,
+              phone: targetPhone,
+              viaSms: viaSms,
+            );
+      }
+
+      if (!mounted) return;
+      setState(() => _isVerifying = false);
+
+      if (success) {
+        if (widget.type == 'reset') {
+          showNeuSnack(
+            context,
+            'Recovery code verified. Please set your new password.',
+            tone: NeuToneKind.success,
+          );
+          context.go('/user/profile/change-password');
+          return;
+        }
+
+        final authError = ref.read(authProvider).errorMessage;
+        if (authError != null && authError.isNotEmpty) {
+          showNeuSnack(
+            context,
+            authError,
+            tone: NeuToneKind.info,
+          );
+        } else {
+          showNeuSnack(
+            context,
+            'Account verified successfully!',
+            tone: NeuToneKind.success,
+          );
+        }
+
+        final user = ref.read(authProvider).user;
+        final requestedRole = widget.role ?? ref.read(authProvider).pendingRole;
+        final isPendingVendor =
+            requestedRole == 'vendor' || user?.vendorStatus == 'pending';
+
+        if (isPendingVendor) {
+          context.go('/account-pending');
+        } else if (user?.isAdmin == true) {
+          context.go('/admin');
+        } else if (user?.isVendor == true) {
+          context.go('/vendor');
+        } else {
+          context.go('/user');
+        }
+      } else {
+        final error = ref.read(authProvider).errorMessage ??
+            'Verification failed. Please check the code and try again.';
+        showNeuSnack(context, error, tone: NeuToneKind.error);
+      }
+    } catch (e) {
+      debugPrint('Error verifying code: $e');
+      if (mounted) {
+        setState(() => _isVerifying = false);
         showNeuSnack(
           context,
-          'Account verified successfully!',
-          tone: NeuToneKind.success,
+          formatAuthErrorMessage(e),
+          tone: NeuToneKind.error,
         );
       }
-
-      final user = ref.read(authProvider).user;
-      final requestedRole = widget.role ?? ref.read(authProvider).pendingRole;
-      final isPendingVendor =
-          requestedRole == 'vendor' || user?.vendorStatus == 'pending';
-
-      if (isPendingVendor) {
-        context.go('/account-pending');
-      } else if (user?.isAdmin == true) {
-        context.go('/admin');
-      } else if (user?.isVendor == true) {
-        context.go('/vendor');
-      } else {
-        context.go('/user');
-      }
-    } else {
-      final error = ref.read(authProvider).errorMessage ??
-          'Verification failed. Please check the code and try again.';
-      showNeuSnack(context, error, tone: NeuToneKind.error);
     }
   }
 
@@ -413,6 +439,55 @@ class _OtpEmailSentScreenState extends ConsumerState<OtpEmailSentScreen> {
                         ],
                       ).animate().fadeIn(delay: 260.ms),
                       const SizedBox(height: 20),
+                    ],
+
+                    if (isResetFlow && widget.isGoogleOnly) ...[
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        margin: const EdgeInsets.only(bottom: 20),
+                        decoration: BoxDecoration(
+                          color: AppColors.accent.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: AppColors.accent.withValues(alpha: 0.28),
+                          ),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(
+                              Icons.info_outline_rounded,
+                              color: AppColors.accent,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Google-Created Account',
+                                    style: AppTextStyles.label(
+                                      fontSize: 12,
+                                      color: AppColors.accent,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'This account was created with Google sign-in. You can sign in directly with Google or enter this recovery code to set a password for email login.',
+                                    style: AppTextStyles.body(
+                                      fontSize: 12,
+                                      color: AppColors.textSecondary,
+                                      height: 1.4,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ).animate().fadeIn(delay: 280.ms),
                     ],
 
                     NeuCard(

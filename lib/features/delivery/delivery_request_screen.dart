@@ -18,6 +18,7 @@ import '../../core/services/supabase_service.dart';
 import '../../core/providers/drone_provider.dart';
 import '../../core/providers/weather_provider.dart';
 import '../../core/widgets/aerodrop_warning_dialog.dart';
+import '../../core/utils/phone_input_formatter.dart';
 
 class CampusLocation {
   final String id;
@@ -93,6 +94,9 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
   @override
   void initState() {
     super.initState();
+    _recipientPhoneController.addListener(() {
+      if (mounted) setState(() {});
+    });
     _loadCampusLocations();
   }
 
@@ -401,15 +405,13 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
 
       final recipientPhone = _recipientPhoneController.text.trim();
       if (recipientPhone.isEmpty) {
-        _showValidationError(
-          'Recipient phone number must be exactly 11 digits.',
-        );
+        _showValidationError('Recipient phone number is required.');
         return false;
       }
 
-      if (recipientPhone.length != 11) {
+      if (!isValidPhoneNumber(recipientPhone)) {
         _showValidationError(
-          'Recipient phone number must be exactly 11 digits.',
+          'Please enter a valid recipient phone number (e.g. 09171234567 or +639171234567).',
         );
         return false;
       }
@@ -887,7 +889,10 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
                                     ? 'Confirm Order'
                                     : 'Continue'),
                           isLoading: _loading,
-                          onPressed: isGrounded && _currentPage == 3
+                          onPressed: (isGrounded && _currentPage == 3) ||
+                                  ((_currentPage == 1 || _currentPage == 3) &&
+                                      !isValidPhoneNumber(
+                                          _recipientPhoneController.text))
                               ? null
                               : _next,
                           icon: isGrounded && _currentPage == 3
@@ -1207,9 +1212,8 @@ class _LocationPage extends StatelessWidget {
                   prefixIcon: Icons.phone_rounded,
                   controller: recipientPhoneController,
                   keyboardType: TextInputType.phone,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly,
-                    LengthLimitingTextInputFormatter(11),
+                  inputFormatters: const [
+                    PhoneInputFormatter(),
                   ],
                 ),
                 const SizedBox(height: 14),

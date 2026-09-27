@@ -56,6 +56,23 @@ void main() {
     });
   });
 
+  group('isValidPhoneNumber', () {
+    test('validates valid Philippine and international phone numbers', () {
+      expect(isValidPhoneNumber('09171234567'), isTrue);
+      expect(isValidPhoneNumber('+639171234567'), isTrue);
+      expect(isValidPhoneNumber('639171234567'), isTrue);
+      expect(isValidPhoneNumber('9171234567'), isTrue);
+      expect(isValidPhoneNumber('+14155552671'), isTrue);
+    });
+
+    test('rejects invalid phone numbers', () {
+      expect(isValidPhoneNumber(''), isFalse);
+      expect(isValidPhoneNumber('123'), isFalse);
+      expect(isValidPhoneNumber('0917'), isFalse);
+      expect(isValidPhoneNumber('notaphonenumber'), isFalse);
+    });
+  });
+
   group('formatAuthErrorMessage', () {
     test('handles phone_provider_disabled cleanly without fake SMS', () {
       final error = const AuthException('Phone provider is disabled', code: 'phone_provider_disabled');
@@ -81,10 +98,28 @@ void main() {
       expect(msg, 'Incorrect credentials or invalid verification code.');
     });
 
-    test('handles rate limiting', () {
-      final error = const AuthException('Rate limit exceeded', code: 'rate_limit_exceeded');
+    test('handles Google test user error', () {
+      final error = const AuthException('Access blocked: AeroDrop is in testing mode and your account is not a test user', code: 'access_denied');
       final msg = formatAuthErrorMessage(error);
-      expect(msg, contains('Too many attempts'));
+      expect(msg, "This Google account isn't a test user yet. Please contact the administrator.");
+    });
+
+    test('handles Google OAuth cancelled sign in', () {
+      final error = const AuthException('User cancelled the sign in flow', code: 'user_cancelled');
+      final msg = formatAuthErrorMessage(error);
+      expect(msg, 'Google sign-in was cancelled.');
+    });
+
+    test('handles local server port 3000 busy error', () {
+      final error = const AuthException('Port 3000 is already in use');
+      final msg = formatAuthErrorMessage(error);
+      expect(msg, 'Port 3000 is already in use. Please close any application using port 3000 and try again.');
+    });
+
+    test('handles network failure cleanly', () {
+      final error = const AuthException('Failed host lookup: network error');
+      final msg = formatAuthErrorMessage(error);
+      expect(msg, 'Network connection failed. Please check your internet connection and try again.');
     });
   });
 

@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../models/user_model.dart';
+import '../services/desktop_oauth.dart';
 import '../services/supabase_service.dart';
 import '../utils/image_utils.dart';
 
@@ -33,30 +36,73 @@ bool isValidEmail(String email) {
   }
 }
 
+bool isValidPhoneNumber(String phone) {
+  try {
+    normalizePhoneNumber(phone);
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
 String normalizePhoneNumber(String phone) {
   final clean = phone.replaceAll(RegExp(r'[\s\-()]'), '');
   if (clean.isEmpty) {
     throw const FormatException('Phone number cannot be empty.');
   }
-  if (clean.startsWith('+')) {
-    if (clean.length < 10 || clean.length > 16) {
-      throw const FormatException('Invalid international phone number format');
+
+  // Philippine formats:
+  if (clean.startsWith('0')) {
+    if (clean.startsWith('09') &&
+        clean.length == 11 &&
+        RegExp(r'^\d{11}$').hasMatch(clean)) {
+      return '+63${clean.substring(1)}';
     }
-    return clean;
+    throw const FormatException(
+      'Invalid Philippine mobile number (must be 09XXXXXXXXX, 11 digits).',
+    );
   }
-  // Philippine mobile numbers
-  if (clean.startsWith('09') && clean.length == 11) {
-    return '+63${clean.substring(1)}';
+
+  if (clean.startsWith('9')) {
+    if (clean.length == 10 && RegExp(r'^\d{10}$').hasMatch(clean)) {
+      return '+63$clean';
+    }
+    throw const FormatException(
+      'Invalid Philippine mobile number (must be 9XXXXXXXXX, 10 digits).',
+    );
   }
-  if (clean.startsWith('9') && clean.length == 10) {
-    return '+63$clean';
+
+  if (clean.startsWith('63')) {
+    if (clean.startsWith('639') &&
+        clean.length == 12 &&
+        RegExp(r'^\d{12}$').hasMatch(clean)) {
+      return '+$clean';
+    }
+    throw const FormatException(
+      'Invalid Philippine mobile number (must be 639XXXXXXXXX, 12 digits).',
+    );
   }
-  if (clean.startsWith('639') && clean.length == 12) {
-    return '+$clean';
+
+  if (clean.startsWith('+63')) {
+    if (clean.startsWith('+639') &&
+        clean.length == 13 &&
+        RegExp(r'^\+639\d{9}$').hasMatch(clean)) {
+      return clean;
+    }
+    throw const FormatException(
+      'Invalid Philippine mobile number (must be +639XXXXXXXXX, 13 characters).',
+    );
   }
-  if (clean.length >= 7 && clean.length <= 15) {
-    return '+$clean';
+
+  // International format starting with '+'
+  if (clean.startsWith('+')) {
+    final digits = clean.substring(1);
+    if (RegExp(r'^\d{9,14}$').hasMatch(digits)) {
+      return clean;
+    }
+    throw const FormatException('Invalid international phone number format.');
   }
+
   throw const FormatException('Invalid phone number format.');
 }
 
@@ -64,6 +110,35 @@ String formatAuthErrorMessage(Object error) {
   if (error is AuthException) {
     final code = error.code?.toLowerCase() ?? '';
     final msg = error.message.toLowerCase();
+
+    if (msg.contains('not a test user') ||
+        msg.contains('testing mode') ||
+        msg.contains('not completed the google verification') ||
+        msg.contains('access blocked') ||
+        (code == 'access_denied' && (msg.contains('test') || msg.contains('developer')))) {
+      return "This Google account isn't a test user yet. Please contact the administrator.";
+    }
+    if (code == 'user_cancelled' ||
+        code == 'canceled' ||
+        code == 'cancelled' ||
+        msg.contains('user cancelled') ||
+        msg.contains('user canceled') ||
+        msg.contains('sign-in was cancelled') ||
+        msg.contains('closed in the browser') ||
+        msg.contains('timed out') ||
+        (code == 'access_denied' && !msg.contains('test user'))) {
+      return 'Google sign-in was cancelled.';
+    }
+    if (msg.contains('port 3000')) {
+      return 'Port 3000 is already in use. Please close any application using port 3000 and try again.';
+    }
+    if (msg.contains('network') ||
+        msg.contains('socket') ||
+        msg.contains('connection') ||
+        msg.contains('failed host lookup') ||
+        msg.contains('clientexception')) {
+      return 'Network connection failed. Please check your internet connection and try again.';
+    }
 
     if (code == 'phone_provider_disabled' ||
         msg.contains('phone provider is disabled') ||
@@ -113,6 +188,31 @@ String formatAuthErrorMessage(Object error) {
   }
 
   final msg = error.toString().toLowerCase();
+  if (msg.contains('not a test user') ||
+      msg.contains('testing mode') ||
+      msg.contains('not completed the google verification') ||
+      msg.contains('access blocked')) {
+    return "This Google account isn't a test user yet. Please contact the administrator.";
+  }
+  if (msg.contains('user cancelled') ||
+      msg.contains('user canceled') ||
+      msg.contains('sign-in was cancelled') ||
+      msg.contains('closed in the browser') ||
+      msg.contains('timed out')) {
+    return 'Google sign-in was cancelled.';
+  }
+  if (msg.contains('port 3000')) {
+    return 'Port 3000 is already in use. Please close any application using port 3000 and try again.';
+  }
+  if (msg.contains('network') ||
+      msg.contains('socket') ||
+      msg.contains('connection') ||
+      msg.contains('failed host lookup') ||
+      msg.contains('clientexception') ||
+      msg.contains('handshakeexception') ||
+      msg.contains('httpexception')) {
+    return 'Network connection failed. Please check your internet connection and try again.';
+  }
   if (msg.contains('phone provider is disabled') ||
       msg.contains('sms not supported') ||
       msg.contains('sms verification is not configured') ||
@@ -195,9 +295,46 @@ class AuthState {
 
 class AuthNotifier extends StateNotifier<AuthState> {
   final Ref? ref;
+  StreamSubscription? _authSubscription;
 
   AuthNotifier([this.ref]) : super(const AuthState()) {
     _initializeSession();
+    _setupAuthListener();
+  }
+
+  void _setupAuthListener() {
+    if (!SupabaseService.isConfigured) return;
+    _authSubscription?.cancel();
+    _authSubscription = SupabaseService.client.auth.onAuthStateChange.listen(
+      (data) async {
+        final event = data.event;
+        final session = data.session;
+
+        if (event == AuthChangeEvent.signedIn && session != null) {
+          if (state.user?.id == session.user.id && state.sessionUnlocked) {
+            return;
+          }
+          final isGoogle =
+              session.user.appMetadata['provider'] == 'google' ||
+              session.user.identities?.any((i) => i.provider == 'google') ==
+                  true;
+
+          if (isGoogle || state.isLoading) {
+            await _handleOAuthSignInSuccess(session.user);
+          }
+        } else if (event == AuthChangeEvent.signedOut) {
+          if (state.user != null && !_loggingOut && mounted) {
+            state = const AuthState();
+          }
+        }
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _authSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> _initializeSession() async {
@@ -244,6 +381,177 @@ class AuthNotifier extends StateNotifier<AuthState> {
       isVerified: true,
       sessionUnlocked: true,
     );
+  }
+
+  // ── Google OAuth Sign-In ──────────────────────────────────────────────────
+
+  Future<bool> signInWithGoogle({String? expectedRole}) async {
+    if (!SupabaseService.isConfigured) {
+      state = state.copyWith(
+        errorMessage: 'Supabase authentication is not configured.',
+      );
+      return false;
+    }
+
+    state = state.copyWith(isLoading: true, errorMessage: null);
+
+    try {
+      if (kIsWeb) {
+        await SupabaseService.client.auth.signInWithOAuth(
+          OAuthProvider.google,
+        );
+        return true;
+      } else if (defaultTargetPlatform == TargetPlatform.windows ||
+          defaultTargetPlatform == TargetPlatform.linux) {
+        final response = await DesktopOAuth.signInWithGoogleDesktop();
+        final authUser =
+            response?.session.user ?? SupabaseService.client.auth.currentUser;
+        if (authUser == null) {
+          throw const AuthException('Google sign-in did not complete.');
+        }
+        return await _handleOAuthSignInSuccess(
+          authUser,
+          expectedRole: expectedRole,
+        );
+      } else {
+        final launched = await SupabaseService.client.auth.signInWithOAuth(
+          OAuthProvider.google,
+          redirectTo: 'io.supabase.aerodrop://login-callback/',
+        );
+        if (!launched) {
+          throw const AuthException(
+            'Could not launch browser for Google sign-in.',
+          );
+        }
+        return true;
+      }
+    } catch (error) {
+      debugPrint('Supabase signInWithGoogle failed: $error');
+      if (mounted) {
+        state = state.copyWith(
+          isLoading: false,
+          errorMessage: formatAuthErrorMessage(error),
+        );
+      }
+      return false;
+    }
+  }
+
+  Future<bool> _handleOAuthSignInSuccess(
+    User authUser, {
+    String? expectedRole,
+  }) async {
+    try {
+      Map<String, dynamic>? userRow;
+      for (var i = 0; i < 4; i++) {
+        userRow = await SupabaseService.client
+            .from('users')
+            .select()
+            .eq('id', authUser.id)
+            .maybeSingle();
+        if (userRow != null) break;
+        await Future.delayed(const Duration(milliseconds: 250));
+      }
+
+      AeroDropUser aeroUser;
+      if (userRow != null) {
+        aeroUser = AeroDropUser.fromMap(Map<String, dynamic>.from(userRow));
+      } else {
+        final name =
+            (authUser.userMetadata?['full_name'] as String?) ??
+            (authUser.userMetadata?['name'] as String?) ??
+            (authUser.email?.split('@').first ?? 'Customer');
+        aeroUser = AeroDropUser(
+          id: authUser.id,
+          name: name,
+          email: authUser.email ?? '',
+          phoneNumber: authUser.phone,
+          role: 'user',
+          accountStatus: 'active',
+        );
+      }
+
+      if (aeroUser.accountStatus == 'suspended') {
+        await SupabaseService.client.auth.signOut();
+        if (mounted) {
+          state = state.copyWith(
+            isLoading: false,
+            errorMessage:
+                'Your account has been suspended. Please contact the administrator.',
+          );
+        }
+        return false;
+      }
+
+      if (aeroUser.accountStatus == 'deleted') {
+        await SupabaseService.client.auth.signOut();
+        if (mounted) {
+          state = state.copyWith(
+            isLoading: false,
+            errorMessage:
+                'This account is no longer available. Please contact the administrator.',
+          );
+        }
+        return false;
+      }
+
+      if (aeroUser.isAdmin ||
+          aeroUser.email.trim().toLowerCase() == 'admin@aerodrop.com') {
+        await SupabaseService.client.auth.signOut();
+        if (mounted) {
+          state = state.copyWith(
+            isLoading: false,
+            errorMessage:
+                'Administrator accounts must sign in using email and password.',
+          );
+        }
+        return false;
+      }
+
+      if (mounted) {
+        state = state.copyWith(
+          user: aeroUser,
+          sessionUnlocked: true,
+          requiresVerification: false,
+          isVerified: true,
+          isLoading: false,
+          errorMessage: null,
+        );
+      }
+      return true;
+    } catch (e) {
+      debugPrint('Error syncing OAuth user: $e');
+      if (mounted) {
+        state = state.copyWith(
+          isLoading: false,
+          errorMessage: formatAuthErrorMessage(e),
+        );
+      }
+      return false;
+    }
+  }
+
+  // ── Google-Only Account Detection ──────────────────────────────────────────
+
+  Future<bool> checkIsGoogleOnlyAccount(String email) async {
+    if (!SupabaseService.isConfigured) return false;
+    try {
+      final normalized = normalizeEmail(email);
+      final response = await SupabaseService.client.rpc(
+        'check_google_only_account',
+        params: {'p_email': normalized},
+      );
+      if (response is bool) {
+        return response;
+      }
+      if (response != null) {
+        return response.toString().toLowerCase() == 'true';
+      }
+      return false;
+    } catch (e) {
+      debugPrint('check_google_only_account RPC check skipped/failed: $e');
+      return false;
+    }
   }
 
   // ── Login ─────────────────────────────────────────────────────────────────
@@ -413,6 +721,20 @@ class AuthNotifier extends StateNotifier<AuthState> {
                 "Your email isn't verified yet. We sent you a new code.",
           );
           return false;
+        }
+
+        if (code == 'invalid_credentials' ||
+            msg.contains('invalid login credentials') ||
+            msg.contains('invalid credentials')) {
+          final isGoogleOnly = await checkIsGoogleOnlyAccount(normalizedEmail);
+          if (isGoogleOnly) {
+            state = state.copyWith(
+              isLoading: false,
+              errorMessage:
+                  'This account uses Google sign-in. Tap Continue with Google to sign in.',
+            );
+            return false;
+          }
         }
       }
 
@@ -955,8 +1277,32 @@ class AuthNotifier extends StateNotifier<AuthState> {
     String? businessDescription,
     String? campusLocationId,
   }) async {
+    if (!SupabaseService.isConfigured) {
+      state = state.copyWith(errorMessage: 'Supabase is not configured.');
+      return false;
+    }
+
     if (state.user == null) {
       state = state.copyWith(errorMessage: 'Not logged in.');
+      return false;
+    }
+
+    // Ensure session is active on Supabase client
+    var currentSession = SupabaseService.client.auth.currentSession;
+    if (currentSession == null) {
+      for (var i = 0; i < 3; i++) {
+        await Future.delayed(const Duration(milliseconds: 200));
+        currentSession = SupabaseService.client.auth.currentSession;
+        if (currentSession != null) break;
+      }
+    }
+
+    if (currentSession == null ||
+        SupabaseService.client.auth.currentUser == null) {
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: 'Your session has expired. Please sign in again.',
+      );
       return false;
     }
 
@@ -969,6 +1315,29 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final currentEmail = state.user!.email;
       final normalizedEmail = email.trim().toLowerCase();
       bool emailChangePending = false;
+
+      // Verify the public.users row exists before updating (wait for trigger if needed)
+      Map<String, dynamic>? userRowCheck;
+      for (var i = 0; i < 5; i++) {
+        try {
+          userRowCheck = await SupabaseService.client
+              .from('users')
+              .select('id')
+              .eq('id', userId)
+              .maybeSingle();
+          if (userRowCheck != null) break;
+        } catch (_) {}
+        await Future.delayed(const Duration(milliseconds: 300));
+      }
+
+      if (userRowCheck == null) {
+        state = state.copyWith(
+          isLoading: false,
+          errorMessage:
+              'User profile is initializing in the database. Please try again in a few seconds.',
+        );
+        return false;
+      }
 
       if (normalizedEmail != currentEmail) {
         if (!isValidEmail(email)) {
@@ -1033,7 +1402,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
       if (error is AuthException) {
         msg = formatAuthErrorMessage(error);
       } else if (error is PostgrestException) {
-        msg = error.message;
+        if (error.code == '42501') {
+          msg =
+              'Permission denied. Please ensure you are signed in and try again.';
+        } else {
+          msg = error.message;
+        }
       }
       state = state.copyWith(isLoading: false, errorMessage: msg);
       return false;

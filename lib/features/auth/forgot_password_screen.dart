@@ -48,15 +48,28 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen>
     if (_formKey.currentState!.validate()) {
       setState(() => _loading = true);
       final email = _emailController.text.trim();
+      final isGoogleOnly =
+          await ref.read(authProvider.notifier).checkIsGoogleOnlyAccount(email);
       final success =
           await ref.read(authProvider.notifier).sendPasswordReset(email);
 
       if (mounted) {
         setState(() => _loading = false);
         if (success) {
+          if (isGoogleOnly) {
+            showNeuSnack(
+              context,
+              'This account was registered with Google sign-in. You can sign in with Google or use this code to set a password.',
+              tone: NeuToneKind.info,
+            );
+          }
           context.push(
             '/email-sent',
-            extra: {'email': email, 'type': 'reset'},
+            extra: <String, String>{
+              'email': email,
+              'type': 'reset',
+              if (isGoogleOnly) 'is_google_only': 'true',
+            },
           );
         } else {
           final error = ref.read(authProvider).errorMessage ??

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 import 'package:aerodrop/core/models/user_model.dart';
@@ -373,6 +374,15 @@ void main() {
         'type': 'reset',
       };
       expect(extraWithoutGoogle['is_google_only'], isNull);
+    });
+
+    test('Desktop OAuth response safely HTML-escapes malicious error descriptions', () {
+      const maliciousError = '<script>alert("xss")</script> & error "quoted"';
+      final safe = htmlEscape.convert(maliciousError);
+      expect(safe, contains('&lt;script&gt;'));
+      expect(safe, contains('&amp;'));
+      expect(safe, contains('&quot;'));
+      expect(safe, isNot(contains('<script>')));
     });
   });
 }

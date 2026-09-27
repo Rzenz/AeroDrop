@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -39,14 +40,46 @@ Future<AuthSessionUrlResponse?> signInWithGoogleDesktopImpl() async {
       );
     }
 
-    // Wait for the browser redirect callback on localhost:3000 with a 2-minute timeout
+    // Wait for the browser redirect callback on localhost:3000 with a 2-minute timeout,
+    // looping over requests and answering 204 to stray requests (e.g. /favicon.ico)
+    // until one contains 'code' or 'error'.
+    final completer = Completer<HttpRequest>();
+    final timer = Timer(const Duration(seconds: 120), () {
+      if (!completer.isCompleted) {
+        completer.completeError(
+          const AuthException(
+            'Google sign-in timed out or was closed in the browser.',
+          ),
+        );
+      }
+    });
+
+    final sub = server.listen(
+      (request) async {
+        final queryParams = request.uri.queryParameters;
+        if (queryParams.containsKey('code') || queryParams.containsKey('error')) {
+          if (!completer.isCompleted) {
+            completer.complete(request);
+          }
+        } else {
+          // Respond 204 to stray browser requests (e.g. /favicon.ico)
+          request.response.statusCode = HttpStatus.noContent;
+          await request.response.close();
+        }
+      },
+      onError: (Object error) {
+        if (!completer.isCompleted) {
+          completer.completeError(error);
+        }
+      },
+    );
+
     HttpRequest request;
     try {
-      request = await server.first.timeout(const Duration(seconds: 120));
-    } on TimeoutException {
-      throw const AuthException(
-        'Google sign-in timed out or was closed in the browser.',
-      );
+      request = await completer.future;
+    } finally {
+      timer.cancel();
+      await sub.cancel();
     }
 
     final queryParams = request.uri.queryParameters;
@@ -86,6 +119,9 @@ Future<AuthSessionUrlResponse?> signInWithGoogleDesktopImpl() async {
       );
       return authResponse;
     } else {
+      final rawError = errorDescription ?? error ?? 'Google sign-in was cancelled.';
+      final safeError = htmlEscape.convert(rawError);
+
       request.response.write('''
 <!DOCTYPE html>
 <html>
@@ -102,7 +138,7 @@ Future<AuthSessionUrlResponse?> signInWithGoogleDesktopImpl() async {
 <body>
   <div class="card">
     <h1>Sign In Failed</h1>
-    <p>${errorDescription ?? error ?? 'Google sign-in was cancelled.'}</p>
+    <p>$safeError</p>
   </div>
 </body>
 </html>
@@ -110,7 +146,7 @@ Future<AuthSessionUrlResponse?> signInWithGoogleDesktopImpl() async {
       await request.response.close();
 
       if (error != null) {
-        throw AuthException(errorDescription ?? error);
+        throw AuthException(rawError);
       }
       throw const AuthException('Google sign-in was cancelled.');
     }

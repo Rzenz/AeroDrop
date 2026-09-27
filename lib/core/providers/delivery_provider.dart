@@ -7,6 +7,8 @@ import '../models/delivery_model.dart';
 import 'drone_provider.dart';
 import '../models/drone_model.dart';
 import '../services/supabase_service.dart';
+import '../services/drone_flight_calculator.dart';
+import '../services/delivery_fee_calculator.dart';
 import 'notification_provider.dart';
 import 'auth_provider.dart';
 import 'order_provider.dart';
@@ -210,6 +212,35 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
   }
 
 
+  (double, double) _coordinatesForLocation(String? locationName) {
+    if (locationName == null || locationName.isEmpty) {
+      return (10.325210, 123.953201);
+    }
+    final query = locationName.toLowerCase();
+    final coords = {
+      'old building': (10.325210, 123.953201),
+      'main': (10.325210, 123.953201),
+      'uclm main': (10.325210, 123.953201),
+      'annex 2 building': (10.325633, 123.953770),
+      'annex-2': (10.325633, 123.953770),
+      'annex 2': (10.325633, 123.953770),
+      'basic education building': (10.325133, 123.953853),
+      'basic-ed': (10.325133, 123.953853),
+      'basic education': (10.325133, 123.953853),
+      'basic ed': (10.325133, 123.953853),
+      'maritime building': (10.326184, 123.954843),
+      'maritime': (10.326184, 123.954843),
+      'base hub': _baseHubCoords,
+      'base-hub': _baseHubCoords,
+    };
+    for (final entry in coords.entries) {
+      if (query.contains(entry.key) || entry.key.contains(query)) {
+        return entry.value;
+      }
+    }
+    return (10.325210, 123.953201);
+  }
+
   String _calculateEtaFromTimestamps(Map<String, dynamic> data) {
     final status = data['status']?.toString().toLowerCase() ?? '';
     if (status == 'delivered') return '0 mins';
@@ -217,23 +248,24 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
       return data['eta']?.toString() ?? 'TBD';
     }
 
+    final totalSecs = (data['estimated_delivery_seconds'] as num?)?.toDouble() ?? 60.0;
+    final progress = (data['progress'] as num?)?.toDouble();
+    if (progress != null && progress > 0.0) {
+      final remaining = DroneFlightCalculator.calculateRemainingSeconds(
+        progress: progress,
+        totalDurationSeconds: totalSecs,
+      );
+      return DroneFlightCalculator.formatEta(remaining);
+    }
+
     final startedAt = data['delivery_started_at'] != null
         ? DateTime.tryParse(data['delivery_started_at'].toString())
         : null;
     if (startedAt == null) return data['eta']?.toString() ?? 'TBD';
 
-    final weather = ref.read(weatherProvider);
-    final speedFactor = weather.isCaution ? 0.7 : 1.0;
-
-    final totalSecs =
-        (((data['estimated_delivery_seconds'] as num?)?.toInt() ?? 60) /
-                speedFactor)
-            .round();
     final elapsed = DateTime.now().difference(startedAt).inSeconds;
-    final remaining = (totalSecs - elapsed).clamp(0, totalSecs);
-    if (remaining <= 0) return '0 mins';
-    if (remaining < 60) return '$remaining secs';
-    return '${(remaining / 60).ceil()} mins';
+    final remaining = (totalSecs.round() - elapsed).clamp(0, totalSecs.round());
+    return DroneFlightCalculator.formatEta(remaining);
   }
 
   double _calculatePaymentAmount({
@@ -242,39 +274,12 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
     required String packageType,
     required double estimatedDistanceKm,
   }) {
-    final baseFee = 20.0;
-    final distanceFee = estimatedDistanceKm * 100.0;
-    final weightFee = packageWeight * 20.0;
-
-    double itemFee = 5.0;
-    switch (packageType) {
-      case 'Documents':
-        itemFee = 0.0;
-        break;
-      case 'Medicine':
-      case 'Food':
-      case 'Other':
-        itemFee = 5.0;
-        break;
-      case 'Electronics':
-        itemFee = 10.0;
-        break;
-    }
-
-    double priorityFee = 0.0;
-    switch (priority) {
-      case 'Standard':
-        priorityFee = 0.0;
-        break;
-      case 'Express':
-        priorityFee = 10.0;
-        break;
-      case 'Scheduled':
-        priorityFee = 5.0;
-        break;
-    }
-
-    return baseFee + distanceFee + weightFee + itemFee + priorityFee;
+    return DeliveryFeeCalculator.calculateCustomDeliveryFee(
+      estimatedDistanceKm: estimatedDistanceKm,
+      packageWeightKg: packageWeight,
+      packageType: packageType,
+      priority: priority,
+    );
   }
 
   String _generatePaymentReference() {
@@ -831,11 +836,6 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
 
       final weatherState = ref.read(weatherProvider);
       final isCaution = weatherState.isCaution;
-      final speed = isCaution ? 3.5 : 5.0;
-      final stepLeg1 = isCaution ? 0.07 : 0.12;
-      final stepLeg2 = isCaution ? 0.07 : 0.10;
-      final stepLeg3 = isCaution ? 0.07 : 0.10;
-      final batteryDrainPerLeg = isCaution ? 8.5 : 6.0;
 
       String droneUuid = '80000000-0000-0000-0000-000000000001';
       if (returningDrone != null && returningDrone.dbId.isNotEmpty) {
@@ -860,22 +860,6 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
         return;
       }
 
-      final coords = {
-        'old building': (10.325210, 123.953201),
-        'main': (10.325210, 123.953201),
-        'uclm main': (10.325210, 123.953201),
-        'annex 2 building': (10.325633, 123.953770),
-        'annex-2': (10.325633, 123.953770),
-        'annex 2': (10.325633, 123.953770),
-        'basic education building': (10.325133, 123.953853),
-        'basic-ed': (10.325133, 123.953853),
-        'basic education': (10.325133, 123.953853),
-        'basic ed': (10.325133, 123.953853),
-        'maritime building': (10.326184, 123.954843),
-        'maritime': (10.326184, 123.954843),
-        'base hub': _baseHubCoords,
-        'base-hub': _baseHubCoords,
-      };
       final hub = _baseHubCoords;
 
       for (final delivery in activeDeliveries) {
@@ -885,32 +869,35 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
           continue;
         }
 
-        final pickupQuery = (delivery.pickupLocationName ?? 'old building')
-            .toLowerCase();
-        final dropoffQuery =
-            (delivery.dropoffLocationName ?? delivery.deliveryAddress)
-                .toLowerCase();
-
-        (double, double) vendorLoc = (10.325210, 123.953201);
-        for (final entry in coords.entries) {
-          if (pickupQuery.contains(entry.key) ||
-              entry.key.contains(pickupQuery)) {
-            vendorLoc = entry.value;
-            break;
-          }
-        }
-
-        (double, double) customerLoc = (10.325210, 123.953201);
-        for (final entry in coords.entries) {
-          if (dropoffQuery.contains(entry.key) ||
-              entry.key.contains(dropoffQuery)) {
-            customerLoc = entry.value;
-            break;
-          }
-        }
+        final vendorLoc = _coordinatesForLocation(delivery.pickupLocationName);
+        final customerLoc = _coordinatesForLocation(
+          delivery.dropoffLocationName ?? delivery.deliveryAddress,
+        );
 
         if (delivery.status == DeliveryStatus.assigning) {
-          // ── PHASE 1: PICKUP (Hub -> Vendor) ──
+          // ── PHASE 1: PICKUP (Hub -> Vendor, EMPTY) ──
+          final distLeg1 = DroneFlightCalculator.calculateDistanceMeters(
+            startLat: hub.$1,
+            startLng: hub.$2,
+            endLat: vendorLoc.$1,
+            endLng: vendorLoc.$2,
+          );
+          final speedLeg1 = DroneFlightCalculator.calculateEffectiveSpeed(
+            isLoaded: false,
+            isCaution: isCaution,
+          );
+          final durationLeg1 = DroneFlightCalculator.calculateDurationSeconds(
+            distanceMeters: distLeg1,
+            effectiveSpeed: speedLeg1,
+          );
+          final stepLeg1 = DroneFlightCalculator.calculateProgressStep(
+            durationSeconds: durationLeg1,
+          );
+          final batteryDrainLeg1 = DroneFlightCalculator.calculateBatteryDrain(
+            isLoaded: false,
+            isCaution: isCaution,
+          );
+
           if (delivery.progress >= 1.0) {
             // Recovery case: already reached 1.0, confirm pickup immediately without sending telemetry
             await _confirmPickup(
@@ -929,7 +916,7 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
 
             final startBattery = _deliveryStartBatteries[delivery.id] ?? 98.0;
             final newBattery =
-                (startBattery - (batteryDrainPerLeg * newLegProgress))
+                (startBattery - (batteryDrainLeg1 * newLegProgress))
                     .clamp(0.0, 100.0);
 
             _lastDeliveryIdForDrone[droneUuid] = delivery.id;
@@ -951,7 +938,7 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
                         'p_latitude': lat,
                         'p_longitude': lng,
                         'p_altitude': alt,
-                        'p_speed': speed,
+                        'p_speed': speedLeg1,
                         'p_battery_level': newBattery,
                         'p_signal_strength': 98.0,
                         'p_heading': 90.0,
@@ -980,8 +967,9 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
                             currentLatitude: lat,
                             currentLongitude: lng,
                             currentAltitude: alt,
-                            currentSpeed: speed,
+                            currentSpeed: speedLeg1,
                             batteryLevel: newBattery,
+                            estimatedDeliverySeconds: durationLeg1.round(),
                           )
                         : d,
                   )
@@ -989,14 +977,38 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
             }
           }
         } else if (delivery.status == DeliveryStatus.inTransit) {
-          // ── PHASE 2: TRANSIT (Vendor -> Customer) ──
+          // ── PHASE 2: TRANSIT (Vendor -> Customer, LOADED) ──
+          final distLeg2 = DroneFlightCalculator.calculateDistanceMeters(
+            startLat: vendorLoc.$1,
+            startLng: vendorLoc.$2,
+            endLat: customerLoc.$1,
+            endLng: customerLoc.$2,
+          );
+          final speedLeg2 = DroneFlightCalculator.calculateEffectiveSpeed(
+            isLoaded: true,
+            payloadKg: delivery.packageWeight,
+            isCaution: isCaution,
+          );
+          final durationLeg2 = DroneFlightCalculator.calculateDurationSeconds(
+            distanceMeters: distLeg2,
+            effectiveSpeed: speedLeg2,
+          );
+          final stepLeg2 = DroneFlightCalculator.calculateProgressStep(
+            durationSeconds: durationLeg2,
+          );
+          final batteryDrainLeg2 = DroneFlightCalculator.calculateBatteryDrain(
+            isLoaded: true,
+            payloadKg: delivery.packageWeight,
+            isCaution: isCaution,
+          );
+
           if (delivery.progress >= 1.0) {
             // Recovery case: already reached 1.0, complete delivery immediately without sending telemetry
             final fallbackStartBattery =
                 _deliveryStartBatteries[delivery.id] ??
-                    (98.0 - batteryDrainPerLeg);
+                    (98.0 - batteryDrainLeg2);
             final fallbackEndBattery =
-                (fallbackStartBattery - batteryDrainPerLeg).clamp(0.0, 100.0);
+                (fallbackStartBattery - batteryDrainLeg2).clamp(0.0, 100.0);
             await _completeDelivery(
               delivery: delivery,
               customerLoc: customerLoc,
@@ -1016,10 +1028,16 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
 
             final startBattery =
                 _deliveryStartBatteries[delivery.id] ??
-                    (98.0 - batteryDrainPerLeg);
+                    (98.0 - batteryDrainLeg2);
             final newBattery =
-                (startBattery - (batteryDrainPerLeg * newLegProgress))
+                (startBattery - (batteryDrainLeg2 * newLegProgress))
                     .clamp(0.0, 100.0);
+
+            final remainingSecs = DroneFlightCalculator.calculateRemainingSeconds(
+              progress: newLegProgress,
+              totalDurationSeconds: durationLeg2,
+            );
+            final etaStr = DroneFlightCalculator.formatEta(remainingSecs);
 
             _lastDeliveryIdForDrone[droneUuid] = delivery.id;
             _leg3Origin[droneUuid] = (lat, lng);
@@ -1043,7 +1061,7 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
                         'p_latitude': lat,
                         'p_longitude': lng,
                         'p_altitude': alt,
-                        'p_speed': speed,
+                        'p_speed': speedLeg2,
                         'p_battery_level': newBattery,
                         'p_signal_strength': 98.0,
                         'p_heading': 90.0,
@@ -1072,8 +1090,10 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
                             currentLatitude: lat,
                             currentLongitude: lng,
                             currentAltitude: alt,
-                            currentSpeed: speed,
+                            currentSpeed: speedLeg2,
                             batteryLevel: newBattery,
+                            estimatedDeliverySeconds: durationLeg2.round(),
+                            eta: etaStr,
                           )
                         : d,
                   )
@@ -1083,7 +1103,7 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
         }
       }
 
-      // ── PHASE 3: LEG 3 DRIVER (Customer/Aborted Position -> Base Hub) ──
+      // ── PHASE 3: LEG 3 DRIVER (Customer/Aborted Position -> Base Hub, EMPTY) ──
       if (returningDrone != null) {
         final dUuid = returningDrone.dbId.isNotEmpty
             ? returningDrone.dbId
@@ -1186,6 +1206,28 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
                     )
                   : (10.325210, 123.953201));
 
+          final distLeg3 = DroneFlightCalculator.calculateDistanceMeters(
+            startLat: leg3Start.$1,
+            startLng: leg3Start.$2,
+            endLat: hub.$1,
+            endLng: hub.$2,
+          );
+          final speedLeg3 = DroneFlightCalculator.calculateEffectiveSpeed(
+            isLoaded: false,
+            isCaution: isCaution,
+          );
+          final durationLeg3 = DroneFlightCalculator.calculateDurationSeconds(
+            distanceMeters: distLeg3,
+            effectiveSpeed: speedLeg3,
+          );
+          final stepLeg3 = DroneFlightCalculator.calculateProgressStep(
+            durationSeconds: durationLeg3,
+          );
+          final batteryDrainLeg3 = DroneFlightCalculator.calculateBatteryDrain(
+            isLoaded: false,
+            isCaution: isCaution,
+          );
+
           final currentLeg3Progress =
               (_leg3Progress[dUuid] ?? 0.0).clamp(0.0, 1.0);
           final newLeg3Progress =
@@ -1203,7 +1245,7 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
             _leg3StartBatteries[dUuid] = startBattery;
           }
           final newBattery = (startBattery -
-                  (batteryDrainPerLeg * newLeg3Progress))
+                  (batteryDrainLeg3 * newLeg3Progress))
               .clamp(0.0, 100.0);
 
           if (SupabaseService.isConfigured) {
@@ -1215,7 +1257,7 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
                   'p_latitude': lat,
                   'p_longitude': lng,
                   'p_altitude': alt,
-                  'p_speed': speed,
+                  'p_speed': speedLeg3,
                   'p_battery_level': newBattery,
                   'p_signal_strength': 98.0,
                   'p_heading': 270.0,
@@ -1627,13 +1669,42 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
 
       final nowStr = DateTime.now().toUtc().toIso8601String();
 
+      final existingDel = state.where((d) => d.id == deliveryId).firstOrNull;
+      final weather = ref.read(weatherProvider);
+      final pickupLoc = _coordinatesForLocation(
+        existingDel?.pickupLocationName ??
+            deliveryData['pickup_location_name']?.toString() ??
+            'Main Building',
+      );
+      final dropoffLoc = _coordinatesForLocation(
+        existingDel?.dropoffLocationName ??
+            existingDel?.deliveryAddress ??
+            deliveryData['delivery_address']?.toString() ??
+            'Campus',
+      );
+      final distMeters = DroneFlightCalculator.calculateDistanceMeters(
+        startLat: pickupLoc.$1,
+        startLng: pickupLoc.$2,
+        endLat: dropoffLoc.$1,
+        endLng: dropoffLoc.$2,
+      );
+      final effSpeed = DroneFlightCalculator.calculateEffectiveSpeed(
+        isLoaded: true,
+        payloadKg: packageWeight,
+        isCaution: weather.isCaution,
+      );
+      final estimatedSecs = DroneFlightCalculator.calculateDurationSeconds(
+        distanceMeters: distMeters,
+        effectiveSpeed: effSpeed,
+      ).round();
+
       final updatedResponse = await SupabaseService.client
           .from('deliveries')
           .update({
             'status': 'in_transit',
             'drone_id': droneUuid,
             'delivery_started_at': nowStr,
-            'estimated_delivery_seconds': 60,
+            'estimated_delivery_seconds': estimatedSecs,
             'progress': 0.0,
             'updated_at': nowStr,
           })

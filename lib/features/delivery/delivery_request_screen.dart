@@ -19,6 +19,7 @@ import '../../core/providers/drone_provider.dart';
 import '../../core/providers/weather_provider.dart';
 import '../../core/widgets/aerodrop_warning_dialog.dart';
 import '../../core/utils/phone_input_formatter.dart';
+import '../../core/services/delivery_fee_calculator.dart';
 
 class CampusLocation {
   final String id;
@@ -170,49 +171,29 @@ class _DeliveryRequestScreenState extends ConsumerState<DeliveryRequestScreen> {
 
     double distance = 0.0;
     try {
-      distance = _getEstimatedDistanceKm(
-        _selectedPickup!.id,
-        _selectedDropoff!.id,
+      final calculated = DeliveryFeeCalculator.calculateDistanceKm(
+        startLat: _selectedPickup!.latitude,
+        startLng: _selectedPickup!.longitude,
+        endLat: _selectedDropoff!.latitude,
+        endLng: _selectedDropoff!.longitude,
       );
+      distance = calculated ??
+          _getEstimatedDistanceKm(
+            _selectedPickup!.id,
+            _selectedDropoff!.id,
+          );
     } catch (_) {
       distance = 0.05;
     }
 
     final weight = double.tryParse(_weightController.text.trim()) ?? 0.0;
 
-    final baseFee = 20.0;
-    final distanceFee = distance * 100.0;
-    final weightFee = weight * 20.0;
-
-    double itemFee = 5.0;
-    switch (_packageType) {
-      case 'Documents':
-        itemFee = 0.0;
-        break;
-      case 'Medicine':
-      case 'Food':
-      case 'Other':
-        itemFee = 5.0;
-        break;
-      case 'Electronics':
-        itemFee = 10.0;
-        break;
-    }
-
-    double priorityFee = 0.0;
-    switch (_priority) {
-      case 'Standard':
-        priorityFee = 0.0;
-        break;
-      case 'Express':
-        priorityFee = 10.0;
-        break;
-      case 'Scheduled':
-        priorityFee = 5.0;
-        break;
-    }
-
-    return baseFee + distanceFee + weightFee + itemFee + priorityFee;
+    return DeliveryFeeCalculator.calculateCustomDeliveryFee(
+      estimatedDistanceKm: distance,
+      packageWeightKg: weight,
+      packageType: _packageType,
+      priority: _priority,
+    );
   }
 
   double _getEstimatedDistanceKm(String pickupId, String dropoffId) {

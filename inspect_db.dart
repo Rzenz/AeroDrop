@@ -2,10 +2,18 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 void main() async {
-  final client = SupabaseClient(
-    'https://owpbhztzjpillorjzpta.supabase.co',
-    'sb_publishable_ZkdB7iXSZiDWBQGaNKDghA_Hjf-8tnk',
+  final url = const String.fromEnvironment('SUPABASE_URL', defaultValue: '');
+  final anonKey = const String.fromEnvironment(
+    'SUPABASE_ANON_KEY',
+    defaultValue: '',
   );
+
+  if (url.isEmpty || anonKey.isEmpty) {
+    debugPrint('SUPABASE_URL and SUPABASE_ANON_KEY must be provided via --dart-define');
+    return;
+  }
+
+  final client = SupabaseClient(url, anonKey);
 
   final tables = [
     'users',

@@ -10,8 +10,11 @@ import '../../core/widgets/neu_card.dart';
 import '../../core/widgets/neu_button.dart';
 import '../../core/models/order_model.dart';
 import '../../core/models/delivery_model.dart';
+import '../../core/providers/location_provider.dart';
 import '../../core/providers/order_provider.dart';
 import '../../core/providers/delivery_provider.dart';
+import '../../core/providers/vendor_provider.dart';
+import '../../core/services/delivery_fee_calculator.dart';
 import '../../core/services/supabase_service.dart';
 import '../../core/widgets/neu_feedback.dart';
 import 'receipt_screen.dart';
@@ -32,7 +35,7 @@ final orderDetailsProvider = FutureProvider.family<OrderModel?, String>((
           vendor:users!vendor_id(full_name, business_name),
           customer:users!user_id(full_name, phone_number),
           campus_locations!delivery_location_id(name),
-          order_items(product_id, product_name, quantity, unit_price),
+          order_items(product_id, product_name, quantity, unit_price, weight_grams),
           deliveries(id, status, progress, drone_id, estimated_delivery_seconds, delivery_started_at, delivery_completed_at, created_at)
         ''')
         .eq('id', id)
@@ -78,6 +81,11 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
   void initState() {
     super.initState();
     _setupRealtime();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && ref.read(vendorProvider).vendors.isEmpty) {
+        ref.read(vendorProvider.notifier).loadVendors();
+      }
+    });
   }
 
   @override
@@ -182,6 +190,51 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
                     .clamp(0.0, 1.0);
 
             final order = baseOrder;
+
+            final allCampusLocations =
+                ref.watch(campusLocationsProvider).value ?? [];
+            final vendors = ref.watch(vendorProvider).vendors;
+            final vendor =
+                vendors.where((v) => v.id == order.vendorId).firstOrNull;
+
+            CampusLocation? vendorLoc;
+            if (vendor != null) {
+              if (vendor.campusLocationId != null &&
+                  vendor.campusLocationId!.isNotEmpty) {
+                vendorLoc = allCampusLocations
+                    .where((l) => l.id == vendor.campusLocationId)
+                    .firstOrNull;
+              }
+              if (vendorLoc == null && vendor.building.isNotEmpty) {
+                final bLower = vendor.building.toLowerCase();
+                vendorLoc = allCampusLocations.where((l) {
+                  final lName = l.name.toLowerCase();
+                  final lCode = l.locationCode.toLowerCase();
+                  return lName.contains(bLower) ||
+                      bLower.contains(lName) ||
+                      lCode == bLower;
+                }).firstOrNull;
+              }
+            }
+
+            final dropoffLoc = allCampusLocations
+                .where((l) => l.id == order.dropoffLocationId)
+                .firstOrNull;
+
+            final distanceKm = DeliveryFeeCalculator.calculateDistanceKm(
+              startLat: vendorLoc?.latitude,
+              startLng: vendorLoc?.longitude,
+              endLat: dropoffLoc?.latitude,
+              endLng: dropoffLoc?.longitude,
+            );
+
+            // ponytail: Recompute delivery fee breakdown from stored order data.
+            // If vendor coordinates changed later, falls back gracefully to null (single line).
+            final feeBreakdown = DeliveryFeeCalculator.recomputeStoredOrderFee(
+              storedDeliveryFee: order.deliveryFee,
+              distanceKm: distanceKm,
+              weightKg: order.totalWeightKg,
+            );
 
             final isVendor = GoRouterState.of(context)
                 .uri
@@ -386,6 +439,34 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
                         label: 'Drone Delivery Fee',
                         value: '₱${order.deliveryFee.toStringAsFixed(2)}',
                       ),
+                      if (feeBreakdown != null) ...[
+                        for (final row in feeBreakdown.breakdownRows) ...[
+                          const SizedBox(height: 3),
+                          Padding(
+                            padding: const EdgeInsets.only(left: 12),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  row.label,
+                                  style: AppTextStyles.caption(
+                                    fontSize: 11,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                                Text(
+                                  '₱${row.amount.toStringAsFixed(2)}',
+                                  style: AppTextStyles.caption(
+                                    fontSize: 11,
+                                    color: AppColors.textSecondary,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
                       const Divider(height: 16),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -480,10 +561,12 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
                           ? order.subtotal
                           : (order.totalAmount - order.deliveryFee),
                       deliveryFee: order.deliveryFee,
+                      feeBreakdown: feeBreakdown,
                       total: order.totalAmount,
                       paymentLabel: _methodLabel(order.paymentMethod),
                       placedAt: order.createdAt,
                       dropoffName: order.dropoffLocationName,
+                      totalWeightGrams: order.totalWeightGrams,
                       customerNote: order.notes,
                       orderStatus: order.statusDisplay,
                       deliveryId: order.deliveryId ?? liveDelivery?.id,

@@ -214,7 +214,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
       if (tel != null && mounted) {
         setState(() {
           if (tel['speed'] != null) {
-            _flightSpeed = '${tel['speed']} km/h';
+            _flightSpeed = '${tel['speed']} m/s';
           }
           if (tel['altitude'] != null) {
             _flightAltitude = '${tel['altitude']} m';

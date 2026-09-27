@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:gal/gal.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/services/delivery_fee_calculator.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_motion.dart';
 import '../../core/theme/app_spacing.dart';
@@ -41,6 +42,7 @@ class ReceiptData {
     this.customerNote,
     this.orderStatus,
     this.deliveryId,
+    this.feeBreakdown,
   });
 
   final String orderRef;
@@ -59,6 +61,7 @@ class ReceiptData {
   final String? customerNote;
   final String? orderStatus;
   final String? deliveryId;
+  final DeliveryFeeBreakdown? feeBreakdown;
 }
 
 /// One printed line item.
@@ -439,6 +442,16 @@ class _Paper extends StatelessWidget {
 
                 _Row(label: 'Subtotal', value: _peso(data.subtotal)),
                 _Row(label: 'Delivery fee', value: _peso(data.deliveryFee)),
+                if (data.feeBreakdown != null &&
+                    (data.feeBreakdown!.totalFee - data.deliveryFee).abs() < 0.01) ...[
+                  for (final item in data.feeBreakdown!.breakdownRows)
+                    _Row(
+                      label: item.label,
+                      value: _peso(item.amount),
+                      muted: true,
+                      indent: true,
+                    ),
+                ],
                 if (data.totalWeightGrams != null && data.totalWeightGrams! > 0)
                   _Row(
                     label: 'Cargo Weight',
@@ -582,23 +595,34 @@ class _LineItem extends StatelessWidget {
 }
 
 class _Row extends StatelessWidget {
-  const _Row({required this.label, required this.value, this.mono = false});
+  const _Row({
+    required this.label,
+    required this.value,
+    this.mono = false,
+    this.muted = false,
+    this.indent = false,
+  });
 
   final String label;
   final String value;
   final bool mono;
+  final bool muted;
+  final bool indent;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
+      padding: EdgeInsets.only(
+        left: indent ? 10.0 : 0.0,
+        bottom: muted ? 2.5 : 4.0,
+      ),
       child: Row(
         children: [
           Expanded(
             child: Text(
               label,
               style: AppTextStyles.receipt(
-                fontSize: 10.5,
+                fontSize: muted ? 9.5 : 10.5,
                 color: _Paper._faint,
               ),
             ),
@@ -611,8 +635,8 @@ class _Row extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.right,
               style: AppTextStyles.receipt(
-                fontSize: 10.5,
-                color: _Paper._ink,
+                fontSize: muted ? 9.5 : 10.5,
+                color: muted ? _Paper._faint : _Paper._ink,
                 fontWeight: mono ? FontWeight.w700 : FontWeight.w400,
               ),
             ),

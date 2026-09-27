@@ -127,7 +127,7 @@ class OrderNotifier extends StateNotifier<OrderState> {
             '*, vendor:users!vendor_id(full_name, business_name), '
             'customer:users!user_id(full_name, phone_number), '
             'campus_locations!delivery_location_id(name), '
-            'order_items(product_name, quantity, unit_price), '
+            'order_items(product_name, quantity, unit_price, weight_grams), '
             'deliveries(id, status, progress, drone_id, estimated_delivery_seconds, delivery_started_at, delivery_completed_at)',
           )
           .eq('user_id', user.id)
@@ -375,7 +375,7 @@ class VendorOrdersNotifier extends StateNotifier<OrderState> {
           .select(
             '*, customer:users!user_id(full_name, phone_number), '
             'campus_locations!delivery_location_id(name), '
-            'order_items(product_name, quantity, unit_price), '
+            'order_items(product_name, quantity, unit_price, weight_grams), '
             'deliveries(id, status, progress, drone_id, estimated_delivery_seconds, delivery_started_at, delivery_completed_at)',
           )
           .eq('vendor_id', user.id)

@@ -9,6 +9,7 @@ import 'package:aerodrop/core/providers/notification_provider.dart';
 import 'package:aerodrop/core/models/delivery_model.dart';
 import 'package:aerodrop/core/providers/auth_provider.dart';
 import 'package:aerodrop/core/models/user_model.dart';
+import 'package:aerodrop/core/services/delivery_fee_calculator.dart';
 
 void main() {
   group('ReceiptData Model & Calculations Tests', () {
@@ -87,6 +88,127 @@ void main() {
       expect(receipt.deliveryFee, 15.0);
       expect(receipt.totalWeightGrams, isNull);
       expect(receipt.customerNote, isNull);
+      expect(receipt.feeBreakdown, isNull);
+    });
+
+    testWidgets('ReceiptScreen renders fee breakdown rows matching checkout wording', (tester) async {
+      final breakdown = DeliveryFeeCalculator.calculateOrderFee(
+        distanceKm: 0.21,
+        weightKg: 0.32,
+        isCaution: false,
+      );
+
+      final receipt = ReceiptData(
+        orderRef: 'ORD-BREAKDOWN-01',
+        vendorName: 'Campus Cafe',
+        lines: const [
+          ReceiptLine(name: 'Iced Latte', quantity: 1, unitPrice: 120.0),
+        ],
+        subtotal: 120.0,
+        deliveryFee: breakdown.totalFee, // 26.60
+        feeBreakdown: breakdown,
+        total: 146.60,
+        paymentLabel: 'GCash',
+        placedAt: DateTime(2026, 9, 27, 12, 0),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ReceiptScreen(data: receipt),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Delivery fee row exists
+      expect(find.text('Delivery fee'), findsOneWidget);
+      expect(find.text('₱26.60'), findsWidgets);
+
+      // Breakdown rows exist matching checkout wording
+      expect(find.text('Base'), findsOneWidget);
+      expect(find.text('₱15.00'), findsOneWidget);
+      expect(find.text('Distance 0.21 km'), findsOneWidget);
+      expect(find.text('₱8.40'), findsOneWidget);
+      expect(find.text('Weight 0.32 kg'), findsOneWidget);
+      expect(find.text('₱3.20'), findsOneWidget);
+      // Weather surcharge not shown for normal weather
+      expect(find.text('Weather surcharge'), findsNothing);
+    });
+
+    testWidgets('ReceiptScreen renders Weather surcharge row when caution applies', (tester) async {
+      final breakdown = DeliveryFeeCalculator.calculateOrderFee(
+        distanceKm: 0.21,
+        weightKg: 0.32,
+        isCaution: true, // caution surcharge +5.00
+      );
+
+      final receipt = ReceiptData(
+        orderRef: 'ORD-CAUTION-01',
+        vendorName: 'Campus Cafe',
+        lines: const [
+          ReceiptLine(name: 'Hot Chocolate', quantity: 1, unitPrice: 100.0),
+        ],
+        subtotal: 100.0,
+        deliveryFee: breakdown.totalFee, // 31.60
+        feeBreakdown: breakdown,
+        total: 131.60,
+        paymentLabel: 'GCash',
+        placedAt: DateTime(2026, 9, 27, 12, 0),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ReceiptScreen(data: receipt),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Delivery fee'), findsOneWidget);
+      expect(find.text('₱31.60'), findsWidgets);
+      expect(find.text('Base'), findsOneWidget);
+      expect(find.text('Distance 0.21 km'), findsOneWidget);
+      expect(find.text('Weight 0.32 kg'), findsOneWidget);
+      // Weather surcharge must be shown
+      expect(find.text('Weather surcharge'), findsOneWidget);
+      expect(find.text('₱5.00'), findsOneWidget);
+    });
+
+    testWidgets('ReceiptScreen gracefully falls back to single line when parts do not reconcile', (tester) async {
+      // Breakdown claims 31.60, but stored deliveryFee is 25.00 (mismatch)
+      final mismatchBreakdown = DeliveryFeeCalculator.calculateOrderFee(
+        distanceKm: 0.21,
+        weightKg: 0.32,
+        isCaution: true,
+      );
+
+      final receipt = ReceiptData(
+        orderRef: 'ORD-MISMATCH-01',
+        vendorName: 'Campus Cafe',
+        lines: const [
+          ReceiptLine(name: 'Sandwich', quantity: 1, unitPrice: 80.0),
+        ],
+        subtotal: 80.0,
+        deliveryFee: 25.00, // Stored fee does not match 31.60 breakdown
+        feeBreakdown: mismatchBreakdown,
+        total: 105.00,
+        paymentLabel: 'GCash',
+        placedAt: DateTime(2026, 9, 27, 12, 0),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ReceiptScreen(data: receipt),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Only stored delivery fee is shown
+      expect(find.text('Delivery fee'), findsOneWidget);
+      expect(find.text('₱25.00'), findsOneWidget);
+
+      // Breakdown items must NOT be rendered because they would show wrong numbers
+      expect(find.text('Distance 0.21 km'), findsNothing);
+      expect(find.text('Weight 0.32 kg'), findsNothing);
+      expect(find.text('Weather surcharge'), findsNothing);
     });
   });
 

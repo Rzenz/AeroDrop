@@ -13,7 +13,7 @@ import '../../core/providers/delivery_provider.dart';
 import '../../core/providers/telemetry_provider.dart';
 import '../../core/models/delivery_model.dart';
 import '../../core/services/supabase_service.dart';
-import '../../core/providers/weather_provider.dart';
+import '../../core/services/drone_flight_calculator.dart';
 
 class TrackingDetailsPage extends ConsumerStatefulWidget {
   final String deliveryId;
@@ -149,17 +149,13 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
         if (status == DeliveryStatus.delivered) {
           etaStr = '0 mins';
         } else if (status == DeliveryStatus.inTransit) {
-          final weather = ref.read(weatherProvider);
-          final cautionFactor = weather.isCaution ? (1.0 / 0.7) : 1.0;
           final totalSecs =
-              (data['estimated_delivery_seconds'] as num?)?.toInt() ?? 60;
-          final remaining =
-              ((1.0 - progress) * totalSecs * cautionFactor).round();
-          etaStr = remaining <= 0
-              ? '0 mins'
-              : remaining < 60
-              ? '$remaining secs'
-              : '${(remaining / 60).ceil()} mins';
+              (data['estimated_delivery_seconds'] as num?)?.toDouble() ?? 60.0;
+          final remaining = DroneFlightCalculator.calculateRemainingSeconds(
+            progress: progress,
+            totalDurationSeconds: totalSecs,
+          );
+          etaStr = DroneFlightCalculator.formatEta(remaining);
         } else if (status == DeliveryStatus.assigning) {
           etaStr = 'En route to vendor';
         }
@@ -525,11 +521,11 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
                                       ? '${activeDelivery.batteryLevel!.round()}%'
                                       : _droneBatteryText);
                               final speedDisplay = isDelivered
-                                  ? '0.0 km/h'
+                                  ? '0.0 m/s'
                                   : (tel?.speed != null
-                                      ? '${tel!.speed!.toStringAsFixed(1)} km/h'
+                                      ? '${tel!.speed!.toStringAsFixed(1)} m/s'
                                       : ((activeDelivery.currentSpeed ?? 0.0) > 0
-                                          ? '${activeDelivery.currentSpeed!.toStringAsFixed(1)} km/h'
+                                          ? '${activeDelivery.currentSpeed!.toStringAsFixed(1)} m/s'
                                           : '—'));
                               final altDisplay = isDelivered
                                   ? '0.0 m'

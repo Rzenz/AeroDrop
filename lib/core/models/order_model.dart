@@ -3,12 +3,14 @@ class OrderItemModel {
   final String productName;
   final int quantity;
   final double unitPrice;
+  final int weightGrams;
 
   OrderItemModel({
     this.productId = '',
     required this.productName,
     required this.quantity,
     this.unitPrice = 0,
+    this.weightGrams = 0,
   });
 }
 
@@ -68,6 +70,18 @@ class OrderModel {
     this.deliveryStartedAt,
     this.deliveryCompletedAt,
   });
+
+  /// Total payload weight in kilograms derived from order items.
+  double get totalWeightKg => items.fold<double>(
+        0.0,
+        (sum, item) => sum + ((item.weightGrams / 1000.0) * item.quantity),
+      );
+
+  /// Total payload weight in grams derived from order items.
+  int get totalWeightGrams => items.fold<int>(
+        0,
+        (sum, item) => sum + (item.weightGrams * item.quantity),
+      );
 
   /// Authoritative effective status derived from database order & delivery state.
   /// Unifies orders.order_status and deliveries.status so the UI consistently
@@ -157,6 +171,7 @@ class OrderModel {
                 productName: i['product_name']?.toString() ?? 'Item',
                 quantity: (i['quantity'] as num?)?.toInt() ?? 1,
                 unitPrice: (i['unit_price'] as num?)?.toDouble() ?? 0.0,
+                weightGrams: (i['weight_grams'] as num?)?.toInt() ?? 0,
               ),
             )
             .toList() ??

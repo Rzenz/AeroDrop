@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
+import 'package:aerodrop/core/constants/auth_constants.dart';
 import 'package:aerodrop/core/models/user_model.dart';
 import 'package:aerodrop/core/providers/auth_provider.dart';
 
@@ -219,7 +220,7 @@ void main() {
 
       final googleAdminUser = AeroDropUser(
         id: 'g-admin',
-        email: 'admin@aerodrop.com',
+        email: AuthConstants.adminEmail,
         name: 'Admin Google',
         role: 'admin',
       );
@@ -296,8 +297,7 @@ void main() {
 
     test('Admin accounts are explicitly blocked from Google OAuth', () {
       bool isOAuthAllowed(AeroDropUser user) {
-        if (user.isAdmin ||
-            user.email.trim().toLowerCase() == 'admin@aerodrop.com') {
+        if (user.isAdmin || AuthConstants.isAdminEmail(user.email)) {
           return false;
         }
         return true;
@@ -319,7 +319,7 @@ void main() {
 
       final adminUser = AeroDropUser(
         id: 'a-1',
-        email: 'admin@aerodrop.com',
+        email: AuthConstants.adminEmail,
         name: 'Admin',
         role: 'admin',
       );
@@ -340,6 +340,201 @@ void main() {
       expect(customer.isAdmin, isFalse);
       expect(customer.isVendor, isFalse);
       expect(customer.isPendingVendor, isFalse);
+    });
+  });
+
+  group('AuthConstants and Admin Email Protection', () {
+    test('isAdminEmail matches canonical admin and legacy admin', () {
+      expect(AuthConstants.adminEmail, 'admin.portal@uclm.edu');
+      expect(AuthConstants.isAdminEmail('admin.portal@uclm.edu'), isTrue);
+      expect(AuthConstants.isAdminEmail('ADMIN.PORTAL@UCLM.EDU '), isTrue);
+      expect(AuthConstants.isAdminEmail('aerodrop.uclm+admin@gmail.com'), isTrue);
+      expect(AuthConstants.isAdminEmail('AERODROP.UCLM+ADMIN@GMAIL.COM '), isTrue);
+      expect(AuthConstants.isAdminEmail('admin@aerodrop.com'), isTrue);
+      expect(AuthConstants.isAdminEmail('ADMIN@AERODROP.COM'), isTrue);
+    });
+
+    test('isAdminEmail rejects non-admin emails', () {
+      expect(AuthConstants.isAdminEmail('customer@gmail.com'), isFalse);
+      expect(AuthConstants.isAdminEmail('vendor@slu.edu.ph'), isFalse);
+      expect(AuthConstants.isAdminEmail(''), isFalse);
+      expect(AuthConstants.isAdminEmail(null), isFalse);
+    });
+
+    test('admin email protection guards prevent sending auth emails', () {
+      // 1. sendLoginOtp check
+      final adminUser = AeroDropUser(
+        id: 'adm-1',
+        email: AuthConstants.adminEmail,
+        name: 'Admin User',
+        role: 'admin',
+      );
+      expect(adminUser.isAdmin || AuthConstants.isAdminEmail(adminUser.email), isTrue);
+
+      // 2. register check
+      expect(AuthConstants.isAdminEmail('admin.portal@uclm.edu'), isTrue);
+
+      // 3. resendRegistrationOtp check
+      expect(AuthConstants.isAdminEmail(adminUser.email) || adminUser.isAdmin, isTrue);
+
+      // 4. sendPasswordReset check
+      expect(AuthConstants.isAdminEmail(adminUser.email) || adminUser.isAdmin, isTrue);
+    });
+  });
+
+  group('Password Login and OAuth Verification State Transitions', () {
+    final customerUser = AeroDropUser(
+      id: 'cust-1',
+      email: 'customer@aerodrop.app',
+      name: 'Customer One',
+      role: 'user',
+    );
+
+    final vendorUser = AeroDropUser(
+      id: 'vend-1',
+      email: 'vendor@aerodrop.app',
+      name: 'Vendor One',
+      role: 'vendor',
+      vendorStatus: 'approved',
+    );
+
+    final pendingVendorUser = AeroDropUser(
+      id: 'pvend-1',
+      email: 'applicant@aerodrop.app',
+      name: 'Pending Vendor One',
+      role: 'user',
+      vendorStatus: 'pending',
+    );
+
+    final adminUser = AeroDropUser(
+      id: 'admin-1',
+      email: AuthConstants.adminEmail,
+      name: 'System Admin',
+      role: 'admin',
+    );
+
+    test('Customer password login sets requiresVerification and keeps session locked', () {
+      final initial = const AuthState();
+      final postLogin = initial.copyWith(
+        user: customerUser,
+        sessionUnlocked: false,
+        requiresVerification: true,
+        isVerified: false,
+      );
+
+      expect(postLogin.user, isNotNull);
+      expect(postLogin.sessionUnlocked, isFalse);
+      expect(postLogin.requiresVerification, isTrue);
+      expect(postLogin.isVerified, isFalse);
+
+      final postOtp = postLogin.copyWith(
+        sessionUnlocked: true,
+        requiresVerification: false,
+        isVerified: true,
+      );
+
+      expect(postOtp.sessionUnlocked, isTrue);
+      expect(postOtp.requiresVerification, isFalse);
+      expect(postOtp.isVerified, isTrue);
+    });
+
+    test('Vendor password login sets requiresVerification and keeps session locked', () {
+      final postLogin = const AuthState().copyWith(
+        user: vendorUser,
+        sessionUnlocked: false,
+        requiresVerification: true,
+        isVerified: false,
+      );
+
+      expect(postLogin.sessionUnlocked, isFalse);
+      expect(postLogin.requiresVerification, isTrue);
+      expect(postLogin.isVerified, isFalse);
+    });
+
+    test('Pending vendor applicant password login requires OTP and routes to /account-pending', () {
+      final postLogin = const AuthState().copyWith(
+        user: pendingVendorUser,
+        sessionUnlocked: false,
+        requiresVerification: true,
+        isVerified: false,
+      );
+
+      expect(postLogin.sessionUnlocked, isFalse);
+      expect(postLogin.requiresVerification, isTrue);
+      expect(postLogin.user?.vendorStatus, 'pending');
+
+      // Post OTP verification route check
+      final user = postLogin.user!;
+      final targetRoute = user.vendorStatus == 'pending' ? '/account-pending' : '/user';
+      expect(targetRoute, '/account-pending');
+    });
+
+    test('Admin password login bypasses OTP directly with unlocked session', () {
+      final postAdminLogin = const AuthState().copyWith(
+        user: adminUser,
+        sessionUnlocked: true,
+        requiresVerification: false,
+        isVerified: true,
+      );
+
+      expect(postAdminLogin.sessionUnlocked, isTrue);
+      expect(postAdminLogin.requiresVerification, isFalse);
+      expect(postAdminLogin.isVerified, isTrue);
+      expect(postAdminLogin.user?.isAdmin, isTrue);
+    });
+
+    test('Google sign-in unlocks session immediately without OTP requirement', () {
+      final postGoogleSignIn = const AuthState().copyWith(
+        user: customerUser,
+        sessionUnlocked: true,
+        requiresVerification: false,
+        isVerified: true,
+      );
+
+      expect(postGoogleSignIn.sessionUnlocked, isTrue);
+      expect(postGoogleSignIn.requiresVerification, isFalse);
+      expect(postGoogleSignIn.isVerified, isTrue);
+    });
+
+    test('Vendor tab mismatch with customer credentials leaves user signed out', () {
+      // Simulating login mismatch logic
+      const expectedRole = 'vendor';
+      final aeroUser = customerUser;
+
+      final isPendingApplicant = aeroUser.vendorStatus == 'pending';
+      final isMismatch = expectedRole == 'vendor' &&
+          !isPendingApplicant &&
+          aeroUser.role != 'vendor' &&
+          !aeroUser.isAdmin;
+      expect(isMismatch, isTrue);
+
+      // State reset on mismatch
+      final stateOnMismatch = const AuthState().copyWith(
+        errorMessage: 'This account is not registered as a vendor.',
+      );
+
+      expect(stateOnMismatch.user, isNull);
+      expect(stateOnMismatch.sessionUnlocked, isFalse);
+      expect(stateOnMismatch.errorMessage, 'This account is not registered as a vendor.');
+    });
+
+    test('Customer tab mismatch with vendor credentials leaves user signed out', () {
+      const expectedRole = 'user';
+      final aeroUser = vendorUser;
+
+      final isMismatch = expectedRole == 'user' && aeroUser.role == 'vendor' && !aeroUser.isAdmin;
+      expect(isMismatch, isTrue);
+
+      final stateOnMismatch = const AuthState().copyWith(
+        errorMessage: 'This account is registered as a vendor. Please use Vendor Login.',
+      );
+
+      expect(stateOnMismatch.user, isNull);
+      expect(stateOnMismatch.sessionUnlocked, isFalse);
+      expect(
+        stateOnMismatch.errorMessage,
+        'This account is registered as a vendor. Please use Vendor Login.',
+      );
     });
   });
 

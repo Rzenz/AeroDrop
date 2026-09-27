@@ -15,6 +15,7 @@ import '../../core/providers/auth_provider.dart';
 import '../../core/providers/location_provider.dart';
 import '../../core/providers/vendor_provider.dart';
 import '../../core/providers/weather_provider.dart';
+import '../../core/services/delivery_fee_calculator.dart';
 import '../payment/widgets/simulated_card_dialog.dart';
 import 'widgets/order_confirmation_dialog.dart';
 
@@ -46,7 +47,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   @override
   Widget build(BuildContext context) {
     final cart = cartNotifier.value;
-    final total = cartNotifier.totalAmount + 20.0;
+    final feeBreakdown = _getFeeBreakdown(cart, isWatch: true);
+    final deliveryFee = feeBreakdown.totalFee;
+    final total = cartNotifier.totalAmount + deliveryFee;
     final totalWeightGrams = cart.fold<int>(
       0,
       (sum, item) => sum + ((item.weightKg * 1000).round() * item.quantity),
@@ -256,8 +259,21 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                         const SizedBox(height: 6),
                         _SummaryRow(
                           label: 'Drone Delivery Fee',
-                          value: '₱20.00',
+                          value: '₱${deliveryFee.toStringAsFixed(2)}',
                         ),
+                        if (feeBreakdown.breakdownText.isNotEmpty) ...[
+                          const SizedBox(height: 3),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              feeBreakdown.breakdownText,
+                              style: AppTextStyles.caption(
+                                fontSize: 10,
+                                color: AppColors.textSecondaryDark,
+                              ),
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 6),
                         _SummaryRow(
                           label: 'Total Cargo Weight',
@@ -455,7 +471,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       return;
     }
 
-    final totalAmount = cartNotifier.totalAmount + 20.0;
+    final feeBreakdown = _getFeeBreakdown(cart, isWatch: false);
+    final deliveryFee = feeBreakdown.totalFee;
+    final totalAmount = cartNotifier.totalAmount + deliveryFee;
     final dropoffName = _dropoffName() ?? 'Selected Campus Pad';
     final paymentLabel = _paymentMethod == 'gcash' ? 'GCash' : 'Credit / Debit Card';
 
@@ -495,7 +513,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
           vendorId: cart.first.vendorId,
           dropoffLocationId: _selectedLocationId!,
           subtotal: cartNotifier.totalAmount,
-          deliveryFee: 20.0,
+          deliveryFee: deliveryFee,
           totalAmount: totalAmount,
           paymentMethod: dbPaymentMethod,
           items: cart,
@@ -508,7 +526,12 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     if (success) {
       // Snapshot the receipt before clearing the cart — the lines are read
       // from it, and an empty cart prints an empty receipt.
-      final receipt = _receiptFor(cart, totalAmount);
+      final receipt = _receiptFor(
+        cart,
+        totalAmount,
+        deliveryFee,
+        feeBreakdown: feeBreakdown,
+      );
       cartNotifier.clear();
       context.go('/user/receipt', extra: receipt);
     } else {
@@ -534,13 +557,83 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     return null;
   }
 
+  /// Computes distance and weight based delivery fee with caution weather surcharge
+  DeliveryFeeBreakdown _getFeeBreakdown(List<CartItem> cart, {bool isWatch = false}) {
+    if (cart.isEmpty) {
+      return DeliveryFeeCalculator.calculateOrderFee();
+    }
+    final allCampusLocations = (isWatch
+            ? ref.watch(campusLocationsProvider).value
+            : ref.read(campusLocationsProvider).value) ??
+        [];
+    final dropoffLocations = (isWatch
+            ? ref.watch(dropoffLocationsProvider).value
+            : ref.read(dropoffLocationsProvider).value) ??
+        allCampusLocations;
+    final vendors = (isWatch
+        ? ref.watch(vendorProvider).vendors
+        : ref.read(vendorProvider).vendors);
+    final vendor =
+        vendors.where((v) => v.id == cart.first.vendorId).firstOrNull;
+
+    CampusLocation? vendorLoc;
+    if (vendor != null) {
+      if (vendor.campusLocationId != null &&
+          vendor.campusLocationId!.isNotEmpty) {
+        vendorLoc = allCampusLocations
+            .where((l) => l.id == vendor.campusLocationId)
+            .firstOrNull;
+      }
+      if (vendorLoc == null && vendor.building.isNotEmpty) {
+        final bLower = vendor.building.toLowerCase();
+        vendorLoc = allCampusLocations.where((l) {
+          final lName = l.name.toLowerCase();
+          final lCode = l.locationCode.toLowerCase();
+          return lName.contains(bLower) ||
+              bLower.contains(lName) ||
+              lCode == bLower;
+        }).firstOrNull;
+      }
+    }
+
+    final dropoffLoc = dropoffLocations
+        .where((l) => l.id == _selectedLocationId)
+        .firstOrNull;
+
+    final distanceKm = DeliveryFeeCalculator.calculateDistanceKm(
+      startLat: vendorLoc?.latitude,
+      startLng: vendorLoc?.longitude,
+      endLat: dropoffLoc?.latitude,
+      endLng: dropoffLoc?.longitude,
+    );
+
+    final totalWeightGrams = cart.fold<int>(
+      0,
+      (sum, item) => sum + ((item.weightKg * 1000).round() * item.quantity),
+    );
+    final weightKg = totalWeightGrams / 1000.0;
+    final weather =
+        isWatch ? ref.watch(weatherProvider) : ref.read(weatherProvider);
+
+    return DeliveryFeeCalculator.calculateOrderFee(
+      distanceKm: distanceKm,
+      weightKg: weightKg,
+      isCaution: weather.isCaution,
+    );
+  }
+
   /// Builds the printed record from the order just placed.
   ///
   /// The reference comes from the order the provider reloaded, which is sorted
   /// newest first — so the first entry is this one. When Supabase is not
   /// configured there is no row to read, and the receipt falls back to the
   /// payment reference format the server would have used.
-  ReceiptData _receiptFor(List<CartItem> cart, double totalAmount) {
+  ReceiptData _receiptFor(
+    List<CartItem> cart,
+    double totalAmount,
+    double deliveryFee, {
+    DeliveryFeeBreakdown? feeBreakdown,
+  }) {
     final placed = ref.read(orderProvider).orders;
     final user = ref.read(authProvider).user;
     final vendors = ref.read(vendorProvider).vendors;
@@ -576,7 +669,8 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
           ),
       ],
       subtotal: cartNotifier.totalAmount,
-      deliveryFee: 20.0,
+      deliveryFee: deliveryFee,
+      feeBreakdown: feeBreakdown,
       total: totalAmount,
       paymentLabel: _paymentMethod == 'gcash'
           ? 'GCash (Simulated)'

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../constants/auth_constants.dart';
 import '../models/user_model.dart';
 import '../services/desktop_oauth.dart';
 import '../services/supabase_service.dart';
@@ -296,6 +297,7 @@ class AuthState {
 class AuthNotifier extends StateNotifier<AuthState> {
   final Ref? ref;
   StreamSubscription? _authSubscription;
+  bool _isGoogleSignInActive = false;
 
   AuthNotifier([this.ref]) : super(const AuthState()) {
     _initializeSession();
@@ -319,7 +321,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
               session.user.identities?.any((i) => i.provider == 'google') ==
                   true;
 
-          if (isGoogle || state.isLoading) {
+          if (isGoogle && (_isGoogleSignInActive || kIsWeb)) {
+            _isGoogleSignInActive = false;
             await _handleOAuthSignInSuccess(session.user);
           }
         } else if (event == AuthChangeEvent.signedOut) {
@@ -393,6 +396,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       return false;
     }
 
+    _isGoogleSignInActive = true;
     state = state.copyWith(isLoading: true, errorMessage: null);
 
     try {
@@ -426,6 +430,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         return true;
       }
     } catch (error) {
+      _isGoogleSignInActive = false;
       debugPrint('Supabase signInWithGoogle failed: $error');
       if (mounted) {
         state = state.copyWith(
@@ -441,6 +446,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     User authUser, {
     String? expectedRole,
   }) async {
+    _isGoogleSignInActive = false;
     try {
       Map<String, dynamic>? userRow;
       for (var i = 0; i < 4; i++) {
@@ -474,8 +480,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       if (aeroUser.accountStatus == 'suspended') {
         await SupabaseService.client.auth.signOut();
         if (mounted) {
-          state = state.copyWith(
-            isLoading: false,
+          state = const AuthState().copyWith(
             errorMessage:
                 'Your account has been suspended. Please contact the administrator.',
           );
@@ -486,8 +491,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       if (aeroUser.accountStatus == 'deleted') {
         await SupabaseService.client.auth.signOut();
         if (mounted) {
-          state = state.copyWith(
-            isLoading: false,
+          state = const AuthState().copyWith(
             errorMessage:
                 'This account is no longer available. Please contact the administrator.',
           );
@@ -495,14 +499,22 @@ class AuthNotifier extends StateNotifier<AuthState> {
         return false;
       }
 
-      if (aeroUser.isAdmin ||
-          aeroUser.email.trim().toLowerCase() == 'admin@aerodrop.com') {
+      if (aeroUser.isAdmin || AuthConstants.isAdminEmail(aeroUser.email)) {
         await SupabaseService.client.auth.signOut();
         if (mounted) {
-          state = state.copyWith(
-            isLoading: false,
+          state = const AuthState().copyWith(
             errorMessage:
                 'Administrator accounts must sign in using email and password.',
+          );
+        }
+        return false;
+      }
+
+      if (expectedRole == 'vendor' && !aeroUser.isVendor && !aeroUser.isAdmin) {
+        await SupabaseService.client.auth.signOut();
+        if (mounted) {
+          state = const AuthState().copyWith(
+            errorMessage: 'This account is not registered as a vendor.',
           );
         }
         return false;
@@ -581,8 +593,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
       if (userRow == null) {
         await SupabaseService.client.auth.signOut();
-        state = state.copyWith(
-          isLoading: false,
+        state = const AuthState().copyWith(
           errorMessage:
               'Your account profile is not synchronized with the database.',
         );
@@ -593,8 +604,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
       if (aeroUser.accountStatus == 'suspended') {
         await SupabaseService.client.auth.signOut();
-        state = state.copyWith(
-          isLoading: false,
+        state = const AuthState().copyWith(
           errorMessage:
               'Your account has been suspended. Please contact the administrator.',
         );
@@ -603,8 +613,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
       if (aeroUser.accountStatus == 'deleted') {
         await SupabaseService.client.auth.signOut();
-        state = state.copyWith(
-          isLoading: false,
+        state = const AuthState().copyWith(
           errorMessage:
               'This account is no longer available. Please contact the administrator.',
         );
@@ -619,8 +628,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
               aeroUser.role != 'vendor' &&
               !aeroUser.isAdmin) {
             await SupabaseService.client.auth.signOut();
-            state = state.copyWith(
-              isLoading: false,
+            state = const AuthState().copyWith(
               errorMessage: 'This account is not registered as a vendor.',
             );
             return false;
@@ -629,8 +637,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
           if (aeroUser.role == 'vendor') {
             if (aeroUser.vendorStatus == 'suspended') {
               await SupabaseService.client.auth.signOut();
-              state = state.copyWith(
-                isLoading: false,
+              state = const AuthState().copyWith(
                 errorMessage:
                     'Your vendor account has been suspended. Please contact the administrator.',
               );
@@ -639,8 +646,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
             if (aeroUser.vendorStatus == 'rejected') {
               await SupabaseService.client.auth.signOut();
-              state = state.copyWith(
-                isLoading: false,
+              state = const AuthState().copyWith(
                 errorMessage:
                     'Your vendor application was rejected. Please contact the administrator.',
               );
@@ -650,8 +656,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         } else if (expectedRole == 'user') {
           if (aeroUser.role == 'vendor' && !aeroUser.isAdmin) {
             await SupabaseService.client.auth.signOut();
-            state = state.copyWith(
-              isLoading: false,
+            state = const AuthState().copyWith(
               errorMessage:
                   'This account is registered as a vendor. Please use Vendor Login.',
             );
@@ -661,7 +666,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       }
 
       // Admin role is excluded from OTP verification
-      if (aeroUser.isAdmin) {
+      if (aeroUser.isAdmin || AuthConstants.isAdminEmail(aeroUser.email)) {
         state = state.copyWith(
           user: aeroUser,
           sessionUnlocked: true,
@@ -694,7 +699,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
         if (code == 'email_not_confirmed' ||
             msg.contains('email not confirmed')) {
-          if (normalizedEmail != 'admin@aerodrop.com') {
+          if (!AuthConstants.isAdminEmail(normalizedEmail)) {
             try {
               await SupabaseService.client.auth.resend(
                 type: OtpType.signup,
@@ -752,6 +757,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
     final user = state.user;
     if (user == null) {
       state = state.copyWith(errorMessage: 'No active session found.');
+      return false;
+    }
+    if (user.isAdmin || AuthConstants.isAdminEmail(user.email)) {
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: 'Admin accounts do not require login OTP.',
+      );
       return false;
     }
     state = state.copyWith(isLoading: true, errorMessage: null);
@@ -894,6 +906,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final normalizedEmail = normalizeEmail(email);
       final normalizedPhone = normalizePhoneNumber(phoneNumber);
 
+      if (AuthConstants.isAdminEmail(normalizedEmail)) {
+        state = state.copyWith(
+          isLoading: false,
+          errorMessage: 'Admin accounts cannot be registered through this form.',
+        );
+        return false;
+      }
+
       final response = await SupabaseService.client.auth.signUp(
         email: normalizedEmail,
         password: password,
@@ -979,7 +999,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
             code == 'email_exists' ||
             msg.contains('already registered') ||
             msg.contains('already exists')) {
-          if (normalizedEmail != 'admin@aerodrop.com') {
+          if (!AuthConstants.isAdminEmail(normalizedEmail)) {
             try {
               await SupabaseService.client.auth.resend(
                 type: OtpType.signup,
@@ -1177,7 +1197,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
         );
       } else {
         final normalizedEmail = normalizeEmail(email);
-        if (normalizedEmail == 'admin@aerodrop.com') {
+        if (AuthConstants.isAdminEmail(normalizedEmail) ||
+            state.user?.isAdmin == true) {
           state = state.copyWith(
             errorMessage: 'Admin accounts do not require verification emails.',
           );
@@ -1213,7 +1234,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
       final normalizedEmail = normalizeEmail(email);
-      if (normalizedEmail == 'admin@aerodrop.com') {
+      if (AuthConstants.isAdminEmail(normalizedEmail) ||
+          state.user?.isAdmin == true) {
         state = state.copyWith(
           isLoading: false,
           errorMessage: 'Password reset is disabled for admin accounts.',
@@ -1340,6 +1362,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
       }
 
       if (normalizedEmail != currentEmail) {
+        if (state.user!.isAdmin ||
+            AuthConstants.isAdminEmail(currentEmail) ||
+            AuthConstants.isAdminEmail(normalizedEmail)) {
+          state = state.copyWith(
+            isLoading: false,
+            errorMessage: 'Administrator email addresses cannot be modified.',
+          );
+          return false;
+        }
+
         if (!isValidEmail(email)) {
           state = state.copyWith(
             isLoading: false,

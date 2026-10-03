@@ -1,364 +1,333 @@
-# AeroDrop: A UCLM Drone Delivery System
+<div align="center">
 
-AeroDrop is a capstone project developed by Bachelor of Science in Information Technology students from the University of Cebu Lapu-Lapu and Mandaue. It is a campus-based marketplace and drone delivery application designed to manage the ordering and delivery of small items within the university.
+<img src="https://raw.githubusercontent.com/Rzenz/AeroDrop/main/supabase/email/aerodrop_email_logo.png" width="160" alt="AeroDrop">
 
-The system connects campus users with approved campus vendors. Users can browse products, add items to their cart, place orders, select a delivery location, track the simulated drone, receive notifications, and view their order history. Vendors can manage products, inventory, and customer orders. Administrators can manage accounts, vendor applications, drones, deliveries, weather conditions, no-fly zones, reports, and system records.
+# AeroDrop
 
-AeroDrop currently uses simulated drone movement, telemetry, weather, payment, and notification workflows. It does not yet control physical drone hardware.
+### A Campus Drone Delivery System for UCLM
 
-## Project Purpose
+![Flutter](https://img.shields.io/badge/Flutter-4DB0F5?style=for-the-badge&logo=flutter&logoColor=white)
+![Dart](https://img.shields.io/badge/Dart-19223B?style=for-the-badge&logo=dart&logoColor=4DB0F5)
+![Supabase](https://img.shields.io/badge/Supabase-19223B?style=for-the-badge&logo=supabase&logoColor=3ECF8E)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-19223B?style=for-the-badge&logo=postgresql&logoColor=white)
 
-The purpose of AeroDrop is to provide a smart and organized campus delivery system for UCLM. It aims to improve how students, faculty, and staff order and receive small items from campus vendors through a centralized mobile application and a simulated drone delivery process.
+![Status](https://img.shields.io/badge/status-working%20prototype-4DB0F5?style=flat-square)
+![Platforms](https://img.shields.io/badge/platforms-Android%20%C2%B7%20iOS%20%C2%B7%20Windows%20%C2%B7%20macOS%20%C2%B7%20Web-19223B?style=flat-square)
+![Weather](https://img.shields.io/badge/weather-live%20Open--Meteo-3ECF8E?style=flat-square)
+![Maps](https://img.shields.io/badge/maps-OpenStreetMap-7EBC6F?style=flat-square)
 
-The system focuses on:
+*Order from campus vendors and have it flown to your drop zone.*
 
-* Campus-based product ordering
-* Vendor and inventory management
-* Order verification and preparation
-* Drone delivery assignment
-* Weather-aware delivery decisions
-* Simulated real-time drone tracking
-* User notifications
-* Administrative monitoring and reporting
+</div>
+
+---
+
+## About
+
+**AeroDrop** is a capstone project by Bachelor of Science in Information Technology students of the **University of Cebu Lapu-Lapu and Mandaue**. It is a campus marketplace and drone delivery application for ordering and delivering small items within the university.
+
+The system connects campus users with approved vendors. Users browse products, place orders, track the drone on a live map, and review what they received. Vendors manage products, inventory, and orders. Administrators oversee accounts, drones, deliveries, weather, and analytics.
+
+> [!NOTE]
+> Drone flight, telemetry, and payments are **simulated**. Weather, campus coordinates, authentication, reviews, and all stored records are **real**.
+
+---
+
+## Highlights
+
+| | |
+|---|---|
+| **Live campus weather** | Real conditions polled every 15 minutes, mapped to drone operating limits |
+| **Interactive map tracking** | OpenStreetMap tiles with real campus coordinates and live drone position |
+| **Physics-aware flight** | Flight time from real distance; payload affects speed and battery |
+| **Verified accounts** | Email one-time codes, plus Google sign-in for customers |
+| **Transparent fees** | Distance and weight based, with a full breakdown before you pay |
+| **Reviews and ratings** | Store and product ratings from verified deliveries |
+| **Analytics export** | Admin reports exportable to CSV and PDF |
+
+---
 
 ## Account Types
 
-AeroDrop supports three main account roles:
+<table>
+<tr>
+<td width="33%" valign="top">
 
 ### User
+Students, faculty, and staff who browse products and place delivery orders.
 
-Users may be students, faculty members, or staff members who browse products and place delivery orders.
+</td>
+<td width="33%" valign="top">
 
 ### Vendor
+Approved campus stores that manage products, inventory, and incoming orders.
 
-Vendors are approved campus stores or sellers that manage products, inventory, and customer orders.
+</td>
+<td width="33%" valign="top">
 
 ### Admin
+Staff who manage accounts, drones, deliveries, weather, and reports.
 
-Administrators manage accounts, vendor applications, drones, deliveries, weather simulations, reports, and other system records.
+</td>
+</tr>
+</table>
 
-## Key Features
+---
 
-### User Side
+## Authentication
 
-* User registration and login
-* Per-login phone security verification
-* User profile and profile-picture management
-* Browse approved campus vendors
-* Browse available products
-* Search and view product information
-* Add, update, and remove cart items
-* Place campus delivery orders
-* Select a campus delivery location
-* View estimated order totals
-* View order status and delivery progress
-* Simulated real-time drone tracking
-* View order and delivery history
-* Cancel eligible pending orders
-* Receive system and delivery notifications
-* View unread notification count
-* Simulate Safe, Caution, and Grounded weather conditions
-* Pull-to-refresh support
+| Method | Who | Verification |
+|---|---|---|
+| **Email and password** | Users, Vendors, Admins | One-time code sent by email at registration and at each login |
+| **Continue with Google** | Customers | None required — Google already verified the address |
 
-### Vendor Side
+Vendors register through the full application form because store details are needed, though approved vendors may then sign in with Google. Administrators cannot use Google sign-in. Password reset also uses emailed one-time codes.
 
-* Vendor registration and application
-* Admin approval before accessing the Vendor Dashboard
-* Vendor business profile management
-* Business logo and profile-image upload
-* Predefined and custom store categories
-* Add, view, edit, and deactivate products
-* Manage product price, weight, and stock quantity
-* View incoming customer orders
-* Confirm or reject eligible orders
-* Mark orders as preparing
-* Mark prepared orders as ready for drone delivery
-* Automatic inventory updates based on completed orders
-* View vendor notifications
-* View order and sales information
+> [!IMPORTANT]
+> SMS verification is **not implemented**. If phone verification is selected, the app honestly reports that SMS is unavailable and directs the user to email.
 
-### Admin Side
+---
 
-* Secure admin login and phone verification
-* View-only administrator account details
-* View and manage registered accounts
-* View user and vendor information
-* Approve or reject vendor applications
-* Suspend or reactivate eligible accounts
-* View and manage orders and deliveries
-* Monitor drone availability, battery, and status
-* Assign drones to eligible deliveries
-* View simulated drone telemetry
-* Manage campus weather-safety status
-* Manage no-fly-zone records
-* View delivery status logs
-* View reports and system analytics
-* Monitor pending vendor applications and deliveries
-* Pull-to-refresh support
+## Features
 
-## Ordering and Delivery Workflow
+<details open>
+<summary><b>User Side</b></summary>
 
-The main AeroDrop workflow is:
+<br>
 
-1. A user logs in and completes phone security verification.
-2. The user browses approved vendors and available products.
-3. The user adds products to the cart.
-4. The user selects a campus delivery location and places an order.
-5. The vendor reviews and confirms the order.
-6. The vendor prepares the products.
-7. The vendor marks the order as ready for delivery.
-8. The system verifies:
+- Registration and login with email verification codes
+- Google sign-in for customer accounts
+- Profile and profile-picture management
+- Browse approved campus vendors, then view each store's products
+- Search products and view detailed information
+- Store and product ratings from real customer reviews
+- Cart management with live totals
+- Order confirmation step before payment
+- Delivery fee from real distance and package weight, with a visible breakdown
+- GCash and simulated card payment
+- Live drone tracking on an interactive campus map
+- Order and delivery history with official receipts
+- Cancel orders while the vendor is still preparing
+- Optional store and product reviews after delivery
+- Notifications with unread counts
+- Current campus weather conditions (read-only)
 
-   * Product availability
-   * Package weight
-   * Drone availability
-   * Drone battery level
-   * Campus pickup and drop-off locations
-   * Current simulated weather condition
-9. An available drone is assigned to the delivery.
-10. The drone is simulated travelling to the vendor pickup location.
-11. The system records package pickup.
-12. The drone is simulated travelling from the vendor to the user.
-13. The user views the drone’s simulated position and delivery progress.
-14. The delivery is marked as completed.
-15. The order, telemetry, notifications, and delivery logs remain available for history and reporting.
+</details>
+
+<details>
+<summary><b>Vendor Side</b></summary>
+
+<br>
+
+- Vendor registration and application, with admin approval required
+- Business profile management with logo upload
+- Predefined and custom store categories
+- Add, edit, and deactivate products with price, weight, and stock
+- Incoming order list with action counts on the navigation bar
+- Confirm or reject orders, mark as preparing, then ready for drone pickup
+- Automatic inventory updates on orders and cancellations
+- Store and product reviews
+- Vendor notifications and sales information
+- Current campus weather conditions (read-only)
+
+</details>
+
+<details>
+<summary><b>Admin Side</b></summary>
+
+<br>
+
+- Secure admin login without verification codes
+- Account management, vendor approval, suspension and reactivation
+- Orders and deliveries, including orders cancelled before dispatch
+- Live campus drone radar with route and telemetry
+- Drone availability, battery, and status monitoring
+- Weather management with temporary manual override
+- No-fly-zone records and delivery status logs
+- Reports and analytics, exportable to CSV and PDF
+- Live badge counts for active deliveries
+
+</details>
+
+---
+
+## Delivery Workflow
+
+```mermaid
+graph LR
+    A[Customer<br/>places order] --> B[Vendor<br/>confirms]
+    B --> C[Vendor<br/>prepares]
+    C --> D[Ready for<br/>drone pickup]
+    D --> E{System checks<br/>stock, weight, drone<br/>battery, weather}
+    E -->|Approved| F[Leg 1<br/>Hub to Vendor]
+    F --> G[Package<br/>picked up]
+    G --> H[Leg 2<br/>Vendor to Customer]
+    H --> I[Delivered]
+    I --> J[Leg 3<br/>Customer to Hub]
+    J --> K[Drone available]
+    I --> L[Customer<br/>reviews order]
+```
+
+The customer may cancel at any point up to **Ready for drone pickup**. Cancellations automatically restore stock and refund simulated payments.
+
+---
 
 ## Drone Setup
 
-The prototype currently uses one primary simulated drone:
+<table>
+<tr><td><b>Drone Code</b></td><td>DRN-001</td></tr>
+<tr><td><b>Drone Name</b></td><td>AeroCarrier Alpha</td></tr>
+<tr><td><b>Model</b></td><td>Prototype 001</td></tr>
+<tr><td><b>Maximum Payload</b></td><td>0.5 kg</td></tr>
+<tr><td><b>Minimum Battery for Dispatch</b></td><td>15%</td></tr>
+<tr><td><b>Statuses</b></td><td>Available, Assigned, Busy, Returning, Charging, Maintenance, Offline</td></tr>
+</table>
 
-* **Drone Code:** DRN-001
-* **Drone Name:** AeroCarrier Alpha
-* **Model:** 001
-* **Maximum Payload:** 0.5 kg
-* **Minimum Battery Requirement:** At least 10% before delivery assignment
-* **Telemetry:** Simulated
-* **Position Tracking:** Simulated
-* **Flight Movement:** Simulated
+### Flight Model
 
-Supported drone statuses include:
+Every delivery runs in three legs:
 
-* Available
-* Assigned
-* Busy
-* Charging
-* Maintenance
-* Offline
+| Leg | Route | Load |
+|---|---|---|
+| **1** | Base hub to Vendor | Empty |
+| **2** | Vendor to Customer | Loaded |
+| **3** | Customer to Base hub | Empty |
 
-## Weather Safety Simulation
+Flight time comes from the **real distance** between campus coordinates divided by the drone's effective speed, with sensible minimum and maximum durations. Carrying a payload reduces speed and increases battery drain on the loaded leg only. Caution weather slows flights further. A recovery mechanism returns the drone to service if a return flight is interrupted.
 
-AeroDrop includes a prototype weather-safety feature that affects drone delivery operations.
+---
 
-Available weather states are:
+## Live Campus Weather
 
-* **Safe** – Clear weather suitable for drone delivery
-* **Caution** – Strong winds that may delay delivery
-* **Grounded** – Heavy rain or unsafe weather that blocks drone dispatch
+Real weather for the UCLM campus is polled from **Open-Meteo** every 15 minutes by scheduled database jobs, then mapped to three operating states using the limits of a small delivery multirotor.
 
-The selected condition is stored in Supabase and used by the order-readiness and drone-dispatch workflow.
+| State | Conditions | Effect on operations |
+|---|---|---|
+| **Safe** | Wind up to 15 km/h, gusts up to 25 km/h, no rain | Normal delivery |
+| **Caution** | Wind 15-28 km/h, gusts 25-40 km/h, light rain below 0.5 mm/h | Slower flights, longer ETAs, small surcharge |
+| **Grounded** | Wind above 28 km/h, gusts above 40 km/h, rain 0.5 mm/h or more, thunderstorm, visibility under 1 km, temperature above 40 C | New orders blocked, active orders cancelled and refunded, drones return to base |
 
-This feature is a simulation and is not connected to a live external weather service.
+These thresholds reflect the roughly 12 m/s wind rating of small multirotors, the absence of weather sealing on consumer drones, and the reduced margin when carrying a payload.
+
+> [!TIP]
+> Administrators can override the weather state for demonstrations. An override lasts two hours by default, displays the real conditions alongside it, and can be ended instantly with a resume action. Customers and vendors only see the resulting status.
+
+---
+
+## Delivery Fees
+
+The fee is calculated from a **base fee**, the **real distance** between vendor and drop-off, the **package weight** (capped at 0.5 kg), and a **surcharge during Caution weather**. The full breakdown is shown at checkout before payment, and again on the receipt and order details.
+
+---
 
 ## Campus Locations
 
-AeroDrop is intended for use within the University of Cebu Lapu-Lapu and Mandaue campus.
+AeroDrop operates inside the University of Cebu Lapu-Lapu and Mandaue campus using real coordinates.
 
-Supported campus locations include:
+| Location | Role |
+|---|---|
+| Old Building (Main Building) | Pickup / Drop-off |
+| Annex 2 Building | Pickup / Drop-off |
+| Basic Education Building | Pickup / Drop-off |
+| Maritime Building | Pickup / Drop-off |
+| **Campus Drone Hub** | Drone base station |
 
-* Old Building or Main Building
-* Annex 1 Building
-* Annex 2 Building
-* Basic Education Building
-* Maritime Building
+The Campus Drone Hub is the drone's home base and cannot be selected as a customer drop-off point.
 
-These locations are used for vendor pickup and user delivery destinations.
+---
 
 ## Technology Stack
 
-### Mobile Application
+<table>
+<tr>
+<td valign="top" width="33%">
 
-* Flutter
-* Dart
-* Riverpod
-* GoRouter
-* Material Design
+**Application**
+- Flutter
+- Dart
+- Riverpod
+- GoRouter
+- flutter_map
+- Material Design
 
-### Backend Services
+</td>
+<td valign="top" width="33%">
 
-* Supabase Authentication
-* Supabase PostgreSQL Database
-* Supabase Storage
-* Supabase Realtime
-* PostgreSQL functions and triggers
-* Row-Level Security policies
+**Backend**
+- Supabase Auth (+ Google OAuth)
+- Supabase PostgreSQL
+- Supabase Storage
+- Supabase Realtime
+- Functions, triggers, RLS
+- pg_cron, pg_net
 
-### Development and Version Control
+</td>
+<td valign="top" width="33%">
 
-* Git
-* GitHub
-* Android Studio
-* Visual Studio Code
-* Figma
+**External Services**
+- Open-Meteo (weather)
+- OpenStreetMap (map tiles)
 
-## Database Structure
+</td>
+</tr>
+</table>
 
-AeroDrop uses Supabase as its backend platform.
+---
 
-The simplified database includes:
+## Getting Started
 
-* `users`
-* `campus_locations`
-* `products`
-* `orders`
-* `order_items`
-* `drones`
-* `deliveries`
-* `drone_telemetry`
-* `notifications`
-* `weather_safety`
-* `no_fly_zones`
-* `delivery_status_logs`
+### Requirements
 
-Supabase Auth manages:
+- Flutter with **Dart SDK 3.12.2** or newer
+- A Supabase project with the migrations in `supabase/migrations` applied in order
+- Platform tools for your target (Android Studio, or Xcode and CocoaPods for iOS/macOS)
 
-* Email authentication
-* Password authentication
-* User sessions
-
-The `public.users` table manages:
-
-* User profile information
-* Account role
-* Account status
-* Vendor application status
-* Business information
-* Profile and business-logo URLs
-
-## Security Features
-
-* Supabase Authentication
-* Role-based access for User, Vendor, and Admin accounts
-* Row-Level Security policies
-* Secure PostgreSQL functions
-* Per-login phone security verification
-* Account-status validation
-* Vendor-approval checks
-* Protected product, order, delivery, and profile records
-* Session cleanup during logout
-* Authentication checks before protected database queries
-
-The Supabase service-role key is not stored in the Flutter application.
-
-## Main Transaction CRUD
-
-The main transaction of AeroDrop is the product-order and drone-delivery process.
-
-### Create
-
-* Users create orders.
-* Vendors create products.
-* The system creates delivery, notification, telemetry, and status-log records.
-
-### Read
-
-* Users view vendors, products, orders, tracking, notifications, and history.
-* Vendors view products, inventory, orders, and notifications.
-* Administrators view accounts, applications, drones, deliveries, reports, and logs.
-
-### Update
-
-* Users update their cart, profile, and eligible orders.
-* Vendors update products, stock, order status, and business information.
-* Administrators update account status, vendor applications, drone status, weather safety, and delivery records.
-* The system updates delivery progress and drone telemetry.
-
-### Delete
-
-The system generally uses deactivation, cancellation, or soft deletion instead of permanently removing important transaction records.
-
-Cancelled and rejected records are retained for:
-
-* History
-* Accountability
-* Reporting
-* Administrative review
-
-## System Modules
-
-AeroDrop consists of the following major modules:
-
-1. User Account Module
-2. Vendor Account Module
-3. Product Catalog Module
-4. Inventory Management Module
-5. Cart and Order Module
-6. Order Verification Module
-7. Drone Delivery Management Module
-8. Tracking and Status Module
-9. Notification Module
-10. Admin Management Module
-11. Reports and Logs Module
-
-## Testing and Code Quality
-
-The project includes:
-
-* Flutter static analysis
-* Unit and provider tests
-* Supabase database integration testing
-* Simplified-schema validation
-* Authentication and routing validation
-* Runtime testing on an Android device
-
-Current development checks include:
+### Setup
 
 ```bash
-flutter analyze
-flutter test
+git clone https://github.com/Rzenz/AeroDrop.git
+cd AeroDrop
+flutter pub get
 ```
 
-The Supabase schema test can be executed using the required environment definitions.
+On macOS or iOS, also run:
 
-## Team Members
+```bash
+cd macos && pod install && cd ..
+```
 
-This capstone project was developed by BSIT students from the University of Cebu Lapu-Lapu and Mandaue.
+### Running
 
-| Name                         | Role            |
-| ---------------------------- | --------------- |
-| Ardiente, Lurinylle Clark B. | Hacker          |
-| Ogdol, Kim Andrie G.         | Project Manager |
-| Oñada, Rozencrantz G.        | Hipster         |
-| Tiu, Erickson N.             | Hacker          |
+Supabase credentials are **not** stored in the repository. Provide them at run time:
 
-## Institution
+```bash
+flutter run \
+  --dart-define=SUPABASE_URL=https://your-project.supabase.co \
+  --dart-define=SUPABASE_ANON_KEY=your-publishable-key
+```
 
-**University of Cebu Lapu-Lapu and Mandaue**
-Bachelor of Science in Information Technology
+### Database
 
-## Project Status
+Schema, functions, triggers, policies, and scheduled jobs live in `supabase/migrations`, applied in numeric order. Weather polling requires the **pg_cron** and **pg_net** extensions enabled in the Supabase project.
 
-AeroDrop is currently a capstone prototype.
+---
 
-The following features are simulated:
+## Attribution
 
-* Drone flight and movement
-* Drone telemetry
-* GPS position updates
-* Weather conditions
-* Payment processing
-* Delivery tracking
-* Push-notification behavior
+Map data and tiles are provided by **OpenStreetMap contributors**, used under the OpenStreetMap Tile Usage Policy. Weather data is provided by **Open-Meteo**.
 
-Future development may include:
+---
 
-* Physical drone integration
-* Live GPS tracking
-* Actual battery and sensor telemetry
-* Obstacle-detection hardware
-* Live weather-service integration
-* Automated route optimization
-* Geofencing and live no-fly-zone enforcement
-* Real SMS verification
-* Real payment-gateway integration
-* Production push notifications
-* Expanded campus-vendor support
+<div align="center">
+
+### Project Status
+
+AeroDrop is a **working prototype**. Drone flight, telemetry, and payments are simulated, while weather, campus coordinates, authentication, reviews, and all stored records are real.
+
+**Future work:** SMS verification, physical drone integration, and public app store release.
+
+<br>
+
+*Developed by BSIT students of the University of Cebu Lapu-Lapu and Mandaue*
+
+</div>

@@ -13,6 +13,7 @@ import '../../core/providers/product_provider.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/providers/notification_provider.dart';
 import '../../core/providers/delivery_provider.dart';
+import '../dashboard/user_dashboard_screen.dart';
 import '../../core/widgets/neu_surface.dart';
 
 class VendorDashboardScreen extends ConsumerWidget {
@@ -217,6 +218,10 @@ class VendorDashboardScreen extends ConsumerWidget {
                   padding: const EdgeInsets.fromLTRB(20, 16, 20, 120),
                   sliver: SliverList(
                     delegate: SliverChildListDelegate([
+                      // Campus Live Weather
+                      const AeroDropWeatherWidget(),
+                      const SizedBox(height: 16),
+
                       // Revenue NeuCard
                       NeuCard(
                         accent: AppColors.accent,

@@ -973,12 +973,8 @@ class AeroDropWeatherWidget extends ConsumerWidget {
         break;
     }
 
-    final tempStr = weather.temperature != null
-        ? "${weather.temperature!.toStringAsFixed(1)}°C"
-        : 'N/A';
-    final windStr = weather.windSpeed != null
-        ? "${weather.windSpeed!.toStringAsFixed(1)} km/h"
-        : 'N/A';
+    final tempStr = weather.temperatureDisplay;
+    final windStr = weather.windDisplay;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -999,14 +995,29 @@ class AeroDropWeatherWidget extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(height: 2),
-                  Text(
-                    'Drone dispatch environment conditions',
-                    style: AppTextStyles.label(
-                      fontSize: 10,
-                      color: AppColors.textSecondary,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 1,
+                  Row(
+                    children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: statusColor,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          weather.lastUpdatedText,
+                          style: AppTextStyles.label(
+                            fontSize: 10,
+                            color: AppColors.textSecondary,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -1076,7 +1087,11 @@ class AeroDropWeatherWidget extends ConsumerWidget {
             _WeatherMetric(
               icon: Icons.air_rounded,
               value: windStr,
-              label: 'Wind Speed',
+              label: (weather.windGusts != null &&
+                      weather.windSpeed != null &&
+                      weather.windGusts! > weather.windSpeed!)
+                  ? 'Wind & Gusts'
+                  : 'Wind Speed',
               iconColor: Colors.cyanAccent,
             ),
           ],

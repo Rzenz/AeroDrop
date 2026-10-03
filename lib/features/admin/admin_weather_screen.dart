@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/custom_text_field.dart';
@@ -24,6 +23,7 @@ class _AdminWeatherScreenState extends ConsumerState<AdminWeatherScreen> {
   late TextEditingController _windController;
   late TextEditingController _messageController;
   bool _submitting = false;
+  bool _resumingLive = false;
   String? _statusError;
 
   @override
@@ -57,7 +57,7 @@ class _AdminWeatherScreenState extends ConsumerState<AdminWeatherScreen> {
   void _setStatus(String status) {
     setState(() {
       _safetyStatus = status;
-      // Auto-populate some sensible defaults to assist admin if empty
+      // Auto-populate sensible defaults to assist admin
       if (_conditionController.text.isEmpty ||
           _conditionController.text == 'Clear Skies' ||
           _conditionController.text == 'High Winds' ||
@@ -101,113 +101,28 @@ class _AdminWeatherScreenState extends ConsumerState<AdminWeatherScreen> {
   Future<void> _submitWeather() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final temp = double.tryParse(_tempController.text);
-    final wind = double.tryParse(_windController.text);
-
     setState(() {
       _submitting = true;
       _statusError = null;
     });
 
-    final currentWeather = ref.read(weatherProvider);
-
-    final payload = {
-      'safety_status': _safetyStatus,
-      'condition': _conditionController.text,
-      'temperature': temp,
-      'wind_speed': wind,
-      'message': _messageController.text,
-    };
-
-    // Debug logs
-    debugPrint('[WEATHER UPDATE] Selected Status: $_safetyStatus');
-    debugPrint('[WEATHER UPDATE] Current ID: ${currentWeather.id}');
-    debugPrint('[WEATHER UPDATE] Payload: $payload');
-
     try {
-      final client = Supabase.instance.client;
-      Map<String, dynamic> returnedRow;
+      final success = await ref
+          .read(weatherProvider.notifier)
+          .setSimulatedWeather(_safetyStatus, durationHours: 2.0);
 
-      if (currentWeather.id == null) {
-        // Double check in DB just in case one got inserted after last fetch
-        final check = await client
-            .from('weather_safety')
-            .select()
-            .order('updated_at', ascending: false)
-            .limit(1)
-            .maybeSingle();
-
-        if (check != null) {
-          debugPrint(
-            '[WEATHER UPDATE] Found existing row during fallback check: ${check['id']}',
-          );
-          final res = await client
-              .from('weather_safety')
-              .update(payload)
-              .eq('id', check['id'])
-              .select()
-              .single();
-          returnedRow = res;
-        } else {
-          debugPrint('[WEATHER UPDATE] Inserting new weather row');
-          final res = await client
-              .from('weather_safety')
-              .insert(payload)
-              .select()
-              .single();
-          returnedRow = res;
-        }
-      } else {
-        debugPrint(
-          '[WEATHER UPDATE] Updating existing weather row: ${currentWeather.id}',
-        );
-        final res = await client
-            .from('weather_safety')
-            .update(payload)
-            .eq('id', currentWeather.id!)
-            .select()
-            .single();
-        returnedRow = res;
-      }
-
-      debugPrint('[WEATHER UPDATE] Returned DB row: $returnedRow');
-
-      // Verify the safety_status matches
-      final returnedStatus = returnedRow['safety_status']?.toString();
-      if (returnedStatus != _safetyStatus) {
-        debugPrint(
-          '[WEATHER UPDATE ERROR] Safety status mismatch: expected $_safetyStatus, got $returnedStatus',
-        );
-        throw Exception('Safety status mismatch in returned database row.');
-      }
-
-      // Invalidate provider and await reload
-      ref.invalidate(weatherProvider);
-      await ref.read(weatherProvider.notifier).loadWeatherSafety();
-
-      final refetched = ref.read(weatherProvider);
-      debugPrint(
-        '[WEATHER UPDATE] Provider refetched state: safetyStatus=${refetched.safetyStatus}, updatedAt=${refetched.updatedAt}',
-      );
-
-      if (refetched.safetyStatus != _safetyStatus) {
-        throw Exception(
-          'Refetched provider state does not match the updated status.',
-        );
+      if (!success) {
+        throw Exception('Server returned false on weather simulation.');
       }
 
       if (mounted) {
-        setState(() {
-          _submitting = false;
-        });
-
         final statusDisplay = _safetyStatus == 'safe'
             ? 'Safe'
             : (_safetyStatus == 'caution' ? 'Caution' : 'Grounded');
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Weather updated to $statusDisplay.'),
+            content: Text('Weather override applied: $statusDisplay (2 hours).'),
             backgroundColor: AppColors.success,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
@@ -217,24 +132,15 @@ class _AdminWeatherScreenState extends ConsumerState<AdminWeatherScreen> {
         );
       }
     } catch (e) {
-      debugPrint('[WEATHER UPDATE EXCEPTION] $e');
-      String displayMsg = 'Unable to update weather.';
-      if (e is PostgrestException) {
-        debugPrint(
-          '[WEATHER UPDATE Supabase Error] Code: ${e.code}, Message: ${e.message}, Hint: ${e.hint}',
-        );
-        displayMsg = 'Unable to update weather: ${e.message}';
-      }
-
+      debugPrint('[WEATHER OVERRIDE EXCEPTION] $e');
       if (mounted) {
         setState(() {
-          _submitting = false;
-          _statusError = displayMsg;
+          _statusError = 'Unable to set weather override: $e';
         });
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('Unable to confirm the weather update.'),
+            content: Text('Unable to apply weather override: $e'),
             backgroundColor: AppColors.danger,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
@@ -242,6 +148,78 @@ class _AdminWeatherScreenState extends ConsumerState<AdminWeatherScreen> {
             ),
           ),
         );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _submitting = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _resumeLiveWeather() async {
+    setState(() {
+      _resumingLive = true;
+      _statusError = null;
+    });
+
+    try {
+      final success = await ref
+          .read(weatherProvider.notifier)
+          .clearWeatherOverride();
+
+      if (!success) {
+        throw Exception('Server returned false on clearing weather override.');
+      }
+
+      if (mounted) {
+        final weather = ref.read(weatherProvider);
+        setState(() {
+          _safetyStatus = weather.safetyStatus;
+          _conditionController.text = weather.condition ?? '';
+          _tempController.text = weather.temperature != null
+              ? weather.temperature!.toStringAsFixed(1)
+              : '';
+          _windController.text = weather.windSpeed != null
+              ? weather.windSpeed!.toStringAsFixed(1)
+              : '';
+          _messageController.text = weather.message ?? '';
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Live campus weather resumed.'),
+            backgroundColor: AppColors.success,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('[CLEAR WEATHER OVERRIDE EXCEPTION] $e');
+      if (mounted) {
+        setState(() {
+          _statusError = 'Failed to resume live weather: $e';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to resume live weather: $e'),
+            backgroundColor: AppColors.danger,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _resumingLive = false;
+        });
       }
     }
   }
@@ -288,57 +266,304 @@ class _AdminWeatherScreenState extends ConsumerState<AdminWeatherScreen> {
                   color: AppColors.textSecondaryDark,
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
 
-              // Current Status Card
-              GlassCard(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    Icon(
-                      weather.safetyStatus == 'safe'
-                          ? Icons.wb_sunny_rounded
-                          : (weather.safetyStatus == 'caution'
-                                ? Icons.air_rounded
-                                : Icons.thunderstorm_rounded),
-                      color: weather.safetyStatus == 'safe'
-                          ? AppColors.accent
-                          : (weather.safetyStatus == 'caution'
-                                ? AppColors.warning
-                                : AppColors.danger),
-                      size: 32,
+              // 1. Data Stale Warning Note (Admin only)
+              if (weather.isDataStale) ...[
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: AppColors.warning.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: AppColors.warning.withValues(alpha: 0.35),
+                      width: 1,
                     ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.warning_amber_rounded,
+                        color: AppColors.warning,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          weather.staleWarningMessage ?? 'Weather data may be out of date.',
+                          style: const TextStyle(
+                            color: AppColors.warning,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+
+              // 2. Active Status & Override Card
+              if (weather.isOverrideActive)
+                GlassCard(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Active Safety Level',
-                            style: TextStyle(
-                              color: AppColors.textSecondaryDark,
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                            ),
+                          Icon(
+                            weather.safetyStatus == 'safe'
+                                ? Icons.wb_sunny_rounded
+                                : (weather.safetyStatus == 'caution'
+                                      ? Icons.air_rounded
+                                      : Icons.thunderstorm_rounded),
+                            color: weather.safetyStatus == 'safe'
+                                ? AppColors.accent
+                                : (weather.safetyStatus == 'caution'
+                                      ? AppColors.warning
+                                      : AppColors.danger),
+                            size: 32,
                           ),
-                          Text(
-                            weather.safetyStatus.toUpperCase(),
-                            style: TextStyle(
-                              color: weather.safetyStatus == 'safe'
-                                  ? AppColors.success
-                                  : (weather.safetyStatus == 'caution'
-                                        ? AppColors.warning
-                                        : AppColors.danger),
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.warning.withValues(alpha: 0.2),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: const Text(
+                                        'OVERRIDE ACTIVE',
+                                        style: TextStyle(
+                                          color: AppColors.warning,
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      weather.overrideRemainingText,
+                                      style: const TextStyle(
+                                        color: AppColors.textSecondaryDark,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Manual: ${weather.safetyStatus.toUpperCase()} - ${weather.overrideRemainingText}',
+                                  style: TextStyle(
+                                    color: weather.safetyStatus == 'safe'
+                                        ? AppColors.success
+                                        : (weather.safetyStatus == 'caution'
+                                              ? AppColors.warning
+                                              : AppColors.danger),
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 14),
+                      const Divider(color: Colors.white12, height: 1),
+                      const SizedBox(height: 12),
+                      // REAL conditions underneath
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.03),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'ACTUAL CAMPUS WEATHER',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.textSecondaryDark,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  '${(weather.realSafetyStatus ?? 'safe').toUpperCase()} • ${weather.realCondition ?? 'Clear Sky'}',
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                Text(
+                                  '${weather.temperatureDisplay} • ${weather.windDisplay}',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.textSecondaryDark,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      // Resume live weather button
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: _resumingLive ? null : _resumeLiveWeather,
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.accent,
+                            side: const BorderSide(color: AppColors.accent),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          icon: _resumingLive
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: AppColors.accent,
+                                  ),
+                                )
+                              : const Icon(Icons.sync_rounded, size: 18),
+                          label: Text(
+                            _resumingLive ? 'Resuming...' : 'Resume Live Weather',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                GlassCard(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            weather.safetyStatus == 'safe'
+                                ? Icons.wb_sunny_rounded
+                                : (weather.safetyStatus == 'caution'
+                                      ? Icons.air_rounded
+                                      : Icons.thunderstorm_rounded),
+                            color: weather.safetyStatus == 'safe'
+                                ? AppColors.accent
+                                : (weather.safetyStatus == 'caution'
+                                      ? AppColors.warning
+                                      : AppColors.danger),
+                            size: 32,
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.success.withValues(alpha: 0.15),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: const Text(
+                                        'LIVE TELEMETRY',
+                                        style: TextStyle(
+                                          color: AppColors.success,
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        weather.lastUpdatedText,
+                                        style: const TextStyle(
+                                          color: AppColors.textSecondaryDark,
+                                          fontSize: 11,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '${weather.safetyStatus.toUpperCase()} — ${weather.condition ?? 'Clear Sky'}',
+                                  style: TextStyle(
+                                    color: weather.safetyStatus == 'safe'
+                                        ? AppColors.success
+                                        : (weather.safetyStatus == 'caution'
+                                              ? AppColors.warning
+                                              : AppColors.danger),
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Text(
+                            'Temp: ${weather.temperatureDisplay}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondaryDark,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Text(
+                            'Wind: ${weather.windDisplay}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondaryDark,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-              ),
               const SizedBox(height: 24),
 
               // Safety Selector Row

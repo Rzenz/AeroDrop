@@ -29,7 +29,7 @@
 The system connects campus users with approved vendors. Users browse products, place orders, track the drone on a live map, and review what they received. Vendors manage products, inventory, and orders. Administrators oversee accounts, drones, deliveries, weather, and analytics.
 
 > [!NOTE]
-> Drone flight, telemetry, and payments are **simulated**. Weather, campus coordinates, authentication, reviews, and all stored records are **real**.
+> Drone flight and telemetry are **simulated**. Online payments run through the **Xendit sandbox** (no real money). Weather, campus coordinates, authentication, reviews, and all stored records are **real**.
 
 ---
 
@@ -41,6 +41,7 @@ The system connects campus users with approved vendors. Users browse products, p
 | **Interactive map tracking** | OpenStreetMap tiles with real campus coordinates and live drone position |
 | **Physics-aware flight** | Flight time from real distance; payload affects speed and battery |
 | **Verified accounts** | Email one-time codes, plus Google sign-in for customers |
+| **Real payment gateway** | GCash and card through Xendit in sandbox mode, confirmed by webhook |
 | **Transparent fees** | Distance and weight based, with a full breakdown before you pay |
 | **Reviews and ratings** | Store and product ratings from verified deliveries |
 | **Analytics export** | Admin reports exportable to CSV and PDF |
@@ -104,7 +105,7 @@ Vendors register through the full application form because store details are nee
 - Cart management with live totals
 - Order confirmation step before payment
 - Delivery fee from real distance and package weight, with a visible breakdown
-- GCash and simulated card payment
+- Pay online with GCash or card through Xendit (sandbox), or use the simulated payment options
 - Live drone tracking on an interactive campus map
 - Order and delivery history with official receipts
 - Cancel orders while the vendor is still preparing
@@ -214,6 +215,30 @@ These thresholds reflect the roughly 12 m/s wind rating of small multirotors, th
 
 ---
 
+## Payments
+
+AeroDrop offers three payment options at checkout.
+
+| Option | How it works |
+|---|---|
+| **Pay online (GCash or Card)** | Creates a real invoice through **Xendit**, the Philippine payment gateway. The customer completes payment on Xendit's hosted page, and the order is confirmed by a server-side webhook. |
+| **Simulated GCash** | Marked paid immediately. Kept as an offline fallback for demonstrations without internet. |
+| **Simulated Card** | Card details are validated locally (Luhn check, expiry, CVC) and never stored. Also marked paid immediately. |
+
+The Xendit integration runs in **test mode**, so no real money moves. Going live requires business verification, which is outside the scope of this project.
+
+How the online payment flow is kept secure:
+
+- The gateway secret key is stored in Supabase and **never ships inside the app**.
+- A Supabase Edge Function creates the invoice, reading the amount **from the database** rather than from the client, so the charge always matches the order.
+- A second Edge Function receives Xendit's webhook, verified by callback token, and marks the order paid. The update is idempotent, so repeated webhooks change nothing.
+- Vendors cannot see or act on an order until payment is confirmed.
+- If an invoice expires unpaid, the order is cancelled automatically and reserved stock is returned.
+
+Cancelling a paid order marks it refunded and restores stock. Refunds are simulated rather than sent back through the gateway.
+
+---
+
 ## Delivery Fees
 
 The fee is calculated from a **base fee**, the **real distance** between vendor and drop-off, the **package weight** (capped at 0.5 kg), and a **surcharge during Caution weather**. The full breakdown is shown at checkout before payment, and again on the receipt and order details.
@@ -259,12 +284,14 @@ The Campus Drone Hub is the drone's home base and cannot be selected as a custom
 - Supabase Storage
 - Supabase Realtime
 - Functions, triggers, RLS
+- Edge Functions (Deno)
 - pg_cron, pg_net
 
 </td>
 <td valign="top" width="33%">
 
 **External Services**
+- Xendit (payments, sandbox)
 - Open-Meteo (weather)
 - OpenStreetMap (map tiles)
 
@@ -314,7 +341,7 @@ Schema, functions, triggers, policies, and scheduled jobs live in `supabase/migr
 
 ## Attribution
 
-Map data and tiles are provided by **OpenStreetMap contributors**, used under the OpenStreetMap Tile Usage Policy. Weather data is provided by **Open-Meteo**.
+Map data and tiles are provided by **OpenStreetMap contributors**, used under the OpenStreetMap Tile Usage Policy. Weather data is provided by **Open-Meteo**. Online payments are processed by **Xendit** in test mode.
 
 ---
 
@@ -322,9 +349,9 @@ Map data and tiles are provided by **OpenStreetMap contributors**, used under th
 
 ### Project Status
 
-AeroDrop is a **working prototype**. Drone flight, telemetry, and payments are simulated, while weather, campus coordinates, authentication, reviews, and all stored records are real.
+AeroDrop is a **working prototype**. Drone flight and telemetry are simulated, while online payments run through a real gateway in sandbox mode, and weather, campus coordinates, authentication, reviews, and all stored records are real.
 
-**Future work:** SMS verification, physical drone integration, and public app store release.
+**Future work:** SMS verification, live payment processing after business verification, physical drone integration, and public app store release.
 
 <br>
 

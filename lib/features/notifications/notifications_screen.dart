@@ -91,9 +91,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
               padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
               child: Row(
                 children: [
-                  // Lands on the home tab rather than unwinding the stack —
-                  // notifications are reachable from anywhere.
-                  NeuBackButton(onPressed: () => context.go('/user')),
+                  const NeuBackButton(),
                   const SizedBox(width: 16),
                   Expanded(
                     child: Column(

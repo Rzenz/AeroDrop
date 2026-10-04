@@ -6,11 +6,13 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/providers/delivery_provider.dart';
+import '../../core/providers/notification_provider.dart';
 import '../../core/utils/logout_helper.dart';
 
 import '../../core/services/supabase_service.dart';
 import '../../core/widgets/neu_action_fan.dart';
 import '../../core/widgets/neu_nav_dock.dart';
+import '../../core/widgets/neu_surface.dart';
 
 /// One admin destination.
 class _Dest {
@@ -136,6 +138,7 @@ class _AdminShellState extends ConsumerState<AdminShell>
   @override
   Widget build(BuildContext context) {
     final loc = GoRouterState.of(context).uri.toString();
+    ref.watch(deliveryProvider);
     final pending = ref.watch(pendingDeliveriesCountProvider);
     final selected = _primary.indexWhere((d) => _isActive(d.route, loc));
 
@@ -249,6 +252,7 @@ class _AdminAppBar extends ConsumerWidget implements PreferredSizeWidget {
   Widget build(BuildContext ctx, WidgetRef ref) {
     final loc = GoRouterState.of(ctx).uri.toString();
     final user = ref.watch(authProvider).user;
+    final unreadCount = ref.watch(unreadNotificationCountProvider);
     return PreferredSize(
       preferredSize: const Size.fromHeight(kToolbarHeight),
       child: ClipRRect(
@@ -268,7 +272,19 @@ class _AdminAppBar extends ConsumerWidget implements PreferredSizeWidget {
               ),
             ),
             actions: [
+              NeuIconButton(
+                icon: Icons.notifications_none_rounded,
+                tooltip: 'Notifications',
+                badgeCount: unreadCount,
+                size: 38,
+                iconSize: 18,
+                color: AppColors.cardDark,
+                iconColor: Colors.white,
+                onPressed: () => ctx.push('/admin/notifications'),
+              ),
+              const SizedBox(width: 8),
               _ProfileButton(user: user),
+              const SizedBox(width: 8),
               Container(
                 margin: const EdgeInsets.only(right: 16),
                 padding: const EdgeInsets.symmetric(

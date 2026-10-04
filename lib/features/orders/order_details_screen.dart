@@ -492,15 +492,17 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
                       const SizedBox(height: 8),
                       _InfoRow(
                         label: 'Payment Method',
-                        value: _methodLabel(order.paymentMethod),
+                        value: _methodLabel(order.paymentMethod, channel: order.paymentChannel),
                       ),
                       const SizedBox(height: 8),
                       _InfoRow(
                         label: 'Payment Status',
-                        value: isDelivered ? 'Paid' : order.paymentStatus.toUpperCase(),
+                        value: isDelivered ? 'Paid' : order.formattedPaymentStatus,
                         valueColor: (isDelivered || order.paymentStatus.toLowerCase() == 'paid')
                             ? AppColors.success
-                            : AppColors.warning,
+                            : (order.paymentStatus.toLowerCase() == 'expired' || order.paymentStatus.toLowerCase() == 'failed')
+                                ? AppColors.danger
+                                : AppColors.warning,
                       ),
                       if (order.paymentReference != null &&
                           order.paymentReference!.isNotEmpty) ...[
@@ -514,6 +516,21 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
                   ),
                 ).animate().fadeIn(delay: 200.ms),
                 const SizedBox(height: 24),
+
+                // Resume payment action button for pending online orders
+                if (order.isPendingOnlinePayment && !isVendor) ...[
+                  NeuButton(
+                    text: 'Complete Online Payment',
+                    icon: Icons.open_in_browser_rounded,
+                    variant: NeuButtonVariant.accent,
+                    onPressed: () {
+                      context.push(
+                        '/user/payment-waiting?orderId=${order.id}${order.paymentInvoiceUrl != null ? '&invoiceUrl=${Uri.encodeComponent(order.paymentInvoiceUrl!)}' : ''}',
+                      );
+                    },
+                  ).animate().fadeIn(delay: 210.ms),
+                  const SizedBox(height: 12),
+                ],
 
                 // Action Buttons Hierarchy:
                 // 1. View Official Receipt
@@ -563,7 +580,7 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
                       deliveryFee: order.deliveryFee,
                       feeBreakdown: feeBreakdown,
                       total: order.totalAmount,
-                      paymentLabel: _methodLabel(order.paymentMethod),
+                      paymentLabel: _methodLabel(order.paymentMethod, channel: order.paymentChannel),
                       placedAt: order.createdAt,
                       dropoffName: order.dropoffLocationName,
                       totalWeightGrams: order.totalWeightGrams,
@@ -759,7 +776,16 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
     });
   }
 
-  static String _methodLabel(String method) {
+  static String _methodLabel(String method, {String? channel}) {
+    if (method.toLowerCase() == 'xendit_online') {
+      if (channel != null && channel.isNotEmpty) {
+        final ch = channel.toUpperCase();
+        if (ch.contains('GCASH')) return 'Online Payment (GCash)';
+        if (ch.contains('CARD')) return 'Online Payment (Card)';
+        return 'Online Payment ($channel)';
+      }
+      return 'Online Payment';
+    }
     return switch (method.toLowerCase()) {
       'cash' || 'cash_on_delivery' => 'Cash on Delivery',
       'gcash_simulated' => 'GCash (Digital Payment)',

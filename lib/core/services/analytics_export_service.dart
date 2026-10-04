@@ -259,8 +259,17 @@ class AnalyticsExportService {
   }
 
   /// Formats raw payment method identifier to a readable label.
-  static String formatPaymentMethod(String? raw) {
+  static String formatPaymentMethod(String? raw, {String? channel}) {
     final m = (raw ?? '').trim().toLowerCase();
+    if (m == 'xendit_online') {
+      if (channel != null && channel.isNotEmpty) {
+        final ch = channel.toUpperCase();
+        if (ch.contains('GCASH')) return 'Online Payment (GCash)';
+        if (ch.contains('CARD')) return 'Online Payment (Card)';
+        return 'Online Payment ($channel)';
+      }
+      return 'Online Payment';
+    }
     if (m == 'gcash_simulated' || m == 'gcash') return 'GCash';
     if (m == 'card_simulated' || m == 'card') return 'Credit/Debit Card';
     if (m == 'cash_on_delivery' || m == 'cash') return 'Cash on Delivery (Legacy)';
@@ -481,7 +490,7 @@ class AnalyticsExportService {
         }
 
         // Payment split bucket
-        final formattedMethod = formatPaymentMethod(pMethod);
+        final formattedMethod = formatPaymentMethod(pMethod, channel: o['payment_channel']?.toString());
         if (!paymentBuckets.containsKey(formattedMethod)) {
           paymentBuckets[formattedMethod] = {
             'count': 0,

@@ -27,9 +27,14 @@ class OrderModel {
   final double subtotal;
   final double deliveryFee;
   final double totalAmount;
-  final String paymentMethod; // plain text: cash, gcash_simulated, …
-  final String paymentStatus; // plain text: pending, paid, …
+  final String paymentMethod; // plain text: cash, gcash_simulated, xendit_online, …
+  final String paymentStatus; // plain text: pending, paid, expired, failed, refunded…
   final String? paymentReference;
+  final String? paymentProvider;
+  final String? paymentInvoiceId;
+  final String? paymentInvoiceUrl;
+  final String? paymentChannel;
+  final DateTime? paidAt;
   final String? notes;
   final DateTime createdAt;
   final List<OrderItemModel> items;
@@ -59,6 +64,11 @@ class OrderModel {
     this.paymentMethod = 'cash',
     this.paymentStatus = 'pending',
     this.paymentReference,
+    this.paymentProvider,
+    this.paymentInvoiceId,
+    this.paymentInvoiceUrl,
+    this.paymentChannel,
+    this.paidAt,
     this.notes,
     required this.createdAt,
     required this.items,
@@ -70,6 +80,49 @@ class OrderModel {
     this.deliveryStartedAt,
     this.deliveryCompletedAt,
   });
+
+  String get formattedPaymentMethod {
+    if (paymentMethod.toLowerCase() == 'xendit_online') {
+      if (paymentChannel != null && paymentChannel!.isNotEmpty) {
+        final ch = paymentChannel!.toUpperCase();
+        if (ch.contains('GCASH')) return 'Online Payment (GCash)';
+        if (ch.contains('CARD')) return 'Online Payment (Card)';
+        return 'Online Payment ($paymentChannel)';
+      }
+      return 'Online Payment';
+    } else if (paymentMethod.toLowerCase() == 'gcash_simulated') {
+      return 'GCash';
+    } else if (paymentMethod.toLowerCase() == 'card_simulated') {
+      return 'Credit / Debit Card';
+    } else if (paymentMethod.toLowerCase() == 'cash_on_delivery') {
+      return 'Cash on Delivery';
+    } else if (paymentMethod.toLowerCase() == 'cash') {
+      return 'Cash';
+    }
+    return paymentMethod;
+  }
+
+  String get formattedPaymentStatus {
+    switch (paymentStatus.toLowerCase()) {
+      case 'paid':
+        return 'Paid';
+      case 'pending':
+        return 'Pending payment';
+      case 'expired':
+        return 'Expired';
+      case 'failed':
+        return 'Failed';
+      case 'refunded':
+        return 'Refunded';
+      default:
+        return paymentStatus;
+    }
+  }
+
+  bool get isPendingOnlinePayment =>
+      paymentMethod == 'xendit_online' &&
+      paymentStatus.toLowerCase() == 'pending' &&
+      orderStatus.toLowerCase() == 'pending';
 
   /// Total payload weight in kilograms derived from order items.
   double get totalWeightKg => items.fold<double>(
@@ -253,6 +306,11 @@ class OrderModel {
       paymentMethod: map['payment_method']?.toString() ?? 'cash',
       paymentStatus: map['payment_status']?.toString() ?? 'pending',
       paymentReference: map['payment_reference']?.toString(),
+      paymentProvider: map['payment_provider']?.toString(),
+      paymentInvoiceId: map['payment_invoice_id']?.toString(),
+      paymentInvoiceUrl: map['payment_invoice_url']?.toString(),
+      paymentChannel: map['payment_channel']?.toString(),
+      paidAt: map['paid_at'] != null ? DateTime.tryParse(map['paid_at'].toString()) : null,
       notes: map['notes']?.toString(),
       createdAt: map['created_at'] != null
           ? DateTime.parse(map['created_at'].toString())

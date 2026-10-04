@@ -28,6 +28,7 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
   final Map<String, DateTime> _leaseWriteFailures = {};
   (double, double) _baseHubCoords = (10.325152, 123.953046);
   RealtimeChannel? _deliveriesSubscription;
+  RealtimeChannel? _ordersSubscription;
   RealtimeChannel? _telemetrySubscription;
   DateTime? _lastTelemetryWriteTime;
 
@@ -40,26 +41,56 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
         _unsubscribeRealtime();
         state = [];
       } else if (previous?.user?.id != next.user?.id ||
-          previous?.sessionUnlocked != next.sessionUnlocked) {
+          previous?.sessionUnlocked != next.sessionUnlocked ||
+          previous?.user?.role != next.user?.role) {
         _loadBaseHubLocation();
-        loadDeliveriesFromSupabase();
+        _refreshDeliveriesForCurrentUser();
         refreshPendingDeliveriesCount();
         _subscribeRealtime();
         _startSimulation();
       }
     });
 
-    Future<void>.microtask(() {
-      if (mounted) {
+    Future<void>.microtask(() async {
+      if (mounted && SupabaseService.isConfigured) {
         _loadBaseHubLocation();
-        loadDeliveriesFromSupabase();
+        await _refreshDeliveriesForCurrentUser();
+        if (mounted) {
+          _subscribeRealtime();
+          refreshPendingDeliveriesCount();
+        }
       }
-    });
-    Future<void>.microtask(() {
-      if (mounted) refreshPendingDeliveriesCount();
     });
     _subscribeRealtime();
     _startSimulation();
+  }
+
+  Future<bool> _checkIsAdmin() async {
+    final authUser = ref.read(authProvider).user;
+    if (authUser?.isAdmin ?? false) return true;
+    final currentUser = SupabaseService.client.auth.currentUser;
+    if (currentUser == null) return false;
+    if (currentUser.userMetadata?['role'] == 'admin') return true;
+    try {
+      final res = await SupabaseService.client
+          .from('users')
+          .select('role')
+          .eq('id', currentUser.id)
+          .maybeSingle();
+      return res?['role'] == 'admin';
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> _refreshDeliveriesForCurrentUser() async {
+    if (!SupabaseService.isConfigured) return;
+    final isAdmin = await _checkIsAdmin();
+    if (isAdmin) {
+      await loadAdminDeliveriesFromSupabase();
+    } else {
+      await loadDeliveriesFromSupabase();
+    }
   }
 
   Future<void> _loadBaseHubLocation() async {
@@ -85,22 +116,37 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
     _unsubscribeRealtime();
 
     try {
-      // Listen to deliveries table updates
+      final userId = SupabaseService.client.auth.currentUser?.id ?? 'anon';
+
+      // 1. Deliveries table subscription
       _deliveriesSubscription = SupabaseService.client
-          .channel('public:deliveries_sync')
+          .channel('deliveries_feed_$userId')
           .onPostgresChanges(
             event: PostgresChangeEvent.all,
             schema: 'public',
             table: 'deliveries',
             callback: (payload) {
-              if (mounted) loadDeliveriesFromSupabase();
+              if (mounted) _refreshDeliveriesForCurrentUser();
             },
           )
           .subscribe();
 
-      // Listen to authoritative telemetry stream
+      // 2. Orders table subscription (for order cancellations, new orders, etc.)
+      _ordersSubscription = SupabaseService.client
+          .channel('orders_feed_$userId')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'orders',
+            callback: (payload) {
+              if (mounted) _refreshDeliveriesForCurrentUser();
+            },
+          )
+          .subscribe();
+
+      // 3. Telemetry subscription
       _telemetrySubscription = SupabaseService.client
-          .channel('public:telemetry_sync')
+          .channel('telemetry_feed_$userId')
           .onPostgresChanges(
             event: PostgresChangeEvent.insert,
             schema: 'public',
@@ -116,10 +162,24 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
   }
 
   void _unsubscribeRealtime() {
-    _deliveriesSubscription?.unsubscribe();
-    _deliveriesSubscription = null;
-    _telemetrySubscription?.unsubscribe();
-    _telemetrySubscription = null;
+    if (_deliveriesSubscription != null) {
+      try {
+        SupabaseService.client.removeChannel(_deliveriesSubscription!);
+      } catch (_) {}
+      _deliveriesSubscription = null;
+    }
+    if (_ordersSubscription != null) {
+      try {
+        SupabaseService.client.removeChannel(_ordersSubscription!);
+      } catch (_) {}
+      _ordersSubscription = null;
+    }
+    if (_telemetrySubscription != null) {
+      try {
+        SupabaseService.client.removeChannel(_telemetrySubscription!);
+      } catch (_) {}
+      _telemetrySubscription = null;
+    }
   }
 
   void _handleRealtimeTelemetry(Map<String, dynamic> record) {
@@ -438,6 +498,11 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
       debugPrint('Load deliveries skipped: no logged in user.');
       state = [];
       return;
+    }
+
+    final isAdmin = await _checkIsAdmin();
+    if (isAdmin) {
+      return loadAdminDeliveriesFromSupabase();
     }
 
     try {

@@ -16,6 +16,8 @@ import '../../core/providers/location_provider.dart';
 import '../../core/providers/vendor_provider.dart';
 import '../../core/providers/weather_provider.dart';
 import '../../core/services/delivery_fee_calculator.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../core/services/supabase_service.dart';
 import '../payment/widgets/simulated_card_dialog.dart';
 import 'widgets/order_confirmation_dialog.dart';
 
@@ -176,10 +178,18 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                     child: Column(
                       children: [
                         _PaymentOption(
+                          value: 'xendit',
+                          groupValue: _paymentMethod,
+                          icon: Icons.language_rounded,
+                          label: 'Pay online (GCash or Card)',
+                          color: AppColors.accent,
+                          onChanged: (v) => setState(() => _paymentMethod = v!),
+                        ),
+                        _PaymentOption(
                           value: 'gcash',
                           groupValue: _paymentMethod,
                           icon: Icons.phone_android_rounded,
-                          label: 'GCash',
+                          label: 'Simulated GCash',
                           color: const Color(0xFF007DC5),
                           onChanged: (v) => setState(() => _paymentMethod = v!),
                         ),
@@ -187,7 +197,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                           value: 'card',
                           groupValue: _paymentMethod,
                           icon: Icons.credit_card_rounded,
-                          label: 'Credit / Debit Card',
+                          label: 'Simulated Card',
                           color: const Color(0xFFA855F7),
                           onChanged: (v) => setState(() => _paymentMethod = v!),
                         ),
@@ -475,7 +485,12 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     final deliveryFee = feeBreakdown.totalFee;
     final totalAmount = cartNotifier.totalAmount + deliveryFee;
     final dropoffName = _dropoffName() ?? 'Selected Campus Pad';
-    final paymentLabel = _paymentMethod == 'gcash' ? 'GCash' : 'Credit / Debit Card';
+    final paymentLabel = switch (_paymentMethod) {
+      'xendit' => 'Pay online (GCash or Card)',
+      'gcash' => 'Simulated GCash',
+      'card' => 'Simulated Card',
+      _ => 'Online Payment',
+    };
 
     // 1. Show Pre-payment Confirmation Dialog (explaining cancellation rules)
     final confirmed = await OrderConfirmationDialog.show(
@@ -490,7 +505,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       return;
     }
 
-    // 2. If Card is selected, open Simulated Card Entry Dialog
+    // 2. If simulated Card is selected, open Simulated Card Entry Dialog
     if (_paymentMethod == 'card') {
       if (!mounted) return;
       final cardResult = await SimulatedCardDialog.show(context, amount: totalAmount);
@@ -500,14 +515,17 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       }
     }
 
-    final dbPaymentMethod = _paymentMethod == 'gcash'
-        ? 'gcash_simulated'
-        : 'card_simulated';
+    final dbPaymentMethod = switch (_paymentMethod) {
+      'xendit' => 'xendit_online',
+      'gcash' => 'gcash_simulated',
+      'card' => 'card_simulated',
+      _ => 'xendit_online',
+    };
 
     final rawNotes = _notesController.text.trim();
     final notes = rawNotes.isNotEmpty ? rawNotes : null;
 
-    final success = await ref
+    final orderId = await ref
         .read(orderProvider.notifier)
         .placeOrder(
           vendorId: cart.first.vendorId,
@@ -521,24 +539,65 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         );
 
     if (!mounted) return;
-    setState(() => _placing = false);
 
-    if (success) {
-      // Snapshot the receipt before clearing the cart — the lines are read
-      // from it, and an empty cart prints an empty receipt.
-      final receipt = _receiptFor(
-        cart,
-        totalAmount,
-        deliveryFee,
-        feeBreakdown: feeBreakdown,
-      );
-      cartNotifier.clear();
-      context.go('/user/receipt', extra: receipt);
-    } else {
+    if (orderId == null) {
+      setState(() => _placing = false);
       final errorMsg =
           ref.read(orderProvider).errorMessage ?? 'Order placement failed.';
       showNeuSnack(context, errorMsg, tone: NeuToneKind.error);
+      return;
     }
+
+    // 3. Handle Xendit Online checkout
+    if (_paymentMethod == 'xendit') {
+      try {
+        final fnRes = await SupabaseService.client.functions.invoke(
+          'create-xendit-payment',
+          body: {'order_id': orderId},
+        );
+
+        final data = fnRes.data is Map ? fnRes.data as Map : {};
+        final invoiceUrl = data['invoice_url']?.toString();
+
+        if (fnRes.status == 200 && invoiceUrl != null && invoiceUrl.isNotEmpty) {
+          cartNotifier.clear();
+          setState(() => _placing = false);
+
+          final uri = Uri.parse(invoiceUrl);
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+
+          if (!mounted) return;
+          context.go('/user/payment-waiting?orderId=$orderId&invoiceUrl=${Uri.encodeComponent(invoiceUrl)}');
+          return;
+        } else {
+          final err = data['error']?.toString() ?? 'Could not start payment. Please try again.';
+          cartNotifier.clear();
+          if (!mounted) return;
+          setState(() => _placing = false);
+          showNeuSnack(context, err, tone: NeuToneKind.error);
+          context.go('/user/payment-waiting?orderId=$orderId');
+          return;
+        }
+      } catch (e) {
+        cartNotifier.clear();
+        if (!mounted) return;
+        setState(() => _placing = false);
+        showNeuSnack(context, 'Payment initialization failed. You can resume from your orders.', tone: NeuToneKind.error);
+        context.go('/user/payment-waiting?orderId=$orderId');
+        return;
+      }
+    }
+
+    // 4. Handle Simulated Payments (GCash & Card)
+    setState(() => _placing = false);
+    final receipt = _receiptFor(
+      cart,
+      totalAmount,
+      deliveryFee,
+      feeBreakdown: feeBreakdown,
+    );
+    cartNotifier.clear();
+    context.go('/user/receipt', extra: receipt);
   }
 
   /// Name of the selected drop-off, read from the same provider that feeds

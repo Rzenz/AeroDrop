@@ -53,6 +53,13 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
           .firstOrNull;
 
       if (localMatch != null) {
+        if (localMatch.paymentMethod == 'xendit_online' &&
+            localMatch.paymentStatus.toLowerCase() != 'paid') {
+          if (mounted) {
+            context.go('/user/payment-waiting?orderId=${localMatch.id}');
+            return;
+          }
+        }
         setState(() {
           _order = localMatch;
           _paid = localMatch.paymentStatus.toLowerCase() == 'paid';
@@ -75,6 +82,13 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
 
         if (res != null) {
           final mapped = OrderModel.fromMap(res);
+          if (mapped.paymentMethod == 'xendit_online' &&
+              mapped.paymentStatus.toLowerCase() != 'paid') {
+            if (mounted) {
+              context.go('/user/payment-waiting?orderId=${mapped.id}');
+              return;
+            }
+          }
           setState(() {
             _order = mapped;
             _paid = mapped.paymentStatus.toLowerCase() == 'paid';

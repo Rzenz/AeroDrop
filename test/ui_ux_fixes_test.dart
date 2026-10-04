@@ -5,6 +5,7 @@ import 'package:aerodrop/core/models/order_model.dart';
 import 'package:aerodrop/core/models/product_model.dart';
 import 'package:aerodrop/core/providers/vendor_provider.dart';
 import 'package:aerodrop/core/providers/order_provider.dart';
+import 'package:aerodrop/core/providers/delivery_provider.dart';
 
 void main() {
   group('1. Customer Shop & Vendor Stores Tests', () {
@@ -306,6 +307,73 @@ void main() {
       expect(dCustomer.cancellationReasonDisplay, 'Cancelled by Customer');
     });
   });
+
+  group('4. Admin Deliveries Live Badge Tests', () {
+    test('pendingDeliveriesCountProvider counts pending queue, assigning, and inTransit', () {
+      final container = ProviderContainer(
+        overrides: [
+          deliveryProvider.overrideWith((ref) => _FakeDeliveryNotifier([
+            _makeDelivery('del-1', DeliveryStatus.pending),
+            _makeDelivery('del-2', DeliveryStatus.assigning),
+            _makeDelivery('del-3', DeliveryStatus.inTransit),
+            _makeDelivery('del-4', DeliveryStatus.delivered),
+            _makeDelivery('del-5', DeliveryStatus.cancelled),
+          ])),
+        ],
+      );
+
+      final count = container.read(pendingDeliveriesCountProvider);
+      // Only pending, assigning, inTransit are counted (3 total)
+      expect(count, 3);
+    });
+
+    test('completing or cancelling a delivery causes pendingDeliveriesCountProvider to drop reactively', () {
+      final notifier = _FakeDeliveryNotifier([
+        _makeDelivery('del-1', DeliveryStatus.assigning),
+        _makeDelivery('del-2', DeliveryStatus.inTransit),
+      ]);
+
+      final container = ProviderContainer(
+        overrides: [
+          deliveryProvider.overrideWith((ref) => notifier),
+        ],
+      );
+
+      expect(container.read(pendingDeliveriesCountProvider), 2);
+
+      // Transition del-1 to delivered
+      notifier.changeStatus('del-1', DeliveryStatus.delivered);
+      expect(container.read(pendingDeliveriesCountProvider), 1);
+
+      // Transition del-2 to cancelled
+      notifier.changeStatus('del-2', DeliveryStatus.cancelled);
+      expect(container.read(pendingDeliveriesCountProvider), 0);
+    });
+
+    test('new delivery arriving increases count and clears when cancelled', () {
+      final notifier = _FakeDeliveryNotifier([]);
+      final container = ProviderContainer(
+        overrides: [
+          deliveryProvider.overrideWith((ref) => notifier),
+        ],
+      );
+
+      // Initially 0 (badge hidden)
+      expect(container.read(pendingDeliveriesCountProvider), 0);
+
+      // New pending queue delivery arrives
+      notifier.addDelivery(_makeDelivery('del-new', DeliveryStatus.pending));
+      expect(container.read(pendingDeliveriesCountProvider), 1);
+
+      // Drone assigned
+      notifier.changeStatus('del-new', DeliveryStatus.assigning);
+      expect(container.read(pendingDeliveriesCountProvider), 1);
+
+      // Customer cancels
+      notifier.changeStatus('del-new', DeliveryStatus.cancelled);
+      expect(container.read(pendingDeliveriesCountProvider), 0);
+    });
+  });
 }
 
 class _FakeOrderNotifier extends StateNotifier<OrderState> implements OrderNotifier, VendorOrdersNotifier {
@@ -313,4 +381,37 @@ class _FakeOrderNotifier extends StateNotifier<OrderState> implements OrderNotif
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _FakeDeliveryNotifier extends StateNotifier<List<DeliveryModel>> implements DeliveryNotifier {
+  _FakeDeliveryNotifier(super.state);
+
+  void addDelivery(DeliveryModel d) {
+    state = [...state, d];
+  }
+
+  void changeStatus(String id, DeliveryStatus newStatus) {
+    state = state.map((d) => d.id == id ? d.copyWith(status: newStatus) : d).toList();
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+DeliveryModel _makeDelivery(String id, DeliveryStatus status) {
+  return DeliveryModel(
+    id: id,
+    orderId: 'order-$id',
+    senderName: 'Campus Coffee',
+    recipientName: 'Student User',
+    recipientPhone: '09123456789',
+    deliveryAddress: 'Maritime Building 3F',
+    packageName: 'Iced Coffee',
+    packageWeight: 0.3,
+    packageType: 'Food',
+    status: status,
+    eta: '10 mins',
+    createdAt: DateTime.now(),
+    progress: 0.5,
+  );
 }

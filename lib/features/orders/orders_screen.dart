@@ -296,6 +296,62 @@ class _OrderCard extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 10),
+            if (order.isPendingOnlinePayment) ...[
+              Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.warning.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.warning.withValues(alpha: 0.4)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.info_outline_rounded, color: AppColors.warning, size: 16),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Awaiting Online Payment',
+                        style: AppTextStyles.label(
+                          fontSize: 11,
+                          color: AppColors.warning,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    InkWell(
+                      onTap: () {
+                        context.push(
+                          '/user/payment-waiting?orderId=${order.id}${order.paymentInvoiceUrl != null ? '&invoiceUrl=${Uri.encodeComponent(order.paymentInvoiceUrl!)}' : ''}',
+                        );
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppColors.warning,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Pay Now',
+                              style: AppTextStyles.label(
+                                fontSize: 11,
+                                color: AppColors.bgDark,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            const Icon(Icons.arrow_forward_rounded, size: 12, color: AppColors.bgDark),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             Divider(color: AppColors.border, height: 1),
             const SizedBox(height: 10),
             // Footer
@@ -306,6 +362,7 @@ class _OrderCard extends StatelessWidget {
                 _PaymentBadge(
                   status: order.paymentStatus,
                   method: order.paymentMethod,
+                  channel: order.paymentChannel,
                 ),
                 // Total + date
                 Column(
@@ -373,23 +430,32 @@ class _OrderCard extends StatelessWidget {
 class _PaymentBadge extends StatelessWidget {
   final String status;
   final String method;
+  final String? channel;
 
-  const _PaymentBadge({required this.status, required this.method});
+  const _PaymentBadge({
+    required this.status,
+    required this.method,
+    this.channel,
+  });
 
   @override
   Widget build(BuildContext context) {
     final s = status.toLowerCase();
     final (label, color) = switch (s) {
       'paid' => ('Paid', AppColors.success),
-      'pending' => ('Unpaid', AppColors.warning),
+      'pending' => ('Pending payment', AppColors.warning),
+      'expired' => ('Expired', AppColors.danger),
       'failed' => ('Failed', AppColors.danger),
       'refunded' => ('Refunded', AppColors.info),
-      _ => ('Unpaid', AppColors.warning),
+      _ => ('Pending payment', AppColors.warning),
     };
     final methodLabel = switch (method.toLowerCase()) {
+      'xendit_online' => (channel != null && channel!.isNotEmpty)
+          ? 'Online (${channel!.toUpperCase().contains('GCASH') ? 'GCash' : (channel!.toUpperCase().contains('CARD') ? 'Card' : channel)})'
+          : 'Online Payment',
       'gcash' || 'gcash_simulated' => 'GCash',
       'cash' || 'cash_on_delivery' => 'Cash',
-      'card' || 'credit_card' => 'Card',
+      'card' || 'credit_card' || 'card_simulated' => 'Card',
       _ => method,
     };
 

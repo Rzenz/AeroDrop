@@ -51,6 +51,76 @@ void main() {
     });
   });
 
+  group('Xendit Online Payment & Order Model Tests', () {
+    test('OrderModel parses Xendit online payment fields correctly', () {
+      final order = OrderModel.fromMap({
+        'id': 'ord-xendit-1',
+        'customer_id': 'cust-1',
+        'vendor_id': 'vend-1',
+        'items': [],
+        'subtotal': 250.0,
+        'delivery_fee': 20.0,
+        'total': 270.0,
+        'status': 'pending',
+        'created_at': '2026-10-04T12:00:00Z',
+        'payment_method': 'xendit_online',
+        'payment_status': 'pending',
+        'payment_provider': 'xendit',
+        'payment_invoice_id': 'inv_123',
+        'payment_invoice_url': 'https://checkout.xendit.co/web/inv_123',
+        'payment_channel': 'GCASH',
+      });
+
+      expect(order.paymentMethod, 'xendit_online');
+      expect(order.paymentProvider, 'xendit');
+      expect(order.paymentInvoiceId, 'inv_123');
+      expect(order.paymentInvoiceUrl, 'https://checkout.xendit.co/web/inv_123');
+      expect(order.paymentChannel, 'GCASH');
+      expect(order.isPendingOnlinePayment, isTrue);
+      expect(order.formattedPaymentMethod, 'Online Payment (GCash)');
+      expect(order.formattedPaymentStatus, 'Pending payment');
+    });
+
+    test('OrderModel formats payment status and methods correctly across states', () {
+      final paidOrder = OrderModel.fromMap({
+        'id': 'ord-xendit-2',
+        'customer_id': 'cust-1',
+        'vendor_id': 'vend-1',
+        'items': [],
+        'subtotal': 250.0,
+        'delivery_fee': 20.0,
+        'total': 270.0,
+        'status': 'confirmed',
+        'created_at': '2026-10-04T12:00:00Z',
+        'payment_method': 'xendit_online',
+        'payment_status': 'paid',
+        'payment_channel': 'CARD',
+      });
+
+      expect(paidOrder.isPendingOnlinePayment, isFalse);
+      expect(paidOrder.formattedPaymentMethod, 'Online Payment (Card)');
+      expect(paidOrder.formattedPaymentStatus, 'Paid');
+
+      final expiredOrder = OrderModel.fromMap({
+        'id': 'ord-xendit-3',
+        'customer_id': 'cust-1',
+        'vendor_id': 'vend-1',
+        'items': [],
+        'subtotal': 250.0,
+        'delivery_fee': 20.0,
+        'total': 270.0,
+        'status': 'cancelled',
+        'created_at': '2026-10-04T12:00:00Z',
+        'payment_method': 'xendit_online',
+        'payment_status': 'expired',
+      });
+
+      expect(expiredOrder.isPendingOnlinePayment, isFalse);
+      expect(expiredOrder.formattedPaymentMethod, 'Online Payment');
+      expect(expiredOrder.formattedPaymentStatus, 'Expired');
+    });
+  });
+
   group('Reviews & Ratings Data Models Tests', () {
     test('RatingSummaryModel computes averages and flags correctly', () {
       const empty = RatingSummaryModel.empty;

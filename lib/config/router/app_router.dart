@@ -60,6 +60,7 @@ import '../../features/orders/orders_screen.dart';
 import '../../features/orders/order_details_screen.dart';
 import '../../features/orders/receipt_screen.dart';
 import '../../features/payment/payment_screen.dart';
+import '../../features/payment/online_payment_waiting_screen.dart';
 
 // Vendor
 import '../../features/vendor/vendor_shell.dart';
@@ -328,6 +329,20 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
       GoRoute(
+        path: '/user/payment-waiting',
+        pageBuilder: (context, state) {
+          final orderId = state.uri.queryParameters['orderId'] ?? '';
+          final invoiceUrl = state.uri.queryParameters['invoiceUrl'];
+          return _slide(
+            state,
+            OnlinePaymentWaitingScreen(
+              orderId: orderId,
+              initialInvoiceUrl: invoiceUrl,
+            ),
+          );
+        },
+      ),
+      GoRoute(
         path: '/user/profile/edit',
         pageBuilder: (context, state) =>
             _slide(state, const EditProfileScreen()),
@@ -579,6 +594,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/admin/reports/users',
         pageBuilder: (context, state) => _slide(state, const ReportsPage()),
+      ),
+      GoRoute(
+        path: '/admin/notifications',
+        pageBuilder: (context, state) =>
+            _slide(state, const NotificationsScreen()),
       ),
 
       // ─── Shared ──────────────────────────────────────────────────────────

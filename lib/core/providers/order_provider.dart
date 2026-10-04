@@ -46,10 +46,18 @@ class OrderNotifier extends StateNotifier<OrderState> {
   }
 
   void _unsubscribe() {
-    _ordersSubscription?.unsubscribe();
-    _ordersSubscription = null;
-    _deliveriesSubscription?.unsubscribe();
-    _deliveriesSubscription = null;
+    if (_ordersSubscription != null) {
+      try {
+        _client.removeChannel(_ordersSubscription!);
+      } catch (_) {}
+      _ordersSubscription = null;
+    }
+    if (_deliveriesSubscription != null) {
+      try {
+        _client.removeChannel(_deliveriesSubscription!);
+      } catch (_) {}
+      _deliveriesSubscription = null;
+    }
   }
 
   final _client = SupabaseService.client;
@@ -158,7 +166,7 @@ class OrderNotifier extends StateNotifier<OrderState> {
     super.dispose();
   }
 
-  Future<bool> placeOrder({
+  Future<String?> placeOrder({
     required String vendorId,
     required String dropoffLocationId,
     required double subtotal,
@@ -169,7 +177,7 @@ class OrderNotifier extends StateNotifier<OrderState> {
     String? notes,
   }) async {
     final user = ref.read(authProvider).user;
-    if (user == null) return false;
+    if (user == null) return null;
 
     // Validate maximum drone payload (0.5 kg = 500 grams)
     final totalWeightGrams = items.fold<int>(
@@ -184,7 +192,7 @@ class OrderNotifier extends StateNotifier<OrderState> {
         errorMessage:
             "This order exceeds the drone's maximum payload of 0.5 kg. Your order weighs $weightKg kg.",
       );
-      return false;
+      return null;
     }
 
     state = OrderState(orders: state.orders, isLoading: true);
@@ -192,7 +200,7 @@ class OrderNotifier extends StateNotifier<OrderState> {
     try {
       if (!SupabaseService.isConfigured) {
         state = OrderState(orders: state.orders, isLoading: false);
-        return true;
+        return 'simulated_offline_order';
       }
 
       final itemsPayload = items
@@ -207,7 +215,7 @@ class OrderNotifier extends StateNotifier<OrderState> {
           .toList();
 
       // Transactional atomic order placement RPC with row locking, stock reduction & payload check
-      await _client.rpc(
+      final res = await _client.rpc(
         'place_order',
         params: {
           'p_vendor_id': vendorId,
@@ -221,13 +229,15 @@ class OrderNotifier extends StateNotifier<OrderState> {
         },
       );
 
-      if (!mounted) return true;
+      final orderId = res?.toString();
+
+      if (!mounted) return orderId;
 
       await loadOrders();
       // Invalidate/reload product inventory and vendor orders so changes reflect immediately
       ref.read(productProvider.notifier).loadProducts();
       ref.read(vendorOrdersProvider.notifier).loadOrders();
-      return true;
+      return orderId;
     } catch (e) {
       debugPrint('Place order failed: $e');
       final errorMsg = e is PostgrestException ? e.message : e.toString();
@@ -236,7 +246,7 @@ class OrderNotifier extends StateNotifier<OrderState> {
         isLoading: false,
         errorMessage: errorMsg,
       );
-      return false;
+      return null;
     }
   }
 
@@ -293,10 +303,18 @@ class VendorOrdersNotifier extends StateNotifier<OrderState> {
   }
 
   void _unsubscribe() {
-    _ordersSubscription?.unsubscribe();
-    _ordersSubscription = null;
-    _deliveriesSubscription?.unsubscribe();
-    _deliveriesSubscription = null;
+    if (_ordersSubscription != null) {
+      try {
+        _client.removeChannel(_ordersSubscription!);
+      } catch (_) {}
+      _ordersSubscription = null;
+    }
+    if (_deliveriesSubscription != null) {
+      try {
+        _client.removeChannel(_deliveriesSubscription!);
+      } catch (_) {}
+      _deliveriesSubscription = null;
+    }
   }
 
   final _client = SupabaseService.client;

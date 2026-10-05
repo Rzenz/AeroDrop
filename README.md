@@ -355,6 +355,6 @@ AeroDrop is a **working prototype**. Drone flight and telemetry are simulated, w
 
 <br>
 
-*Developed by BSIT students of the University of Cebu Lapu-Lapu and Mandaue*
+*Developed by 4th year BSIT students of the University of Cebu Lapu-Lapu and Mandaue*
 
 </div>

@@ -660,18 +660,40 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
               ),
 
               // Interactive map canvas
+              // FlutterMap must not be built inside a LayoutBuilder: it calls
+              // setState and fires map callbacks during layout, which breaks
+              // the relayout boundary. Only the offline canvas needs a size.
               Expanded(
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final size = Size(
-                      constraints.maxWidth,
-                      constraints.maxHeight,
-                    );
+                child: _isOfflineFallback
+                    ? LayoutBuilder(
+                        builder: (context, constraints) {
+                          final size = Size(
+                            constraints.maxWidth,
+                            constraints.maxHeight,
+                          );
 
-                    if (_isOfflineFallback) {
-                      return _buildOfflineMapCanvas(
-                        size: size,
-                        hubOffsetRatio: hubOffsetRatio,
+                          return _buildOfflineMapCanvas(
+                            size: size,
+                            hubOffsetRatio: hubOffsetRatio,
+                            pickupName: pickupName,
+                            dropoffName: dropoffName,
+                            isReturning: isReturning,
+                            isAssigning: isAssigning,
+                            isInTransit: isInTransit,
+                            isDelivered: isDelivered,
+                            isStandby: isStandby,
+                            legProgress: legProgress,
+                            statusColor: statusColor,
+                          );
+                        },
+                      )
+                    : _buildOnlineMapCanvas(
+                        hubLatLng: hubLatLng,
+                        vendorLatLng: vendorLatLng,
+                        customerLatLng: customerLatLng,
+                        startLatLng: startLatLng,
+                        endLatLng: endLatLng,
+                        droneLatLng: droneLatLng,
                         pickupName: pickupName,
                         dropoffName: dropoffName,
                         isReturning: isReturning,
@@ -679,29 +701,8 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
                         isInTransit: isInTransit,
                         isDelivered: isDelivered,
                         isStandby: isStandby,
-                        legProgress: legProgress,
                         statusColor: statusColor,
-                      );
-                    }
-
-                    return _buildOnlineMapCanvas(
-                      hubLatLng: hubLatLng,
-                      vendorLatLng: vendorLatLng,
-                      customerLatLng: customerLatLng,
-                      startLatLng: startLatLng,
-                      endLatLng: endLatLng,
-                      droneLatLng: droneLatLng,
-                      pickupName: pickupName,
-                      dropoffName: dropoffName,
-                      isReturning: isReturning,
-                      isAssigning: isAssigning,
-                      isInTransit: isInTransit,
-                      isDelivered: isDelivered,
-                      isStandby: isStandby,
-                      statusColor: statusColor,
-                    );
-                  },
-                ),
+                      ),
               ),
 
               // Bottom live telemetry bar

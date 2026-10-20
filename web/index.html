@@ -31,6 +31,26 @@
 
   <title>AeroDrop</title>
   <link rel="manifest" href="manifest.json">
+
+  <!--
+    Corbado Passkeys Web SDK.
+
+    AeroDrop does not use passkeys — authentication is email OTP, password and
+    OAuth. This is here because supabase_flutter pulls in `passkeys`, whose web
+    implementation registers itself on every web startup and, if it cannot find
+    `window.PasskeyAuthenticator`, logs "Passkeys Web SDK not loaded" and calls
+    window.close(), which halts the app before Flutter paints a frame. See
+    passkeys_web/lib/passkeys_web.dart, registerWith().
+
+    Loaded synchronously and before flutter_bootstrap.js (which is async) so the
+    global exists by the time the plugin registrant runs. The file is vendored
+    in web/js rather than hot-linked from the GitHub release so the app still
+    boots without internet access.
+
+    Source: https://github.com/corbado/flutter-passkeys/releases/download/2.4.0/bundle.js
+    Re-download this if `passkeys_web` is ever upgraded past 2.9.0.
+  -->
+  <script src="js/passkeys_bundle.js"></script>
 </head>
 <body>
   <!--

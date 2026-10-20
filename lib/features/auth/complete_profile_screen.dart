@@ -24,8 +24,7 @@ class CompleteProfileScreen extends ConsumerStatefulWidget {
       _CompleteProfileScreenState();
 }
 
-class _CompleteProfileScreenState
-    extends ConsumerState<CompleteProfileScreen> {
+class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   final _phoneController = TextEditingController();
   bool _submitting = false;
@@ -68,7 +67,8 @@ class _CompleteProfileScreenState
     }
 
     final user = ref.read(authProvider).user;
-    final hasSession = SupabaseService.isConfigured &&
+    final hasSession =
+        SupabaseService.isConfigured &&
         SupabaseService.client.auth.currentSession != null;
     if (user == null || !hasSession) {
       setState(() => _submitting = false);
@@ -112,7 +112,8 @@ class _CompleteProfileScreenState
       }
     } else {
       final err =
-          ref.read(authProvider).errorMessage ?? 'Failed to update phone number.';
+          ref.read(authProvider).errorMessage ??
+          'Failed to update phone number.';
       showNeuSnack(context, err, tone: NeuToneKind.error);
     }
   }
@@ -181,12 +182,16 @@ class _CompleteProfileScreenState
                                   width: 44,
                                   height: 44,
                                   decoration: BoxDecoration(
-                                    color: AppColors.accent.withValues(alpha: 0.12),
+                                    color: AppColors.accent.withValues(
+                                      alpha: 0.12,
+                                    ),
                                     borderRadius: BorderRadius.circular(
                                       AppRadii.pill,
                                     ),
                                     border: Border.all(
-                                      color: AppColors.accent.withValues(alpha: 0.28),
+                                      color: AppColors.accent.withValues(
+                                        alpha: 0.28,
+                                      ),
                                     ),
                                   ),
                                   child: const Center(
@@ -200,7 +205,8 @@ class _CompleteProfileScreenState
                                 const SizedBox(width: AppSpacing.md),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         user.fullName.isNotEmpty
@@ -235,9 +241,7 @@ class _CompleteProfileScreenState
                           hintText: '0917 123 4567',
                           keyboardType: TextInputType.phone,
                           prefixIcon: Icons.phone_android_rounded,
-                          inputFormatters: const [
-                            PhoneInputFormatter(),
-                          ],
+                          inputFormatters: const [PhoneInputFormatter()],
                           validator: (value) {
                             if (value == null || value.trim().isEmpty) {
                               return 'Please enter your mobile number';

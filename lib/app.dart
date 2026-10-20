@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'config/router/app_router.dart';
+import 'demo/demo_mode.dart'; // DEMO
 import 'core/providers/settings_provider.dart';
 import 'core/theme/app_colors.dart';
 import 'core/theme/app_theme.dart';
@@ -54,7 +55,12 @@ class AeroDropApp extends ConsumerWidget {
         ).clamp(minScaleFactor: 0.85, maxScaleFactor: 1.6);
         return MediaQuery(
           data: MediaQuery.of(context).copyWith(textScaler: scaler),
-          child: child ?? const SizedBox.shrink(),
+          // DEMO
+          child: DemoOverlay(
+            router: router,
+            navigatorKey: rootNavigatorKey,
+            child: child ?? const SizedBox.shrink(),
+          ),
         );
       },
     );

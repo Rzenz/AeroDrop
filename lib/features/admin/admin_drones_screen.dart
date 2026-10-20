@@ -12,6 +12,7 @@ import '../../core/models/drone_model.dart';
 import '../../core/providers/drone_provider.dart';
 import '../../core/providers/settings_provider.dart';
 import '../../core/widgets/neu_back_button.dart';
+import '../../core/widgets/neu_feedback.dart';
 
 class AdminDronesScreen extends ConsumerWidget {
   const AdminDronesScreen({super.key});
@@ -320,14 +321,7 @@ class AdminDronesScreen extends ConsumerWidget {
                               .read(droneProvider.notifier)
                               .updateStatus(drone.id, status);
                           Navigator.pop(ctx);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                'Drone status updated to ${status.name.toUpperCase()}',
-                              ),
-                              backgroundColor: AppColors.success,
-                            ),
-                          );
+                          showNeuSnack(context, 'Drone status updated to ${status.name.toUpperCase()}', tone: NeuToneKind.success);
                         },
                         child: Container(
                           padding: const EdgeInsets.symmetric(
@@ -378,14 +372,7 @@ class AdminDronesScreen extends ConsumerWidget {
                                 .read(droneProvider.notifier)
                                 .rechargeDrone(drone.id);
                             Navigator.pop(ctx);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'Drone battery recharged to 100%!',
-                                ),
-                                backgroundColor: AppColors.success,
-                              ),
-                            );
+                            showNeuSnack(context, 'Drone battery recharged to 100%!', tone: NeuToneKind.success);
                           },
                           icon: const Icon(Icons.battery_charging_full_rounded),
                           label: const Text('Recharge Fleet'),
@@ -437,14 +424,7 @@ class AdminDronesScreen extends ConsumerWidget {
                                 ),
                               );
                             } else {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    'Drone "${drone.name}" sent to decommission queue.',
-                                  ),
-                                  backgroundColor: AppColors.success,
-                                ),
-                              );
+                              showNeuSnack(context, 'Drone "${drone.name}" sent to decommission queue.', tone: NeuToneKind.success);
                             }
                           },
                           icon: const Icon(Icons.delete_forever_rounded),

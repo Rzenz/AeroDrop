@@ -48,10 +48,12 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen>
     if (_formKey.currentState!.validate()) {
       setState(() => _loading = true);
       final email = _emailController.text.trim();
-      final isGoogleOnly =
-          await ref.read(authProvider.notifier).checkIsGoogleOnlyAccount(email);
-      final success =
-          await ref.read(authProvider.notifier).sendPasswordReset(email);
+      final isGoogleOnly = await ref
+          .read(authProvider.notifier)
+          .checkIsGoogleOnlyAccount(email);
+      final success = await ref
+          .read(authProvider.notifier)
+          .sendPasswordReset(email);
 
       if (mounted) {
         setState(() => _loading = false);
@@ -72,7 +74,8 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen>
             },
           );
         } else {
-          final error = ref.read(authProvider).errorMessage ??
+          final error =
+              ref.read(authProvider).errorMessage ??
               'Failed to send password reset code. Please try again.';
           showNeuSnack(context, error, tone: NeuToneKind.error);
         }

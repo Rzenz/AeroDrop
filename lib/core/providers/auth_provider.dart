@@ -401,8 +401,17 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
     try {
       if (kIsWeb) {
+        // Back to this site's root, whatever host it is served from — the
+        // dev server, a preview deploy or the live domain. Without it,
+        // Supabase sends the browser to the dashboard's Site URL, which
+        // need not be this site at all. The root, not `#/login`: Supabase
+        // appends `?code=` for the PKCE exchange, and on a hash-routed page
+        // a query after the `#` lands in the fragment where it is not read.
+        // The router takes the visitor on from the root once the session
+        // is in (see app_router.dart).
         await SupabaseService.client.auth.signInWithOAuth(
           OAuthProvider.google,
+          redirectTo: '${Uri.base.origin}${Uri.base.path}',
         );
         return true;
       } else if (defaultTargetPlatform == TargetPlatform.windows ||

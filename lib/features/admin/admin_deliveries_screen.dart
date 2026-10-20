@@ -10,6 +10,7 @@ import '../../core/providers/delivery_provider.dart';
 import '../../core/models/delivery_model.dart';
 import '../../core/widgets/neu_back_button.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/widgets/neu_feedback.dart';
 
 class AdminDeliveriesScreen extends ConsumerStatefulWidget {
   const AdminDeliveriesScreen({super.key});
@@ -42,27 +43,9 @@ class _AdminDeliveriesScreenState extends ConsumerState<AdminDeliveriesScreen> {
     final error = await ref.read(deliveryProvider.notifier).acceptDelivery(id);
     if (!mounted) return;
     if (error != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to accept: $error'),
-          backgroundColor: AppColors.danger,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-      );
+      showNeuSnack(context, 'Failed to accept: $error', tone: NeuToneKind.error);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Delivery accepted and drone assigned!'),
-          backgroundColor: AppColors.success,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-      );
+      showNeuSnack(context, 'Delivery accepted and drone assigned!', tone: NeuToneKind.success);
       _fetchDeliveries();
     }
   }
@@ -71,27 +54,9 @@ class _AdminDeliveriesScreenState extends ConsumerState<AdminDeliveriesScreen> {
     final error = await ref.read(deliveryProvider.notifier).rejectDelivery(id);
     if (!mounted) return;
     if (error != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to reject: $error'),
-          backgroundColor: AppColors.danger,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-      );
+      showNeuSnack(context, 'Failed to reject: $error', tone: NeuToneKind.error);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Delivery request rejected.'),
-          backgroundColor: AppColors.success,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-      );
+      showNeuSnack(context, 'Delivery request rejected.', tone: NeuToneKind.success);
       _fetchDeliveries();
     }
   }

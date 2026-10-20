@@ -289,6 +289,20 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
   }
 }
 
+/// The printed paper on its own, with its torn edge — for the website's
+/// receipt page, which shows the paper without the printer around it.
+class ReceiptPaper extends StatelessWidget {
+  const ReceiptPaper({super.key, required this.data});
+
+  final ReceiptData data;
+
+  @override
+  Widget build(BuildContext context) => ClipPath(
+    clipper: const ReceiptTornEdgeClipper(),
+    child: _Paper(data: data),
+  );
+}
+
 /// What shows on the machine's screen: who it is from, and the amount.
 class _Summary extends StatelessWidget {
   const _Summary({required this.data});

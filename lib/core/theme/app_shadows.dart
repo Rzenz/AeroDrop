@@ -38,8 +38,8 @@ class AppShadows {
 
   /// Opacity of the light highlight. The dark canvas needs a gentler highlight
   /// than the light one or the top-left edge turns into a visible rim.
-  static double _lightAlpha(NeuDepth depth) {
-    final base = AppTheme.isDarkMode ? 0.55 : 0.9;
+  static double _lightAlpha(NeuDepth depth, [bool? dark]) {
+    final base = (dark ?? AppTheme.isDarkMode) ? 0.55 : 0.9;
     return switch (depth) {
       NeuDepth.flat => base * 0.7,
       NeuDepth.low => base * 0.85,
@@ -48,8 +48,8 @@ class AppShadows {
     };
   }
 
-  static double _shadowAlpha(NeuDepth depth) {
-    final base = AppTheme.isDarkMode ? 0.62 : 0.72;
+  static double _shadowAlpha(NeuDepth depth, [bool? dark]) {
+    final base = (dark ?? AppTheme.isDarkMode) ? 0.62 : 0.72;
     return switch (depth) {
       NeuDepth.flat => base * 0.7,
       NeuDepth.low => base * 0.85,
@@ -94,6 +94,30 @@ class AppShadows {
     });
   }
 
+  /// A raised surface in a fixed [palette] rather than the app theme's —
+  /// for screens that keep one palette whatever the theme says (the admin
+  /// console and the public website are always dark).
+  static List<BoxShadow> raisedIn(
+    NeuPalette palette, [
+    NeuDepth depth = NeuDepth.low,
+  ]) {
+    final d = _distance(depth);
+    return [
+      BoxShadow(
+        color: palette.shadow.withValues(
+          alpha: _shadowAlpha(depth, palette.dark),
+        ),
+        offset: Offset(d, d),
+        blurRadius: d * 2,
+      ),
+      BoxShadow(
+        color: palette.light.withValues(alpha: _lightAlpha(depth, palette.dark)),
+        offset: Offset(-d, -d),
+        blurRadius: d * 2,
+      ),
+    ];
+  }
+
   /// Convenience aliases for the levels used most often.
   static List<BoxShadow> get flat => raised(NeuDepth.flat);
   static List<BoxShadow> get low => raised(NeuDepth.low);
@@ -133,4 +157,76 @@ class AppShadows {
       spreadRadius: -4,
     ),
   ];
+}
+
+/// The colours a neumorphic surface is cut from: the canvas it shares with
+/// its surroundings, the well colour, and the light/shadow pair.
+///
+/// [current] follows the app theme. [dark] is pinned, for the surfaces that
+/// stay dark in either theme.
+class NeuPalette {
+  const NeuPalette({
+    required this.base,
+    required this.raised,
+    required this.sunken,
+    required this.light,
+    required this.shadow,
+    required this.border,
+    required this.text,
+    required this.textSoft,
+    required this.textFaint,
+    required this.dark,
+  });
+
+  final Color base;
+
+  /// One step up, for a surface layered on another raised surface.
+  final Color raised;
+  final Color sunken;
+  final Color light;
+  final Color shadow;
+  final Color border;
+  final Color text;
+  final Color textSoft;
+  final Color textFaint;
+  final bool dark;
+
+  static const NeuPalette darkPalette = NeuPalette(
+    base: AppColors.bgDark,
+    raised: AppColors.cardDark2,
+    sunken: AppColors.sunkenDark,
+    light: AppColors.neuLightShadowDark,
+    shadow: AppColors.neuDarkShadowDark,
+    border: AppColors.borderDark,
+    text: AppColors.textPrimaryDark,
+    textSoft: AppColors.textSecondaryDark,
+    textFaint: AppColors.textTertiaryDark,
+    dark: true,
+  );
+
+  static const NeuPalette lightPalette = NeuPalette(
+    base: AppColors.bgLight,
+    raised: AppColors.cardLight2,
+    sunken: AppColors.sunkenLight,
+    light: AppColors.neuLightShadowLight,
+    shadow: AppColors.neuDarkShadowLight,
+    border: AppColors.borderLight,
+    text: AppColors.textPrimaryLight,
+    textSoft: AppColors.textSecondaryLight,
+    textFaint: AppColors.textTertiaryLight,
+    dark: false,
+  );
+
+  static NeuPalette get current =>
+      AppTheme.isDarkMode ? darkPalette : lightPalette;
+
+  /// Accent for text and icons on this palette's canvas.
+  Color get accentText => dark ? AppColors.accent : AppColors.accentOnLight;
+
+  /// Fill for an accent surface, and what sits on it.
+  Color get accentFill => dark ? AppColors.accent : AppColors.primary;
+  Color get onAccentFill => dark ? AppColors.bgDark : AppColors.onBrand;
+
+  List<BoxShadow> shadows([NeuDepth depth = NeuDepth.low]) =>
+      AppShadows.raisedIn(this, depth);
 }

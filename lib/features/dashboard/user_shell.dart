@@ -1,9 +1,11 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'widgets/aerodrop_bottom_navigation.dart';
+import '../web/app/web_app_shell.dart';
 import '../../core/models/cart_model.dart';
 import '../../core/services/supabase_service.dart';
 import '../../core/providers/auth_provider.dart';
@@ -224,6 +226,15 @@ class _UserShellState extends ConsumerState<UserShell>
   Widget build(BuildContext context) {
     final selected = _selectedIndex(context);
     final activeOrdersCount = ref.watch(customerActiveOrdersCountProvider);
+
+    // The website has its own chrome (a sidebar, or a top bar and menu on
+    // a phone browser); the dock is the app's.
+    if (kIsWeb) {
+      return WebAppShell(
+        location: GoRouterState.of(context).uri.path,
+        child: widget.child,
+      );
+    }
 
     return Scaffold(
       extendBody: true,

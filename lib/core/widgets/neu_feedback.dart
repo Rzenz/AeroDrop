@@ -34,16 +34,26 @@ extension _ToneStyle on NeuToneKind {
 /// One entry point for every transient message in the app, so tone, shape and
 /// duration stop being decided per call site. The icon carries the tone as well
 /// as the colour, because a red bar alone is not a message anyone can read.
+///
+/// The toast is a raised piece of the canvas with the tone's icon pressed
+/// into it — the same material as every card — and a rail along its foot that
+/// empties over [duration], so the reader can see how long it will stay. On a
+/// phone it sits above the dock; on a wide window it takes the bottom-right
+/// corner at a readable width instead of stretching across the page.
 void showNeuSnack(
   BuildContext context,
   String message, {
   NeuToneKind tone = NeuToneKind.info,
   String? actionLabel,
   VoidCallback? onAction,
-  Duration duration = const Duration(seconds: 3),
+  Duration duration = const Duration(seconds: 4),
 }) {
   final messenger = ScaffoldMessenger.maybeOf(context);
   if (messenger == null) return;
+
+  final width = MediaQuery.sizeOf(context).width;
+  final wide = width >= _wideToastFrom;
+  const toastWidth = 400.0;
 
   // Replace rather than queue: a stack of stale toasts is worse than the one
   // message that actually describes the current state.
@@ -55,58 +65,197 @@ void showNeuSnack(
       elevation: 0,
       behavior: SnackBarBehavior.floating,
       padding: EdgeInsets.zero,
-      margin: const EdgeInsets.all(AppSpacing.md),
-      content: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md,
-          vertical: AppSpacing.sm,
-        ),
+      margin: wide
+          ? EdgeInsets.fromLTRB(width - toastWidth - 28, 0, 28, 28)
+          : const EdgeInsets.fromLTRB(
+              AppSpacing.md,
+              0,
+              AppSpacing.md,
+              AppSpacing.md,
+            ),
+      dismissDirection: wide
+          ? DismissDirection.startToEnd
+          : DismissDirection.down,
+      content: NeuToast(
+        message: message,
+        tone: tone,
+        duration: duration,
+        actionLabel: onAction == null ? null : actionLabel,
+        onAction: onAction == null
+            ? null
+            : () {
+                messenger.hideCurrentSnackBar();
+                onAction();
+              },
+        onDismiss: messenger.hideCurrentSnackBar,
+      ),
+    ),
+  );
+}
+
+/// The wide-window breakpoint ([WideLayout.breakpoint]), repeated here so the
+/// feedback layer does not depend on the shell.
+const double _wideToastFrom = 1100;
+
+/// The toast's body. Public so it can be shown in tests and previews.
+class NeuToast extends StatefulWidget {
+  const NeuToast({
+    super.key,
+    required this.message,
+    this.tone = NeuToneKind.info,
+    this.duration = const Duration(seconds: 4),
+    this.actionLabel,
+    this.onAction,
+    this.onDismiss,
+  });
+
+  final String message;
+  final NeuToneKind tone;
+  final Duration duration;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+  final VoidCallback? onDismiss;
+
+  @override
+  State<NeuToast> createState() => _NeuToastState();
+}
+
+class _NeuToastState extends State<NeuToast>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _life = AnimationController(
+    vsync: this,
+    duration: widget.duration,
+  );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Under reduced motion the rail stays full rather than draining.
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _life.value = 0;
+    } else if (!_life.isAnimating && _life.value == 0) {
+      _life.forward();
+    }
+  }
+
+  @override
+  void dispose() {
+    _life.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final toneColor = widget.tone == NeuToneKind.info
+        ? AppColors.accentText
+        : AppColors.readable(widget.tone.color);
+    final radius = BorderRadius.circular(AppRadii.lg);
+
+    return Semantics(
+      liveRegion: true,
+      container: true,
+      child: Container(
         decoration: BoxDecoration(
-          color: AppColors.surfaceRaised,
-          borderRadius: AppRadii.brMd,
-          border: Border.all(color: tone.color.withValues(alpha: 0.35)),
+          color: AppColors.base,
+          borderRadius: radius,
           boxShadow: AppShadows.floating,
         ),
-        child: Row(
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Icon(tone.icon, color: tone.color, size: 19),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(
-              child: Text(
-                message,
-                style: AppTextStyles.body(
-                  fontSize: 13.5,
-                  color: AppColors.textPrimary,
-                ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 12, 6, 10),
+              child: Row(
+                children: [
+                  NeuSurface(
+                    style: NeuStyle.inset,
+                    depth: NeuDepth.low,
+                    width: 38,
+                    height: 38,
+                    color: AppColors.surfaceSunken,
+                    borderRadius: BorderRadius.circular(19),
+                    alignment: Alignment.center,
+                    child: Icon(widget.tone.icon, color: toneColor, size: 20),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Text(
+                      widget.message,
+                      style: AppTextStyles.body(
+                        fontSize: 13.5,
+                        height: 1.4,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                  if (widget.actionLabel != null) ...[
+                    const SizedBox(width: AppSpacing.xs),
+                    NeuPressable(
+                      onTap: widget.onAction,
+                      depth: NeuDepth.flat,
+                      borderRadius: AppRadii.brPill,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 7,
+                      ),
+                      child: Text(
+                        widget.actionLabel!,
+                        style: AppTextStyles.label(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.accentText,
+                        ),
+                      ),
+                    ),
+                  ],
+                  if (widget.onDismiss != null)
+                    IconButton(
+                      tooltip: 'Dismiss',
+                      visualDensity: VisualDensity.compact,
+                      onPressed: widget.onDismiss,
+                      icon: Icon(
+                        Icons.close_rounded,
+                        size: 18,
+                        color: AppColors.textTertiary,
+                      ),
+                    ),
+                ],
               ),
             ),
-            if (actionLabel != null && onAction != null) ...[
-              const SizedBox(width: AppSpacing.xs),
-              GestureDetector(
-                onTap: () {
-                  messenger.hideCurrentSnackBar();
-                  onAction();
-                },
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.xs,
-                    vertical: AppSpacing.xxs,
-                  ),
-                  child: Text(
-                    actionLabel,
-                    style: AppTextStyles.label(
-                      fontSize: 13,
-                      color: AppColors.accentText,
+            // How long the message has left. A pressed-in rail with the
+            // tone draining out of it, left to right.
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+              child: NeuSurface(
+                style: NeuStyle.inset,
+                depth: NeuDepth.flat,
+                height: 5,
+                color: AppColors.surfaceSunken,
+                borderRadius: AppRadii.brPill,
+                child: AnimatedBuilder(
+                  animation: _life,
+                  builder: (context, _) => FractionallySizedBox(
+                    alignment: Alignment.centerLeft,
+                    widthFactor: 1 - _life.value,
+                    heightFactor: 1,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: toneColor.withValues(alpha: 0.85),
+                        borderRadius: AppRadii.brPill,
+                      ),
                     ),
                   ),
                 ),
               ),
-            ],
+            ),
           ],
         ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 /// Confirmation dialog.

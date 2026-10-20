@@ -10,6 +10,7 @@ import '../../core/services/supabase_service.dart';
 import '../../core/widgets/glass_card.dart';
 import '../../core/widgets/neu_back_button.dart';
 import '../../core/providers/auth_provider.dart';
+import '../../core/widgets/neu_feedback.dart';
 
 class AdminUsersScreen extends ConsumerStatefulWidget {
   const AdminUsersScreen({super.key});
@@ -143,12 +144,7 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
             onPressed: () async {
               Navigator.pop(ctx);
               if (!SupabaseService.isConfigured) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Supabase is not configured.'),
-                    backgroundColor: AppColors.danger,
-                  ),
-                );
+                showNeuSnack(context, 'Supabase is not configured.', tone: NeuToneKind.error);
                 return;
               }
               try {
@@ -161,14 +157,7 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
 
                 if (userRecord == null) {
                   if (!mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'Approval Blocked: User has no application profile record.',
-                      ),
-                      backgroundColor: AppColors.danger,
-                    ),
-                  );
+                  showNeuSnack(context, 'Approval Blocked: User has no application profile record.', tone: NeuToneKind.error);
                   return;
                 }
 
@@ -186,14 +175,7 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
 
                 if (missingFields.isNotEmpty) {
                   if (!mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        'Approval Blocked: Required fields missing: ${missingFields.join(", ")}',
-                      ),
-                      backgroundColor: AppColors.danger,
-                    ),
-                  );
+                  showNeuSnack(context, 'Approval Blocked: Required fields missing: ${missingFields.join(", ")}', tone: NeuToneKind.error);
                   return;
                 }
 
@@ -209,23 +191,11 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
                     .eq('id', userId);
 
                 if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'Vendor "$bizName" has been approved successfully!',
-                    ),
-                    backgroundColor: AppColors.success,
-                  ),
-                );
+                showNeuSnack(context, 'Vendor "$bizName" has been approved successfully!', tone: NeuToneKind.success);
                 _fetchUsers();
               } catch (e) {
                 if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Failed to approve vendor: $e'),
-                    backgroundColor: AppColors.danger,
-                  ),
-                );
+                showNeuSnack(context, 'Failed to approve vendor: $e', tone: NeuToneKind.error);
               }
             },
             child: const Text(
@@ -282,21 +252,11 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
             .eq('id', userId);
 
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Vendor application for "$name" has been rejected.'),
-            backgroundColor: AppColors.danger,
-          ),
-        );
+        showNeuSnack(context, 'Vendor application for "$name" has been rejected.', tone: NeuToneKind.error);
         _fetchUsers();
       } catch (e) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to reject vendor: $e'),
-            backgroundColor: AppColors.danger,
-          ),
-        );
+        showNeuSnack(context, 'Failed to reject vendor: $e', tone: NeuToneKind.error);
       }
     }
   }
@@ -349,21 +309,11 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
             .eq('id', userId);
 
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Vendor "$name" has been suspended.'),
-            backgroundColor: AppColors.warning,
-          ),
-        );
+        showNeuSnack(context, 'Vendor "$name" has been suspended.', tone: NeuToneKind.warning);
         _fetchUsers();
       } catch (e) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to suspend vendor: $e'),
-            backgroundColor: AppColors.danger,
-          ),
-        );
+        showNeuSnack(context, 'Failed to suspend vendor: $e', tone: NeuToneKind.error);
       }
     }
   }
@@ -413,12 +363,7 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
 
     if (confirm == true && mounted) {
       if (!SupabaseService.isConfigured) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Supabase is not configured.'),
-            backgroundColor: AppColors.danger,
-          ),
-        );
+        showNeuSnack(context, 'Supabase is not configured.', tone: NeuToneKind.error);
         return;
       }
 
@@ -428,32 +373,17 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
       if (!mounted) return;
 
       if (error == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('User account suspended.'),
-            backgroundColor: AppColors.success,
-          ),
-        );
+        showNeuSnack(context, 'User account suspended.', tone: NeuToneKind.success);
         _fetchUsers();
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to suspend user: $error'),
-            backgroundColor: AppColors.danger,
-          ),
-        );
+        showNeuSnack(context, 'Failed to suspend user: $error', tone: NeuToneKind.error);
       }
     }
   }
 
   Future<void> _handleActivate(String userId) async {
     if (!SupabaseService.isConfigured) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Supabase is not configured.'),
-          backgroundColor: AppColors.danger,
-        ),
-      );
+      showNeuSnack(context, 'Supabase is not configured.', tone: NeuToneKind.error);
       return;
     }
 
@@ -461,20 +391,10 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
     if (!mounted) return;
 
     if (error == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('User account activated.'),
-          backgroundColor: AppColors.success,
-        ),
-      );
+      showNeuSnack(context, 'User account activated.', tone: NeuToneKind.success);
       _fetchUsers();
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to activate user: $error'),
-          backgroundColor: AppColors.danger,
-        ),
-      );
+      showNeuSnack(context, 'Failed to activate user: $error', tone: NeuToneKind.error);
     }
   }
 
@@ -523,12 +443,7 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
 
     if (confirm == true && mounted) {
       if (!SupabaseService.isConfigured) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Supabase is not configured.'),
-            backgroundColor: AppColors.danger,
-          ),
-        );
+        showNeuSnack(context, 'Supabase is not configured.', tone: NeuToneKind.error);
         return;
       }
 
@@ -538,20 +453,10 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
       if (!mounted) return;
 
       if (error == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('User account deleted.'),
-            backgroundColor: AppColors.success,
-          ),
-        );
+        showNeuSnack(context, 'User account deleted.', tone: NeuToneKind.success);
         _fetchUsers();
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to delete user: $error'),
-            backgroundColor: AppColors.danger,
-          ),
-        );
+        showNeuSnack(context, 'Failed to delete user: $error', tone: NeuToneKind.error);
       }
     }
   }

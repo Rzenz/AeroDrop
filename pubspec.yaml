@@ -58,6 +58,7 @@ dependencies:
   url_launcher: ^6.3.0
   flutter_map: ^8.3.2
   latlong2: ^0.10.1
+  font_awesome_flutter: ^11.0.0
 
 dev_dependencies:
   flutter_test:
@@ -87,6 +88,8 @@ flutter:
   assets:
     - assets/lottie/
     - assets/images/
+    - assets/images/landing/
+    - assets/images/team/
     - assets/svg/
 
   # An image asset can refer to one or more resolution-specific "variants", see

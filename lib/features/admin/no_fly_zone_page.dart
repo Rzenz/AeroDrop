@@ -9,6 +9,7 @@ import '../../core/widgets/animated_fab.dart';
 import '../../core/widgets/custom_text_field.dart';
 import '../../core/services/supabase_service.dart';
 import '../../core/widgets/neu_back_button.dart';
+import '../../core/widgets/neu_feedback.dart';
 
 class NoFlyZonePage extends ConsumerStatefulWidget {
   const NoFlyZonePage({super.key});
@@ -73,13 +74,7 @@ class _NoFlyZonePageState extends ConsumerState<NoFlyZonePage> {
 
   Future<void> _deleteZone(String id) async {
     if (!SupabaseService.isConfigured) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Database service is not configured.'),
-          backgroundColor: AppColors.warning,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      showNeuSnack(context, 'Database service is not configured.', tone: NeuToneKind.warning);
       return;
     }
 
@@ -93,25 +88,11 @@ class _NoFlyZonePageState extends ConsumerState<NoFlyZonePage> {
           .eq('id', id);
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Restricted airspace zone set to Inactive successfully!',
-          ),
-          backgroundColor: AppColors.success,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      showNeuSnack(context, 'Restricted airspace zone set to Inactive successfully!', tone: NeuToneKind.success);
       _fetchZones();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to deactivate zone: $e'),
-          backgroundColor: AppColors.danger,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      showNeuSnack(context, 'Failed to deactivate zone: $e', tone: NeuToneKind.error);
     }
   }
 
@@ -180,12 +161,7 @@ class _NoFlyZonePageState extends ConsumerState<NoFlyZonePage> {
               Navigator.pop(ctx);
 
               if (!SupabaseService.isConfigured) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Database service is not configured.'),
-                    backgroundColor: AppColors.warning,
-                  ),
-                );
+                showNeuSnack(context, 'Database service is not configured.', tone: NeuToneKind.warning);
                 return;
               }
 
@@ -217,21 +193,11 @@ class _NoFlyZonePageState extends ConsumerState<NoFlyZonePage> {
                 });
 
                 if (!context.mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('New restricted zone saved!'),
-                    backgroundColor: AppColors.success,
-                  ),
-                );
+                showNeuSnack(context, 'New restricted zone saved!', tone: NeuToneKind.success);
                 _fetchZones();
               } catch (e) {
                 if (!context.mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Failed to save zone: $e'),
-                    backgroundColor: AppColors.danger,
-                  ),
-                );
+                showNeuSnack(context, 'Failed to save zone: $e', tone: NeuToneKind.error);
               }
             },
             child: const Text(
@@ -308,12 +274,7 @@ class _NoFlyZonePageState extends ConsumerState<NoFlyZonePage> {
               Navigator.pop(ctx);
 
               if (!SupabaseService.isConfigured) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Database service is not configured.'),
-                    backgroundColor: AppColors.warning,
-                  ),
-                );
+                showNeuSnack(context, 'Database service is not configured.', tone: NeuToneKind.warning);
                 return;
               }
 
@@ -348,21 +309,11 @@ class _NoFlyZonePageState extends ConsumerState<NoFlyZonePage> {
                     .eq('id', zone['id']!);
 
                 if (!context.mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Restriction parameters updated!'),
-                    backgroundColor: AppColors.success,
-                  ),
-                );
+                showNeuSnack(context, 'Restriction parameters updated!', tone: NeuToneKind.success);
                 _fetchZones();
               } catch (e) {
                 if (!context.mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Failed to update zone: $e'),
-                    backgroundColor: AppColors.danger,
-                  ),
-                );
+                showNeuSnack(context, 'Failed to update zone: $e', tone: NeuToneKind.error);
               }
             },
             child: const Text(

@@ -194,8 +194,13 @@ final notificationProvider =
 /// Unread is strictly defined as belonging to current user with read_at IS NULL (and !isRead).
 final unreadNotificationCountProvider = Provider<int>((ref) {
   final authUser = ref.watch(authProvider).user;
+  // The fallback reads the Supabase session, which throws when Supabase is
+  // not configured — guarded so an unconfigured build shows a zero count.
   final currentUserId =
-      authUser?.id ?? SupabaseService.client.auth.currentUser?.id;
+      authUser?.id ??
+      (SupabaseService.isConfigured
+          ? SupabaseService.client.auth.currentUser?.id
+          : null);
   final notifications = ref.watch(notificationProvider);
 
   return notifications.where((n) {

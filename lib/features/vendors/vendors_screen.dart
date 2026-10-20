@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/constants/vendor_categories.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_radii.dart';
 import '../../core/theme/app_spacing.dart';
@@ -15,7 +16,15 @@ import '../../core/providers/product_provider.dart';
 import '../../core/providers/vendor_provider.dart';
 
 class VendorsScreen extends ConsumerStatefulWidget {
-  const VendorsScreen({super.key});
+  const VendorsScreen({super.key, this.initialCategory, this.initialSearch});
+
+  /// Store category to open filtered to, from `/user/shop?category=`.
+  /// Ignored unless it is one of [vendorCategories].
+  final String? initialCategory;
+
+  /// Text to open the store search with, from `/user/shop?search=`. The
+  /// landing page's canteen tiles pass a building name here.
+  final String? initialSearch;
 
   @override
   ConsumerState<VendorsScreen> createState() => _VendorsScreenState();
@@ -28,16 +37,67 @@ class _VendorsScreenState extends ConsumerState<VendorsScreen> {
   String _productSearch = '';
   String _productCategory = 'All';
 
-  static const _vendorCategories = [
-    'All',
-    'Food',
-    'Drinks',
-    'Electronics',
-    'Stationery',
-    'Books',
-    'Maritime Supplies',
-    'Healthy Food',
-  ];
+  /// The categories a vendor picks from at registration, so every chip can
+  /// match a real store.
+  static const _vendorCategories = ['All', ...vendorCategories];
+
+  /// Owned here, not by the field, so a search arriving in the URL shows up
+  /// as typed text the student can edit or clear.
+  final _vendorSearchController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _applyInitialCategory();
+    _applyInitialSearch();
+  }
+
+  @override
+  void dispose() {
+    _vendorSearchController.dispose();
+    super.dispose();
+  }
+
+  void _applyInitialSearch() {
+    final search = widget.initialSearch?.trim();
+    if (search == null || search.isEmpty) return;
+    _selectedTab = 0;
+    _vendorSearch = search;
+    _vendorSearchController.text = search;
+  }
+
+  @override
+  void didUpdateWidget(covariant VendorsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // The shell keeps this screen mounted when only the query changes, so a
+    // second tile clicked from the landing page arrives here, not initState.
+    if (widget.initialCategory != oldWidget.initialCategory) {
+      _applyInitialCategory();
+    }
+    if (widget.initialSearch != oldWidget.initialSearch) {
+      _applyInitialSearch();
+    }
+  }
+
+  void _applyInitialCategory() {
+    final category = widget.initialCategory;
+    if (category != null && _vendorCategories.contains(category)) {
+      _selectedTab = 0;
+      _vendorCategory = category;
+    }
+  }
+
+  /// Matches on the category the vendor registered with. "Other" holds every
+  /// vendor whose category is not one of the predefined ones, which is where
+  /// a custom category typed at registration ends up.
+  bool _matchesVendorCategory(VendorViewModel v) {
+    if (_vendorCategory == 'All') return true;
+    if (_vendorCategory == 'Other') {
+      return !isPredefinedVendorCategory(v.businessCategory);
+    }
+    return v.businessCategory?.trim().toLowerCase() ==
+        _vendorCategory.toLowerCase();
+  }
 
   List<VendorViewModel> _getFilteredVendors(List<VendorViewModel> vendors) {
     return vendors.where((v) {
@@ -45,10 +105,7 @@ class _VendorsScreenState extends ConsumerState<VendorsScreen> {
           _vendorSearch.isEmpty ||
           v.businessName.toLowerCase().contains(_vendorSearch.toLowerCase()) ||
           v.building.toLowerCase().contains(_vendorSearch.toLowerCase());
-      final matchCat =
-          _vendorCategory == 'All' ||
-          v.categories.any((c) => c.toLowerCase().contains(_vendorCategory.toLowerCase()));
-      return matchSearch && matchCat;
+      return matchSearch && _matchesVendorCategory(v);
     }).toList();
   }
 
@@ -138,6 +195,7 @@ class _VendorsScreenState extends ConsumerState<VendorsScreen> {
                   0,
                 ),
                 child: NeuSearchField(
+                  controller: _vendorSearchController,
                   hintText: 'Search campus stores or buildings',
                   onChanged: (v) => setState(() => _vendorSearch = v),
                 ),
@@ -182,7 +240,9 @@ class _VendorsScreenState extends ConsumerState<VendorsScreen> {
               Expanded(
                 child: vendorState.isLoading
                     ? const Center(
-                        child: CircularProgressIndicator(color: AppColors.accent),
+                        child: CircularProgressIndicator(
+                          color: AppColors.accent,
+                        ),
                       )
                     : filteredVendors.isEmpty
                     ? Center(
@@ -203,8 +263,9 @@ class _VendorsScreenState extends ConsumerState<VendorsScreen> {
                             ),
                             const SizedBox(height: 16),
                             ElevatedButton.icon(
-                              onPressed: () =>
-                                  ref.read(vendorProvider.notifier).loadVendors(),
+                              onPressed: () => ref
+                                  .read(vendorProvider.notifier)
+                                  .loadVendors(),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: AppColors.base,
                                 foregroundColor: Colors.white,
@@ -221,11 +282,16 @@ class _VendorsScreenState extends ConsumerState<VendorsScreen> {
                     : ListView.builder(
                         padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
                         itemCount: filteredVendors.length,
-                        itemBuilder: (context, i) => _VendorCard(
-                          vendor: filteredVendors[i],
-                          onTap: () =>
-                              context.push('/user/vendors/${filteredVendors[i].id}'),
-                        ).animate().fadeIn(delay: (i * 50).ms).slideY(begin: 0.08),
+                        itemBuilder: (context, i) =>
+                            _VendorCard(
+                                  vendor: filteredVendors[i],
+                                  onTap: () => context.push(
+                                    '/user/vendors/${filteredVendors[i].id}',
+                                  ),
+                                )
+                                .animate()
+                                .fadeIn(delay: (i * 50).ms)
+                                .slideY(begin: 0.08),
                       ),
               ),
             ] else ...[
@@ -252,8 +318,9 @@ class _VendorsScreenState extends ConsumerState<VendorsScreen> {
                     vertical: AppSpacing.xs,
                   ),
                   options: productState.categories,
-                  selectedIndex:
-                      productState.categories.indexOf(_productCategory),
+                  selectedIndex: productState.categories.indexOf(
+                    _productCategory,
+                  ),
                   onSelected: (i) => setState(
                     () => _productCategory = productState.categories[i],
                   ),
@@ -284,7 +351,9 @@ class _VendorsScreenState extends ConsumerState<VendorsScreen> {
               Expanded(
                 child: productState.isLoading
                     ? const Center(
-                        child: CircularProgressIndicator(color: AppColors.accent),
+                        child: CircularProgressIndicator(
+                          color: AppColors.accent,
+                        ),
                       )
                     : filteredProducts.isEmpty
                     ? Center(
@@ -305,8 +374,9 @@ class _VendorsScreenState extends ConsumerState<VendorsScreen> {
                             ),
                             const SizedBox(height: 16),
                             ElevatedButton.icon(
-                              onPressed: () =>
-                                  ref.read(productProvider.notifier).loadProducts(),
+                              onPressed: () => ref
+                                  .read(productProvider.notifier)
+                                  .loadProducts(),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: AppColors.base,
                                 foregroundColor: Colors.white,
@@ -326,18 +396,21 @@ class _VendorsScreenState extends ConsumerState<VendorsScreen> {
                           crossAxisCount: AppBreakpoints.gridColumns(context),
                           mainAxisSpacing: AppSpacing.sm,
                           crossAxisSpacing: AppSpacing.sm,
-                          mainAxisExtent: _ProductGridCard.preferredHeight(context),
+                          mainAxisExtent: _ProductGridCard.preferredHeight(
+                            context,
+                          ),
                         ),
                         itemCount: filteredProducts.length,
-                        itemBuilder: (context, i) => _ProductGridCard(
-                          product: filteredProducts[i],
-                          onTap: () => context.push(
-                            '/user/products/${filteredProducts[i].id}',
-                          ),
-                        )
-                            .animate()
-                            .fadeIn(delay: (i * 40).ms)
-                            .scale(begin: const Offset(0.96, 0.96)),
+                        itemBuilder: (context, i) =>
+                            _ProductGridCard(
+                                  product: filteredProducts[i],
+                                  onTap: () => context.push(
+                                    '/user/products/${filteredProducts[i].id}',
+                                  ),
+                                )
+                                .animate()
+                                .fadeIn(delay: (i * 40).ms)
+                                .scale(begin: const Offset(0.96, 0.96)),
                       ),
               ),
             ],
@@ -420,7 +493,8 @@ class _VendorCard extends StatelessWidget {
               decoration: BoxDecoration(
                 color: vendor.logoColor,
                 borderRadius: BorderRadius.circular(14),
-                image: vendor.businessLogoUrl != null &&
+                image:
+                    vendor.businessLogoUrl != null &&
                         vendor.businessLogoUrl!.isNotEmpty
                     ? DecorationImage(
                         image: NetworkImage(vendor.businessLogoUrl!),
@@ -429,7 +503,8 @@ class _VendorCard extends StatelessWidget {
                     : null,
               ),
               alignment: Alignment.center,
-              child: vendor.businessLogoUrl != null &&
+              child:
+                  vendor.businessLogoUrl != null &&
                       vendor.businessLogoUrl!.isNotEmpty
                   ? null
                   : Text(
@@ -546,28 +621,36 @@ class _VendorCard extends StatelessWidget {
                   const SizedBox(height: 6),
                   Wrap(
                     spacing: 4,
-                    children: vendor.categories
-                        .take(3)
-                        .map(
-                          (cat) => Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 7,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppColors.primary.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              cat,
-                              style: AppTextStyles.caption(
-                                fontSize: 9.5,
-                                color: AppColors.primaryLight,
+                    // The vendor's registered category — the same value the
+                    // store chips filter on.
+                    children:
+                        [
+                              if (vendor.businessCategory?.trim().isNotEmpty ??
+                                  false)
+                                vendor.businessCategory!.trim(),
+                            ]
+                            .map(
+                              (cat) => Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 7,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary.withValues(
+                                    alpha: 0.15,
+                                  ),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  cat,
+                                  style: AppTextStyles.caption(
+                                    fontSize: 9.5,
+                                    color: AppColors.primaryLight,
+                                  ),
+                                ),
                               ),
-                            ),
-                          ),
-                        )
-                        .toList(),
+                            )
+                            .toList(),
                   ),
                 ],
               ),

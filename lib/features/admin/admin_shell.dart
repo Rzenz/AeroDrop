@@ -1,4 +1,6 @@
 import 'dart:ui';
+
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,6 +15,7 @@ import '../../core/services/supabase_service.dart';
 import '../../core/widgets/neu_action_fan.dart';
 import '../../core/widgets/neu_nav_dock.dart';
 import '../../core/widgets/neu_surface.dart';
+import '../web/app/web_app_shell.dart';
 
 /// One admin destination.
 class _Dest {
@@ -141,6 +144,16 @@ class _AdminShellState extends ConsumerState<AdminShell>
     ref.watch(deliveryProvider);
     final pending = ref.watch(pendingDeliveriesCountProvider);
     final selected = _primary.indexWhere((d) => _isActive(d.route, loc));
+
+    // The website has its own chrome: every destination on the sidebar,
+    // and each page its own header. The dock, its fan and this title bar
+    // are the app's.
+    if (kIsWeb) {
+      return WebAppShell(
+        location: GoRouterState.of(context).uri.path,
+        child: widget.child,
+      );
+    }
 
     return PopScope(
       // An open fan is a layer over the page; back should shut it rather than

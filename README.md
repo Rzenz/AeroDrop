@@ -333,6 +333,27 @@ flutter run \
   --dart-define=SUPABASE_ANON_KEY=your-publishable-key
 ```
 
+### Credentials file
+
+Instead of typing both values on every run, copy `config.example.json` to `config.json` (already git-ignored), fill in the project URL and publishable key, and pass the file:
+
+```bash
+flutter run --dart-define-from-file=config.json
+```
+
+The **AeroDrop (app)** and **AeroDrop (website)** launch configurations in `.vscode/launch.json` do this for you.
+
+### Website
+
+The web build uses the same Supabase project and the same sign-in, registration and verification flows as the app. It needs the same credentials at build time:
+
+```bash
+flutter run -d chrome --web-port=5050 --dart-define-from-file=config.json
+flutter build web --release --dart-define-from-file=config.json
+```
+
+For **Continue with Google** on the web, add every address the site is served from to *Supabase → Authentication → URL Configuration → Redirect URLs*, for example `http://localhost:5050/` and the live domain. Google sign-in returns to the site's root and the app continues from there to the right dashboard.
+
 ### Database
 
 Schema, functions, triggers, policies, and scheduled jobs live in `supabase/migrations`, applied in numeric order. Weather polling requires the **pg_cron** and **pg_net** extensions enabled in the Supabase project.

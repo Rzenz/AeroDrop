@@ -8,6 +8,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/widgets/glass_card.dart';
 import '../../core/widgets/neu_back_button.dart';
 import '../../core/providers/settings_provider.dart';
+import '../../core/widgets/neu_feedback.dart';
 
 class AdminSettingsScreen extends ConsumerStatefulWidget {
   const AdminSettingsScreen({super.key});
@@ -244,18 +245,7 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
               Icons.tune_rounded,
               AppColors.secondary,
               () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: const Text(
-                      'Calibration command sent to all drones.',
-                    ),
-                    backgroundColor: AppColors.secondary,
-                    behavior: SnackBarBehavior.floating,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                );
+                showNeuSnack(context, 'Calibration command sent to all drones.', tone: NeuToneKind.info);
               },
             ).animate(delay: 580.ms).fadeIn().slideY(begin: 0.05),
 
@@ -265,18 +255,7 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
               Icons.restart_alt_rounded,
               AppColors.danger,
               () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: const Text(
-                      'Sessions cleared. Drones recalled to base.',
-                    ),
-                    backgroundColor: AppColors.danger,
-                    behavior: SnackBarBehavior.floating,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                );
+                showNeuSnack(context, 'Sessions cleared. Drones recalled to base.', tone: NeuToneKind.error);
               },
             ).animate(delay: 660.ms).fadeIn().slideY(begin: 0.05),
             const SizedBox(height: 80),

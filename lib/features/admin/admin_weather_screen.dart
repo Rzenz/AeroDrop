@@ -7,6 +7,7 @@ import '../../core/widgets/glass_card.dart';
 import '../../core/widgets/custom_button.dart';
 import '../../core/widgets/neu_back_button.dart';
 import '../../core/providers/weather_provider.dart';
+import '../../core/widgets/neu_feedback.dart';
 
 class AdminWeatherScreen extends ConsumerStatefulWidget {
   const AdminWeatherScreen({super.key});
@@ -120,16 +121,7 @@ class _AdminWeatherScreenState extends ConsumerState<AdminWeatherScreen> {
             ? 'Safe'
             : (_safetyStatus == 'caution' ? 'Caution' : 'Grounded');
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Weather override applied: $statusDisplay (2 hours).'),
-            backgroundColor: AppColors.success,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        );
+        showNeuSnack(context, 'Weather override applied: $statusDisplay (2 hours).', tone: NeuToneKind.success);
       }
     } catch (e) {
       debugPrint('[WEATHER OVERRIDE EXCEPTION] $e');
@@ -138,16 +130,7 @@ class _AdminWeatherScreenState extends ConsumerState<AdminWeatherScreen> {
           _statusError = 'Unable to set weather override: $e';
         });
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Unable to apply weather override: $e'),
-            backgroundColor: AppColors.danger,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        );
+        showNeuSnack(context, 'Unable to apply weather override: $e', tone: NeuToneKind.error);
       }
     } finally {
       if (mounted) {
@@ -187,16 +170,7 @@ class _AdminWeatherScreenState extends ConsumerState<AdminWeatherScreen> {
           _messageController.text = weather.message ?? '';
         });
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Live campus weather resumed.'),
-            backgroundColor: AppColors.success,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        );
+        showNeuSnack(context, 'Live campus weather resumed.', tone: NeuToneKind.success);
       }
     } catch (e) {
       debugPrint('[CLEAR WEATHER OVERRIDE EXCEPTION] $e');
@@ -204,16 +178,7 @@ class _AdminWeatherScreenState extends ConsumerState<AdminWeatherScreen> {
         setState(() {
           _statusError = 'Failed to resume live weather: $e';
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to resume live weather: $e'),
-            backgroundColor: AppColors.danger,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        );
+        showNeuSnack(context, 'Failed to resume live weather: $e', tone: NeuToneKind.error);
       }
     } finally {
       if (mounted) {

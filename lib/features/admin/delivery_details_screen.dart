@@ -14,6 +14,7 @@ import '../../core/models/drone_model.dart';
 import '../../core/models/delivery_model.dart';
 import '../../core/widgets/neu_back_button.dart';
 import '../../core/widgets/shared_drone_radar.dart';
+import '../../core/widgets/neu_feedback.dart';
 
 class DeliveryDetailsScreen extends ConsumerWidget {
   final String deliveryId;
@@ -389,26 +390,9 @@ class DeliveryDetailsScreen extends ConsumerWidget {
                                   .rejectDelivery(delivery.id);
                               if (context.mounted) {
                                 if (error != null) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text('Failed to reject: $error'),
-                                      backgroundColor: AppColors.danger,
-                                      behavior: SnackBarBehavior.floating,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                    ),
-                                  );
+                                  showNeuSnack(context, 'Failed to reject: $error', tone: NeuToneKind.error);
                                 } else {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Delivery request rejected.',
-                                      ),
-                                      backgroundColor: AppColors.success,
-                                      behavior: SnackBarBehavior.floating,
-                                    ),
-                                  );
+                                  showNeuSnack(context, 'Delivery request rejected.', tone: NeuToneKind.success);
                                   context.pop();
                                 }
                               }
@@ -422,15 +406,7 @@ class DeliveryDetailsScreen extends ConsumerWidget {
                             text: 'Accept & Dispatch',
                             onPressed: () async {
                               if (!allPassed) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      'Cannot dispatch: flight readiness checks have not passed.',
-                                    ),
-                                    backgroundColor: AppColors.danger,
-                                    behavior: SnackBarBehavior.floating,
-                                  ),
-                                );
+                                showNeuSnack(context, 'Cannot dispatch: flight readiness checks have not passed.', tone: NeuToneKind.error);
                                 return;
                               }
                               final error = await ref
@@ -438,26 +414,9 @@ class DeliveryDetailsScreen extends ConsumerWidget {
                                   .acceptDelivery(delivery.id);
                               if (context.mounted) {
                                 if (error != null) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text('Failed to accept: $error'),
-                                      backgroundColor: AppColors.danger,
-                                      behavior: SnackBarBehavior.floating,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                    ),
-                                  );
+                                  showNeuSnack(context, 'Failed to accept: $error', tone: NeuToneKind.error);
                                 } else {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Delivery accepted and drone assigned!',
-                                      ),
-                                      backgroundColor: AppColors.success,
-                                      behavior: SnackBarBehavior.floating,
-                                    ),
-                                  );
+                                  showNeuSnack(context, 'Delivery accepted and drone assigned!', tone: NeuToneKind.success);
                                   context.pop();
                                 }
                               }

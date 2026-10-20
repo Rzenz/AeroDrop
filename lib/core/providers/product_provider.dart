@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' show SupabaseClient;
 import '../models/product_model.dart';
 import '../services/supabase_service.dart';
 import 'auth_provider.dart';
@@ -28,9 +29,16 @@ class ProductNotifier extends StateNotifier<ProductState> {
     loadProducts();
   }
 
-  final _client = SupabaseService.client;
+  // Read on use rather than at construction: the getter throws when
+  // Supabase is not configured, which made merely watching this provider
+  // crash an unconfigured build instead of showing an empty state.
+  SupabaseClient get _client => SupabaseService.client;
 
   Future<void> loadProducts() async {
+    if (!SupabaseService.isConfigured) {
+      if (mounted) state = ProductState(products: [], categories: ['All']);
+      return;
+    }
     final authUser = SupabaseService.client.auth.currentUser;
     if (authUser == null) {
       if (!mounted) return;

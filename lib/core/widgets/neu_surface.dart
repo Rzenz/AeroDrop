@@ -12,7 +12,7 @@ import '../theme/app_theme.dart';
 // NeuDepth is part of this file's public surface in practice — every caller
 // that builds a NeuSurface needs it, so re-export it rather than making each
 // one import the shadow tokens too.
-export '../theme/app_shadows.dart' show NeuDepth;
+export '../theme/app_shadows.dart' show NeuDepth, NeuPalette;
 
 /// How a neumorphic surface sits relative to the material behind it.
 enum NeuStyle {
@@ -49,9 +49,13 @@ class NeuSurface extends StatelessWidget {
     this.height,
     this.alignment,
     this.clipBehavior = Clip.none,
+    this.palette,
   });
 
   final Widget child;
+
+  /// Pins the surface to a fixed palette instead of the app theme's.
+  final NeuPalette? palette;
   final NeuStyle style;
   final NeuDepth depth;
   final EdgeInsetsGeometry? padding;
@@ -68,7 +72,8 @@ class NeuSurface extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final radius = borderRadius ?? AppRadii.brLg;
-    final fill = color ?? AppColors.base;
+    final p = palette;
+    final fill = color ?? p?.base ?? AppColors.base;
     final isInset = style == NeuStyle.inset;
 
     Widget inner = child;
@@ -89,9 +94,9 @@ class NeuSurface extends StatelessWidget {
                 painter: _InnerShadowPainter(
                   radius: radius,
                   distance: _insetDistance(depth),
-                  lightColor: AppColors.neuLight,
-                  shadowColor: AppColors.neuShadow,
-                  isDark: AppTheme.isDarkMode,
+                  lightColor: p?.light ?? AppColors.neuLight,
+                  shadowColor: p?.shadow ?? AppColors.neuShadow,
+                  isDark: p?.dark ?? AppTheme.isDarkMode,
                 ),
               ),
             ),
@@ -111,7 +116,9 @@ class NeuSurface extends StatelessWidget {
         gradient: gradient,
         borderRadius: radius,
         border: border,
-        boxShadow: style == NeuStyle.raised ? AppShadows.raised(depth) : null,
+        boxShadow: style != NeuStyle.raised
+            ? null
+            : (p == null ? AppShadows.raised(depth) : p.shadows(depth)),
       ),
       child: inner,
     );
@@ -155,9 +162,11 @@ class NeuPressable extends StatefulWidget {
     this.haptic = true,
     this.semanticLabel,
     this.debounce = const Duration(milliseconds: 350),
+    this.palette,
   });
 
   final Widget child;
+  final NeuPalette? palette;
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
   final NeuDepth depth;
@@ -216,6 +225,7 @@ class _NeuPressableState extends State<NeuPressable> {
             ? NeuStyle.inset
             : (widget.enabled ? NeuStyle.raised : NeuStyle.flat),
         depth: widget.depth,
+        palette: widget.palette,
         padding: widget.padding,
         borderRadius: radius,
         color: widget.color,

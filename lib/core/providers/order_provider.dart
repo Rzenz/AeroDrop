@@ -60,7 +60,9 @@ class OrderNotifier extends StateNotifier<OrderState> {
     }
   }
 
-  final _client = SupabaseService.client;
+  // Read on use: the getter throws when Supabase is not configured, and
+  // every use below already checks for that first.
+  SupabaseClient get _client => SupabaseService.client;
 
   void _subscribeToOrders() {
     if (!SupabaseService.isConfigured) return;
@@ -317,7 +319,9 @@ class VendorOrdersNotifier extends StateNotifier<OrderState> {
     }
   }
 
-  final _client = SupabaseService.client;
+  // Read on use: the getter throws when Supabase is not configured, and
+  // every use below already checks for that first.
+  SupabaseClient get _client => SupabaseService.client;
 
   void _subscribeToOrders() {
     if (!SupabaseService.isConfigured) return;

@@ -20,7 +20,11 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.fallbackRoute,
     this.color,
     this.iconColor,
+    this.leading,
   });
+
+  /// Optional mark between the back button and the title — an avatar, a logo.
+  final Widget? leading;
 
   final String title;
   final String? subtitle;
@@ -52,6 +56,10 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
                 color: color,
                 iconColor: iconColor,
               ),
+              const SizedBox(width: AppSpacing.sm),
+            ],
+            if (leading != null) ...[
+              leading!,
               const SizedBox(width: AppSpacing.sm),
             ],
             Expanded(

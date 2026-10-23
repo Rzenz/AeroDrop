@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_radii.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/custom_app_bar.dart';
 import '../../core/widgets/neu_card.dart';
@@ -12,6 +13,7 @@ import '../../core/models/order_model.dart';
 import '../../core/models/delivery_model.dart';
 import '../../core/providers/location_provider.dart';
 import '../../core/providers/order_provider.dart';
+import '../../core/providers/order_chat_provider.dart';
 import '../../core/providers/delivery_provider.dart';
 import '../../core/providers/vendor_provider.dart';
 import '../../core/services/delivery_fee_calculator.dart';
@@ -636,6 +638,18 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
                   ],
                 ],
 
+                // Message the other party (customer <-> vendor chat). Hidden
+                // while an online payment is pending: the vendor cannot see
+                // the order yet, so the insert policy would reject posts.
+                if (order.vendorId.isNotEmpty &&
+                    !order.chatAwaitingPayment) ...[
+                  _OrderChatButton(
+                    orderId: order.id,
+                    isVendor: isVendor,
+                  ).animate().fadeIn(delay: 270.ms),
+                  const SizedBox(height: 12),
+                ],
+
                 // Contact Support Button
                 NeuButton(
                   text: 'Contact Support',
@@ -796,6 +810,71 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
 
   static String _formatDate(DateTime dt) {
     return '${dt.month}/${dt.day}/${dt.year} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+  }
+}
+
+/// "Message vendor" / "Message customer" with an unread badge.
+///
+/// A separate ConsumerWidget so the chat provider (and its realtime channel)
+/// only exists while the button is actually on screen.
+class _OrderChatButton extends ConsumerWidget {
+  final String orderId;
+  final bool isVendor;
+
+  const _OrderChatButton({required this.orderId, required this.isVendor});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final unread = ref.watch(
+      orderChatProvider(orderId).select((s) => s.unreadCount),
+    );
+
+    return NeuButton(
+      text: isVendor ? 'Message customer' : 'Message vendor',
+      variant: NeuButtonVariant.neutral,
+      semanticLabel: unread > 0
+          ? '${isVendor ? 'Message customer' : 'Message vendor'}, $unread unread'
+          : null,
+      leading: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Icon(
+            Icons.chat_bubble_outline_rounded,
+            size: 20,
+            color: AppColors.textPrimary,
+          ),
+          if (unread > 0)
+            Positioned(
+              right: -8,
+              top: -6,
+              child: Container(
+                constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.danger,
+                  borderRadius: AppRadii.brPill,
+                  border: Border.all(color: AppColors.base, width: 1.5),
+                ),
+                child: Center(
+                  child: Text(
+                    unread > 99 ? '99+' : '$unread',
+                    maxLines: 1,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                      height: 1.1,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+      onPressed: () => context.push(
+        '${isVendor ? '/vendor' : '/user'}/orders/$orderId/chat',
+      ),
+    );
   }
 }
 

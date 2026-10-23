@@ -124,6 +124,11 @@ class OrderModel {
       paymentStatus.toLowerCase() == 'pending' &&
       orderStatus.toLowerCase() == 'pending';
 
+  /// Mirrors the order_messages insert policy's payment gate: an online order
+  /// cannot be posted to until it is paid.
+  bool get chatAwaitingPayment =>
+      paymentMethod == 'xendit_online' && paymentStatus != 'paid';
+
   /// Total payload weight in kilograms derived from order items.
   double get totalWeightKg => items.fold<double>(
         0.0,

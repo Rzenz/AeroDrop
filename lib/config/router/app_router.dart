@@ -59,6 +59,7 @@ import '../../features/cart/checkout_screen.dart';
 import '../../features/orders/orders_screen.dart';
 import '../../features/orders/order_details_screen.dart';
 import '../../features/orders/receipt_screen.dart';
+import '../../features/chat/order_chat_screen.dart';
 import '../../features/payment/payment_screen.dart';
 import '../../features/payment/online_payment_waiting_screen.dart';
 
@@ -322,6 +323,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
       GoRoute(
+        path: '/user/orders/:id/chat',
+        pageBuilder: (context, state) {
+          final id = state.pathParameters['id'] ?? '';
+          return _slide(state, OrderChatScreen(orderId: id));
+        },
+      ),
+      GoRoute(
         path: '/user/payment',
         pageBuilder: (context, state) {
           final orderId = state.uri.queryParameters['orderId'];
@@ -425,6 +433,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         pageBuilder: (context, state) {
           final id = state.pathParameters['id'] ?? '';
           return _slide(state, OrderDetailsScreen(orderId: id));
+        },
+      ),
+      GoRoute(
+        path: '/vendor/orders/:id/chat',
+        pageBuilder: (context, state) {
+          final id = state.pathParameters['id'] ?? '';
+          return _slide(state, OrderChatScreen(orderId: id));
         },
       ),
       GoRoute(

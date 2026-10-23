@@ -408,19 +408,28 @@ class _AdminWeatherScreenState extends ConsumerState<AdminWeatherScreen> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Text(
-                                  '${(weather.realSafetyStatus ?? 'safe').toUpperCase()} • ${weather.realCondition ?? 'Clear Sky'}',
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.white,
+                                Flexible(
+                                  child: Text(
+                                    '${(weather.realSafetyStatus ?? 'safe').toUpperCase()} • ${weather.realCondition ?? 'Clear Sky'}',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.white,
+                                    ),
                                   ),
                                 ),
-                                Text(
-                                  '${weather.temperatureDisplay} • ${weather.windDisplay}',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: AppColors.textSecondaryDark,
+                                Flexible(
+                                  flex: 2,
+                                  child: Text(
+                                    '${weather.temperatureDisplay} • ${weather.windDisplay}',
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: AppColors.textSecondaryDark,
+                                    ),
                                   ),
                                 ),
                               ],
@@ -552,11 +561,15 @@ class _AdminWeatherScreenState extends ConsumerState<AdminWeatherScreen> {
                             ),
                           ),
                           const SizedBox(width: 16),
-                          Text(
-                            'Wind: ${weather.windDisplay}',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: AppColors.textSecondaryDark,
+                          Flexible(
+                            child: Text(
+                              'Wind: ${weather.windDisplay}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: AppColors.textSecondaryDark,
+                              ),
                             ),
                           ),
                         ],

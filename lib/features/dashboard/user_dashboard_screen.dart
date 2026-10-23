@@ -1050,6 +1050,7 @@ class AeroDropWeatherWidget extends ConsumerWidget {
         Row(
           children: [
             Expanded(
+              flex: 3,
               child: Row(
                 children: [
                   Icon(weatherIcon, color: iconColor, size: 38),
@@ -1059,11 +1060,17 @@ class AeroDropWeatherWidget extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(
-                          tempStr,
-                          style: AppTextStyles.display(
-                            fontSize: 24,
-                            color: AppColors.textPrimary,
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            tempStr,
+                            maxLines: 1,
+                            softWrap: false,
+                            style: AppTextStyles.display(
+                              fontSize: 24,
+                              color: AppColors.textPrimary,
+                            ),
                           ),
                         ),
                         Text(
@@ -1084,15 +1091,18 @@ class AeroDropWeatherWidget extends ConsumerWidget {
             const SizedBox(width: 16),
             Container(height: 40, width: 1.5, color: AppColors.border),
             const SizedBox(width: 16),
-            _WeatherMetric(
-              icon: Icons.air_rounded,
-              value: windStr,
-              label: (weather.windGusts != null &&
-                      weather.windSpeed != null &&
-                      weather.windGusts! > weather.windSpeed!)
-                  ? 'Wind & Gusts'
-                  : 'Wind Speed',
-              iconColor: Colors.cyanAccent,
+            Expanded(
+              flex: 2,
+              child: _WeatherMetric(
+                icon: Icons.air_rounded,
+                value: windStr,
+                label: (weather.windGusts != null &&
+                        weather.windSpeed != null &&
+                        weather.windGusts! > weather.windSpeed!)
+                    ? 'Wind & Gusts'
+                    : 'Wind Speed',
+                iconColor: Colors.cyanAccent,
+              ),
             ),
           ],
         ),
@@ -1141,12 +1151,16 @@ class _WeatherMetric extends StatelessWidget {
           children: [
             Icon(icon, color: iconColor, size: 14),
             const SizedBox(width: 4),
-            Text(
-              value,
-              style: AppTextStyles.title(
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
+            Expanded(
+              child: Text(
+                value,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: AppTextStyles.title(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
               ),
             ),
           ],
@@ -1154,6 +1168,8 @@ class _WeatherMetric extends StatelessWidget {
         const SizedBox(height: 2),
         Text(
           label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: AppTextStyles.label(
             fontSize: 9,
             color: AppColors.textSecondary,

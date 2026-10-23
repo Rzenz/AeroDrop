@@ -545,6 +545,7 @@ class _AdminSupportScreenState extends ConsumerState<AdminSupportScreen> {
                                           backgroundColor: AppColors.success,
                                           foregroundColor: Colors.white,
                                           visualDensity: VisualDensity.compact,
+                                          minimumSize: const Size(0, 36),
                                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                                           shape: RoundedRectangleBorder(
                                             borderRadius: BorderRadius.circular(8),
@@ -560,6 +561,7 @@ class _AdminSupportScreenState extends ConsumerState<AdminSupportScreen> {
                                           foregroundColor: AppColors.warning,
                                           side: const BorderSide(color: AppColors.warning),
                                           visualDensity: VisualDensity.compact,
+                                          minimumSize: const Size(0, 36),
                                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                                           shape: RoundedRectangleBorder(
                                             borderRadius: BorderRadius.circular(8),

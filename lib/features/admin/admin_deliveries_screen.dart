@@ -283,6 +283,19 @@ class _AdminDeliveriesScreenState extends ConsumerState<AdminDeliveriesScreen> {
                                                 maxLines: 1,
                                                 overflow: TextOverflow.ellipsis,
                                               ),
+                                              if (d.isMultiTrip) ...[
+                                                const SizedBox(height: 3),
+                                                Text(
+                                                  'Trip ${d.currentTrip} of ${d.tripsRequired}',
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  style: AppTextStyles.caption(
+                                                    fontSize: 11,
+                                                    color: AppColors.accent,
+                                                  ),
+                                                ),
+                                              ],
                                               if (d.status == DeliveryStatus.cancelled) ...[
                                                 const SizedBox(height: 3),
                                                 Text(

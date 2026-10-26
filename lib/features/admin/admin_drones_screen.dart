@@ -9,6 +9,7 @@ import '../../core/widgets/drone_card.dart';
 import '../../core/widgets/animated_fab.dart';
 import '../../core/widgets/glass_card.dart';
 import '../../core/models/drone_model.dart';
+import '../../core/providers/delivery_provider.dart';
 import '../../core/providers/drone_provider.dart';
 import '../../core/providers/settings_provider.dart';
 import '../../core/widgets/neu_back_button.dart';
@@ -19,6 +20,12 @@ class AdminDronesScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final drones = ref.watch(droneProvider);
+    // Multi-trip orders part-way through: a drone flying one of these back
+    // is heading to the vendor for the next load, not home
+    final betweenTrips = ref
+        .watch(deliveryProvider)
+        .where((d) => d.returnLegHeadsToVendor)
+        .toList();
     final available = drones
         .where((d) => d.status == DroneStatus.available)
         .length;
@@ -178,8 +185,18 @@ class AdminDronesScreen extends ConsumerWidget {
                   : SliverList(
                       delegate: SliverChildBuilderDelegate((context, index) {
                         final drone = drones[index];
+                        final shuttle = betweenTrips
+                            .where(
+                              (d) =>
+                                  d.droneId == drone.id ||
+                                  d.droneId == drone.dbId ||
+                                  d.droneId == drone.name,
+                            )
+                            .firstOrNull;
                         return DroneCard(
                               drone: drone,
+                              tripsCompleted: shuttle?.tripsCompleted ?? 0,
+                              tripsRequired: shuttle?.tripsRequired ?? 1,
                               onTap: () =>
                                   _showDroneOptions(context, drone, ref),
                             )

@@ -336,7 +336,7 @@ class _Headline extends StatelessWidget {
       TextSpan(
         children: [
           TextSpan(
-            text: 'Hungry? ',
+            text: 'Tired? ',
             style: base.copyWith(color: AppColors.accentText),
           ),
           TextSpan(text: 'We fly it over.', style: base),

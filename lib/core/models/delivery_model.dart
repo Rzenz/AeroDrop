@@ -38,6 +38,36 @@ class DeliveryModel {
   final bool noDroneDispatched;
   final String? orderStatus;
 
+  // Multi-trip: an order heavier than one drone load is flown in several
+  // Hub -> Vendor -> Customer -> Hub cycles
+  final int tripsRequired;
+  final int tripsCompleted;
+
+  bool get isMultiTrip => tripsRequired > 1;
+
+  /// Trips are owed, so an in_transit status may mean "between trips".
+  bool get hasTripsRemaining => tripsCompleted < tripsRequired;
+
+  /// Part-way through a multi-trip order: at least one trip delivered and
+  /// more owed. Any return leg now heads to the vendor for the next load,
+  /// never home to the hub.
+  ///
+  /// Depends on trips owed, not on the leg: between trips the delivery is
+  /// 'in_transit' while the drone shuttles back, then 'assigning' once
+  /// arrive_at_vendor_for_next_trip parks it at the vendor.
+  bool get returnLegHeadsToVendor =>
+      (status == DeliveryStatus.inTransit ||
+          status == DeliveryStatus.assigning) &&
+      tripsCompleted >= 1 &&
+      tripsCompleted < tripsRequired;
+
+  /// The trip being flown or just finished, 1-based, for "Trip 1 of 2".
+  int get currentTrip {
+    if (status == DeliveryStatus.delivered) return tripsRequired;
+    final next = tripsCompleted + 1;
+    return next > tripsRequired ? tripsRequired : next;
+  }
+
   String get cancellationReasonDisplay {
     final r = cancellationReason?.toLowerCase().trim() ?? '';
     return switch (r) {
@@ -80,6 +110,8 @@ class DeliveryModel {
     this.cancellationReason,
     this.noDroneDispatched = false,
     this.orderStatus,
+    this.tripsRequired = 1,
+    this.tripsCompleted = 0,
   });
 
   DeliveryModel copyWith({
@@ -114,6 +146,8 @@ class DeliveryModel {
     String? cancellationReason,
     bool? noDroneDispatched,
     String? orderStatus,
+    int? tripsRequired,
+    int? tripsCompleted,
   }) {
     return DeliveryModel(
       id: id ?? this.id,
@@ -148,6 +182,8 @@ class DeliveryModel {
       cancellationReason: cancellationReason ?? this.cancellationReason,
       noDroneDispatched: noDroneDispatched ?? this.noDroneDispatched,
       orderStatus: orderStatus ?? this.orderStatus,
+      tripsRequired: tripsRequired ?? this.tripsRequired,
+      tripsCompleted: tripsCompleted ?? this.tripsCompleted,
     );
   }
 }

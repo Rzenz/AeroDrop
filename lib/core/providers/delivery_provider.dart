@@ -486,6 +486,8 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
       cancellationReason: order['cancellation_reason']?.toString(),
       noDroneDispatched: false,
       orderStatus: order['order_status']?.toString(),
+      tripsRequired: (data['trips_required'] as num?)?.toInt() ?? 1,
+      tripsCompleted: (data['trips_completed'] as num?)?.toInt() ?? 0,
     );
   }
 
@@ -814,13 +816,22 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
     _leg3Progress[droneUuid] = 0.0;
     _leg3StartBatteries[droneUuid] = batteryLevel;
 
+    // A multi-trip order only becomes delivered on its last trip. Earlier
+    // trips leave it in_transit while the drone returns to base to reload;
+    // the id stays in _completingDeliveryIds until dispatch_next_queued_delivery
+    // sends it back to 'assigning' for the next trip.
+    final isFinalTrip = delivery.tripsCompleted + 1 >= delivery.tripsRequired;
+
     // Optimistically transition to delivered with progress 1.0
     state = state
         .map(
           (d) => d.id == delivery.id
               ? d.copyWith(
-                  status: DeliveryStatus.delivered,
-                  progress: 1.0,
+                  status: isFinalTrip
+                      ? DeliveryStatus.delivered
+                      : DeliveryStatus.inTransit,
+                  progress: isFinalTrip ? 1.0 : 0.0,
+                  tripsCompleted: delivery.tripsCompleted + 1,
                   currentLatitude: customerLoc.$1,
                   currentLongitude: customerLoc.$2,
                   currentAltitude: 0.0,
@@ -852,6 +863,60 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
     } catch (_) {}
   }
 
+  /// Parks a multi-trip drone at the vendor after the empty shuttle leg back
+  /// from the customer, so the next trip's pickup starts there instead of at
+  /// the hub.
+  Future<void> _arriveAtVendorForNextTrip({
+    required DeliveryModel delivery,
+    required (double, double) vendorLoc,
+    required double batteryLevel,
+    required String droneId,
+    required String droneUuid,
+  }) async {
+    // The next trip drains from the battery the drone actually has left
+    _deliveryStartBatteries[delivery.id] = batteryLevel;
+
+    // Optimistically park at the vendor: 'assigning' at full progress is what
+    // the leg-1 driver reads as "already at the vendor", so it confirms the
+    // pickup on its next tick rather than flying the hub approach again
+    state = state
+        .map(
+          (d) => d.id == delivery.id
+              ? d.copyWith(
+                  status: DeliveryStatus.assigning,
+                  progress: 1.0,
+                  currentLatitude: vendorLoc.$1,
+                  currentLongitude: vendorLoc.$2,
+                  currentAltitude: 0.0,
+                  batteryLevel: batteryLevel,
+                )
+              : d,
+        )
+        .toList();
+    ref.read(droneProvider.notifier).updateStatus(droneId, DroneStatus.assigned);
+
+    if (!SupabaseService.isConfigured) return;
+
+    try {
+      await SupabaseService.client.rpc(
+        'arrive_at_vendor_for_next_trip',
+        params: {'p_delivery_id': delivery.id},
+      );
+    } catch (e) {
+      debugPrint('arrive_at_vendor_for_next_trip RPC error: $e');
+      // Fall back to the hub route: freeing the drone lets
+      // dispatch_next_queued_delivery resume the order from the hub
+      try {
+        await SupabaseService.client.rpc(
+          'complete_drone_return',
+          params: {'p_drone_id': droneUuid},
+        );
+      } catch (e) {
+        debugPrint('complete_drone_return RPC error: $e');
+      }
+    }
+  }
+
   void _startSimulation() {
     _simulationTimer?.cancel();
     _simulationTimer = Timer.periodic(const Duration(seconds: 3), (
@@ -880,8 +945,11 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
           ));
       _confirmingPickupDeliveryIds.removeWhere((id) =>
           state.any((d) => d.id == id && d.status != DeliveryStatus.assigning));
-      _completingDeliveryIds.removeWhere((id) =>
-          state.any((d) => d.id == id && d.status == DeliveryStatus.delivered));
+      // A multi-trip delivery leaves this set when its next trip is dispatched
+      _completingDeliveryIds.removeWhere((id) => state.any((d) =>
+          d.id == id &&
+          (d.status == DeliveryStatus.delivered ||
+              d.status == DeliveryStatus.assigning)));
       final returningDrone = dronesList
           .where((d) =>
               d.status == DroneStatus.returning &&
@@ -968,7 +1036,9 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
             await _confirmPickup(
               delivery: delivery,
               vendorLoc: vendorLoc,
-              batteryLevel: delivery.batteryLevel ?? 92.0,
+              batteryLevel: _deliveryStartBatteries[delivery.id] ??
+                  delivery.batteryLevel ??
+                  92.0,
             );
           } else {
             final currentLegProgress = delivery.progress.clamp(0.0, 1.0);
@@ -1041,8 +1111,18 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
                   .toList();
             }
           }
-        } else if (delivery.status == DeliveryStatus.inTransit) {
+        } else if (delivery.status == DeliveryStatus.inTransit &&
+            !(delivery.tripsCompleted > 0 &&
+                delivery.hasTripsRemaining &&
+                dronesList.any(
+                  (d) =>
+                      d.status == DroneStatus.returning ||
+                      d.status == DroneStatus.available,
+                ))) {
           // ── PHASE 2: TRANSIT (Vendor -> Customer, LOADED) ──
+          // Skipped between trips of a multi-trip order: the delivery stays
+          // in_transit while the drone flies home to reload, and flying this
+          // leg then would complete a trip the drone never made.
           final distLeg2 = DroneFlightCalculator.calculateDistanceMeters(
             startLat: vendorLoc.$1,
             startLng: vendorLoc.$2,
@@ -1169,11 +1249,25 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
       }
 
       // ── PHASE 3: LEG 3 DRIVER (Customer/Aborted Position -> Base Hub, EMPTY) ──
+      // Between trips of a multi-trip order the destination is the vendor
+      // instead: Customer -> Vendor, then the next trip's pickup.
       if (returningDrone != null) {
         final dUuid = returningDrone.dbId.isNotEmpty
             ? returningDrone.dbId
             : droneUuid;
         String? deliveryIdForTelemetry = _lastDeliveryIdForDrone[dUuid];
+
+        // A multi-trip delivery between trips is the flight in progress
+        deliveryIdForTelemetry ??= state
+            .where(
+              (d) =>
+                  d.droneId != null &&
+                  d.status == DeliveryStatus.inTransit &&
+                  d.tripsCompleted > 0 &&
+                  d.hasTripsRemaining,
+            )
+            .firstOrNull
+            ?.id;
 
         if (deliveryIdForTelemetry == null) {
           // Find the most recently updated delivery for THIS drone with status 'delivered' OR 'cancelled'
@@ -1253,6 +1347,19 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
         }
 
         if (hasLease) {
+          final shuttleDelivery = state
+              .where(
+                (d) =>
+                    d.id == deliveryIdForTelemetry &&
+                    d.status == DeliveryStatus.inTransit &&
+                    d.tripsCompleted > 0 &&
+                    d.hasTripsRemaining,
+              )
+              .firstOrNull;
+          final destination = shuttleDelivery != null
+              ? _coordinatesForLocation(shuttleDelivery.pickupLocationName)
+              : hub;
+
           final leg3Start = _leg3Origin[dUuid] ??
               (returningDrone.currentCoordinates.contains(',')
                   ? (
@@ -1274,8 +1381,8 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
           final distLeg3 = DroneFlightCalculator.calculateDistanceMeters(
             startLat: leg3Start.$1,
             startLng: leg3Start.$2,
-            endLat: hub.$1,
-            endLng: hub.$2,
+            endLat: destination.$1,
+            endLng: destination.$2,
           );
           final speedLeg3 = DroneFlightCalculator.calculateEffectiveSpeed(
             isLoaded: false,
@@ -1299,10 +1406,10 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
               (currentLeg3Progress + stepLeg3).clamp(0.0, 1.0);
           _leg3Progress[dUuid] = newLeg3Progress;
 
-          final lat =
-              leg3Start.$1 + (hub.$1 - leg3Start.$1) * newLeg3Progress;
-          final lng =
-              leg3Start.$2 + (hub.$2 - leg3Start.$2) * newLeg3Progress;
+          final lat = leg3Start.$1 +
+              (destination.$1 - leg3Start.$1) * newLeg3Progress;
+          final lng = leg3Start.$2 +
+              (destination.$2 - leg3Start.$2) * newLeg3Progress;
           final alt = newLeg3Progress > 0.85 ? 0.0 : 15.0;
 
           final startBattery = _leg3StartBatteries[dUuid] ?? returningDrone.batteryLevel;
@@ -1327,7 +1434,10 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
                   'p_signal_strength': 98.0,
                   'p_heading': 270.0,
                   'p_event_type': 'returning_to_base',
-                  'p_progress': newLeg3Progress,
+                  // No progress: between trips of a multi-trip order the
+                  // delivery is still in_transit, and the server would
+                  // record this return leg as its delivery progress.
+                  'p_progress': null,
                 },
               );
               // Telemetry write succeeded: clear failure backoff
@@ -1352,7 +1462,7 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
               .updateBattery(returningDrone.id, newBattery);
 
           if (newLeg3Progress >= 1.0) {
-            // Drone arrived back at Campus Base Hub!
+            // Drone arrived back at Campus Base Hub, or at the vendor between trips
             _completingReturnDroneIds.add(dUuid);
             _completingReturnDroneIds.add(returningDrone.id);
             _leg3Progress.remove(dUuid);
@@ -1361,19 +1471,29 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
             _leaseWriteFailures.remove(dUuid);
             _leg3StartBatteries.remove(dUuid);
 
-            // Optimistically set available status so display updates and no more leg 3 ticks write
-            ref
-                .read(droneProvider.notifier)
-                .updateStatus(returningDrone.id, DroneStatus.available);
+            if (shuttleDelivery != null) {
+              await _arriveAtVendorForNextTrip(
+                delivery: shuttleDelivery,
+                vendorLoc: destination,
+                batteryLevel: newBattery,
+                droneId: returningDrone.id,
+                droneUuid: dUuid,
+              );
+            } else {
+              // Optimistically set available status so display updates and no more leg 3 ticks write
+              ref
+                  .read(droneProvider.notifier)
+                  .updateStatus(returningDrone.id, DroneStatus.available);
 
-            if (SupabaseService.isConfigured) {
-              try {
-                await SupabaseService.client.rpc(
-                  'complete_drone_return',
-                  params: {'p_drone_id': dUuid},
-                );
-              } catch (e) {
-                debugPrint('complete_drone_return RPC error: $e');
+              if (SupabaseService.isConfigured) {
+                try {
+                  await SupabaseService.client.rpc(
+                    'complete_drone_return',
+                    params: {'p_drone_id': dUuid},
+                  );
+                } catch (e) {
+                  debugPrint('complete_drone_return RPC error: $e');
+                }
               }
             }
 

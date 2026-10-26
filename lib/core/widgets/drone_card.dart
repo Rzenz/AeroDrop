@@ -10,7 +10,19 @@ class DroneCard extends StatelessWidget {
   final DroneModel drone;
   final VoidCallback? onTap;
 
-  const DroneCard({super.key, required this.drone, this.onTap});
+  /// Trip progress of the order this drone is flying, when it is part-way
+  /// through a multi-trip order. A returning drone with trips still owed is
+  /// heading back to the vendor for the next load, not home to the hub.
+  final int tripsCompleted;
+  final int tripsRequired;
+
+  const DroneCard({
+    super.key,
+    required this.drone,
+    this.onTap,
+    this.tripsCompleted = 0,
+    this.tripsRequired = 1,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -213,7 +225,10 @@ class DroneCard extends StatelessWidget {
                         : drone.status == DroneStatus.available
                         ? 'Ready for delivery'
                         : drone.status == DroneStatus.returning
-                        ? 'Returning to Base'
+                        ? (tripsCompleted > 0 && tripsCompleted < tripsRequired
+                              ? 'Returning to Vendor • Collecting load '
+                                    '${tripsCompleted + 1} of $tripsRequired'
+                              : 'Returning to Base')
                         : 'Drone not available',
                     style: AppTextStyles.body(
                       fontSize: 11,
@@ -224,6 +239,8 @@ class DroneCard extends StatelessWidget {
                           ? AppColors.success
                           : AppColors.warning,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),

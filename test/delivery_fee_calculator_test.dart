@@ -32,7 +32,7 @@ void main() {
       expect(fee78m.totalFee, equals(18.12));
     });
 
-    test('2. Weight cap at 0.5 kg: scales at PHP 10.00/kg and caps at 0.5 kg', () {
+    test('2. Weight: scales at PHP 10.00/kg and caps at 2 trips (1.0 kg)', () {
       // 0.32 kg: 0.32 * 10 = 3.20
       final fee320g = DeliveryFeeCalculator.calculateOrderFee(
         distanceKm: 0.0,
@@ -53,15 +53,27 @@ void main() {
       expect(feeMax.weightFee, equals(5.00));
       expect(feeMax.totalFee, equals(20.00));
 
-      // 1.50 kg (exceeds drone max): capped to 0.50 kg -> 5.00
+      // 0.80 kg (two trips): billed on the actual weight -> 8.00
+      final feeTwoTrips = DeliveryFeeCalculator.calculateOrderFee(
+        distanceKm: 0.0,
+        weightKg: 0.80,
+        isCaution: false,
+        trips: 2,
+      );
+      expect(feeTwoTrips.weightKg, equals(0.80));
+      expect(feeTwoTrips.weightFee, equals(8.00));
+      expect(feeTwoTrips.extraTripFee, equals(25.00));
+      expect(feeTwoTrips.totalFee, equals(48.00)); // 15 + 8 + 25 extra trip
+
+      // 1.50 kg (beyond 2 trips): capped to 1.00 kg -> 10.00
       final feeOver = DeliveryFeeCalculator.calculateOrderFee(
         distanceKm: 0.0,
         weightKg: 1.50,
         isCaution: false,
       );
-      expect(feeOver.weightKg, equals(0.50));
-      expect(feeOver.weightFee, equals(5.00));
-      expect(feeOver.totalFee, equals(20.00));
+      expect(feeOver.weightKg, equals(1.00));
+      expect(feeOver.weightFee, equals(10.00));
+      expect(feeOver.totalFee, equals(25.00));
 
       // Combined distance + weight: 0.21 km + 0.32 kg -> Base 15 + 8.40 + 3.20 = 26.60
       final feeCombined = DeliveryFeeCalculator.calculateOrderFee(
@@ -73,6 +85,50 @@ void main() {
       expect(
         feeCombined.breakdownText,
         equals('Base ₱15.00 + Distance 0.21 km ₱8.40 + Weight 0.32 kg ₱3.20'),
+      );
+    });
+
+    test('2b. Multi-trip: trips from weight, distance charged per trip', () {
+      expect(DeliveryFeeCalculator.tripsForWeight(0.0), equals(1));
+      expect(DeliveryFeeCalculator.tripsForWeight(0.50), equals(1));
+      // Float sums of item weights must not tip exactly 0.5 kg into 2 trips
+      expect(DeliveryFeeCalculator.tripsForWeight(0.1 + 0.2 + 0.2), equals(1));
+      expect(DeliveryFeeCalculator.tripsForWeight(0.501), equals(2));
+      expect(DeliveryFeeCalculator.tripsForWeight(1.00), equals(2));
+      // Not clamped: the cart must see an over-limit order
+      expect(DeliveryFeeCalculator.tripsForWeight(1.20), equals(3));
+
+      // 0.30 km x 2 trips = 24.00; 0.80 kg = 8.00; caution charged once
+      final fee = DeliveryFeeCalculator.calculateOrderFee(
+        distanceKm: 0.30,
+        weightKg: 0.80,
+        isCaution: true,
+        trips: 2,
+      );
+      expect(fee.trips, equals(2));
+      expect(fee.distanceFee, equals(24.00));
+      expect(fee.totalFee, equals(77.00)); // 15 + 24 + 8 + 25 + 5
+      expect(
+        fee.breakdownRows.map((r) => r.label).toList(),
+        equals([
+          'Base',
+          'Distance 0.30 km × 2 trips',
+          'Weight 0.80 kg',
+          'Extra drone trip (1 × ₱25.00)',
+          'Weather surcharge',
+        ]),
+      );
+      expect(fee.breakdownRows[3].amount, equals(25.00));
+
+      // A single trip carries no extra-trip charge or row
+      final single = DeliveryFeeCalculator.calculateOrderFee(
+        distanceKm: 0.30,
+        weightKg: 0.40,
+      );
+      expect(single.extraTripFee, equals(0.0));
+      expect(
+        single.breakdownRows.any((r) => r.label.startsWith('Extra drone')),
+        isFalse,
       );
     });
 

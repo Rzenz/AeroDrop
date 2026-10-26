@@ -19,8 +19,10 @@ class DeliveryFeeBreakdown {
   final double weightKg;
   final double weightFee;
   final double weatherFee;
+  final double extraTripFee;
   final double totalFee;
   final String breakdownText;
+  final int trips;
 
   const DeliveryFeeBreakdown({
     required this.baseFee,
@@ -29,14 +31,17 @@ class DeliveryFeeBreakdown {
     required this.weightKg,
     required this.weightFee,
     required this.weatherFee,
+    this.extraTripFee = 0.0,
     required this.totalFee,
     required this.breakdownText,
+    this.trips = 1,
   });
 
   /// Breakdown rows matching receipt and checkout specifications:
   /// - Base: ₱15.00
-  /// - Distance: ₱XX.XX (if > 0)
+  /// - Distance: ₱XX.XX (if > 0; labelled "× N trips" when flown more than once)
   /// - Weight: ₱XX.XX (if > 0)
+  /// - Extra drone trip (N × ₱25.00) (only for multi-trip orders)
   /// - Weather surcharge: ₱5.00 (only when caution fee applied)
   List<DeliveryFeeRow> get breakdownRows {
     final rows = <DeliveryFeeRow>[
@@ -44,12 +49,27 @@ class DeliveryFeeBreakdown {
     ];
     if (distanceKm > 0 || distanceFee > 0) {
       rows.add(
-        DeliveryFeeRow('Distance ${distanceKm.toStringAsFixed(2)} km', distanceFee),
+        DeliveryFeeRow(
+          trips > 1
+              ? 'Distance ${distanceKm.toStringAsFixed(2)} km × $trips trips'
+              : 'Distance ${distanceKm.toStringAsFixed(2)} km',
+          distanceFee,
+        ),
       );
     }
     if (weightKg > 0 || weightFee > 0) {
       rows.add(
         DeliveryFeeRow('Weight ${weightKg.toStringAsFixed(2)} kg', weightFee),
+      );
+    }
+    if (extraTripFee > 0) {
+      final extraTrips = trips - 1;
+      rows.add(
+        DeliveryFeeRow(
+          'Extra drone ${extraTrips == 1 ? 'trip' : 'trips'} '
+          '($extraTrips × ₱${DeliveryFeeCalculator.extraTripFee.toStringAsFixed(2)})',
+          extraTripFee,
+        ),
       );
     }
     if (weatherFee > 0) {
@@ -73,32 +93,57 @@ class DeliveryFeeCalculator {
   static const double distanceRatePerKm = 40.0; // PHP 40.00 per kilometer
   static const double weightRatePerKg = 10.0; // PHP 10.00 per kilogram
   static const double maxPayloadKg = 0.5; // Drone max capacity cap (0.5 kg)
+  static const int maxTrips = 2; // Heaviest order: maxTrips loads (1.0 kg)
   static const double weatherCautionSurcharge = 5.0; // PHP 5.00 caution fee
+  static const double extraTripFee = 25.0; // PHP 25.00 per trip beyond the first
+
+  /// Number of drone trips an order of this weight needs. One trip carries
+  /// maxPayloadKg; heavier orders are flown in several. Mirrors place_order.
+  ///
+  /// Not clamped to [maxTrips]: the cart needs to know when an order is over
+  /// the limit. Rounded to whole grams first, as place_order sums integer
+  /// grams — summing doubles can push exactly 0.5 kg to 0.5000000001.
+  static int tripsForWeight(double weightKg) {
+    final grams = (weightKg * 1000).round();
+    if (grams <= 0) return 1;
+    final trips = (grams / (maxPayloadKg * 1000)).ceil();
+    return trips < 1 ? 1 : trips;
+  }
 
   /// Calculates the distance-based delivery fee for customer checkout orders:
-  /// - Base: ₱15.00
-  /// - Distance: ₱40.00 / km (using real Haversine distance, 0 if same building or missing coords)
-  /// - Weight: ₱10.00 / kg of payload (capped at drone max 0.5 kg)
-  /// - Weather: +₱5.00 when weather is caution
+  /// - Base: ₱15.00, charged once
+  /// - Distance: ₱40.00 / km × trips (using real Haversine distance, 0 if same building or missing coords)
+  /// - Weight: ₱10.00 / kg of payload (capped at maxTrips loads, 1.0 kg)
+  /// - Extra trips: ₱25.00 for each trip beyond the first
+  /// - Weather: +₱5.00 when weather is caution, charged once
   /// - Rounded to 2 decimals, never below base fee (₱15.00)
   static DeliveryFeeBreakdown calculateOrderFee({
     double? distanceKm,
     double weightKg = 0.0,
     bool isCaution = false,
+    int trips = 1,
   }) {
-    // Distance fee (missing or near-zero distance defaults to 0)
-    final double dist = (distanceKm != null && distanceKm > 0.005) ? distanceKm : 0.0;
-    final double distFee = double.parse((dist * distanceRatePerKm).toStringAsFixed(2));
+    final int tripCount = trips < 1 ? 1 : trips;
 
-    // Weight fee (capped at max drone payload 0.5 kg)
-    final double cappedWeight = weightKg.clamp(0.0, maxPayloadKg);
+    // Distance fee (missing or near-zero distance defaults to 0); the drone
+    // flies the route once per trip
+    final double dist = (distanceKm != null && distanceKm > 0.005) ? distanceKm : 0.0;
+    final double distFee =
+        double.parse((dist * distanceRatePerKm * tripCount).toStringAsFixed(2));
+
+    // Weight fee on the actual total weight (capped at maxTrips loads)
+    final double cappedWeight = weightKg.clamp(0.0, maxPayloadKg * maxTrips);
     final double wFee = double.parse((cappedWeight * weightRatePerKg).toStringAsFixed(2));
+
+    // Extra trip fee: a flat charge per trip beyond the first, so a
+    // multi-trip order costs more even when the route is very short
+    final double tripFee = extraTripFee * (tripCount - 1);
 
     // Weather fee (+₱5.00 for caution weather)
     final double weaFee = isCaution ? weatherCautionSurcharge : 0.0;
 
     // Total fee, never below base fee
-    final double rawTotal = baseFee + distFee + wFee + weaFee;
+    final double rawTotal = baseFee + distFee + wFee + tripFee + weaFee;
     final double total = double.parse(
       (rawTotal < baseFee ? baseFee : rawTotal).toStringAsFixed(2),
     );
@@ -108,10 +153,19 @@ class DeliveryFeeCalculator {
       'Base ₱${baseFee.toStringAsFixed(2)}',
     ];
     if (dist > 0) {
-      parts.add('Distance ${dist.toStringAsFixed(2)} km ₱${distFee.toStringAsFixed(2)}');
+      parts.add(
+        tripCount > 1
+            ? 'Distance ${dist.toStringAsFixed(2)} km × $tripCount trips ₱${distFee.toStringAsFixed(2)}'
+            : 'Distance ${dist.toStringAsFixed(2)} km ₱${distFee.toStringAsFixed(2)}',
+      );
     }
     if (cappedWeight > 0) {
       parts.add('Weight ${cappedWeight.toStringAsFixed(2)} kg ₱${wFee.toStringAsFixed(2)}');
+    }
+    if (tripFee > 0) {
+      parts.add(
+        'Extra drone ${tripCount - 1 == 1 ? 'trip' : 'trips'} ₱${tripFee.toStringAsFixed(2)}',
+      );
     }
     if (weaFee > 0) {
       parts.add('Weather ₱${weaFee.toStringAsFixed(2)}');
@@ -126,8 +180,10 @@ class DeliveryFeeCalculator {
       weightKg: cappedWeight,
       weightFee: wFee,
       weatherFee: weaFee,
+      extraTripFee: tripFee,
       totalFee: total,
       breakdownText: breakdown,
+      trips: tripCount,
     );
   }
 
@@ -146,12 +202,14 @@ class DeliveryFeeCalculator {
     required double storedDeliveryFee,
     double? distanceKm,
     double weightKg = 0.0,
+    int trips = 1,
   }) {
     // 1. Check normal order fee (no weather surcharge)
     final normal = calculateOrderFee(
       distanceKm: distanceKm,
       weightKg: weightKg,
       isCaution: false,
+      trips: trips,
     );
     if ((normal.totalFee - storedDeliveryFee).abs() < 0.01) {
       return normal;
@@ -162,6 +220,7 @@ class DeliveryFeeCalculator {
       distanceKm: distanceKm,
       weightKg: weightKg,
       isCaution: true,
+      trips: trips,
     );
     if ((withCaution.totalFee - storedDeliveryFee).abs() < 0.01) {
       return withCaution;

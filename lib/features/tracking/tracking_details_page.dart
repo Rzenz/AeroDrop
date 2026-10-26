@@ -10,6 +10,11 @@ import '../../core/widgets/staggered_list.dart';
 import '../../core/widgets/neu_feedback.dart';
 import '../../core/widgets/shared_drone_radar.dart';
 import '../../core/providers/delivery_provider.dart';
+import '../../core/providers/drone_provider.dart';
+import '../../core/models/flight_phase.dart';
+import '../../core/models/telemetry_model.dart';
+import '../../core/providers/order_provider.dart';
+import '../orders/widgets/order_chat_entry.dart';
 import '../../core/providers/telemetry_provider.dart';
 import '../../core/models/delivery_model.dart';
 import '../../core/services/supabase_service.dart';
@@ -192,6 +197,9 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
           deliveredAt: data['delivered_at'] != null
               ? DateTime.tryParse(data['delivered_at'].toString())
               : null,
+          tripsRequired: (data['trips_required'] as num?)?.toInt() ?? 1,
+          tripsCompleted: (data['trips_completed'] as num?)?.toInt() ?? 0,
+          orderId: data['order_id']?.toString(),
         );
 
         if (mounted) {
@@ -347,17 +355,70 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
     final isDelivered = activeDelivery.status == DeliveryStatus.delivered;
     final isAssigning = activeDelivery.status == DeliveryStatus.assigning;
 
-    final radarTitle = isDelivered
-        ? 'DELIVERED'
-        : (isAssigning ? 'HEADING TO PICKUP' : 'DRONE EN ROUTE');
+    // Same inputs and resolver as the radar below, so the header and the
+    // radar's badge always describe the same moment
+    TelemetryModel? telemetry;
+    try {
+      telemetry = ref.watch(deliveryTelemetryProvider(widget.deliveryId)) ??
+          ref.watch(fleetTelemetryProvider);
+    } catch (_) {
+      telemetry = null;
+    }
+    final phase = resolveFlightPhase(
+      delivery: activeDelivery,
+      droneStatus: ref.watch(droneProvider).firstOrNull?.status,
+      telemetryEvent: telemetry?.eventType,
+    );
+    final loadLabel = nextLoadLabel(activeDelivery).toUpperCase();
 
+    final radarTitle = switch (phase) {
+      FlightPhase.headingToPickup => 'HEADING TO PICKUP',
+      FlightPhase.atVendor => 'AT VENDOR · COLLECTING $loadLabel',
+      FlightPhase.delivering => 'DRONE EN ROUTE',
+      FlightPhase.returningToVendor => 'RETURNING TO VENDOR · COLLECTING $loadLabel',
+      FlightPhase.returningToBase =>
+        isDelivered ? 'DELIVERED · RETURNING TO BASE' : 'RETURNING TO BASE',
+      FlightPhase.delivered => 'DELIVERED',
+      FlightPhase.standby =>
+        isDelivered ? 'DELIVERED' : (isAssigning ? 'HEADING TO PICKUP' : 'DRONE EN ROUTE'),
+    };
+
+    // Between trips deliveries.progress is reset for the next load, so the
+    // card shows how many loads have arrived instead of a stalled 0% / 100%
+    final betweenTrips = phase == FlightPhase.returningToVendor ||
+        phase == FlightPhase.atVendor;
     final progressPercent = (activeDelivery.progress * 100).round();
+    final progressBadge = betweenTrips
+        ? 'Loads: ${activeDelivery.tripsCompleted} of ${activeDelivery.tripsRequired}'
+        : 'Progress: $progressPercent%';
+    final progressValue = betweenTrips
+        ? activeDelivery.tripsCompleted / activeDelivery.tripsRequired
+        : activeDelivery.progress;
+
+    // Chat with the other party, kept in the app bar so it stays reachable
+    // while the map is in view. Same conditions as the order details button.
+    final routePath = GoRouterState.of(context).uri.path;
+    final isVendor = routePath.startsWith('/vendor');
+    final chatOrderId = activeDelivery.orderId;
+    final chatOrder = chatOrderId == null || chatOrderId.isEmpty
+        ? null
+        : (isVendor
+                  ? ref.watch(vendorOrdersProvider).orders
+                  : ref.watch(orderProvider).orders)
+              .where((o) => o.id == chatOrderId)
+              .firstOrNull;
+    final showChat = chatOrder != null &&
+        chatOrder.vendorId.isNotEmpty &&
+        !chatOrder.chatAwaitingPayment;
 
     return Scaffold(
       backgroundColor: AppColors.base,
       appBar: CustomAppBar(
         title: isDelivered ? 'Delivery Completed' : 'Live Flight Tracking',
         subtitle: 'ID: ${widget.deliveryId.length > 8 ? widget.deliveryId.substring(0, 8).toUpperCase() : widget.deliveryId}',
+        action: showChat
+            ? OrderChatAction(orderId: chatOrder.id, isVendor: isVendor)
+            : null,
       ),
       body: Container(
         decoration: BoxDecoration(color: AppColors.base),
@@ -470,7 +531,9 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
                                   ),
                                 ),
                                 child: Text(
-                                  'Progress: $progressPercent%',
+                                  progressBadge,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                   style: AppTextStyles.caption(
                                     fontSize: 12,
                                     fontWeight: FontWeight.bold,
@@ -484,7 +547,7 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
                           ClipRRect(
                             borderRadius: BorderRadius.circular(4),
                             child: LinearProgressIndicator(
-                              value: activeDelivery.progress,
+                              value: progressValue,
                               backgroundColor: AppColors.border,
                               valueColor: AlwaysStoppedAnimation(
                                 isDelivered ? AppColors.success : AppColors.accent,
@@ -492,6 +555,21 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
                               minHeight: 8,
                             ),
                           ),
+                          if (activeDelivery.isMultiTrip) ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              'Trip ${activeDelivery.currentTrip} of ${activeDelivery.tripsRequired}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTextStyles.caption(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: isDelivered
+                                    ? AppColors.success
+                                    : AppColors.accent,
+                              ),
+                            ),
+                          ],
                           Divider(color: AppColors.border, height: 24),
                           _rowDetail(
                             Icons.airplanemode_active_rounded,

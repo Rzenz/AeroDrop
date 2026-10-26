@@ -56,7 +56,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       0,
       (sum, item) => sum + ((item.weightKg * 1000).round() * item.quantity),
     );
-    final isOverweight = totalWeightGrams > 500;
+    // Over one drone load is fine (flown in trips); over maxTrips loads is not
+    final trips = cartNotifier.tripsRequired;
+    final isOverweight = cartNotifier.exceedsMaxTrips;
     final totalWeightKg = (totalWeightGrams / 1000.0).toStringAsFixed(2);
     final locationsAsync = ref.watch(dropoffLocationsProvider);
     final weather = ref.watch(weatherProvider);
@@ -277,9 +279,26 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                             alignment: Alignment.centerLeft,
                             child: Text(
                               feeBreakdown.breakdownText,
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
                               style: AppTextStyles.caption(
                                 fontSize: 10,
                                 color: AppColors.textSecondaryDark,
+                              ),
+                            ),
+                          ),
+                        ],
+                        if (trips > 1 && !isOverweight) ...[
+                          const SizedBox(height: 6),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              'This order needs $trips drone trips; the route fee is charged per trip.',
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTextStyles.caption(
+                                fontSize: 11,
+                                color: AppColors.warning,
                               ),
                             ),
                           ),
@@ -297,7 +316,8 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                         const SizedBox(height: 6),
                         _SummaryRow(
                           label: 'Maximum Drone Payload',
-                          value: '500 g (0.50 kg)',
+                          value:
+                              '500 g per trip, up to ${DeliveryFeeCalculator.maxTrips} trips',
                         ),
                         const SizedBox(height: 10),
                         Divider(color: AppColors.border),
@@ -372,7 +392,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
-                              "This order exceeds the drone's maximum payload of 0.5 kg. Your order weighs $totalWeightKg kg.",
+                              'This order weighs $totalWeightKg kg and would need $trips drone trips. The maximum is ${DeliveryFeeCalculator.maxTrips} trips (1.0 kg). Please split it into separate orders.',
+                              maxLines: 4,
+                              overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
                                 color: AppColors.danger,
                                 fontSize: 13,
@@ -414,10 +436,10 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                           )
                         : Text(
                             isOverweight
-                                ? 'Payload Exceeded'
+                                ? 'Order Too Heavy'
                                 : (isGrounded
-                                    ? 'Flight Grounded'
-                                    : 'Confirm Order'),
+                                      ? 'Flight Grounded'
+                                      : 'Confirm Order'),
                             style: AppTextStyles.subHead(
                               fontSize: 17,
                               fontWeight: FontWeight.bold,
@@ -456,16 +478,12 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       return;
     }
 
-    final totalWeightGrams = cart.fold<int>(
-      0,
-      (sum, item) => sum + ((item.weightKg * 1000).round() * item.quantity),
-    );
-    if (totalWeightGrams > 500) {
+    if (cartNotifier.exceedsMaxTrips) {
       setState(() => _placing = false);
-      final weightKg = (totalWeightGrams / 1000.0).toStringAsFixed(2);
+      final weightKg = cartNotifier.totalWeightKg.toStringAsFixed(2);
       showNeuSnack(
         context,
-        "This order exceeds the drone's maximum payload of 0.5 kg. Your order weighs $weightKg kg.",
+        'This order weighs $weightKg kg; the maximum is ${DeliveryFeeCalculator.maxTrips} drone trips (1.0 kg). Please split it into separate orders.',
         tone: NeuToneKind.error,
       );
       return;
@@ -492,6 +510,31 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       _ => 'Online Payment',
     };
 
+    // 0. A multi-trip order is delivered in parts; make sure that is wanted
+    if (cartNotifier.needsMultipleTrips) {
+      final trips = cartNotifier.tripsRequired;
+      final weightKg = cartNotifier.totalWeightKg.toStringAsFixed(2);
+      final proceed = await showNeuConfirm(
+        context,
+        title: 'Deliver in $trips trips?',
+        message:
+            'Your order weighs $weightKg kg, more than one drone load '
+            '(${DeliveryFeeCalculator.maxPayloadKg.toStringAsFixed(1)} kg). '
+            'The drone will deliver it in $trips separate trips, and the '
+            'order is complete only after the last one arrives.\n\n'
+            'Delivery fee: ₱${deliveryFee.toStringAsFixed(2)}',
+        confirmLabel: 'Continue',
+        cancelLabel: 'Edit cart',
+        icon: Icons.repeat_rounded,
+      );
+      if (!mounted) return;
+      if (!proceed) {
+        setState(() => _placing = false);
+        context.pop();
+        return;
+      }
+    }
+
     // 1. Show Pre-payment Confirmation Dialog (explaining cancellation rules)
     final confirmed = await OrderConfirmationDialog.show(
       context,
@@ -508,7 +551,10 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     // 2. If simulated Card is selected, open Simulated Card Entry Dialog
     if (_paymentMethod == 'card') {
       if (!mounted) return;
-      final cardResult = await SimulatedCardDialog.show(context, amount: totalAmount);
+      final cardResult = await SimulatedCardDialog.show(
+        context,
+        amount: totalAmount,
+      );
       if (cardResult == null) {
         if (mounted) setState(() => _placing = false);
         return;
@@ -559,7 +605,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         final data = fnRes.data is Map ? fnRes.data as Map : {};
         final invoiceUrl = data['invoice_url']?.toString();
 
-        if (fnRes.status == 200 && invoiceUrl != null && invoiceUrl.isNotEmpty) {
+        if (fnRes.status == 200 &&
+            invoiceUrl != null &&
+            invoiceUrl.isNotEmpty) {
           cartNotifier.clear();
           setState(() => _placing = false);
 
@@ -567,10 +615,14 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
           await launchUrl(uri, mode: LaunchMode.externalApplication);
 
           if (!mounted) return;
-          context.go('/user/payment-waiting?orderId=$orderId&invoiceUrl=${Uri.encodeComponent(invoiceUrl)}');
+          context.go(
+            '/user/payment-waiting?orderId=$orderId&invoiceUrl=${Uri.encodeComponent(invoiceUrl)}',
+          );
           return;
         } else {
-          final err = data['error']?.toString() ?? 'Could not start payment. Please try again.';
+          final err =
+              data['error']?.toString() ??
+              'Could not start payment. Please try again.';
           cartNotifier.clear();
           if (!mounted) return;
           setState(() => _placing = false);
@@ -582,7 +634,11 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         cartNotifier.clear();
         if (!mounted) return;
         setState(() => _placing = false);
-        showNeuSnack(context, 'Payment initialization failed. You can resume from your orders.', tone: NeuToneKind.error);
+        showNeuSnack(
+          context,
+          'Payment initialization failed. You can resume from your orders.',
+          tone: NeuToneKind.error,
+        );
         context.go('/user/payment-waiting?orderId=$orderId');
         return;
       }
@@ -607,7 +663,8 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   /// through a transitive export, not a declared dependency, and would break
   /// the build the day that package stops re-exporting it.
   String? _dropoffName() {
-    final locations = ref.read(dropoffLocationsProvider).value ??
+    final locations =
+        ref.read(dropoffLocationsProvider).value ??
         ref.read(campusLocationsProvider).value;
     if (locations == null) return null;
     for (final l in locations) {
@@ -617,23 +674,29 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   }
 
   /// Computes distance and weight based delivery fee with caution weather surcharge
-  DeliveryFeeBreakdown _getFeeBreakdown(List<CartItem> cart, {bool isWatch = false}) {
+  DeliveryFeeBreakdown _getFeeBreakdown(
+    List<CartItem> cart, {
+    bool isWatch = false,
+  }) {
     if (cart.isEmpty) {
       return DeliveryFeeCalculator.calculateOrderFee();
     }
-    final allCampusLocations = (isWatch
+    final allCampusLocations =
+        (isWatch
             ? ref.watch(campusLocationsProvider).value
             : ref.read(campusLocationsProvider).value) ??
         [];
-    final dropoffLocations = (isWatch
+    final dropoffLocations =
+        (isWatch
             ? ref.watch(dropoffLocationsProvider).value
             : ref.read(dropoffLocationsProvider).value) ??
         allCampusLocations;
     final vendors = (isWatch
         ? ref.watch(vendorProvider).vendors
         : ref.read(vendorProvider).vendors);
-    final vendor =
-        vendors.where((v) => v.id == cart.first.vendorId).firstOrNull;
+    final vendor = vendors
+        .where((v) => v.id == cart.first.vendorId)
+        .firstOrNull;
 
     CampusLocation? vendorLoc;
     if (vendor != null) {
@@ -671,13 +734,15 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       (sum, item) => sum + ((item.weightKg * 1000).round() * item.quantity),
     );
     final weightKg = totalWeightGrams / 1000.0;
-    final weather =
-        isWatch ? ref.watch(weatherProvider) : ref.read(weatherProvider);
+    final weather = isWatch
+        ? ref.watch(weatherProvider)
+        : ref.read(weatherProvider);
 
     return DeliveryFeeCalculator.calculateOrderFee(
       distanceKm: distanceKm,
       weightKg: weightKg,
       isCaution: weather.isCaution,
+      trips: DeliveryFeeCalculator.tripsForWeight(weightKg),
     );
   }
 
@@ -880,16 +945,23 @@ class _SummaryRow extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          label,
-          style: TextStyle(
-            color: AppColors.textSecondary,
-            fontSize: bold ? 14 : 12,
-            fontWeight: bold ? FontWeight.bold : FontWeight.normal,
+        Flexible(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: bold ? 14 : 12,
+              fontWeight: bold ? FontWeight.bold : FontWeight.normal,
+            ),
           ),
         ),
+        const SizedBox(width: 8),
         Text(
           value,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: TextStyle(
             color: valueColor,
             fontSize: bold ? 17 : 12,

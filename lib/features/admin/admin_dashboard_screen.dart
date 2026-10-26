@@ -85,6 +85,12 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
 
     final activeDelivery = activeDeliveries.firstOrNull;
     final hasActiveDelivery = activeDelivery != null;
+    // A returning drone with trips still owed is shuttling back to the vendor
+    final shuttle =
+        deliveries.where((d) => d.returnLegHeadsToVendor).firstOrNull;
+    final returningLabel = shuttle != null
+        ? 'Returning to Vendor • Load ${shuttle.tripsCompleted + 1} of ${shuttle.tripsRequired}'
+        : 'Returning to Base';
 
     return Scaffold(
       backgroundColor: AppColors.bgDark,
@@ -274,7 +280,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                 title: hasActiveDelivery
                     ? 'Delivery in Progress • ${activeDelivery.droneId ?? (drones.isNotEmpty ? drones.first.name : "Active Flight")}'
                     : (drones.isNotEmpty
-                        ? 'Campus Drone Radar • ${drones.first.status == DroneStatus.returning ? "Returning to Base" : "${drones.first.status.name[0].toUpperCase()}${drones.first.status.name.substring(1)}"}'
+                        ? 'Campus Drone Radar • ${drones.first.status == DroneStatus.returning ? returningLabel : "${drones.first.status.name[0].toUpperCase()}${drones.first.status.name.substring(1)}"}'
                         : 'Campus Drone Radar • Standby'),
                 onTapDetails: () {
                   if (hasActiveDelivery) {

@@ -10,6 +10,7 @@ import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/neu_card.dart';
 import '../../core/models/cart_model.dart';
 import '../../core/providers/product_provider.dart';
+import '../../core/services/delivery_fee_calculator.dart';
 
 class CartScreen extends ConsumerWidget {
   const CartScreen({super.key});
@@ -53,6 +54,11 @@ class CartScreen extends ConsumerWidget {
               ? _EmptyCart(onShop: () => context.go('/user/shop'))
               : Column(
                   children: [
+                    if (cartNotifier.needsMultipleTrips)
+                      const Padding(
+                        padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
+                        child: _TripBanner(),
+                      ),
                     Expanded(
                       child: ListView.builder(
                         padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
@@ -69,6 +75,79 @@ class CartScreen extends ConsumerWidget {
                 ),
         );
       },
+    );
+  }
+}
+
+/// Warns that the cart is heavier than one drone load. Above maxTrips loads
+/// it becomes blocking: place_order would reject the order anyway.
+class _TripBanner extends StatelessWidget {
+  const _TripBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    final blocked = cartNotifier.exceedsMaxTrips;
+    final trips = cartNotifier.tripsRequired;
+    final weight = cartNotifier.totalWeightKg.toStringAsFixed(2);
+    final perTrip = DeliveryFeeCalculator.maxPayloadKg.toStringAsFixed(1);
+    final maxTrips = DeliveryFeeCalculator.maxTrips;
+    final maxKg = (DeliveryFeeCalculator.maxPayloadKg * maxTrips)
+        .toStringAsFixed(1);
+    final tone = blocked ? AppColors.danger : AppColors.warning;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: tone.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: tone.withValues(alpha: 0.5)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            blocked ? Icons.block_rounded : Icons.repeat_rounded,
+            color: tone,
+            size: 22,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  blocked
+                      ? 'Too heavy for drone delivery ($weight kg)'
+                      : 'Heavy order: $weight kg, $trips drone trips',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.body(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: tone,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  blocked
+                      ? 'Orders are limited to $maxKg kg ($maxTrips trips of '
+                            '$perTrip kg). Remove some items or split this into '
+                            'separate orders to check out.'
+                      : 'This is more than one drone load ($perTrip kg), so '
+                            'the drone will deliver it in $trips separate trips. '
+                            'The delivery fee is higher and the wait is longer.',
+                  maxLines: 4,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.body(
+                    fontSize: 12,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -287,9 +366,9 @@ class _CartSummary extends ConsumerWidget {
     final totalItems = cart.fold<int>(0, (s, i) => s + i.quantity);
     final totalAmount = cart.fold<double>(0, (s, i) => s + i.subtotal);
 
-    // Delivery fee
-    const deliveryFee = 20.0;
-    final grandTotal = totalAmount + deliveryFee;
+    // The delivery fee depends on the drop-off location, which is only chosen
+    // at checkout, so no figure is shown here.
+    final trips = cartNotifier.tripsRequired;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
@@ -330,18 +409,27 @@ class _CartSummary extends ConsumerWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
+              Flexible(
+                child: Text(
+                  trips > 1 && !cartNotifier.exceedsMaxTrips
+                      ? 'Drone Delivery ($trips trips)'
+                      : 'Drone Delivery',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.body(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
               Text(
-                'Drone Delivery',
+                'Calculated at checkout',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: AppTextStyles.body(
                   fontSize: 13,
                   color: AppColors.textSecondary,
-                ),
-              ),
-              Text(
-                '₱20.00',
-                style: AppTextStyles.body(
-                  fontSize: 13,
-                  color: AppColors.textPrimary,
                 ),
               ),
             ],
@@ -353,14 +441,16 @@ class _CartSummary extends ConsumerWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Total',
+                'Subtotal',
                 style: AppTextStyles.subHead(
                   fontSize: 16,
                   color: AppColors.textPrimary,
                 ),
               ),
               Text(
-                '₱${grandTotal.toStringAsFixed(2)}',
+                '₱${totalAmount.toStringAsFixed(2)}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: AppTextStyles.heading(
                   fontSize: 20,
                   color: AppColors.accent,
@@ -370,70 +460,75 @@ class _CartSummary extends ConsumerWidget {
           ),
           const SizedBox(height: 16),
           FilledButton(
-            onPressed: () {
-              HapticFeedback.mediumImpact();
-              final dbProducts = ref.read(productProvider).products;
-              List<String> removedOrFlagged = [];
+            onPressed: cartNotifier.exceedsMaxTrips
+                ? null
+                : () {
+                    HapticFeedback.mediumImpact();
+                    final dbProducts = ref.read(productProvider).products;
+                    List<String> removedOrFlagged = [];
 
-              if (dbProducts.isNotEmpty) {
-                for (int i = cart.length - 1; i >= 0; i--) {
-                  final item = cart[i];
-                  final match = dbProducts
-                      .where((p) => p.id == item.productId)
-                      .firstOrNull;
-                  if (match != null) {
-                    if (!match.isAvailable || match.stock <= 0) {
-                      cartNotifier.removeItem(item.productId);
-                      removedOrFlagged.add(
-                        '${item.productName} (out of stock)',
-                      );
-                    } else {
-                      // Update price if changed
-                      if (item.unitPrice != match.price) {
-                        item.unitPrice = match.price;
-                      }
-                      // Cap quantity at available stock
-                      if (item.quantity > match.stock) {
-                        item.quantity = match.stock;
-                        removedOrFlagged.add(
-                          '${item.productName} (limited to ${match.stock} available)',
-                        );
+                    if (dbProducts.isNotEmpty) {
+                      for (int i = cart.length - 1; i >= 0; i--) {
+                        final item = cart[i];
+                        final match = dbProducts
+                            .where((p) => p.id == item.productId)
+                            .firstOrNull;
+                        if (match != null) {
+                          if (!match.isAvailable || match.stock <= 0) {
+                            cartNotifier.removeItem(item.productId);
+                            removedOrFlagged.add(
+                              '${item.productName} (out of stock)',
+                            );
+                          } else {
+                            // Update price if changed
+                            if (item.unitPrice != match.price) {
+                              item.unitPrice = match.price;
+                            }
+                            // Cap quantity at available stock
+                            if (item.quantity > match.stock) {
+                              item.quantity = match.stock;
+                              removedOrFlagged.add(
+                                '${item.productName} (limited to ${match.stock} available)',
+                              );
+                            }
+                          }
+                        }
                       }
                     }
-                  }
-                }
-              }
 
-              if (removedOrFlagged.isNotEmpty) {
-                showNeuSnack(
-                  context,
-                  'Cart updated: ${removedOrFlagged.join(", ")}',
-                  tone: NeuToneKind.info,
-                );
-                return; // Let user review changes before proceeding
-              }
+                    if (removedOrFlagged.isNotEmpty) {
+                      showNeuSnack(
+                        context,
+                        'Cart updated: ${removedOrFlagged.join(", ")}',
+                        tone: NeuToneKind.info,
+                      );
+                      return; // Let user review changes before proceeding
+                    }
 
-              if (cart.isEmpty) {
-                showNeuSnack(
-                  context,
-                  'Your cart is empty.',
-                  tone: NeuToneKind.warning,
-                );
-                return;
-              }
+                    if (cart.isEmpty) {
+                      showNeuSnack(
+                        context,
+                        'Your cart is empty.',
+                        tone: NeuToneKind.warning,
+                      );
+                      return;
+                    }
 
-              context.push('/user/checkout');
-            },
+                    context.push('/user/checkout');
+                  },
             style: FilledButton.styleFrom(
               backgroundColor: AppColors.accent,
               foregroundColor: AppColors.bgDark,
+              disabledBackgroundColor: AppColors.cardDark,
               minimumSize: const Size(double.infinity, 54),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
             ),
             child: Text(
-              'Proceed to Checkout',
+              cartNotifier.exceedsMaxTrips
+                  ? 'Order Too Heavy'
+                  : 'Proceed to Checkout',
               style: AppTextStyles.subHead(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,

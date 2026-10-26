@@ -12,6 +12,7 @@ import '../../core/providers/drone_provider.dart';
 import '../../core/providers/weather_provider.dart';
 import '../../core/models/drone_model.dart';
 import '../../core/models/delivery_model.dart';
+import '../../core/services/delivery_fee_calculator.dart';
 import '../../core/widgets/neu_back_button.dart';
 import '../../core/widgets/shared_drone_radar.dart';
 
@@ -55,8 +56,10 @@ class DeliveryDetailsScreen extends ConsumerWidget {
 
     final weather = ref.watch(weatherProvider);
     final isWeatherSafe = !weather.isGrounded;
-    final isWeightValid =
-        delivery.packageWeight > 0 && delivery.packageWeight <= 0.5;
+    // A multi-trip order may carry one drone load per trip
+    final isWeightValid = delivery.packageWeight > 0 &&
+        delivery.packageWeight <=
+            DeliveryFeeCalculator.maxPayloadKg * delivery.tripsRequired;
     final isRouteValid =
         pickup.isNotEmpty && dropoff.isNotEmpty && dropoff != 'Unknown';
     final hasItems =
@@ -273,8 +276,14 @@ class DeliveryDetailsScreen extends ConsumerWidget {
                         _buildDetailRow(
                           Icons.scale_outlined,
                           'Max Payload Limit',
-                          '0.5 kg',
+                          '0.5 kg per trip',
                         ),
+                        if (delivery.isMultiTrip)
+                          _buildDetailRow(
+                            Icons.repeat_rounded,
+                            'Drone Trips',
+                            'Trip ${delivery.currentTrip} of ${delivery.tripsRequired}',
+                          ),
                         if (delivery.estimatedDistanceKm != null)
                           _buildDetailRow(
                             Icons.map_outlined,
@@ -683,8 +692,10 @@ class _CargoVerificationCard extends ConsumerWidget {
     final drones = ref.watch(droneProvider);
 
     final isWeatherSafe = !weather.isGrounded;
-    final isWeightValid =
-        delivery.packageWeight > 0 && delivery.packageWeight <= 0.5;
+    // A multi-trip order may carry one drone load per trip
+    final isWeightValid = delivery.packageWeight > 0 &&
+        delivery.packageWeight <=
+            DeliveryFeeCalculator.maxPayloadKg * delivery.tripsRequired;
 
     final address = delivery.deliveryAddress;
     String pickup = 'Main Gate';
@@ -771,7 +782,9 @@ class _CargoVerificationCard extends ConsumerWidget {
           _buildCheckRow(
             Icons.scale_outlined,
             'Payload Weight Limit',
-            '${delivery.packageWeight.toStringAsFixed(3)} kg (Max 0.500 kg)',
+            delivery.isMultiTrip
+                ? '${delivery.packageWeight.toStringAsFixed(3)} kg over ${delivery.tripsRequired} trips (Max 0.500 kg each)'
+                : '${delivery.packageWeight.toStringAsFixed(3)} kg (Max 0.500 kg)',
             isWeightValid,
           ),
           _buildCheckRow(

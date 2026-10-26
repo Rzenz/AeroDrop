@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_radii.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/custom_app_bar.dart';
 import '../../core/widgets/neu_card.dart';
@@ -13,13 +12,13 @@ import '../../core/models/order_model.dart';
 import '../../core/models/delivery_model.dart';
 import '../../core/providers/location_provider.dart';
 import '../../core/providers/order_provider.dart';
-import '../../core/providers/order_chat_provider.dart';
 import '../../core/providers/delivery_provider.dart';
 import '../../core/providers/vendor_provider.dart';
 import '../../core/services/delivery_fee_calculator.dart';
 import '../../core/services/supabase_service.dart';
 import '../../core/widgets/neu_feedback.dart';
 import 'receipt_screen.dart';
+import 'widgets/order_chat_entry.dart';
 import 'widgets/order_review_dialog.dart';
 
 final orderDetailsProvider = FutureProvider.family<OrderModel?, String>((
@@ -38,7 +37,7 @@ final orderDetailsProvider = FutureProvider.family<OrderModel?, String>((
           customer:users!user_id(full_name, phone_number),
           campus_locations!delivery_location_id(name),
           order_items(product_id, product_name, quantity, unit_price, weight_grams),
-          deliveries(id, status, progress, drone_id, estimated_delivery_seconds, delivery_started_at, delivery_completed_at, created_at)
+          deliveries(id, status, progress, drone_id, estimated_delivery_seconds, delivery_started_at, delivery_completed_at, created_at, trips_completed)
         ''')
         .eq('id', id)
         .maybeSingle();
@@ -193,6 +192,9 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
 
             final order = baseOrder;
 
+            // Live delivery state is fresher than the order row's join
+            final currentTrip = liveDelivery?.currentTrip ?? order.currentTrip;
+
             final allCampusLocations =
                 ref.watch(campusLocationsProvider).value ?? [];
             final vendors = ref.watch(vendorProvider).vendors;
@@ -236,6 +238,7 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
               storedDeliveryFee: order.deliveryFee,
               distanceKm: distanceKm,
               weightKg: order.totalWeightKg,
+              trips: order.tripsRequired,
             );
 
             final isVendor = GoRouterState.of(context)
@@ -293,11 +296,17 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(
-                              'Flight Progress',
-                              style: AppTextStyles.caption(
-                                fontSize: 11,
-                                color: AppColors.textSecondary,
+                            Flexible(
+                              child: Text(
+                                order.isMultiTrip
+                                    ? 'Flight Progress · Trip $currentTrip of ${order.tripsRequired}'
+                                    : 'Flight Progress',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppTextStyles.caption(
+                                  fontSize: 11,
+                                  color: AppColors.textSecondary,
+                                ),
                               ),
                             ),
                             Text(
@@ -643,7 +652,7 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
                 // the order yet, so the insert policy would reject posts.
                 if (order.vendorId.isNotEmpty &&
                     !order.chatAwaitingPayment) ...[
-                  _OrderChatButton(
+                  OrderChatButton(
                     orderId: order.id,
                     isVendor: isVendor,
                   ).animate().fadeIn(delay: 270.ms),
@@ -810,71 +819,6 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
 
   static String _formatDate(DateTime dt) {
     return '${dt.month}/${dt.day}/${dt.year} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
-  }
-}
-
-/// "Message vendor" / "Message customer" with an unread badge.
-///
-/// A separate ConsumerWidget so the chat provider (and its realtime channel)
-/// only exists while the button is actually on screen.
-class _OrderChatButton extends ConsumerWidget {
-  final String orderId;
-  final bool isVendor;
-
-  const _OrderChatButton({required this.orderId, required this.isVendor});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final unread = ref.watch(
-      orderChatProvider(orderId).select((s) => s.unreadCount),
-    );
-
-    return NeuButton(
-      text: isVendor ? 'Message customer' : 'Message vendor',
-      variant: NeuButtonVariant.neutral,
-      semanticLabel: unread > 0
-          ? '${isVendor ? 'Message customer' : 'Message vendor'}, $unread unread'
-          : null,
-      leading: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Icon(
-            Icons.chat_bubble_outline_rounded,
-            size: 20,
-            color: AppColors.textPrimary,
-          ),
-          if (unread > 0)
-            Positioned(
-              right: -8,
-              top: -6,
-              child: Container(
-                constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.danger,
-                  borderRadius: AppRadii.brPill,
-                  border: Border.all(color: AppColors.base, width: 1.5),
-                ),
-                child: Center(
-                  child: Text(
-                    unread > 99 ? '99+' : '$unread',
-                    maxLines: 1,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 9,
-                      fontWeight: FontWeight.w700,
-                      height: 1.1,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-      onPressed: () => context.push(
-        '${isVendor ? '/vendor' : '/user'}/orders/$orderId/chat',
-      ),
-    );
   }
 }
 

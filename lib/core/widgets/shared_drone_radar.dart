@@ -9,6 +9,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../theme/app_radii.dart';
 import '../models/delivery_model.dart';
+import '../models/flight_phase.dart';
 import '../models/drone_model.dart';
 import '../models/telemetry_model.dart';
 import '../providers/telemetry_provider.dart';
@@ -360,27 +361,40 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
     final fallbackDrone = dronesList.firstOrNull;
     final droneDbStatus = fallbackDrone?.status;
 
-    final bool isAssigning = d?.status == DeliveryStatus.assigning;
-    final bool isInTransit = d?.status == DeliveryStatus.inTransit;
-    final bool isDelivered = d?.status == DeliveryStatus.delivered;
-    final bool isReturning = telemetry?.eventType == 'returning_to_base' ||
-        (d?.status != DeliveryStatus.assigning &&
-            d?.status != DeliveryStatus.inTransit &&
-            droneDbStatus == DroneStatus.returning);
-    final bool isStandby = !isReturning &&
-        (d == null || (!isAssigning && !isInTransit && !isDelivered));
-
     final hubOffsetRatio = const Offset(0.50, 0.33); // Drone Hub at top center
 
+    // With no delivery given (the fleet view), a returning drone is matched to
+    // the delivery its telemetry belongs to, so a shuttle between trips is
+    // still recognised as one
     final allDeliveries = ref.watch(deliveryProvider);
-    final DeliveryModel? activeOrRecentDel = isReturning
-        ? (d ??
-            (telemetry?.deliveryId != null
-                ? allDeliveries
-                    .where((del) => del.id == telemetry!.deliveryId)
-                    .firstOrNull
-                : null))
-        : d;
+    final droneReturning = droneDbStatus != null
+        ? droneDbStatus == DroneStatus.returning
+        : telemetry?.eventType == 'returning_to_base';
+    final DeliveryModel? activeOrRecentDel = d ??
+        (droneReturning && telemetry?.deliveryId != null
+            ? allDeliveries
+                .where((del) => del.id == telemetry!.deliveryId)
+                .firstOrNull
+            : null);
+
+    // One phase drives every label below, and the tracking header too
+    final phase = resolveFlightPhase(
+      delivery: activeOrRecentDel,
+      droneStatus: droneDbStatus,
+      telemetryEvent: telemetry?.eventType,
+    );
+    final bool returningToVendor = phase == FlightPhase.returningToVendor;
+    final bool atVendor = phase == FlightPhase.atVendor;
+    final bool isReturning =
+        returningToVendor || phase == FlightPhase.returningToBase;
+    final bool isAssigning =
+        atVendor || phase == FlightPhase.headingToPickup;
+    final bool isInTransit = phase == FlightPhase.delivering;
+    final bool isDelivered = d?.status == DeliveryStatus.delivered;
+    final bool isStandby = phase == FlightPhase.standby;
+    final String loadLabel = activeOrRecentDel != null
+        ? nextLoadLabel(activeOrRecentDel)
+        : '';
 
     final String pickupName =
         activeOrRecentDel?.pickupLocationName ?? 'Vendor Shop';
@@ -395,8 +409,11 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
           telemetry.latitude != 0.0 &&
           telemetry.longitude != 0.0) {
         final originCoords = _coordinatesForBuilding(dropoffName);
-        final baseLat = _baseHubCoords.$1;
-        final baseLng = _baseHubCoords.$2;
+        final targetCoords = returningToVendor
+            ? _coordinatesForBuilding(pickupName)
+            : _baseHubCoords;
+        final baseLat = targetCoords.$1;
+        final baseLng = targetCoords.$2;
         final originLat = originCoords.$1;
         final originLng = originCoords.$2;
 
@@ -426,8 +443,8 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
                 ? 0.0
                 : (telemetry?.progress != null && telemetry!.progress > 0
                     ? telemetry.progress.clamp(0.0, 1.0)
-                    : (d?.progress != null
-                        ? d!.progress.clamp(0.0, 1.0)
+                    : (activeOrRecentDel != null
+                        ? activeOrRecentDel.progress.clamp(0.0, 1.0)
                         : 0.0)));
 
     final String dbStatusLabel = switch (droneDbStatus) {
@@ -437,37 +454,51 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
       DroneStatus.charging => 'Charging',
       DroneStatus.maintenance => 'Maintenance',
       DroneStatus.offline => 'Offline',
-      DroneStatus.returning => 'Returning to Base',
+      // Never "to Base" while the delivery still owes a trip
+      DroneStatus.returning =>
+        (activeOrRecentDel?.returnLegHeadsToVendor ?? false)
+            ? 'Returning to Vendor'
+            : 'Returning to Base',
       null => 'Available',
     };
 
     // Status formatting
-    final String statusBadgeText = isReturning
-        ? 'Returning to Base'
-        : isAssigning
-        ? 'Heading to Pickup'
-        : isInTransit
-        ? 'In Flight / In Transit'
-        : isDelivered
-        ? 'Delivered'
-        : '$dbStatusLabel — At Base';
+    final String statusBadgeText = switch (phase) {
+      FlightPhase.returningToVendor => 'Returning to Vendor',
+      FlightPhase.returningToBase => 'Returning to Base',
+      FlightPhase.atVendor => 'At Vendor',
+      FlightPhase.headingToPickup => 'Heading to Pickup',
+      FlightPhase.delivering => 'In Flight / In Transit',
+      FlightPhase.delivered => 'Delivered',
+      FlightPhase.standby => '$dbStatusLabel — At Base',
+    };
 
-    final Color statusColor = isReturning
-        ? AppColors.warning
-        : isAssigning
-        ? AppColors.primaryLight
-        : isInTransit
-        ? AppColors.accent
-        : isDelivered
-        ? AppColors.success
-        : AppColors.accent;
+    // Only the final leg home is the warning colour. A shuttle back to the
+    // vendor, or a wait there, is still mid-delivery: in-flight blue.
+    // Drives the badge, route lines, drone marker and progress readout.
+    final Color statusColor = switch (phase) {
+      FlightPhase.returningToBase => AppColors.warning,
+      FlightPhase.returningToVendor => AppColors.accent,
+      FlightPhase.atVendor => AppColors.accent,
+      FlightPhase.headingToPickup => AppColors.primaryLight,
+      FlightPhase.delivering => AppColors.accent,
+      FlightPhase.delivered => AppColors.success,
+      FlightPhase.standby => AppColors.accent,
+    };
 
     final String droneCodeDisplay = telemetry?.droneCode ??
         (d != null && d.droneId != null && d.droneId!.isNotEmpty
             ? d.droneId!
             : (fallbackDrone?.id ?? '—'));
 
-    final String legDescription = isReturning
+    final String legDescription = returningToVendor
+        ? (legProgress >= 1.0
+              ? 'Back at $pickupName • Collecting $loadLabel'
+              : 'Drone $droneCodeDisplay returning to $pickupName • '
+                    'Collecting $loadLabel')
+        : atVendor
+        ? 'At $pickupName • Collecting $loadLabel'
+        : isReturning
         ? (legProgress >= 1.0
               ? 'Arrived at Campus Drone Hub Base'
               : 'Drone $droneCodeDisplay returning to Base Hub')
@@ -494,7 +525,7 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
     LatLng endLatLng;
     if (isReturning) {
       startLatLng = customerLatLng;
-      endLatLng = hubLatLng;
+      endLatLng = returningToVendor ? vendorLatLng : hubLatLng;
     } else if (isAssigning) {
       startLatLng = hubLatLng;
       endLatLng = vendorLatLng;
@@ -568,6 +599,8 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
                             children: [
                               Text(
                                 widget.title ?? (isStandby ? 'Campus Drone Radar' : 'Live Drone Radar'),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
                                 style: AppTextStyles.subHead(
                                   fontSize: 14,
                                   fontWeight: FontWeight.bold,
@@ -589,6 +622,8 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
                                 ),
                                 child: Text(
                                   statusBadgeText,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                   style: AppTextStyles.caption(
                                     fontSize: 11,
                                     fontWeight: FontWeight.bold,
@@ -678,6 +713,7 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
                             pickupName: pickupName,
                             dropoffName: dropoffName,
                             isReturning: isReturning,
+                            returningToVendor: returningToVendor,
                             isAssigning: isAssigning,
                             isInTransit: isInTransit,
                             isDelivered: isDelivered,
@@ -751,13 +787,19 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
                     _buildTelemetryItem(
                       icon: Icons.alt_route_rounded,
                       label: isReturning
-                          ? 'Return Progress'
+                          ? (returningToVendor
+                                ? 'Return to Vendor'
+                                : 'Return Progress')
+                          : atVendor
+                          ? 'At Vendor'
                           : (isStandby
                               ? 'Status'
                               : (isAssigning
                                   ? 'Pickup Progress'
                                   : 'Delivery Progress')),
-                      value: (isStandby && !isReturning)
+                      value: atVendor
+                          ? 'Collecting $loadLabel'
+                          : (isStandby && !isReturning)
                           ? dbStatusLabel
                           : '${(legProgress * 100).round()}%',
                       color: statusColor,
@@ -1014,6 +1056,7 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
     required String pickupName,
     required String dropoffName,
     required bool isReturning,
+    bool returningToVendor = false,
     required bool isAssigning,
     required bool isInTransit,
     required bool isDelivered,
@@ -1034,7 +1077,7 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
 
     if (isReturning) {
       startPoint = customerPoint;
-      endPoint = hubPoint;
+      endPoint = returningToVendor ? vendorPoint : hubPoint;
       dronePoint = Offset(
         startPoint.dx + (endPoint.dx - startPoint.dx) * legProgress,
         startPoint.dy + (endPoint.dy - startPoint.dy) * legProgress,

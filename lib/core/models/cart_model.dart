@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 
+import '../services/delivery_fee_calculator.dart';
+
 // ─── Cart Item ─────────────────────────────────────────────────────────────
 
 class CartItem {
@@ -75,6 +77,16 @@ class CartNotifier extends ValueNotifier<List<CartItem>> {
   int get totalItems => value.fold(0, (sum, i) => sum + i.quantity);
 
   double get totalAmount => value.fold(0.0, (sum, i) => sum + i.subtotal);
+
+  double get totalWeightKg =>
+      value.fold(0.0, (s, i) => s + i.weightKg * i.quantity);
+
+  int get tripsRequired =>
+      DeliveryFeeCalculator.tripsForWeight(totalWeightKg);
+
+  bool get needsMultipleTrips => tripsRequired > 1;
+
+  bool get exceedsMaxTrips => tripsRequired > DeliveryFeeCalculator.maxTrips;
 
   bool hasItem(String productId) => value.any((i) => i.productId == productId);
 }

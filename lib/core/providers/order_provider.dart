@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 import '../models/cart_model.dart';
 import '../services/supabase_service.dart';
+import '../services/delivery_fee_calculator.dart';
 import '../models/order_model.dart';
 import 'auth_provider.dart';
 import 'product_provider.dart';
@@ -136,7 +137,7 @@ class OrderNotifier extends StateNotifier<OrderState> {
             'customer:users!user_id(full_name, phone_number), '
             'campus_locations!delivery_location_id(name), '
             'order_items(product_name, quantity, unit_price, weight_grams), '
-            'deliveries(id, status, progress, drone_id, estimated_delivery_seconds, delivery_started_at, delivery_completed_at)',
+            'deliveries(id, status, progress, drone_id, estimated_delivery_seconds, delivery_started_at, delivery_completed_at, trips_completed)',
           )
           .eq('user_id', user.id)
           .order('created_at', ascending: false);
@@ -179,18 +180,24 @@ class OrderNotifier extends StateNotifier<OrderState> {
     final user = ref.read(authProvider).user;
     if (user == null) return null;
 
-    // Validate maximum drone payload (0.5 kg = 500 grams)
+    // Validate drone trips: one trip carries 500 g, up to maxTrips per order.
+    // Heavier-than-one-load orders are allowed; place_order flies them in trips.
     final totalWeightGrams = items.fold<int>(
       0,
       (sum, item) => sum + ((item.weightKg * 1000).round() * item.quantity),
     );
-    if (totalWeightGrams > 500) {
+    final trips = DeliveryFeeCalculator.tripsForWeight(
+      totalWeightGrams / 1000.0,
+    );
+    if (trips > DeliveryFeeCalculator.maxTrips) {
       final weightKg = (totalWeightGrams / 1000.0).toStringAsFixed(2);
       state = OrderState(
         orders: state.orders,
         isLoading: false,
         errorMessage:
-            "This order exceeds the drone's maximum payload of 0.5 kg. Your order weighs $weightKg kg.",
+            'This order weighs $weightKg kg and would need $trips drone trips. '
+            'The maximum is ${DeliveryFeeCalculator.maxTrips} trips. '
+            'Please split it into separate orders.',
       );
       return null;
     }
@@ -394,7 +401,7 @@ class VendorOrdersNotifier extends StateNotifier<OrderState> {
             '*, customer:users!user_id(full_name, phone_number), '
             'campus_locations!delivery_location_id(name), '
             'order_items(product_name, quantity, unit_price, weight_grams), '
-            'deliveries(id, status, progress, drone_id, estimated_delivery_seconds, delivery_started_at, delivery_completed_at)',
+            'deliveries(id, status, progress, drone_id, estimated_delivery_seconds, delivery_started_at, delivery_completed_at, trips_completed)',
           )
           .eq('vendor_id', user.id)
           .order('created_at', ascending: false);
@@ -432,10 +439,7 @@ class VendorOrdersNotifier extends StateNotifier<OrderState> {
         payload['cancellation_reason'] = cancellationReason ?? 'vendor';
       }
 
-      await _client
-          .from('orders')
-          .update(payload)
-          .eq('id', orderId);
+      await _client.from('orders').update(payload).eq('id', orderId);
 
       if (!mounted) return false;
 

@@ -38,6 +38,7 @@ class OrderModel {
   final String? notes;
   final DateTime createdAt;
   final List<OrderItemModel> items;
+  final int tripsRequired; // orders.trips_required: drone loads this order needs
 
   // Delivery-related fields joined from public.deliveries
   final String? deliveryId;
@@ -47,6 +48,7 @@ class OrderModel {
   final int? estimatedDeliverySeconds;
   final DateTime? deliveryStartedAt;
   final DateTime? deliveryCompletedAt;
+  final int deliveryTripsCompleted;
 
   OrderModel({
     required this.id,
@@ -72,6 +74,7 @@ class OrderModel {
     this.notes,
     required this.createdAt,
     required this.items,
+    this.tripsRequired = 1,
     this.deliveryId,
     this.deliveryStatus,
     this.deliveryProgress,
@@ -79,7 +82,17 @@ class OrderModel {
     this.estimatedDeliverySeconds,
     this.deliveryStartedAt,
     this.deliveryCompletedAt,
+    this.deliveryTripsCompleted = 0,
   });
+
+  bool get isMultiTrip => tripsRequired > 1;
+
+  /// The trip being flown or just finished, 1-based, for "Trip 1 of 2".
+  int get currentTrip {
+    if (effectiveStatus == 'delivered') return tripsRequired;
+    final next = deliveryTripsCompleted + 1;
+    return next > tripsRequired ? tripsRequired : next;
+  }
 
   String get formattedPaymentMethod {
     if (paymentMethod.toLowerCase() == 'xendit_online') {
@@ -184,8 +197,11 @@ class OrderModel {
         oStatus == 'out_for_delivery' ||
         oStatus == 'in_transit' ||
         oStatus == 'picked_up') {
-      // Check if simulated delivery duration has elapsed based on timestamps
-      if (deliveryStartedAt != null &&
+      // Check if simulated delivery duration has elapsed based on timestamps.
+      // Never for a multi-trip order still owing trips: it is in_transit
+      // between trips by design, and only the server can finish it.
+      if (deliveryTripsCompleted >= tripsRequired - 1 &&
+          deliveryStartedAt != null &&
           estimatedDeliverySeconds != null &&
           estimatedDeliverySeconds! > 0) {
         final elapsedSecs = DateTime.now()
@@ -294,6 +310,8 @@ class OrderModel {
     final deliveryCompletedAt = deliveryMap?['delivery_completed_at'] != null
         ? DateTime.tryParse(deliveryMap!['delivery_completed_at'].toString())
         : null;
+    final deliveryTripsCompleted =
+        (deliveryMap?['trips_completed'] as num?)?.toInt() ?? 0;
 
     return OrderModel(
       id: map['id']?.toString() ?? '',
@@ -321,6 +339,7 @@ class OrderModel {
           ? DateTime.parse(map['created_at'].toString())
           : DateTime.now(),
       items: itemsList,
+      tripsRequired: (map['trips_required'] as num?)?.toInt() ?? 1,
       deliveryId: deliveryId,
       deliveryStatus: deliveryStatus,
       deliveryProgress: deliveryProgress,
@@ -328,6 +347,7 @@ class OrderModel {
       estimatedDeliverySeconds: estimatedDeliverySeconds,
       deliveryStartedAt: deliveryStartedAt,
       deliveryCompletedAt: deliveryCompletedAt,
+      deliveryTripsCompleted: deliveryTripsCompleted,
     );
   }
 }

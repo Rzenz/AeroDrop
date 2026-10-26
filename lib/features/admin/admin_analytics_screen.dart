@@ -144,9 +144,10 @@ class _AdminAnalyticsScreenState extends ConsumerState<AdminAnalyticsScreen> {
         .where((d) => d.status == DeliveryStatus.delivered)
         .length;
 
-    double successRate = totalCount > 0
+    // Null with no deliveries: there is no rate to show, not a perfect one
+    final double? successRate = totalCount > 0
         ? (deliveredCount / totalCount * 100)
-        : 100.0;
+        : null;
     double avgFlightTime = _calculateAverageFlightTimeMinutes(deliveries);
 
     // Filter today's deliveries
@@ -189,22 +190,26 @@ class _AdminAnalyticsScreenState extends ConsumerState<AdminAnalyticsScreen> {
       );
     }
 
-    // Package Type Breakdown percentages
-    int totalPackageTypes = deliveries.length;
-    int docCount = deliveries
-        .where((d) => d.packageType.toLowerCase() == 'documents')
+    // Delivery status breakdown. Package type is not stored for orders, so a
+    // breakdown by it would only ever show a label assigned in code.
+    final statusTotal = deliveries.length;
+    final waitingCount = deliveries
+        .where((d) => d.status == DeliveryStatus.pending)
         .length;
-    int medCount = deliveries
-        .where((d) => d.packageType.toLowerCase() == 'medicine')
+    final inProgressCount = deliveries
+        .where(
+          (d) =>
+              d.status == DeliveryStatus.assigning ||
+              d.status == DeliveryStatus.inTransit,
+        )
         .length;
-    int elecCount = deliveries
-        .where((d) => d.packageType.toLowerCase() == 'electronics')
+    final cancelledCount = deliveries
+        .where((d) => d.status == DeliveryStatus.cancelled)
         .length;
-    int otherCount = totalPackageTypes - (docCount + medCount + elecCount);
 
     int getPct(int count) {
-      if (totalPackageTypes == 0) return 0;
-      return ((count / totalPackageTypes) * 100).round();
+      if (statusTotal == 0) return 0;
+      return ((count / statusTotal) * 100).round();
     }
 
     return Scaffold(
@@ -277,8 +282,12 @@ class _AdminAnalyticsScreenState extends ConsumerState<AdminAnalyticsScreen> {
                   ),
                   AnalyticsCard(
                     title: 'Success Rate',
-                    value: '${successRate.toStringAsFixed(1)}%',
-                    change: 'Delivered: $deliveredCount',
+                    value: successRate == null
+                        ? '—'
+                        : '${successRate.toStringAsFixed(1)}%',
+                    change: successRate == null
+                        ? 'No deliveries yet'
+                        : 'Delivered: $deliveredCount',
                     isPositive: true,
                     icon: Icons.verified_rounded,
                     iconColor: AppColors.success,
@@ -384,14 +393,16 @@ class _AdminAnalyticsScreenState extends ConsumerState<AdminAnalyticsScreen> {
 
               const SizedBox(height: 20),
 
-              // Package type breakdown
+              // Delivery status breakdown
               GlassCard(
                 padding: const EdgeInsets.all(20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Package Type Breakdown',
+                      'Deliveries by Status',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: AppTextStyles.title(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -399,18 +410,42 @@ class _AdminAnalyticsScreenState extends ConsumerState<AdminAnalyticsScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    _breakdown(
-                      'Documents',
-                      getPct(docCount),
-                      AppColors.primary,
-                    ),
-                    _breakdown('Medicine', getPct(medCount), AppColors.success),
-                    _breakdown(
-                      'Electronics',
-                      getPct(elecCount),
-                      AppColors.secondary,
-                    ),
-                    _breakdown('Others', getPct(otherCount), AppColors.warning),
+                    if (statusTotal == 0)
+                      Text(
+                        'No deliveries yet.',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: AppColors.textSecondaryDark,
+                          fontSize: 13,
+                        ),
+                      )
+                    else ...[
+                      _breakdown(
+                        'Delivered',
+                        deliveredCount,
+                        getPct(deliveredCount),
+                        AppColors.success,
+                      ),
+                      _breakdown(
+                        'In progress',
+                        inProgressCount,
+                        getPct(inProgressCount),
+                        AppColors.primary,
+                      ),
+                      _breakdown(
+                        'Waiting for a drone',
+                        waitingCount,
+                        getPct(waitingCount),
+                        AppColors.warning,
+                      ),
+                      _breakdown(
+                        'Cancelled',
+                        cancelledCount,
+                        getPct(cancelledCount),
+                        AppColors.danger,
+                      ),
+                    ],
                   ],
                 ),
               ).animate(delay: 420.ms).fadeIn().slideY(begin: 0.1),
@@ -483,6 +518,7 @@ class _AdminAnalyticsScreenState extends ConsumerState<AdminAnalyticsScreen> {
                         trips: '$deliveredCount delivered dispatches',
                         battery:
                             '${drones.first.batteryLevel.toStringAsFixed(0)}% battery',
+                        batteryLevel: drones.first.batteryLevel,
                         status: drones.first.status.name.toUpperCase(),
                         color: AppColors.primary,
                       )
@@ -524,7 +560,7 @@ class _AdminAnalyticsScreenState extends ConsumerState<AdminAnalyticsScreen> {
     );
   }
 
-  Widget _breakdown(String label, int pct, Color color) {
+  Widget _breakdown(String label, int count, int pct, Color color) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
       child: Column(
@@ -533,12 +569,19 @@ class _AdminAnalyticsScreenState extends ConsumerState<AdminAnalyticsScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                label,
-                style: const TextStyle(color: Colors.white70, fontSize: 13),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Colors.white70, fontSize: 13),
+                ),
               ),
+              const SizedBox(width: 8),
               Text(
-                '$pct%',
+                '$count · $pct%',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   color: color,
                   fontWeight: FontWeight.bold,
@@ -567,6 +610,7 @@ class _AdminAnalyticsScreenState extends ConsumerState<AdminAnalyticsScreen> {
     required String name,
     required String trips,
     required String battery,
+    required double batteryLevel,
     required String status,
     required Color color,
   }) {
@@ -615,7 +659,7 @@ class _AdminAnalyticsScreenState extends ConsumerState<AdminAnalyticsScreen> {
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.w600,
-                  color: drone001BatteryColor(battery),
+                  color: _batteryColor(batteryLevel),
                 ),
               ),
             ],
@@ -644,22 +688,10 @@ class _AdminAnalyticsScreenState extends ConsumerState<AdminAnalyticsScreen> {
     );
   }
 
-  Color drone001BatteryColor(String text) {
-    if (text.contains('10%') ||
-        text.contains('9%') ||
-        text.contains('8%') ||
-        text.contains('7%') ||
-        text.contains('6%') ||
-        text.contains('5%') ||
-        text.contains('4%') ||
-        text.contains('3%') ||
-        text.contains('2%') ||
-        text.contains('1%') ||
-        text.contains('0%')) {
-      return AppColors.danger;
-    }
-    return AppColors.success;
-  }
+  /// Red at 10% and below, as the old text match intended; compared as a
+  /// number, since "100%" and "20%" both contain the text "0%".
+  Color _batteryColor(double level) =>
+      level <= 10 ? AppColors.danger : AppColors.success;
 
   Widget _buildExportButton(BuildContext context) {
     return Container(
@@ -799,7 +831,8 @@ class _AdminAnalyticsScreenState extends ConsumerState<AdminAnalyticsScreen> {
                         ),
                         _presetChip(
                           label: 'Last 30 Days',
-                          isSelected: selectedRange.preset ==
+                          isSelected:
+                              selectedRange.preset ==
                               DateRangePreset.last30Days,
                           onTap: () {
                             setDialogState(() {
@@ -1163,11 +1196,7 @@ class _AdminAnalyticsScreenState extends ConsumerState<AdminAnalyticsScreen> {
     } catch (e) {
       if (context.mounted) {
         Navigator.of(context, rootNavigator: true).pop(); // dismiss loading
-        showNeuSnack(
-          context,
-          'Export failed: $e',
-          tone: NeuToneKind.error,
-        );
+        showNeuSnack(context, 'Export failed: $e', tone: NeuToneKind.error);
       }
     }
   }

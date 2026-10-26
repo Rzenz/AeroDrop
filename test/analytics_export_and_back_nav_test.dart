@@ -64,6 +64,7 @@ void main() {
         cancelledOrders: 1,
         cancelledByCustomer: 0,
         cancelledByVendor: 0,
+        cancelledByAdmin: 0,
         cancelledByWeather: 1,
         cancelledOther: 0,
         totalRevenue: 520.0,

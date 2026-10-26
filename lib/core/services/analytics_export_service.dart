@@ -202,6 +202,7 @@ class AnalyticsReportData {
   final int cancelledOrders;
   final int cancelledByCustomer;
   final int cancelledByVendor;
+  final int cancelledByAdmin;
   final int cancelledByWeather;
   final int cancelledOther;
   final double totalRevenue;
@@ -222,6 +223,7 @@ class AnalyticsReportData {
     required this.cancelledOrders,
     required this.cancelledByCustomer,
     required this.cancelledByVendor,
+    required this.cancelledByAdmin,
     required this.cancelledByWeather,
     required this.cancelledOther,
     required this.totalRevenue,
@@ -313,6 +315,7 @@ class AnalyticsExportService {
         cancelledOrders: 0,
         cancelledByCustomer: 0,
         cancelledByVendor: 0,
+        cancelledByAdmin: 0,
         cancelledByWeather: 0,
         cancelledOther: 0,
         totalRevenue: 0.0,
@@ -392,6 +395,7 @@ class AnalyticsExportService {
       int cancelledOrders = 0;
       int cancelledByCustomer = 0;
       int cancelledByVendor = 0;
+      int cancelledByAdmin = 0;
       int cancelledByWeather = 0;
       int cancelledOther = 0;
       double totalRevenue = 0.0;
@@ -474,14 +478,19 @@ class AnalyticsExportService {
 
         if (isCancelled) {
           cancelledOrders++;
-          if (cancelReason == 'customer' || cancelReason.contains('customer')) {
-            cancelledByCustomer++;
-          } else if (cancelReason == 'vendor' || cancelReason.contains('vendor') || cancelReason.contains('reject')) {
-            cancelledByVendor++;
-          } else if (cancelReason == 'weather_grounded' || cancelReason.contains('weather')) {
-            cancelledByWeather++;
-          } else {
-            cancelledOther++;
+          // Exact values written by the app and database; a substring match
+          // put 'admin_rejected' under vendor because it contains "reject".
+          switch (cancelReason) {
+            case 'customer':
+              cancelledByCustomer++;
+            case 'vendor':
+              cancelledByVendor++;
+            case 'admin_rejected':
+              cancelledByAdmin++;
+            case 'weather_grounded':
+              cancelledByWeather++;
+            default:
+              cancelledOther++;
           }
         }
 
@@ -622,6 +631,7 @@ class AnalyticsExportService {
         cancelledOrders: cancelledOrders,
         cancelledByCustomer: cancelledByCustomer,
         cancelledByVendor: cancelledByVendor,
+        cancelledByAdmin: cancelledByAdmin,
         cancelledByWeather: cancelledByWeather,
         cancelledOther: cancelledOther,
         totalRevenue: totalRevenue,
@@ -644,6 +654,7 @@ class AnalyticsExportService {
         cancelledOrders: 0,
         cancelledByCustomer: 0,
         cancelledByVendor: 0,
+        cancelledByAdmin: 0,
         cancelledByWeather: 0,
         cancelledOther: 0,
         totalRevenue: 0.0,
@@ -680,6 +691,7 @@ class AnalyticsExportService {
     rows.add(['Cancelled Orders (Total)', data.cancelledOrders]);
     rows.add(['- Cancelled by Customer', data.cancelledByCustomer]);
     rows.add(['- Cancelled by Vendor', data.cancelledByVendor]);
+    rows.add(['- Rejected by Admin', data.cancelledByAdmin]);
     rows.add(['- Weather Grounded', data.cancelledByWeather]);
     rows.add(['- Other Cancellations', data.cancelledOther]);
     rows.add(['Total Revenue (Delivered & Paid)', formatCurrency(data.totalRevenue)]);
@@ -1019,7 +1031,7 @@ class AnalyticsExportService {
                 buildKpiCard(
                   'Cancelled Orders',
                   '${data.cancelledOrders}',
-                  'Cust: ${data.cancelledByCustomer} • Vend: ${data.cancelledByVendor} • WX: ${data.cancelledByWeather}',
+                  'Cust: ${data.cancelledByCustomer} • Vend: ${data.cancelledByVendor} • Admin: ${data.cancelledByAdmin} • WX: ${data.cancelledByWeather}',
                   valueColor: data.cancelledOrders > 0 ? dangerRed : brandNavy,
                 ),
                 buildKpiCard(

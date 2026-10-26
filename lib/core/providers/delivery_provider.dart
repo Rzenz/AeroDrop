@@ -8,8 +8,6 @@ import 'drone_provider.dart';
 import '../models/drone_model.dart';
 import '../services/supabase_service.dart';
 import '../services/drone_flight_calculator.dart';
-import '../services/delivery_fee_calculator.dart';
-import 'notification_provider.dart';
 import 'auth_provider.dart';
 import 'order_provider.dart';
 import 'weather_provider.dart';
@@ -196,13 +194,17 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
 
     if (battery != null) {
       try {
-        ref.read(droneProvider.notifier).updateBattery(droneId ?? 'DRN-001', battery);
+        ref
+            .read(droneProvider.notifier)
+            .updateBattery(droneId ?? 'DRN-001', battery);
       } catch (_) {}
     }
 
     if (lat != null && lng != null) {
       try {
-        ref.read(droneProvider.notifier).updateCoordinates(droneId ?? 'DRN-001', '$lat,$lng');
+        ref
+            .read(droneProvider.notifier)
+            .updateCoordinates(droneId ?? 'DRN-001', '$lat,$lng');
       } catch (_) {}
     }
 
@@ -215,7 +217,9 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
             currentAltitude: alt ?? del.currentAltitude,
             currentSpeed: speed ?? del.currentSpeed,
             batteryLevel: battery ?? del.batteryLevel,
-            progress: (eventType == 'returning_to_base' && del.status == DeliveryStatus.delivered)
+            progress:
+                (eventType == 'returning_to_base' &&
+                    del.status == DeliveryStatus.delivered)
                 ? del.progress
                 : (progress ?? del.progress),
           );
@@ -271,7 +275,6 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
     }
   }
 
-
   (double, double) _coordinatesForLocation(String? locationName) {
     if (locationName == null || locationName.isEmpty) {
       return (10.325210, 123.953201);
@@ -308,7 +311,8 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
       return data['eta']?.toString() ?? 'TBD';
     }
 
-    final totalSecs = (data['estimated_delivery_seconds'] as num?)?.toDouble() ?? 60.0;
+    final totalSecs =
+        (data['estimated_delivery_seconds'] as num?)?.toDouble() ?? 60.0;
     final progress = (data['progress'] as num?)?.toDouble();
     if (progress != null && progress > 0.0) {
       final remaining = DroneFlightCalculator.calculateRemainingSeconds(
@@ -326,25 +330,6 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
     final elapsed = DateTime.now().difference(startedAt).inSeconds;
     final remaining = (totalSecs.round() - elapsed).clamp(0, totalSecs.round());
     return DroneFlightCalculator.formatEta(remaining);
-  }
-
-  double _calculatePaymentAmount({
-    required double packageWeight,
-    required String priority,
-    required String packageType,
-    required double estimatedDistanceKm,
-  }) {
-    return DeliveryFeeCalculator.calculateCustomDeliveryFee(
-      estimatedDistanceKm: estimatedDistanceKm,
-      packageWeightKg: packageWeight,
-      packageType: packageType,
-      priority: priority,
-    );
-  }
-
-  String _generatePaymentReference() {
-    final timestamp = DateTime.now().millisecondsSinceEpoch;
-    return 'PAY-$timestamp';
   }
 
   DeliveryModel _mapToDeliveryModel(Map<String, dynamic> data) {
@@ -470,8 +455,8 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
           : null,
       estimatedDeliverySeconds:
           (data['estimated_delivery_seconds'] as num?)?.toInt() ?? 60,
-      deliveredAt: data['delivered_at'] != null
-          ? DateTime.tryParse(data['delivered_at'].toString())
+      deliveredAt: data['delivery_completed_at'] != null
+          ? DateTime.tryParse(data['delivery_completed_at'].toString())
           : null,
       pickupLocationId: pickupLocationId,
       dropoffLocationId: dropoffLocationId,
@@ -568,8 +553,7 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
           for (final ord in cancelledOrdersRes) {
             final orderId = ord['id']?.toString();
             if (orderId != null && !deliveryOrderIds.contains(orderId)) {
-              final customer =
-                  ord['customer'] as Map<String, dynamic>? ?? {};
+              final customer = ord['customer'] as Map<String, dynamic>? ?? {};
               final vendor = ord['vendor'] as Map<String, dynamic>? ?? {};
               final location =
                   ord['campus_locations'] as Map<String, dynamic>? ?? {};
@@ -601,8 +585,7 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
                   'Unknown Vendor';
               final recipientName =
                   customer['full_name']?.toString() ?? 'Unknown Customer';
-              final recipientPhone =
-                  customer['phone_number']?.toString() ?? '';
+              final recipientPhone = customer['phone_number']?.toString() ?? '';
               final deliveryAddress =
                   location['name']?.toString() ?? 'UCLM Campus';
               final cancellationReason =
@@ -626,7 +609,7 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
                   eta: 'N/A',
                   createdAt: ord['created_at'] != null
                       ? DateTime.tryParse(ord['created_at'].toString()) ??
-                          DateTime.now()
+                            DateTime.now()
                       : DateTime.now(),
                   progress: 0.0,
                   paymentAmount: (ord['total_amount'] as num?)?.toDouble(),
@@ -739,26 +722,6 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
     }
   }
 
-  /// After a user-initiated cancellation the Supabase trigger inserts a
-  /// 'Delivery Rejected' notification (it can't distinguish who cancelled).
-  /// This patches that row to the correct user-cancellation copy.
-  Future<void> _fixCancelNotification(String deliveryId, String userId) async {
-    if (!SupabaseService.isConfigured) return;
-    try {
-      await SupabaseService.client
-          .from('notifications')
-          .update({
-            'title': 'Delivery Request Cancelled',
-            'message': 'You cancelled your delivery request.',
-            'type': 'delivery_cancelled',
-          })
-          .eq('user_id', userId)
-          .eq('related_delivery_id', deliveryId)
-          .or('type.eq.delivery_rejected,type.eq.delivery_cancelled');
-    } catch (e) {
-      debugPrint('Fix cancel notification error: $e');
-    }
-  }
   Future<void> _confirmPickup({
     required DeliveryModel delivery,
     required (double, double) vendorLoc,
@@ -893,7 +856,9 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
               : d,
         )
         .toList();
-    ref.read(droneProvider.notifier).updateStatus(droneId, DroneStatus.assigned);
+    ref
+        .read(droneProvider.notifier)
+        .updateStatus(droneId, DroneStatus.assigned);
 
     if (!SupabaseService.isConfigured) return;
 
@@ -940,21 +905,33 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
           .toList();
 
       final dronesList = ref.read(droneProvider);
-      _completingReturnDroneIds.removeWhere((id) => dronesList.any(
-            (d) => (d.id == id || d.dbId == id) && d.status != DroneStatus.returning,
-          ));
-      _confirmingPickupDeliveryIds.removeWhere((id) =>
-          state.any((d) => d.id == id && d.status != DeliveryStatus.assigning));
+      _completingReturnDroneIds.removeWhere(
+        (id) => dronesList.any(
+          (d) =>
+              (d.id == id || d.dbId == id) && d.status != DroneStatus.returning,
+        ),
+      );
+      _confirmingPickupDeliveryIds.removeWhere(
+        (id) => state.any(
+          (d) => d.id == id && d.status != DeliveryStatus.assigning,
+        ),
+      );
       // A multi-trip delivery leaves this set when its next trip is dispatched
-      _completingDeliveryIds.removeWhere((id) => state.any((d) =>
-          d.id == id &&
-          (d.status == DeliveryStatus.delivered ||
-              d.status == DeliveryStatus.assigning)));
+      _completingDeliveryIds.removeWhere(
+        (id) => state.any(
+          (d) =>
+              d.id == id &&
+              (d.status == DeliveryStatus.delivered ||
+                  d.status == DeliveryStatus.assigning),
+        ),
+      );
       final returningDrone = dronesList
-          .where((d) =>
-              d.status == DroneStatus.returning &&
-              !_completingReturnDroneIds.contains(d.dbId) &&
-              !_completingReturnDroneIds.contains(d.id))
+          .where(
+            (d) =>
+                d.status == DroneStatus.returning &&
+                !_completingReturnDroneIds.contains(d.dbId) &&
+                !_completingReturnDroneIds.contains(d.id),
+          )
           .firstOrNull;
 
       if (activeDeliveries.isEmpty && returningDrone == null) return;
@@ -1036,14 +1013,17 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
             await _confirmPickup(
               delivery: delivery,
               vendorLoc: vendorLoc,
-              batteryLevel: _deliveryStartBatteries[delivery.id] ??
+              batteryLevel:
+                  _deliveryStartBatteries[delivery.id] ??
                   delivery.batteryLevel ??
                   92.0,
             );
           } else {
             final currentLegProgress = delivery.progress.clamp(0.0, 1.0);
-            final newLegProgress =
-                (currentLegProgress + stepLeg1).clamp(0.0, 1.0);
+            final newLegProgress = (currentLegProgress + stepLeg1).clamp(
+              0.0,
+              1.0,
+            );
 
             final lat = hub.$1 + (vendorLoc.$1 - hub.$1) * newLegProgress;
             final lng = hub.$2 + (vendorLoc.$2 - hub.$2) * newLegProgress;
@@ -1051,8 +1031,10 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
 
             final startBattery = _deliveryStartBatteries[delivery.id] ?? 98.0;
             final newBattery =
-                (startBattery - (batteryDrainLeg1 * newLegProgress))
-                    .clamp(0.0, 100.0);
+                (startBattery - (batteryDrainLeg1 * newLegProgress)).clamp(
+                  0.0,
+                  100.0,
+                );
 
             _lastDeliveryIdForDrone[droneUuid] = delivery.id;
             _leg3Origin[droneUuid] = (lat, lng);
@@ -1151,9 +1133,9 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
             // Recovery case: already reached 1.0, complete delivery immediately without sending telemetry
             final fallbackStartBattery =
                 _deliveryStartBatteries[delivery.id] ??
-                    (98.0 - batteryDrainLeg2);
-            final fallbackEndBattery =
-                (fallbackStartBattery - batteryDrainLeg2).clamp(0.0, 100.0);
+                (98.0 - batteryDrainLeg2);
+            final fallbackEndBattery = (fallbackStartBattery - batteryDrainLeg2)
+                .clamp(0.0, 100.0);
             await _completeDelivery(
               delivery: delivery,
               customerLoc: customerLoc,
@@ -1162,8 +1144,10 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
             );
           } else {
             final currentLegProgress = delivery.progress.clamp(0.0, 1.0);
-            final newLegProgress =
-                (currentLegProgress + stepLeg2).clamp(0.0, 1.0);
+            final newLegProgress = (currentLegProgress + stepLeg2).clamp(
+              0.0,
+              1.0,
+            );
 
             final lat =
                 vendorLoc.$1 + (customerLoc.$1 - vendorLoc.$1) * newLegProgress;
@@ -1173,15 +1157,18 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
 
             final startBattery =
                 _deliveryStartBatteries[delivery.id] ??
-                    (98.0 - batteryDrainLeg2);
+                (98.0 - batteryDrainLeg2);
             final newBattery =
-                (startBattery - (batteryDrainLeg2 * newLegProgress))
-                    .clamp(0.0, 100.0);
+                (startBattery - (batteryDrainLeg2 * newLegProgress)).clamp(
+                  0.0,
+                  100.0,
+                );
 
-            final remainingSecs = DroneFlightCalculator.calculateRemainingSeconds(
-              progress: newLegProgress,
-              totalDurationSeconds: durationLeg2,
-            );
+            final remainingSecs =
+                DroneFlightCalculator.calculateRemainingSeconds(
+                  progress: newLegProgress,
+                  totalDurationSeconds: durationLeg2,
+                );
             final etaStr = DroneFlightCalculator.formatEta(remainingSecs);
 
             _lastDeliveryIdForDrone[droneUuid] = delivery.id;
@@ -1272,7 +1259,8 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
         if (deliveryIdForTelemetry == null) {
           // Find the most recently updated delivery for THIS drone with status 'delivered' OR 'cancelled'
           final matchingDeliveries = state.where((d) {
-            final matchesDrone = d.droneId == dUuid ||
+            final matchesDrone =
+                d.droneId == dUuid ||
                 d.droneId == returningDrone.id ||
                 d.droneId == returningDrone.dbId ||
                 d.droneId == returningDrone.name ||
@@ -1313,12 +1301,18 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
         // Check if current user is authorized to write telemetry for this delivery
         final authUser = ref.read(authProvider).user;
         final isAdmin = authUser?.role == 'admin';
-        final isCustomer = ref.read(orderProvider).orders.any(
+        final isCustomer = ref
+            .read(orderProvider)
+            .orders
+            .any(
               (o) =>
                   o.deliveryId == deliveryIdForTelemetry ||
                   o.id == deliveryIdForTelemetry,
             );
-        final isVendor = ref.read(vendorOrdersProvider).orders.any(
+        final isVendor = ref
+            .read(vendorOrdersProvider)
+            .orders
+            .any(
               (o) =>
                   o.deliveryId == deliveryIdForTelemetry ||
                   o.id == deliveryIdForTelemetry,
@@ -1327,14 +1321,13 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
         final isAuthorized = isAdmin || isCustomer || isVendor;
 
         final lastFailure = _leaseWriteFailures[dUuid];
-        final isBackoffActive = lastFailure != null &&
+        final isBackoffActive =
+            lastFailure != null &&
             DateTime.now().difference(lastFailure).inSeconds < 15;
 
         bool hasLease = false;
         // Only try to claim/renew lease if authorized and not in 15s failure backoff
-        if (isAuthorized &&
-            !isBackoffActive &&
-            SupabaseService.isConfigured) {
+        if (isAuthorized && !isBackoffActive && SupabaseService.isConfigured) {
           try {
             final leaseRes = await SupabaseService.client.rpc(
               'claim_drone_sim_lease',
@@ -1360,7 +1353,8 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
               ? _coordinatesForLocation(shuttleDelivery.pickupLocationName)
               : hub;
 
-          final leg3Start = _leg3Origin[dUuid] ??
+          final leg3Start =
+              _leg3Origin[dUuid] ??
               (returningDrone.currentCoordinates.contains(',')
                   ? (
                       double.tryParse(
@@ -1400,25 +1394,32 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
             isCaution: isCaution,
           );
 
-          final currentLeg3Progress =
-              (_leg3Progress[dUuid] ?? 0.0).clamp(0.0, 1.0);
-          final newLeg3Progress =
-              (currentLeg3Progress + stepLeg3).clamp(0.0, 1.0);
+          final currentLeg3Progress = (_leg3Progress[dUuid] ?? 0.0).clamp(
+            0.0,
+            1.0,
+          );
+          final newLeg3Progress = (currentLeg3Progress + stepLeg3).clamp(
+            0.0,
+            1.0,
+          );
           _leg3Progress[dUuid] = newLeg3Progress;
 
-          final lat = leg3Start.$1 +
-              (destination.$1 - leg3Start.$1) * newLeg3Progress;
-          final lng = leg3Start.$2 +
-              (destination.$2 - leg3Start.$2) * newLeg3Progress;
+          final lat =
+              leg3Start.$1 + (destination.$1 - leg3Start.$1) * newLeg3Progress;
+          final lng =
+              leg3Start.$2 + (destination.$2 - leg3Start.$2) * newLeg3Progress;
           final alt = newLeg3Progress > 0.85 ? 0.0 : 15.0;
 
-          final startBattery = _leg3StartBatteries[dUuid] ?? returningDrone.batteryLevel;
+          final startBattery =
+              _leg3StartBatteries[dUuid] ?? returningDrone.batteryLevel;
           if (!_leg3StartBatteries.containsKey(dUuid)) {
             _leg3StartBatteries[dUuid] = startBattery;
           }
-          final newBattery = (startBattery -
-                  (batteryDrainLeg3 * newLeg3Progress))
-              .clamp(0.0, 100.0);
+          final newBattery =
+              (startBattery - (batteryDrainLeg3 * newLeg3Progress)).clamp(
+                0.0,
+                100.0,
+              );
 
           if (SupabaseService.isConfigured) {
             try {
@@ -1507,238 +1508,6 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
         }
       }
     });
-  }
-
-  Future<String?> createDelivery({
-    required String senderName,
-    required String recipientName,
-    required String recipientPhone,
-    required String deliveryAddress,
-    required String packageName,
-    required double packageWeight,
-    required String packageType,
-    String priority = 'Standard',
-    String paymentMethod = 'Cash',
-    String? pickupLocationId,
-    String? dropoffLocationId,
-    DateTime? scheduledAt,
-    double? pickupLatitude,
-    double? pickupLongitude,
-    double? dropoffLatitude,
-    double? dropoffLongitude,
-    double estimatedDistanceKm = 0.0,
-  }) async {
-    if (packageWeight <= 0) {
-      return 'Please enter a valid package weight.';
-    }
-
-    if (packageWeight > 0.5) {
-      return 'Package is too heavy. Maximum supported drone payload is 0.5 kg.';
-    }
-
-    if (pickupLocationId != null &&
-        dropoffLocationId != null &&
-        pickupLocationId == dropoffLocationId) {
-      return 'Pickup and drop-off location cannot be the same.';
-    }
-
-    if (!SupabaseService.isConfigured) {
-      return 'Supabase is not configured.';
-    }
-
-    final currentUser = SupabaseService.client.auth.currentUser;
-
-    if (currentUser == null) {
-      return 'You must be logged in to request a delivery.';
-    }
-
-    try {
-      // 1. Check DRN-001 Drone Battery
-      final droneResponse = await SupabaseService.client
-          .from('drones')
-          .select('battery_level')
-          .eq('drone_code', 'DRN-001')
-          .maybeSingle();
-
-      if (droneResponse != null) {
-        final droneBattery = _toDouble(droneResponse['battery_level'], 100.0);
-        if (droneBattery < 10.0) {
-          return 'Drone battery is too low. Please try again later.';
-        }
-      }
-
-      // 2. Check Weather Safety
-      final weatherResponse = await SupabaseService.client
-          .from('weather_safety')
-          .select()
-          .order('updated_at', ascending: false)
-          .limit(1)
-          .maybeSingle();
-
-      if (weatherResponse == null) {
-        return 'No weather record configured. Drone dispatch blocked.';
-      }
-
-      final weatherStatus =
-          weatherResponse['safety_status']?.toString() ?? 'grounded';
-      final dispatchEnabled = weatherResponse['dispatch_enabled'] != false;
-
-      // Grounded check — insert a cancelled record for audit trail then block
-      if (weatherStatus == 'grounded' || !dispatchEnabled) {
-        try {
-          final paymentAmountGrounded = _calculatePaymentAmount(
-            packageWeight: packageWeight,
-            priority: priority,
-            packageType: packageType,
-            estimatedDistanceKm: estimatedDistanceKm,
-          );
-          final nowStr = DateTime.now().toUtc().toIso8601String();
-
-          // 1. Insert order (cancelled)
-          final orderRes = await SupabaseService.client
-              .from('orders')
-              .insert({
-                'user_id': currentUser.id,
-                'order_status': 'cancelled',
-                'delivery_location_id':
-                    dropoffLocationId ?? '10000000-0000-0000-0000-000000000001',
-                'total_amount': paymentAmountGrounded,
-                'created_at': nowStr,
-                'updated_at': nowStr,
-              })
-              .select()
-              .single();
-          final orderId = orderRes['id'].toString();
-
-          // 2. Insert delivery (cancelled)
-          await SupabaseService.client
-              .from('deliveries')
-              .insert({
-                'order_id': orderId,
-                'status': 'cancelled',
-                'priority': priority,
-                'pickup_location_id':
-                    pickupLocationId ?? '10000000-0000-0000-0000-000000000001',
-                'dropoff_location_id':
-                    dropoffLocationId ?? '10000000-0000-0000-0000-000000000001',
-                'delivery_progress': 0.0,
-                'eta': 'Cancelled',
-                'estimated_distance_km': estimatedDistanceKm,
-                'created_at': nowStr,
-                'updated_at': nowStr,
-                'delivered_at': nowStr,
-              })
-              .select()
-              .single();
-
-          // 3. Insert package as order item
-          await SupabaseService.client.from('order_items').insert({
-            'order_id': orderId,
-            'product_name': packageName,
-            'quantity': 1,
-            'unit_price': paymentAmountGrounded,
-            'weight_grams': (packageWeight * 1000).toInt(),
-            'subtotal': paymentAmountGrounded,
-            'created_at': nowStr,
-          });
-        } catch (e) {
-          debugPrint('Grounded delivery audit insert failed (non-fatal): $e');
-        }
-        return 'Delivery cancelled due to unsafe weather.';
-      }
-
-      // Caution check
-
-      const eta = 'Waiting for admin approval';
-
-      final paymentAmount = _calculatePaymentAmount(
-        packageWeight: packageWeight,
-        priority: priority,
-        packageType: packageType,
-        estimatedDistanceKm: estimatedDistanceKm,
-      );
-      const paymentStatus = 'paid';
-      final paymentReference = _generatePaymentReference();
-
-      final nowStr = DateTime.now().toUtc().toIso8601String();
-
-      // 1. Insert order
-      final orderRes = await SupabaseService.client
-          .from('orders')
-          .insert({
-            'user_id': currentUser.id,
-            'order_status': 'pending',
-            'delivery_location_id':
-                dropoffLocationId ?? '10000000-0000-0000-0000-000000000001',
-            'total_amount': paymentAmount,
-            'payment_method': paymentMethod,
-            'payment_status': paymentStatus,
-            'payment_reference': paymentReference,
-            'created_at': nowStr,
-            'updated_at': nowStr,
-          })
-          .select()
-          .single();
-      final orderId = orderRes['id'].toString();
-
-      // 2. Insert delivery
-      final deliveryRes = await SupabaseService.client
-          .from('deliveries')
-          .insert({
-            'order_id': orderId,
-            'status': 'pending',
-            'priority': priority,
-            'pickup_location_id':
-                pickupLocationId ?? '10000000-0000-0000-0000-000000000001',
-            'dropoff_location_id':
-                dropoffLocationId ?? '10000000-0000-0000-0000-000000000001',
-            'delivery_progress': 0.0,
-            'eta': eta,
-            'estimated_distance_km': estimatedDistanceKm,
-            'created_at': nowStr,
-            'updated_at': nowStr,
-          })
-          .select()
-          .single();
-      final deliveryId = deliveryRes['id'].toString();
-
-      // 3. Insert package as order item
-      await SupabaseService.client.from('order_items').insert({
-        'order_id': orderId,
-        'product_name': packageName,
-        'quantity': 1,
-        'unit_price': paymentAmount,
-        'weight_grams': (packageWeight * 1000).toInt(),
-        'subtotal': paymentAmount,
-        'created_at': nowStr,
-      });
-
-      // Fetch the full delivery data with all joins to map it correctly
-      final fullDeliveryRes = await SupabaseService.client
-          .from('deliveries')
-          .select('''
-            *,
-            orders!order_id(
-              *,
-              vendor:users!vendor_id(full_name, business_name),
-              customer:users!user_id(full_name, phone_number),
-              campus_locations!delivery_location_id(name),
-              order_items(product_name, quantity, weight_grams)
-            )
-          ''')
-          .eq('id', deliveryId)
-          .single();
-
-      final createdDelivery = _mapToDeliveryModel(
-        Map<String, dynamic>.from(fullDeliveryRes),
-      );
-
-      state = [createdDelivery, ...state];
-      return null;
-    } catch (error) {
-      debugPrint('Create delivery failed: $error');
-      return 'Delivery request failed. Please check Supabase or terminal logs.';
-    }
   }
 
   void updateDeliveryStatus(
@@ -1977,22 +1746,24 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
           .eq('id', deliveryId)
           .maybeSingle();
 
-      if (deliveryData != null) {
-        final statusStr = deliveryData['status']?.toString();
-        if (statusStr == 'cancelled') {
-          return 'This delivery request has already been cancelled.';
-        }
+      if (deliveryData == null) return 'Delivery not found.';
+      final statusStr = deliveryData['status']?.toString();
+      if (statusStr == 'cancelled') {
+        return 'This delivery request has already been cancelled.';
+      }
+      if (statusStr == 'delivered') {
+        return 'This delivery has already been completed.';
       }
 
       final nowStr = DateTime.now().toUtc().toIso8601String();
 
+      // Cancelling the delivery fires handle_delivery_drone_release, which
+      // sends an assigned drone back to base.
       final updatedResponse = await SupabaseService.client
           .from('deliveries')
           .update({
             'status': 'cancelled',
-            'admin_decision_by': currentUser.id,
-            'admin_decision_at': nowStr,
-            'delivered_at': nowStr, // mark end time
+            'delivery_completed_at': nowStr, // mark end time
           })
           .eq('id', deliveryId)
           .select('''
@@ -2007,14 +1778,17 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
           ''')
           .single();
 
-      final orderId = updatedResponse['order_id']?.toString() ??
+      final orderId =
+          updatedResponse['order_id']?.toString() ??
           updatedResponse['orders']?['id']?.toString();
+      // Cancelling the order is what refunds a simulated payment, restores
+      // stock and notifies the customer, vendor and admins, all in triggers.
       if (orderId != null) {
         await SupabaseService.client
             .from('orders')
             .update({
               'order_status': 'cancelled',
-              'cancellation_reason': 'vendor',
+              'cancellation_reason': 'admin_rejected',
               'updated_at': nowStr,
             })
             .eq('id', orderId);
@@ -2023,7 +1797,8 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
       await _insertStatusLog(
         deliveryId: deliveryId,
         status: 'cancelled',
-        message: 'Delivery request rejected: $reason',
+        message:
+            'Delivery request rejected by admin ${currentUser.id}: $reason',
       );
 
       final updatedDelivery = _mapToDeliveryModel(
@@ -2040,96 +1815,6 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
     } catch (e) {
       debugPrint('Reject delivery error: $e');
       return 'Failed to reject delivery: ${e.toString()}';
-    }
-  }
-
-  Future<String?> cancelDeliveryRequest(
-    String deliveryId, {
-    String reason = 'Cancelled by user',
-  }) async {
-    if (!SupabaseService.isConfigured) return 'Supabase is not configured';
-
-    final currentUser = SupabaseService.client.auth.currentUser;
-    if (currentUser == null) return 'You must be logged in.';
-
-    try {
-      final deliveryData = await SupabaseService.client
-          .from('deliveries')
-          .select('*, orders(user_id)')
-          .eq('id', deliveryId)
-          .maybeSingle();
-
-      if (deliveryData == null) {
-        return 'Delivery request not found.';
-      }
-
-      final userId = deliveryData['orders']?['user_id']?.toString();
-      if (userId != currentUser.id) {
-        return 'You do not have permission to cancel this delivery request.';
-      }
-
-      final statusStr = deliveryData['status']?.toString();
-      if (statusStr != 'pending') {
-        return 'Only pending delivery requests can be cancelled.';
-      }
-
-      final nowStr = DateTime.now().toUtc().toIso8601String();
-
-      final updatedResponse = await SupabaseService.client
-          .from('deliveries')
-          .update({'status': 'cancelled', 'delivered_at': nowStr})
-          .eq('id', deliveryId)
-          .select('''
-            *,
-            orders!order_id(
-              *,
-              vendor:users!vendor_id(full_name, business_name),
-              customer:users!user_id(full_name, phone_number),
-              campus_locations!delivery_location_id(name),
-              order_items(product_name, quantity, weight_grams)
-            )
-          ''')
-          .single();
-
-      final orderId = updatedResponse['order_id']?.toString() ??
-          updatedResponse['orders']?['id']?.toString();
-      if (orderId != null) {
-        try {
-          await SupabaseService.client.rpc(
-            'customer_cancel_order',
-            params: {'p_order_id': orderId},
-          );
-        } catch (e) {
-          debugPrint('customer_cancel_order RPC in cancelDeliveryRequest error: $e');
-        }
-      }
-
-      await _insertStatusLog(
-        deliveryId: deliveryId,
-        status: 'cancelled',
-        message: 'Delivery request was cancelled by the user.',
-      );
-
-      // Correct the trigger-generated notification to user-cancel copy
-      await _fixCancelNotification(deliveryId, currentUser.id);
-
-      final updatedDelivery = _mapToDeliveryModel(
-        Map<String, dynamic>.from(updatedResponse),
-      );
-
-      state = state
-          .map((d) => d.id == deliveryId ? updatedDelivery : d)
-          .toList();
-
-      await refreshPendingDeliveriesCount();
-
-      // Reload notifications so the UI reflects the patched title/message
-      ref.read(notificationProvider.notifier).loadNotifications();
-
-      return null;
-    } catch (e) {
-      debugPrint('Cancel delivery request error: $e');
-      return 'Failed to cancel request: ${e.toString()}';
     }
   }
 
@@ -2187,8 +1872,7 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
         for (final ord in cancelledOrdersRes) {
           final orderId = ord['id']?.toString();
           if (orderId != null && !deliveryOrderIds.contains(orderId)) {
-            final customer =
-                ord['customer'] as Map<String, dynamic>? ?? {};
+            final customer = ord['customer'] as Map<String, dynamic>? ?? {};
             final vendor = ord['vendor'] as Map<String, dynamic>? ?? {};
             final location =
                 ord['campus_locations'] as Map<String, dynamic>? ?? {};
@@ -2220,8 +1904,7 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
                 'Unknown Vendor';
             final recipientName =
                 customer['full_name']?.toString() ?? 'Unknown Customer';
-            final recipientPhone =
-                customer['phone_number']?.toString() ?? '';
+            final recipientPhone = customer['phone_number']?.toString() ?? '';
             final deliveryAddress =
                 location['name']?.toString() ?? 'UCLM Campus';
             final cancellationReason =
@@ -2245,7 +1928,7 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
                 eta: 'N/A',
                 createdAt: ord['created_at'] != null
                     ? DateTime.tryParse(ord['created_at'].toString()) ??
-                        DateTime.now()
+                          DateTime.now()
                     : DateTime.now(),
                 progress: 0.0,
                 paymentAmount: (ord['total_amount'] as num?)?.toDouble(),
@@ -2279,15 +1962,17 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
 
 final pendingDeliveriesCountProvider = Provider<int>((ref) {
   final deliveries = ref.watch(deliveryProvider);
-  return deliveries.where((d) =>
-    d.status == DeliveryStatus.pending ||
-    d.status == DeliveryStatus.assigning ||
-    d.status == DeliveryStatus.inTransit
-  ).length;
+  return deliveries
+      .where(
+        (d) =>
+            d.status == DeliveryStatus.pending ||
+            d.status == DeliveryStatus.assigning ||
+            d.status == DeliveryStatus.inTransit,
+      )
+      .length;
 });
 
 final deliveryProvider =
     StateNotifierProvider<DeliveryNotifier, List<DeliveryModel>>((ref) {
       return DeliveryNotifier(ref);
     });
-

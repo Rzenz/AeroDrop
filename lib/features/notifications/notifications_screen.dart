@@ -8,6 +8,7 @@ import '../../core/widgets/empty_state_widget.dart';
 import '../../core/providers/notification_provider.dart';
 import '../../core/models/notification_model.dart';
 import '../../core/widgets/neu_back_button.dart';
+import 'notification_route.dart';
 
 class NotificationsScreen extends ConsumerStatefulWidget {
   const NotificationsScreen({super.key});
@@ -314,11 +315,15 @@ class _TimelineNotificationTileState
                       ref
                           .read(notificationProvider.notifier)
                           .markOneAsRead(widget.notification.id);
-                      if (widget.notification.relatedDeliveryId != null &&
-                          widget.notification.relatedDeliveryId!.isNotEmpty) {
-                        context.push(
-                          '/user/track/details?id=${widget.notification.relatedDeliveryId}',
-                        );
+                      final target = notificationTarget(
+                        widget.notification,
+                        GoRouterState.of(context).uri.path,
+                      );
+                      if (target == null) return;
+                      if (target.isShellTab) {
+                        context.go(target.location);
+                      } else {
+                        context.push(target.location);
                       }
                     },
                     child: Container(

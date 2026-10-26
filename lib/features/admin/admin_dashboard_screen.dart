@@ -20,7 +20,8 @@ class AdminDashboardScreen extends ConsumerStatefulWidget {
   const AdminDashboardScreen({super.key});
 
   @override
-  ConsumerState<AdminDashboardScreen> createState() => _AdminDashboardScreenState();
+  ConsumerState<AdminDashboardScreen> createState() =>
+      _AdminDashboardScreenState();
 }
 
 class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
@@ -53,17 +54,18 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
         .where((d) => d.status == DroneStatus.available)
         .length;
     final lowBatteryAlerts = ref.watch(lowBatteryAlertsProvider);
-    final lowBatteryDrone =
-        drones.where((d) => d.batteryLevel < 10.0).firstOrNull;
-    final showLowBatteryWarning =
-        lowBatteryAlerts && lowBatteryDrone != null;
+    final lowBatteryDrone = drones
+        .where((d) => d.batteryLevel < 10.0)
+        .firstOrNull;
+    final showLowBatteryWarning = lowBatteryAlerts && lowBatteryDrone != null;
     final totalCount = deliveries.length;
     final deliveredCount = deliveries
         .where((d) => d.status == DeliveryStatus.delivered)
         .length;
-    final successRate = totalCount > 0
+    // Null with no deliveries: there is no rate to show, not a perfect one
+    final double? successRate = totalCount > 0
         ? (deliveredCount / totalCount * 100)
-        : 100.0;
+        : null;
 
     final now = DateTime.now();
     final last7Days = List.generate(
@@ -86,8 +88,9 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
     final activeDelivery = activeDeliveries.firstOrNull;
     final hasActiveDelivery = activeDelivery != null;
     // A returning drone with trips still owed is shuttling back to the vendor
-    final shuttle =
-        deliveries.where((d) => d.returnLegHeadsToVendor).firstOrNull;
+    final shuttle = deliveries
+        .where((d) => d.returnLegHeadsToVendor)
+        .firstOrNull;
     final returningLabel = shuttle != null
         ? 'Returning to Vendor • Load ${shuttle.tripsCompleted + 1} of ${shuttle.tripsRequired}'
         : 'Returning to Base';
@@ -113,6 +116,8 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
               // Title
               Text(
                 'Command Deck',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: AppTextStyles.title(
                   fontSize: 24,
                   fontWeight: FontWeight.w900,
@@ -121,6 +126,8 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
               ).animate().fadeIn().slideY(begin: -0.1),
               Text(
                 'Real-time fleet & delivery overview',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: AppTextStyles.body(
                   fontSize: 14,
                   color: AppColors.textSecondaryDark,
@@ -155,6 +162,8 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                       Expanded(
                         child: Text(
                           'Drone battery is low. Recharge required before accepting deliveries.',
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             color: AppColors.danger,
                             fontWeight: FontWeight.bold,
@@ -204,6 +213,8 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                           ),
                           child: const Text(
                             'AUTONOMOUS NETWORK',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               fontSize: 10,
                               color: AppColors.bgDark,
@@ -220,7 +231,11 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                     ),
                     const SizedBox(height: 14),
                     Text(
-                      'Campus Fleet Active',
+                      drones.isEmpty
+                          ? 'No Drones Registered'
+                          : 'Campus Fleet Active',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: AppTextStyles.display(
                         fontSize: 26,
                         color: AppColors.bgDark,
@@ -228,7 +243,11 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '$availDrones drones ready for immediate dispatch.',
+                      drones.isEmpty
+                          ? 'Add a drone under Fleet before deliveries can be dispatched.'
+                          : '$availDrones of ${drones.length} drones ready for immediate dispatch.',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: AppTextStyles.body(
                         fontSize: 13.5,
                         color: AppColors.bgDark.withValues(alpha: 0.8),
@@ -243,34 +262,41 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Campus Drone Radar',
-                    style: AppTextStyles.title(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                  TextButton.icon(
-                    onPressed: () {
-                      if (hasActiveDelivery) {
-                        context.push(
-                          '/admin/deliveries/details?id=${activeDelivery.id}',
-                        );
-                      } else {
-                        context.go('/admin/deliveries');
-                      }
-                    },
-                    icon: const Icon(Icons.fullscreen_rounded, size: 16, color: AppColors.accent),
-                    label: Text(
-                      hasActiveDelivery ? 'Track Delivery' : 'Deliveries',
-                      style: AppTextStyles.body(
-                        fontSize: 13,
+                  Expanded(
+                    child: Text(
+                      'Campus Drone Radar',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.title(
+                        fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: AppColors.accent,
+                        color: Colors.white,
                       ),
                     ),
                   ),
+                  // Opens the flight in progress. With nothing in the air there
+                  // is nothing to open; the deliveries list is "See all" below.
+                  if (hasActiveDelivery)
+                    TextButton.icon(
+                      onPressed: () => context.push(
+                        '/admin/deliveries/details?id=${activeDelivery.id}',
+                      ),
+                      icon: const Icon(
+                        Icons.fullscreen_rounded,
+                        size: 16,
+                        color: AppColors.accent,
+                      ),
+                      label: Text(
+                        'Track Delivery',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.body(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.accent,
+                        ),
+                      ),
+                    ),
                 ],
               ),
               const SizedBox(height: 8),
@@ -280,67 +306,72 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                 title: hasActiveDelivery
                     ? 'Delivery in Progress • ${activeDelivery.droneId ?? (drones.isNotEmpty ? drones.first.name : "Active Flight")}'
                     : (drones.isNotEmpty
-                        ? 'Campus Drone Radar • ${drones.first.status == DroneStatus.returning ? returningLabel : "${drones.first.status.name[0].toUpperCase()}${drones.first.status.name.substring(1)}"}'
-                        : 'Campus Drone Radar • Standby'),
-                onTapDetails: () {
-                  if (hasActiveDelivery) {
-                    context.push(
-                      '/admin/deliveries/details?id=${activeDelivery.id}',
-                    );
-                  } else {
-                    context.go('/admin/deliveries');
-                  }
-                },
+                          ? 'Campus Drone Radar • ${drones.first.status == DroneStatus.returning ? returningLabel : "${drones.first.status.name[0].toUpperCase()}${drones.first.status.name.substring(1)}"}'
+                          : 'Campus Drone Radar • Standby'),
+                onTapDetails: hasActiveDelivery
+                    ? () => context.push(
+                        '/admin/deliveries/details?id=${activeDelivery.id}',
+                      )
+                    : null,
               ).animate().fadeIn(delay: 200.ms),
 
               const SizedBox(height: 24),
 
-              // KPI grid
-              GridView.count(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                crossAxisCount: 2,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-                childAspectRatio: 1.25,
-                children: [
-                  AnalyticsCard(
-                    title: 'Active Flights',
-                    value: '$active',
-                    change: 'In-Flight',
-                    isPositive: true,
-                    icon: Icons.flight_takeoff_rounded,
-                    iconColor: AppColors.primary,
-                    animDelay: 0,
-                  ),
-                  AnalyticsCard(
-                    title: 'Pending',
-                    value: '$pending',
-                    change: 'Awaiting',
-                    isPositive: pending == 0,
-                    icon: Icons.schedule_rounded,
-                    iconColor: AppColors.warning,
-                    animDelay: 80,
-                  ),
-                  AnalyticsCard(
-                    title: 'Fleet Online',
-                    value: '$availDrones/${drones.length}',
-                    change: 'Operational',
-                    isPositive: true,
-                    icon: Icons.electric_bolt_rounded,
-                    iconColor: AppColors.success,
-                    animDelay: 160,
-                  ),
-                  AnalyticsCard(
-                    title: 'Success Rate',
-                    value: '${successRate.toStringAsFixed(1)}%',
-                    change: 'Delivered: $deliveredCount',
-                    isPositive: true,
-                    icon: Icons.verified_rounded,
-                    iconColor: AppColors.accent,
-                    animDelay: 240,
-                  ),
-                ],
+              // KPI grid: four across on a laptop, two on a phone
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final wide = constraints.maxWidth >= 840;
+                  return GridView.count(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    crossAxisCount: wide ? 4 : 2,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                    childAspectRatio: wide ? 1.6 : 1.25,
+                    children: [
+                      AnalyticsCard(
+                        title: 'Active Flights',
+                        value: '$active',
+                        change: 'In-Flight',
+                        isPositive: true,
+                        icon: Icons.flight_takeoff_rounded,
+                        iconColor: AppColors.primary,
+                        animDelay: 0,
+                      ),
+                      AnalyticsCard(
+                        title: 'Pending',
+                        value: '$pending',
+                        change: 'Awaiting',
+                        isPositive: pending == 0,
+                        icon: Icons.schedule_rounded,
+                        iconColor: AppColors.warning,
+                        animDelay: 80,
+                      ),
+                      AnalyticsCard(
+                        title: 'Fleet Online',
+                        value: '$availDrones/${drones.length}',
+                        change: 'Operational',
+                        isPositive: true,
+                        icon: Icons.electric_bolt_rounded,
+                        iconColor: AppColors.success,
+                        animDelay: 160,
+                      ),
+                      AnalyticsCard(
+                        title: 'Success Rate',
+                        value: successRate == null
+                            ? '—'
+                            : '${successRate.toStringAsFixed(1)}%',
+                        change: successRate == null
+                            ? 'No deliveries yet'
+                            : 'Delivered: $deliveredCount',
+                        isPositive: true,
+                        icon: Icons.verified_rounded,
+                        iconColor: AppColors.accent,
+                        animDelay: 240,
+                      ),
+                    ],
+                  );
+                },
               ),
 
               const SizedBox(height: 28),
@@ -354,12 +385,16 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          '7-Day Deliveries',
-                          style: AppTextStyles.title(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
+                        Expanded(
+                          child: Text(
+                            '7-Day Deliveries',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTextStyles.title(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
                         Container(
@@ -373,6 +408,8 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                           ),
                           child: const Text(
                             'This week',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               color: AppColors.primary,
                               fontSize: 11,
@@ -402,6 +439,8 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                                 reservedSize: 28,
                                 getTitlesWidget: (val, _) => Text(
                                   val.toInt().toString(),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.clip,
                                   style: const TextStyle(
                                     color: AppColors.textSecondaryDark,
                                     fontSize: 10,
@@ -429,6 +468,8 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                                   ];
                                   return Text(
                                     days[d.weekday - 1],
+                                    maxLines: 1,
+                                    overflow: TextOverflow.clip,
                                     style: const TextStyle(
                                       color: AppColors.textSecondaryDark,
                                       fontSize: 10,
@@ -479,22 +520,29 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
 
               const SizedBox(height: 28),
 
-              // Recent deliveries
+              // Recent deliveries — "See all" is the dashboard's one way
+              // into the deliveries list
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Recent Activity',
-                    style: AppTextStyles.title(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                  Expanded(
+                    child: Text(
+                      'Recent Deliveries',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.title(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
                   TextButton(
                     onPressed: () => context.go('/admin/deliveries'),
                     child: Text(
-                      'View all',
+                      'See all',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: AppTextStyles.body(
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
@@ -505,6 +553,36 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                 ],
               ).animate(delay: 400.ms).fadeIn(),
               const SizedBox(height: 8),
+
+              if (deliveries.isEmpty)
+                GlassCard(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 24,
+                    horizontal: 20,
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.local_shipping_outlined,
+                        color: AppColors.textSecondaryDark,
+                        size: 32,
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Text(
+                          'No deliveries yet. They appear here as soon as '
+                          'the first order is dispatched.',
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTextStyles.body(
+                            fontSize: 13,
+                            color: AppColors.textSecondaryDark,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
 
               ...deliveries.take(3).toList().asMap().entries.map((e) {
                 return DeliveryCard(

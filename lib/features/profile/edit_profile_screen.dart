@@ -280,7 +280,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             businessName: isVendor ? _businessNameController.text : null,
             businessCategory: isVendor ? resolvedCategory : null,
             businessDescription: isVendor ? _businessDescController.text : null,
-            campusLocationId: isVendor ? _selectedLocationId : null,
+            // Vendors: their pickup point. Customers: their default drop-off.
+            campusLocationId: _selectedLocationId,
           );
 
       if (!mounted) return;

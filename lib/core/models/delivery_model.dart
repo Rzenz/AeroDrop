@@ -74,6 +74,7 @@ class DeliveryModel {
       'weather_grounded' => 'Weather Grounded',
       'vendor' => 'Cancelled by Vendor',
       'customer' => 'Cancelled by Customer',
+      'admin_rejected' => 'Rejected by Admin',
       _ => r.isNotEmpty ? r : 'Cancelled by Customer',
     };
   }

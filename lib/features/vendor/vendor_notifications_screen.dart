@@ -5,11 +5,13 @@ import '../../core/widgets/neu_surface.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/neu_card.dart';
 import '../../core/providers/notification_provider.dart';
 import '../../core/models/notification_model.dart';
+import '../notifications/notification_route.dart';
 
 class VendorNotificationsScreen extends ConsumerWidget {
   const VendorNotificationsScreen({super.key});
@@ -178,6 +180,16 @@ class VendorNotificationsScreen extends ConsumerWidget {
       onTap: () {
         if (!n.isRead) {
           ref.read(notificationProvider.notifier).markOneAsRead(n.id);
+        }
+        final target = notificationTarget(
+          n,
+          GoRouterState.of(context).uri.path,
+        );
+        if (target == null) return;
+        if (target.isShellTab) {
+          context.go(target.location);
+        } else {
+          context.push(target.location);
         }
       },
       child: Container(

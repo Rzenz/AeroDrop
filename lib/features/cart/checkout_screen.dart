@@ -102,6 +102,16 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                             ),
                           );
                         }
+                        // Default to the drop-off saved on the profile when
+                        // it is still selectable. Only a default: picking a
+                        // different one here changes this order alone.
+                        final savedId =
+                            ref.watch(authProvider).user?.campusLocationId;
+                        final defaultId =
+                            locations.any((l) => l.id == savedId)
+                            ? savedId!
+                            : locations.first.id;
+
                         // Initialize selection if null
                         if (_selectedLocationId == null ||
                             !locations.any(
@@ -109,14 +119,13 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                             )) {
                           WidgetsBinding.instance.addPostFrameCallback((_) {
                             setState(() {
-                              _selectedLocationId = locations.first.id;
+                              _selectedLocationId = defaultId;
                             });
                           });
                         }
 
                         return DropdownButtonFormField<String>(
-                          initialValue:
-                              _selectedLocationId ?? locations.first.id,
+                          initialValue: _selectedLocationId ?? defaultId,
                           dropdownColor: AppColors.surfaceRaised,
                           style: AppTextStyles.body(
                             fontSize: 13,

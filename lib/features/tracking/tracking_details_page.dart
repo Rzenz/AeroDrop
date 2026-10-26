@@ -7,7 +7,6 @@ import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/neu_card.dart';
 import '../../core/widgets/custom_app_bar.dart';
 import '../../core/widgets/staggered_list.dart';
-import '../../core/widgets/neu_feedback.dart';
 import '../../core/widgets/shared_drone_radar.dart';
 import '../../core/providers/delivery_provider.dart';
 import '../../core/providers/drone_provider.dart';
@@ -144,7 +143,8 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
             : DeliveryStatus.pending;
 
         // Single authoritative source of truth: deliveries.progress
-        final double rawProgress = (data['progress'] as num?)?.toDouble() ?? 0.0;
+        final double rawProgress =
+            (data['progress'] as num?)?.toDouble() ?? 0.0;
         final double progress = status == DeliveryStatus.delivered
             ? 1.0
             : rawProgress.clamp(0.0, 1.0);
@@ -194,8 +194,8 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
               : null,
           estimatedDeliverySeconds:
               (data['estimated_delivery_seconds'] as num?)?.toInt() ?? 60,
-          deliveredAt: data['delivered_at'] != null
-              ? DateTime.tryParse(data['delivered_at'].toString())
+          deliveredAt: data['delivery_completed_at'] != null
+              ? DateTime.tryParse(data['delivery_completed_at'].toString())
               : null,
           tripsRequired: (data['trips_required'] as num?)?.toInt() ?? 1,
           tripsCompleted: (data['trips_completed'] as num?)?.toInt() ?? 0,
@@ -307,8 +307,9 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
   @override
   Widget build(BuildContext context) {
     final deliveries = ref.watch(deliveryProvider);
-    final providerDelivery =
-        deliveries.where((d) => d.id == widget.deliveryId).firstOrNull;
+    final providerDelivery = deliveries
+        .where((d) => d.id == widget.deliveryId)
+        .firstOrNull;
 
     final baseDelivery = providerDelivery ?? _fetchedDelivery;
     final status = baseDelivery?.status ?? DeliveryStatus.pending;
@@ -326,31 +327,42 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
       _flightAltitude.replaceAll('m', '').trim(),
     );
 
-    final activeDelivery = (baseDelivery ??
-            DeliveryModel(
-              id: widget.deliveryId,
-              senderName: '',
-              recipientName: '',
-              recipientPhone: '',
-              deliveryAddress: '',
-              packageName: 'AeroDrop Package',
-              packageWeight: 0,
-              packageType: 'Package',
+    final activeDelivery =
+        (baseDelivery ??
+                DeliveryModel(
+                  id: widget.deliveryId,
+                  senderName: '',
+                  recipientName: '',
+                  recipientPhone: '',
+                  deliveryAddress: '',
+                  packageName: 'AeroDrop Package',
+                  packageWeight: 0,
+                  packageType: 'Package',
+                  status: status,
+                  eta: 'TBD',
+                  createdAt: DateTime.now(),
+                  progress: progress,
+                ))
+            .copyWith(
               status: status,
-              eta: 'TBD',
-              createdAt: DateTime.now(),
               progress: progress,
-            ))
-        .copyWith(
-          status: status,
-          progress: progress,
-          pickupLocationName: baseDelivery?.pickupLocationName ?? _pickupName,
-          dropoffLocationName:
-              baseDelivery?.dropoffLocationName ?? _dropoffName,
-          batteryLevel: baseDelivery?.batteryLevel ?? parsedBattery ?? (status == DeliveryStatus.delivered ? 88.0 : 96.0),
-          currentSpeed: baseDelivery?.currentSpeed ?? parsedSpeed ?? (status == DeliveryStatus.delivered ? 0.0 : 18.0),
-          currentAltitude: baseDelivery?.currentAltitude ?? parsedAlt ?? (status == DeliveryStatus.delivered ? 0.0 : 25.0),
-        );
+              pickupLocationName:
+                  baseDelivery?.pickupLocationName ?? _pickupName,
+              dropoffLocationName:
+                  baseDelivery?.dropoffLocationName ?? _dropoffName,
+              batteryLevel:
+                  baseDelivery?.batteryLevel ??
+                  parsedBattery ??
+                  (status == DeliveryStatus.delivered ? 88.0 : 96.0),
+              currentSpeed:
+                  baseDelivery?.currentSpeed ??
+                  parsedSpeed ??
+                  (status == DeliveryStatus.delivered ? 0.0 : 18.0),
+              currentAltitude:
+                  baseDelivery?.currentAltitude ??
+                  parsedAlt ??
+                  (status == DeliveryStatus.delivered ? 0.0 : 25.0),
+            );
 
     final isDelivered = activeDelivery.status == DeliveryStatus.delivered;
     final isAssigning = activeDelivery.status == DeliveryStatus.assigning;
@@ -359,7 +371,8 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
     // radar's badge always describe the same moment
     TelemetryModel? telemetry;
     try {
-      telemetry = ref.watch(deliveryTelemetryProvider(widget.deliveryId)) ??
+      telemetry =
+          ref.watch(deliveryTelemetryProvider(widget.deliveryId)) ??
           ref.watch(fleetTelemetryProvider);
     } catch (_) {
       telemetry = null;
@@ -375,18 +388,21 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
       FlightPhase.headingToPickup => 'HEADING TO PICKUP',
       FlightPhase.atVendor => 'AT VENDOR · COLLECTING $loadLabel',
       FlightPhase.delivering => 'DRONE EN ROUTE',
-      FlightPhase.returningToVendor => 'RETURNING TO VENDOR · COLLECTING $loadLabel',
+      FlightPhase.returningToVendor =>
+        'RETURNING TO VENDOR · COLLECTING $loadLabel',
       FlightPhase.returningToBase =>
         isDelivered ? 'DELIVERED · RETURNING TO BASE' : 'RETURNING TO BASE',
       FlightPhase.delivered => 'DELIVERED',
       FlightPhase.standby =>
-        isDelivered ? 'DELIVERED' : (isAssigning ? 'HEADING TO PICKUP' : 'DRONE EN ROUTE'),
+        isDelivered
+            ? 'DELIVERED'
+            : (isAssigning ? 'HEADING TO PICKUP' : 'DRONE EN ROUTE'),
     };
 
     // Between trips deliveries.progress is reset for the next load, so the
     // card shows how many loads have arrived instead of a stalled 0% / 100%
-    final betweenTrips = phase == FlightPhase.returningToVendor ||
-        phase == FlightPhase.atVendor;
+    final betweenTrips =
+        phase == FlightPhase.returningToVendor || phase == FlightPhase.atVendor;
     final progressPercent = (activeDelivery.progress * 100).round();
     final progressBadge = betweenTrips
         ? 'Loads: ${activeDelivery.tripsCompleted} of ${activeDelivery.tripsRequired}'
@@ -407,7 +423,8 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
                   : ref.watch(orderProvider).orders)
               .where((o) => o.id == chatOrderId)
               .firstOrNull;
-    final showChat = chatOrder != null &&
+    final showChat =
+        chatOrder != null &&
         chatOrder.vendorId.isNotEmpty &&
         !chatOrder.chatAwaitingPayment;
 
@@ -415,7 +432,8 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
       backgroundColor: AppColors.base,
       appBar: CustomAppBar(
         title: isDelivered ? 'Delivery Completed' : 'Live Flight Tracking',
-        subtitle: 'ID: ${widget.deliveryId.length > 8 ? widget.deliveryId.substring(0, 8).toUpperCase() : widget.deliveryId}',
+        subtitle:
+            'ID: ${widget.deliveryId.length > 8 ? widget.deliveryId.substring(0, 8).toUpperCase() : widget.deliveryId}',
         action: showChat
             ? OrderChatAction(orderId: chatOrder.id, isVendor: isVendor)
             : null,
@@ -427,7 +445,9 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
             color: AppColors.accent,
             backgroundColor: AppColors.base,
             onRefresh: () async {
-              await ref.read(deliveryProvider.notifier).loadDeliveriesFromSupabase();
+              await ref
+                  .read(deliveryProvider.notifier)
+                  .loadDeliveriesFromSupabase();
               await _fetchDetails();
             },
             child: SingleChildScrollView(
@@ -450,19 +470,28 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
                     // ETA / Arrival Status Card
                     NeuCard(
                       padding: const EdgeInsets.all(20),
-                      accent: isDelivered ? AppColors.success : AppColors.primary,
+                      accent: isDelivered
+                          ? AppColors.success
+                          : AppColors.primary,
                       child: Row(
                         children: [
                           Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: (isDelivered ? AppColors.success : AppColors.primary)
-                                  .withValues(alpha: 0.15),
+                              color:
+                                  (isDelivered
+                                          ? AppColors.success
+                                          : AppColors.primary)
+                                      .withValues(alpha: 0.15),
                               shape: BoxShape.circle,
                             ),
                             child: Icon(
-                              isDelivered ? Icons.check_circle_rounded : Icons.timer_rounded,
-                              color: isDelivered ? AppColors.success : AppColors.primaryLight,
+                              isDelivered
+                                  ? Icons.check_circle_rounded
+                                  : Icons.timer_rounded,
+                              color: isDelivered
+                                  ? AppColors.success
+                                  : AppColors.primaryLight,
                               size: 28,
                             ),
                           ),
@@ -472,7 +501,9 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  isDelivered ? 'Delivery Status' : 'Estimated Arrival Time',
+                                  isDelivered
+                                      ? 'Delivery Status'
+                                      : 'Estimated Arrival Time',
                                   style: AppTextStyles.body(
                                     fontSize: 12,
                                     color: AppColors.textSecondary,
@@ -482,7 +513,8 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
                                 Text(
                                   isDelivered
                                       ? 'Order Delivered Successfully 🎉'
-                                      : activeDelivery.status == DeliveryStatus.cancelled
+                                      : activeDelivery.status ==
+                                            DeliveryStatus.cancelled
                                       ? 'Cancelled'
                                       : isAssigning
                                       ? 'En Route to Pickup'
@@ -490,7 +522,9 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
                                   style: AppTextStyles.title(
                                     fontSize: 18,
                                     fontWeight: FontWeight.bold,
-                                    color: isDelivered ? AppColors.success : AppColors.textPrimary,
+                                    color: isDelivered
+                                        ? AppColors.success
+                                        : AppColors.textPrimary,
                                   ),
                                 ),
                               ],
@@ -512,7 +546,9 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(
-                                isDelivered ? 'Delivery Summary' : 'Flight Telemetry',
+                                isDelivered
+                                    ? 'Delivery Summary'
+                                    : 'Flight Telemetry',
                                 style: AppTextStyles.title(
                                   fontSize: 15,
                                   fontWeight: FontWeight.bold,
@@ -520,14 +556,23 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
                                 ),
                               ),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
                                 decoration: BoxDecoration(
-                                  color: (isDelivered ? AppColors.success : AppColors.accent)
-                                      .withValues(alpha: 0.15),
+                                  color:
+                                      (isDelivered
+                                              ? AppColors.success
+                                              : AppColors.accent)
+                                          .withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(6),
                                   border: Border.all(
-                                    color: (isDelivered ? AppColors.success : AppColors.accent)
-                                        .withValues(alpha: 0.3),
+                                    color:
+                                        (isDelivered
+                                                ? AppColors.success
+                                                : AppColors.accent)
+                                            .withValues(alpha: 0.3),
                                   ),
                                 ),
                                 child: Text(
@@ -537,7 +582,9 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
                                   style: AppTextStyles.caption(
                                     fontSize: 12,
                                     fontWeight: FontWeight.bold,
-                                    color: isDelivered ? AppColors.success : AppColors.accent,
+                                    color: isDelivered
+                                        ? AppColors.success
+                                        : AppColors.accent,
                                   ),
                                 ),
                               ),
@@ -550,7 +597,9 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
                               value: progressValue,
                               backgroundColor: AppColors.border,
                               valueColor: AlwaysStoppedAnimation(
-                                isDelivered ? AppColors.success : AppColors.accent,
+                                isDelivered
+                                    ? AppColors.success
+                                    : AppColors.accent,
                               ),
                               minHeight: 8,
                             ),
@@ -582,8 +631,8 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
                             isDelivered
                                 ? _dropoffName
                                 : (isAssigning
-                                    ? 'En route to $_pickupName'
-                                    : 'Flying along campus flight path'),
+                                      ? 'En route to $_pickupName'
+                                      : 'Flying along campus flight path'),
                           ),
                           _rowDetail(
                             Icons.flag_rounded,
@@ -592,26 +641,32 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
                           ),
                           Builder(
                             builder: (context) {
-                              final tel = ref.watch(deliveryTelemetryProvider(widget.deliveryId));
+                              final tel = ref.watch(
+                                deliveryTelemetryProvider(widget.deliveryId),
+                              );
                               final batteryDisplay = tel?.batteryLevel != null
                                   ? '${tel!.batteryLevel!.round()}%'
                                   : (activeDelivery.batteryLevel != null
-                                      ? '${activeDelivery.batteryLevel!.round()}%'
-                                      : _droneBatteryText);
+                                        ? '${activeDelivery.batteryLevel!.round()}%'
+                                        : _droneBatteryText);
                               final speedDisplay = isDelivered
                                   ? '0.0 m/s'
                                   : (tel?.speed != null
-                                      ? '${tel!.speed!.toStringAsFixed(1)} m/s'
-                                      : ((activeDelivery.currentSpeed ?? 0.0) > 0
-                                          ? '${activeDelivery.currentSpeed!.toStringAsFixed(1)} m/s'
-                                          : '—'));
+                                        ? '${tel!.speed!.toStringAsFixed(1)} m/s'
+                                        : ((activeDelivery.currentSpeed ??
+                                                      0.0) >
+                                                  0
+                                              ? '${activeDelivery.currentSpeed!.toStringAsFixed(1)} m/s'
+                                              : '—'));
                               final altDisplay = isDelivered
                                   ? '0.0 m'
                                   : (tel?.altitude != null
-                                      ? '${tel!.altitude!.toStringAsFixed(1)} m'
-                                      : ((activeDelivery.currentAltitude ?? 0.0) > 0
-                                          ? '${activeDelivery.currentAltitude!.toStringAsFixed(1)} m'
-                                          : '—'));
+                                        ? '${tel!.altitude!.toStringAsFixed(1)} m'
+                                        : ((activeDelivery.currentAltitude ??
+                                                      0.0) >
+                                                  0
+                                              ? '${activeDelivery.currentAltitude!.toStringAsFixed(1)} m'
+                                              : '—'));
                               final sigDisplay = tel?.signalStrength != null
                                   ? '${tel!.signalStrength!.round()}%'
                                   : _signalStrengthText;
@@ -686,22 +741,13 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
                             isDelivered
                                 ? 'Delivery Complete (Landed)'
                                 : (isAssigning
-                                    ? 'Waypoints Engaged (Leg 1)'
-                                    : 'Autonomous Transit (Leg 2)'),
+                                      ? 'Waypoints Engaged (Leg 1)'
+                                      : 'Autonomous Transit (Leg 2)'),
                           ),
                         ],
                       ),
                     ),
 
-                    // Cancel Button (only when still pending approval)
-                    if (activeDelivery.status == DeliveryStatus.pending) ...[
-                      const SizedBox(height: 24),
-                      _DestructiveButton(
-                        text: 'Cancel Delivery Request',
-                        icon: Icons.cancel_outlined,
-                        onPressed: () => _showCancelConfirmation(context, ref),
-                      ),
-                    ],
                     const SizedBox(height: 32),
                   ],
                 ),
@@ -742,160 +788,6 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  void _showCancelConfirmation(BuildContext context, WidgetRef ref) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF132031),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: Row(
-          children: [
-            const Icon(
-              Icons.warning_amber_rounded,
-              color: Colors.redAccent,
-              size: 28,
-            ),
-            const SizedBox(width: 12),
-            Text(
-              'Cancel Delivery Request?',
-              style: AppTextStyles.title(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
-              ),
-            ),
-          ],
-        ),
-        content: Text(
-          'This request will be marked as cancelled and kept in your history.',
-          style: AppTextStyles.body(
-            fontSize: 14,
-            color: AppColors.textSecondary,
-          ),
-        ),
-        actionsPadding: const EdgeInsets.only(right: 16, bottom: 16),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'No',
-              style: AppTextStyles.body(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.redAccent,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            ),
-            onPressed: () async {
-              Navigator.pop(context);
-              final error = await ref
-                  .read(deliveryProvider.notifier)
-                  .cancelDeliveryRequest(widget.deliveryId);
-
-              if (!context.mounted) return;
-
-              if (error == null) {
-                showNeuSnack(
-                  context,
-                  'Delivery request cancelled.',
-                  tone: NeuToneKind.success,
-                );
-                context.pop();
-              } else {
-                showNeuSnack(context, error, tone: NeuToneKind.error);
-              }
-            },
-            child: Text(
-              'Yes, Cancel',
-              style: AppTextStyles.body(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _DestructiveButton extends StatelessWidget {
-  final String text;
-  final VoidCallback onPressed;
-  final IconData? icon;
-
-  const _DestructiveButton({
-    required this.text,
-    required this.onPressed,
-    this.icon,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      height: 56,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(28),
-        gradient: LinearGradient(
-          colors: [
-            Colors.red.withValues(alpha: 0.15),
-            Colors.redAccent.withValues(alpha: 0.05),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        border: Border.all(
-          color: Colors.redAccent.withValues(alpha: 0.3),
-          width: 1.5,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.redAccent.withValues(alpha: 0.1),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(28),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: onPressed,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                if (icon != null) ...[
-                  Icon(icon, color: Colors.redAccent, size: 20),
-                  const SizedBox(width: 8),
-                ],
-                Text(
-                  text,
-                  style: AppTextStyles.title(
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.redAccent,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
       ),
     );
   }

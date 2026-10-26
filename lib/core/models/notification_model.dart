@@ -5,6 +5,7 @@ class NotificationModel {
   final String message;
   final String type;
   final String? relatedDeliveryId;
+  final Map<String, dynamic>? metadata;
   final bool isRead;
   final DateTime createdAt;
   final DateTime? readAt;
@@ -17,6 +18,7 @@ class NotificationModel {
     String? body,
     this.type = 'info',
     this.relatedDeliveryId,
+    this.metadata,
     required this.isRead,
     DateTime? createdAt,
     DateTime? timestamp,
@@ -35,6 +37,7 @@ class NotificationModel {
     String? message,
     String? type,
     String? relatedDeliveryId,
+    Map<String, dynamic>? metadata,
     bool? isRead,
     DateTime? createdAt,
     DateTime? readAt,
@@ -46,6 +49,7 @@ class NotificationModel {
       message: message ?? this.message,
       type: type ?? this.type,
       relatedDeliveryId: relatedDeliveryId ?? this.relatedDeliveryId,
+      metadata: metadata ?? this.metadata,
       isRead: isRead ?? this.isRead,
       createdAt: createdAt ?? this.createdAt,
       readAt: readAt ?? this.readAt,
@@ -63,6 +67,9 @@ class NotificationModel {
           map['notification_type']?.toString() ??
           'info',
       relatedDeliveryId: map['related_delivery_id']?.toString(),
+      metadata: map['metadata'] is Map
+          ? Map<String, dynamic>.from(map['metadata'] as Map)
+          : null,
       isRead: map['is_read'] == true,
       createdAt: map['created_at'] != null
           ? DateTime.tryParse(map['created_at'].toString()) ?? DateTime.now()

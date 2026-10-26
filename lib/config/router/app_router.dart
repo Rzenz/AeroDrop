@@ -257,11 +257,6 @@ final routerProvider = Provider<GoRouter>((ref) {
                 _fade(state, const VendorsScreen()),
           ),
           GoRoute(
-            path: '/user/vendors',
-            pageBuilder: (context, state) =>
-                _fade(state, const VendorsScreen()),
-          ),
-          GoRoute(
             path: '/user/track',
             pageBuilder: (context, state) =>
                 _fade(state, const TrackingScreen()),
@@ -287,6 +282,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/user/request', redirect: (_, _) => '/user/shop'),
       // /user/history → redirect to orders (old concept removed)
       GoRoute(path: '/user/history', redirect: (_, _) => '/user/orders'),
+      // /user/vendors → redirect to shop (rendered the same VendorsScreen)
+      GoRoute(path: '/user/vendors', redirect: (_, _) => '/user/shop'),
       // Marketplace push routes
       GoRoute(
         path: '/user/vendors/:id',
@@ -391,8 +388,15 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: '/vendor/orders',
-            pageBuilder: (context, state) =>
-                _fade(state, const VendorOrdersScreen()),
+            pageBuilder: (context, state) => _fade(
+              state,
+              VendorOrdersScreen(
+                // A new key per status, so tapping a different dashboard tile
+                // while the tab is already open still switches the tab
+                key: ValueKey(state.uri.queryParameters['status']),
+                initialStatus: state.uri.queryParameters['status'],
+              ),
+            ),
           ),
           GoRoute(
             path: '/vendor/products',
@@ -568,19 +572,15 @@ final routerProvider = Provider<GoRouter>((ref) {
           );
         },
       ),
-      GoRoute(
-        path: '/admin/missions',
-        pageBuilder: (context, state) =>
-            _slide(state, const AdminDronesScreen()),
-      ),
+      // Duplicates of real destinations, kept as redirects so stale links work
+      GoRoute(path: '/admin/missions', redirect: (_, _) => '/admin/drones'),
       GoRoute(
         path: '/admin/missions/details',
-        pageBuilder: (context, state) =>
-            _slide(state, const AdminDronesScreen()),
+        redirect: (_, _) => '/admin/drones',
       ),
       GoRoute(
         path: '/admin/routes/planner',
-        pageBuilder: (context, state) => _slide(state, const NoFlyZonePage()),
+        redirect: (_, _) => '/admin/routes/no-fly-zones',
       ),
       GoRoute(
         path: '/admin/routes/no-fly-zones',

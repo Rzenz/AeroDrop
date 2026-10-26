@@ -32,12 +32,17 @@ const _primary = <_Dest>[
 ];
 
 /// The rest, plus sign out. These fan out of the centre button.
+///
+/// Support leads: it is the one day-to-day destination the dock has no room
+/// for. Then reporting, as a pair — Analytics (performance metrics, charts)
+/// beside Activity Logs (raw audit trails), told apart by their icons — and
+/// configuration last.
 const _extra = <_Dest>[
-  _Dest(Icons.bar_chart_rounded, 'Analytics', '/admin/analytics'),
-  _Dest(Icons.map_rounded, 'Flight\nBoundaries', '/admin/routes/no-fly-zones'),
-  _Dest(Icons.wb_sunny_rounded, 'Weather', '/admin/weather'),
   _Dest(Icons.support_agent_rounded, 'Support', '/admin/support'),
-  _Dest(Icons.analytics_outlined, 'System\nLogs', '/admin/reports'),
+  _Dest(Icons.bar_chart_rounded, 'Analytics', '/admin/analytics'),
+  _Dest(Icons.receipt_long_rounded, 'Activity\nLogs', '/admin/reports'),
+  _Dest(Icons.wb_sunny_rounded, 'Weather', '/admin/weather'),
+  _Dest(Icons.map_rounded, 'Flight\nBoundaries', '/admin/routes/no-fly-zones'),
   _Dest(Icons.settings_rounded, 'Settings', '/admin/settings'),
 ];
 
@@ -241,7 +246,7 @@ class _AdminAppBar extends ConsumerWidget implements PreferredSizeWidget {
     if (loc.startsWith('/admin/routes/no-fly-zones')) {
       return 'Flight Boundaries';
     }
-    if (loc.startsWith('/admin/reports')) return 'System Logs';
+    if (loc.startsWith('/admin/reports')) return 'Activity Logs';
     if (loc.startsWith('/admin/weather')) return 'Weather Controls';
     if (loc.startsWith('/admin/support')) return 'Support & Inquiries';
     if (loc.startsWith('/admin/settings')) return 'Settings';

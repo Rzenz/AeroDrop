@@ -11,7 +11,11 @@ import '../../core/models/order_model.dart';
 import '../../core/providers/order_provider.dart';
 
 class VendorOrdersScreen extends ConsumerStatefulWidget {
-  const VendorOrdersScreen({super.key});
+  /// Status tab to open on, by its label ('pending', 'preparing', 'ready', …),
+  /// so the dashboard's status tiles can land on the matching tab.
+  final String? initialStatus;
+
+  const VendorOrdersScreen({super.key, this.initialStatus});
 
   @override
   ConsumerState<VendorOrdersScreen> createState() => _VendorOrdersScreenState();
@@ -41,7 +45,15 @@ class _VendorOrdersScreenState extends ConsumerState<VendorOrdersScreen>
   @override
   void initState() {
     super.initState();
-    _tab = TabController(length: _statusTabs.length, vsync: this);
+    final wanted = widget.initialStatus?.toLowerCase();
+    final initial = _statusTabs.indexWhere(
+      (t) => t.label.toLowerCase().replaceAll(' ', '_') == wanted,
+    );
+    _tab = TabController(
+      length: _statusTabs.length,
+      initialIndex: initial < 0 ? 0 : initial,
+      vsync: this,
+    );
     Future.microtask(() {
       if (mounted) {
         ref.read(vendorOrdersProvider.notifier).loadOrders();

@@ -11,7 +11,7 @@ cp .env.example .env   # required: the app's Supabase URL and anon key
 npm run dev            # http://localhost:5173
 ```
 
-`npm run build` writes a static site to `dist/`. Any static host works; route every path to `index.html` so deep links like `/admin/drones` load.
+`npm run build` writes a static site to `dist/`. It is set up for Vercel (see [Deploy to Vercel](#deploy-to-vercel)); any other static host works if every path falls back to `index.html`.
 
 ## Connecting to the app's back end
 
@@ -101,6 +101,33 @@ The app's source and its `pubspec.lock` are never modified.
 Two app screens have light-theme bugs, so the website doesn't show them:
 - `lib/core/widgets/delivery_card.dart` draws the order title and percentage in `Colors.white`. On the light home screen they're invisible, so Home isn't in the hero.
 - `lib/features/auth/verification_page.dart` always paints a dark background (`bgGradientDark`), while its text follows the theme, so it's unreadable in light mode.
+
+## Deploy to Vercel
+
+`vercel.json` holds everything Vercel needs: the Vite preset, `npm ci`, the `dist` output, a fallback so deep links such as `/admin/drones` and `/auth/callback` load, security headers, and long-lived caching for hashed assets.
+
+1. Commit and push the repository (it is on GitHub as `Rzenz/AeroDrop`). `.env` is git-ignored, so keys never reach the repository.
+2. In Vercel, choose **Add New → Project** and import the repository.
+3. Set **Root Directory** to `website`. Leave the build settings as detected; they come from `vercel.json`.
+4. Under **Environment Variables**, add these for Production and Preview:
+
+   | Name | Value |
+   |---|---|
+   | `VITE_SUPABASE_URL` | `https://<project-ref>.supabase.co` |
+   | `VITE_SUPABASE_ANON_KEY` | The publishable key (`sb_publishable_…`) or legacy `anon` key |
+   | `VITE_PLAY_STORE_URL` | Optional. The Google Play listing |
+
+5. Deploy. The build stops with a clear message if a Supabase value is missing or if the key is a secret key.
+6. In Supabase, go to **Authentication → URL Configuration**:
+   - Set **Site URL** to the Vercel domain.
+   - Add `https://<your-domain>/auth/callback` to **Redirect URLs**.
+   - For preview deployments, also add `https://*-<team>.vercel.app/auth/callback`.
+
+`VITE_` variables are baked in at build time. After changing one in Vercel, redeploy for it to take effect.
+
+The build writes a Content-Security-Policy into `index.html` that names the configured Supabase project. If the project URL changes (for example, to a custom domain), just redeploy and the policy follows.
+
+The CLI works too: from `website/`, run `npx vercel` for a preview or `npx vercel --prod` for production. Set the variables first with `npx vercel env add`.
 
 ## Before going live
 

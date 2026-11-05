@@ -6,7 +6,6 @@ import { AppShot, PhoneFrame, type ShotName } from '@/components/app-shot'
 import { PlayStoreButton } from '@/components/brand'
 import { PLAY_STORE_URL } from '@/lib/config'
 import { SiteHeader } from '@/components/site-header'
-import { usePageTitle } from '@/lib/use-page-title'
 
 // Facts here come from the project README, so the site and the docs agree.
 
@@ -31,7 +30,6 @@ const roles: { shot: ShotName; alt: string; icon: ReactNode; title: string; body
 ]
 
 export default function About() {
-  usePageTitle('About Us')
   return (
     <div className="min-h-dvh overflow-x-clip bg-bg text-ink">
       <SiteHeader />

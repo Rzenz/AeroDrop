@@ -74,10 +74,6 @@ export function PortalLayout({ role }: { role: Role }) {
     return hit.title ?? hit.label
   }, [location.pathname, groups])
 
-  useEffect(() => {
-    document.title = `${title} · AeroDrop`
-  }, [title])
-
   const notificationsPath = role === 'admin' ? '/admin/notifications' : role === 'vendor' ? '/vendor/notifications' : '/user/notifications'
 
   const sidebar = <SidebarContent role={role} badges={badges} />

@@ -5,10 +5,8 @@ import { PLAY_STORE_URL } from '@/lib/config'
 import { HoloCard } from '@/components/holo-card'
 import { SiteHeader } from '@/components/site-header'
 import { team } from '@/data/team'
-import { usePageTitle } from '@/lib/use-page-title'
 
 export default function Team() {
-  usePageTitle('Meet the Team')
   const reduce = useReducedMotion()
 
   return (

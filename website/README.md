@@ -117,7 +117,9 @@ Two app screens have light-theme bugs, so the website doesn't show them:
    | `VITE_SUPABASE_ANON_KEY` | The publishable key (`sb_publishable_…`) or legacy `anon` key |
    | `VITE_PLAY_STORE_URL` | Optional. The Google Play listing |
 
-5. Deploy. The build stops with a clear message if a Supabase value is missing or if the key is a secret key.
+   If you connected Supabase through Vercel's Supabase integration instead, its `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` (or `SUPABASE_URL` and `SUPABASE_ANON_KEY`) are picked up automatically. The `VITE_` names win if both are set. The integration must be linked to the app's existing project, not a new one. The build log prints `[aerodrop] Supabase project: <ref>.supabase.co` so you can check.
+
+5. Deploy. The build stops with a clear message if a Supabase value is missing or if the key is a secret key. The service-role key and JWT secret are never read.
 6. In Supabase, go to **Authentication → URL Configuration**:
    - Set **Site URL** to the Vercel domain.
    - Add `https://<your-domain>/auth/callback` to **Redirect URLs**.

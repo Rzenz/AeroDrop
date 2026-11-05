@@ -1,0 +1,289 @@
+@import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
+
+/* Dark mode is driven by data-theme so a subtree (the admin console, which the
+   app always paints dark) can opt in on its own. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* ── Tokens ────────────────────────────────────────────────────────────────
+   Pure white (light) and pure black (dark) canvases with neutral greys. The
+   only colour is the brand from the app icon: sky #4FB1F6 and indigo, the
+   indigo deepened to #3468CC in light mode so it clears 4.5:1 as text on
+   every light fill. Same names on both themes, so components never branch.
+
+   Elevation follows better-ui/surfaces: on white, cards stay white and are
+   separated by layered shadows with a 1px ring; on black, cards step up to
+   a near-black fill and carry a faint white ring. */
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --surface-2: #f7f7f8;
+  --sunken: #f2f2f3;
+  --line: #e4e4e7;
+  --ink: #0a0a0a;
+  --ink-2: #52525b;
+  --ink-3: #686870;
+  --brand: #3468cc;
+  --brand-ink: #2c56ac;
+  --on-brand: #ffffff;
+  --sky: #4fb1f6;
+  --success: #11704f;
+  --warning: #935500;
+  --danger: #c4314b;
+  --success-bg: #e8f6ef;
+  --warning-bg: #fdf3e2;
+  --danger-bg: #fdecef;
+  --info-bg: #ebf3fe;
+  --ring: rgba(52, 104, 204, 0.45);
+  --shadow-sm: 0px 2px 3px -1px rgba(0, 0, 0, 0.1), 0px 1px 0px 0px rgba(25, 28, 33, 0.02), 0px 0px 0px 1px rgba(25, 28, 33, 0.08);
+  --shadow-md: 0px 0px 0px 1px rgba(0, 0, 0, 0.06), 0px 1px 1px -0.5px rgba(0, 0, 0, 0.06), 0px 3px 3px -1.5px rgba(0, 0, 0, 0.06), 0px 6px 6px -3px rgba(0, 0, 0, 0.06), 0px 12px 12px -6px rgba(0, 0, 0, 0.06), 0px 24px 24px -12px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 2.8px 2.2px rgba(0, 0, 0, 0.034), 0 6.7px 5.3px rgba(0, 0, 0, 0.048), 0 12.5px 10px rgba(0, 0, 0, 0.06), 0 22.3px 17.9px rgba(0, 0, 0, 0.072), 0 41.8px 33.4px rgba(0, 0, 0, 0.086), 0 100px 80px rgba(0, 0, 0, 0.12);
+  --img-outline: rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #000000;
+  --surface: #0e0e10;
+  --surface-2: #161618;
+  --sunken: #1c1c1f;
+  --line: #2a2a2e;
+  --ink: #f5f5f7;
+  --ink-2: #a1a1aa;
+  --ink-3: #8e8e96;
+  --brand: #4fb1f6;
+  --brand-ink: #8acdfa;
+  --on-brand: #000000;
+  --sky: #4fb1f6;
+  --success: #3ed09a;
+  --warning: #f0a03c;
+  --danger: #f27a8e;
+  --success-bg: rgba(43, 190, 138, 0.14);
+  --warning-bg: rgba(240, 160, 60, 0.14);
+  --danger-bg: rgba(239, 92, 116, 0.14);
+  --info-bg: rgba(79, 177, 246, 0.14);
+  --ring: rgba(79, 177, 246, 0.55);
+  /* Shadows are invisible on black; a single faint white ring carries the edge. */
+  --shadow-sm: 0 0 0 1px rgba(255, 255, 255, 0.08);
+  --shadow-md: 0 0 0 1px rgba(255, 255, 255, 0.09);
+  --shadow-lg: 0 0 0 1px rgba(255, 255, 255, 0.12), 0 24px 60px -20px rgba(0, 0, 0, 0.9);
+  --img-outline: rgba(255, 255, 255, 0.1);
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-sunken: var(--sunken);
+  --color-line: var(--line);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-brand: var(--brand);
+  --color-brand-ink: var(--brand-ink);
+  --color-on-brand: var(--on-brand);
+  --color-sky: var(--sky);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-success-bg: var(--success-bg);
+  --color-warning-bg: var(--warning-bg);
+  --color-danger-bg: var(--danger-bg);
+  --color-info-bg: var(--info-bg);
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Plus Jakarta Sans", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Roboto Mono", ui-monospace, monospace;
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  body {
+    @apply bg-bg text-ink font-sans;
+  }
+  h1, h2, h3, h4 {
+    @apply font-display text-balance;
+  }
+  p {
+    @apply text-pretty;
+  }
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  img {
+    outline: 1px solid var(--img-outline);
+    outline-offset: -1px;
+  }
+  img.no-outline {
+    outline: none;
+  }
+}
+
+/* ── Uiverse: knob switch (elijahwgummer-poc / giant-panda-93, MIT) ────────
+   Recoloured to the brand, wired to a real checkbox so it keeps native
+   keyboard and form behaviour. */
+.uv-switch {
+  --w: 44px;
+  --h: 26px;
+  --knob: 20px;
+  position: relative;
+  display: inline-block;
+  width: var(--w);
+  height: var(--h);
+  flex-shrink: 0;
+}
+.uv-switch input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  margin: 0;
+  cursor: pointer;
+  z-index: 2;
+}
+.uv-switch .uv-track {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: var(--sunken);
+  box-shadow: inset 0 0 0 1px var(--line);
+  transition: background-color 150ms ease-out;
+}
+.uv-switch .uv-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: var(--knob);
+  height: var(--knob);
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.uv-switch input:checked ~ .uv-track {
+  background: var(--brand);
+  box-shadow: none;
+}
+.uv-switch input:checked ~ .uv-knob {
+  transform: translateX(calc(var(--w) - var(--knob) - 6px));
+}
+.uv-switch input:focus-visible ~ .uv-track {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.uv-switch input:disabled ~ .uv-track,
+.uv-switch input:disabled ~ .uv-knob {
+  opacity: 0.5;
+}
+
+/* ── Uiverse: ring spinner (Clemix37 / young-bulldog-90, MIT) ──────────── */
+.uv-spinner {
+  position: relative;
+  display: inline-block;
+  width: var(--size, 20px);
+  height: var(--size, 20px);
+}
+.uv-spinner::before {
+  content: "";
+  box-sizing: border-box;
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid color-mix(in oklab, currentColor 20%, transparent);
+  border-top-color: currentColor;
+  animation: uv-spin 0.8s linear infinite;
+}
+@keyframes uv-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ── Uiverse: bounce dots (Javierrocadev / hard-horse-30, MIT) ──────────── */
+.uv-dots span {
+  animation: uv-bounce 1s infinite;
+}
+.uv-dots span:nth-child(1),
+.uv-dots span:nth-child(3) {
+  animation-delay: 0.7s;
+}
+.uv-dots span:nth-child(2) {
+  animation-delay: 0.3s;
+}
+@keyframes uv-bounce {
+  0%, 100% {
+    transform: translateY(-40%);
+    animation-timing-function: cubic-bezier(0.8, 0, 1, 1);
+  }
+  50% {
+    transform: none;
+    animation-timing-function: cubic-bezier(0, 0, 0.2, 1);
+  }
+}
+
+/* ── Overlay motion: enter ease-out, exit ease-in and shorter ──────────── */
+@keyframes fade-in { from { opacity: 0; } }
+@keyframes fade-out { to { opacity: 0; } }
+@keyframes dialog-in { from { opacity: 0; transform: scale(0.96); } }
+@keyframes dialog-out { to { opacity: 0; transform: scale(0.98); } }
+@keyframes drawer-in { from { transform: translateX(-100%); } }
+@keyframes drawer-out { to { transform: translateX(-100%); } }
+
+/* Drone marker pulse on the live map */
+.drone-ping { animation: drone-ping 1.6s cubic-bezier(0, 0, 0.2, 1) infinite; }
+@keyframes drone-ping { 75%, 100% { transform: scale(1.8); opacity: 0; } }
+
+/* ── Marquee (marquee-loop skill) ───────────────────────────────────────── */
+.marquee {
+  mask-image: linear-gradient(to right, transparent, #000 10%, #000 90%, transparent);
+}
+.marquee-track {
+  animation: marquee 40s linear infinite;
+}
+.marquee:hover .marquee-track {
+  animation-play-state: paused;
+}
+@keyframes marquee {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+/* Leaflet sits under our overlays, not over them. */
+.leaflet-container {
+  font-family: var(--font-sans);
+  background: var(--sunken);
+  z-index: 0;
+}
+.leaflet-pane,
+.leaflet-top,
+.leaflet-bottom {
+  z-index: 1 !important;
+}
+.leaflet-container img {
+  outline: none;
+}
+[data-theme="dark"] .leaflet-tile-pane {
+  filter: invert(1) hue-rotate(200deg) brightness(0.85) contrast(0.9) saturate(0.6);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .marquee-track {
+    animation: none;
+    flex-wrap: wrap;
+  }
+}

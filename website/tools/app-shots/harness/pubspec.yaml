@@ -1,0 +1,21 @@
+name: appshots
+description: Throwaway harness that renders the real AeroDrop app against a mock backend for screenshots.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.12.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_riverpod: ^2.5.1
+  aerodrop:
+    path: ../../../..
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/lottie/
+    - assets/images/
+    - assets/svg/

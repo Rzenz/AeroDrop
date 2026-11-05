@@ -1,4 +1,4 @@
-import { Camera, KeyRound, LifeBuoy, Mail, Moon, ReceiptText, Store, Trash2 } from 'lucide-react'
+import { Camera, Cookie, KeyRound, LifeBuoy, Mail, Moon, ReceiptText, Store, Trash2 } from 'lucide-react'
 import { useRef, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth, useMe } from '@/auth/auth'
@@ -7,6 +7,7 @@ import { ConfirmDialog } from '@/components/ui/dialog'
 import { Avatar, Badge, Card, CardHeader, Field, Input, Select, Switch, Textarea } from '@/components/ui/primitives'
 import { toast } from '@/components/ui/toast'
 import { api } from '@/data/api'
+import { openCookieSettings } from '@/lib/consent'
 import { VENDOR_CATEGORIES } from '@/lib/constants'
 import { formatDate } from '@/lib/format'
 import { isHub } from '@/lib/flight'
@@ -110,6 +111,9 @@ export default function Profile() {
             <span className="flex-1">Dark theme</span>
             <Switch label="Dark theme" checked={theme === 'dark'} onChange={(v) => setTheme(v ? 'dark' : 'light')} />
           </div>
+          <button type="button" onClick={openCookieSettings} className="flex h-12 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-medium text-ink-2 hover:bg-sunken hover:text-ink">
+            <Cookie aria-hidden className="size-[18px]" /> Cookie settings
+          </button>
         </Card>
       </div>
 

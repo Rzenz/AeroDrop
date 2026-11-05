@@ -3,6 +3,7 @@ import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { Card, CardHeader, Switch } from '@/components/ui/primitives'
 import { MAX_PAYLOAD_KG, MAX_TRIPS } from '@/lib/fees'
+import { canStorePreferences } from '@/lib/consent'
 import { readLocal, writeLocal } from '@/lib/store'
 
 // Console preferences, saved per browser. Dispatch, battery and weather
@@ -16,7 +17,7 @@ export default function AdminSettings() {
   const set = (k: keyof typeof defaults) => (v: boolean) => {
     const next = { ...prefs, [k]: v }
     setPrefs(next)
-    writeLocal(KEY, next)
+    if (canStorePreferences()) writeLocal(KEY, next)
   }
 
   return (

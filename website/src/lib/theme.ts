@@ -1,3 +1,4 @@
+import { canStorePreferences } from './consent'
 import { createStore, useStore } from './store'
 
 export type Theme = 'light' | 'dark'
@@ -22,11 +23,14 @@ export function setTheme(t: Theme) {
   document.documentElement.dataset.theme = t
   void document.body.offsetHeight
   requestAnimationFrame(() => style.remove())
-  // Stored as a bare string: the boot script in index.html reads it pre-paint.
-  try {
-    localStorage.setItem(KEY, t)
-  } catch {
-    /* ignore */
+  // Stored as a bare string: the boot script reads it pre-paint. Only with
+  // Preferences consent; otherwise the choice lasts until the page reloads.
+  if (canStorePreferences()) {
+    try {
+      localStorage.setItem(KEY, t)
+    } catch {
+      /* ignore */
+    }
   }
   themeStore.set(t)
 }

@@ -7,6 +7,7 @@ import { Toaster } from '@/components/ui/toast'
 import { PortalLayout } from '@/layouts/portal-layout'
 import Landing from '@/pages/landing'
 import Legal, { NotFound } from '@/pages/legal'
+import { CookieConsent } from '@/components/cookie-consent'
 import type { Role } from '@/types'
 
 // Every portal page is its own chunk, so the landing page stays light.
@@ -63,6 +64,7 @@ function Root() {
     <AuthProvider>
       <Outlet />
       <Toaster />
+      <CookieConsent />
     </AuthProvider>
   )
 }

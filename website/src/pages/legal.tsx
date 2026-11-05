@@ -1,6 +1,7 @@
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Settings2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Logo } from '@/components/brand'
+import { openCookieSettings } from '@/lib/consent'
 
 // Text copied from the app's privacy_policy_page.dart and
 // terms_conditions_page.dart so both say the same thing.
@@ -41,6 +42,21 @@ export default function Legal({ page }: { page: keyof typeof content }) {
               <p className="mt-2 text-ink-2">{body}</p>
             </section>
           ))}
+          {page === 'privacy' ? (
+            <section className="rounded-2xl bg-surface p-6 shadow-md">
+              <h2 className="font-semibold text-ink">Cookies and browser storage (website)</h2>
+              <p className="mt-2 text-ink-2">
+                The website keeps your sign-in session, sign-in code check and cart in this browser so it can work. With your consent it also remembers your theme and admin console settings. It sets no analytics or advertising cookies.
+              </p>
+              <button
+                type="button"
+                onClick={openCookieSettings}
+                className="mt-4 inline-flex h-11 items-center gap-2 rounded-xl bg-surface-2 px-4 text-sm font-semibold text-ink shadow-sm transition-[background-color,scale] duration-150 hover:bg-sunken active:scale-[0.96]"
+              >
+                <Settings2 aria-hidden className="size-4" /> Cookie Settings
+              </button>
+            </section>
+          ) : null}
         </div>
       </div>
     </div>

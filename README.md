@@ -16,6 +16,7 @@
 ![Weather](https://img.shields.io/badge/weather-live%20Open--Meteo-3ECF8E?style=flat-square)
 ![Maps](https://img.shields.io/badge/maps-OpenStreetMap-7EBC6F?style=flat-square)
 ![Realtime](https://img.shields.io/badge/chat-realtime-4DB0F5?style=flat-square)
+![Payloads](https://img.shields.io/badge/payloads-multi--trip-19223B?style=flat-square)
 
 *Order from campus vendors and have it flown to your drop zone.*
 
@@ -42,11 +43,12 @@ The system connects campus users with approved vendors. Users browse products, p
 | **Interactive map tracking** | OpenStreetMap tiles with real campus coordinates and live drone position |
 | **Physics-aware flight** | Flight time from real distance; payload affects speed and battery |
 | **Order chat** | Realtime messaging between customer and vendor while an order is active |
+| **Multi-trip payloads** | Orders too heavy for one flight are carried in two, with the drone shuttling back to the vendor |
+| **Support conversations** | Reporters and admins exchange messages and photos on a ticket, not a one-way form |
 | **Verified accounts** | Email one-time codes, plus Google sign-in for customers |
 | **Real payment gateway** | GCash and card through Xendit in sandbox mode, confirmed by webhook |
 | **Transparent fees** | Distance and weight based, with a full breakdown before you pay |
 | **Reviews and ratings** | Store and product ratings from verified deliveries |
-| **Support reports** | Customers raise issues; admins are notified and can resolve them |
 | **Analytics export** | Admin reports exportable to CSV and PDF |
 
 ---
@@ -108,13 +110,15 @@ Vendors register through the full application form because store details are nee
 - Cart management with live totals
 - Order confirmation step before payment
 - Delivery fee from real distance and package weight, with a visible breakdown
+- Warning in the cart when an order is heavier than one drone load, and how many trips it will take
 - Pay online with GCash or card through Xendit (sandbox), or use the simulated payment options
 - **Message the vendor** about an active order, with realtime delivery and unread counts
 - Live drone tracking on an interactive campus map
 - Order and delivery history with official receipts
 - Cancel orders while the vendor is still preparing
 - Optional store and product reviews after delivery
-- Raise a support report, with a confirmation and an update when it is resolved
+- Raise a support report and keep talking to support about it, attaching up to three photos per message
+- Read the Terms and Privacy Policy before accepting them, and again from the profile at any time
 - Notifications with unread counts
 - Current campus weather conditions (read-only)
 
@@ -132,6 +136,7 @@ Vendors register through the full application form because store details are nee
 - Incoming order list with action counts on the navigation bar
 - Confirm or reject orders, mark as preparing, then ready for drone pickup
 - **Message the customer** about an incoming order, with realtime delivery and unread counts
+- Raise a support report and hold a conversation with an administrator about it
 - Automatic inventory updates on orders and cancellations
 - Store and product reviews
 - Vendor notifications and sales information
@@ -150,7 +155,7 @@ Vendors register through the full application form because store details are nee
 - Live campus drone radar with route and telemetry
 - Drone availability, battery, and status monitoring
 - Weather management with temporary manual override
-- Support reports queue, with notes and resolve or reopen actions
+- Support queue: reply to reporters in a thread, attach photos, add private notes, resolve or reopen
 - Read-only access to customer and vendor conversations for dispute handling
 - In-app notification centre covering vendor applications, deliveries, cancellations, expired payments, weather changes, drone battery, and new support reports
 - No-fly-zone records and delivery status logs
@@ -182,6 +187,24 @@ The customer may cancel at any point up to **Ready for drone pickup**. Cancellat
 
 ---
 
+## Multi-Trip Deliveries
+
+One drone load is **0.5 kg**. An order heavier than that is not refused: it is flown in **two trips**, up to a ceiling of **1.0 kg**. Anything above that has to be split into separate orders.
+
+The cart warns as soon as an order crosses one load, states how many trips it will need, and asks the customer to confirm before the order is placed. Above the ceiling, checkout is blocked rather than failing at the server.
+
+Between trips the drone **shuttles straight back to the vendor** for the next load rather than returning to base:
+
+```
+Hub -> Vendor -> Customer -> Vendor -> Customer -> Hub
+```
+
+The tracking screen names the stage throughout, so "Returning to Base" never appears while a load is still owed. A single-trip order flies the ordinary route and shows no trip labels at all.
+
+The trip count is derived by the database, never sent by the client, and recomputed at dispatch so a stock or weight change since checkout is caught. Dispatch also requires enough battery for **every** trip, not just the first, and an order left part-flown by grounded weather or a flat battery is retried automatically and reported to administrators if it stays stuck.
+
+---
+
 ## Order Chat
 
 Customers and vendors can message each other about an order, in the manner of a food delivery app, so questions about preparation or the drop-off point do not require leaving the system.
@@ -207,19 +230,29 @@ Every role has an in-app notification centre with unread counts.
 
 | Audience | Notified about |
 |---|---|
-| **Customer** | Order status changes, payment outcomes, cancellations and refunds, delivery progress, new messages, support report received and resolved |
+| **Customer** | Order status changes, payment outcomes, cancellations and refunds, delivery progress, each trip of a multi-trip order, new messages, and every support reply |
 | **Vendor** | New and cancelled orders, drone pickup, delivery completion, new messages |
-| **Admin** | Vendor applications, completed and failed deliveries, cancelled orders, expired payments, weather caution and grounding, low drone battery, stalled drone returns, new support reports |
+| **Admin** | Vendor applications, completed and failed deliveries, cancelled orders, expired payments, weather caution and grounding, low drone battery, stalled drone returns, part-flown orders that cannot continue, new support reports and every reporter reply |
 
 Weather groundings are reported to administrators as a **single consolidated alert** carrying the number of orders cancelled, rather than one notification per affected order.
 
 ---
 
-## Support Reports
+## Support Conversations
 
-Customers can report a problem from the Help and Support screen, optionally tied to a specific order or delivery. Reports are stored with a category, status, and resolution time.
+A customer or vendor can report a problem from Help and Support, optionally tied to a specific order or delivery. A report is not a form that disappears: it opens a **conversation**.
 
-When a report is filed, every administrator is notified and the customer receives a confirmation. When an administrator resolves or reopens it, the customer is notified of that too. Editing internal notes alone does not notify the customer, so administrators can annotate a case freely without disturbing the reporter.
+| | |
+|---|---|
+| **Who can talk** | The reporter and any administrator |
+| **Attachments** | Up to three images per message, so a damaged delivery can be shown rather than described |
+| **Reopening** | A reporter replying to a resolved report reopens it; an administrator's reply does not |
+| **Editing** | Messages cannot be edited or deleted, so the thread stands as a record |
+| **Delivery** | Realtime, with unread counts and a single collapsed alert per report |
+
+Every administrator is notified when a report is filed and when a reporter replies; the reporter is notified when support answers and when the report is resolved. Alerts collapse to **one unread per report** so an active exchange does not flood anyone — with one deliberate exception: reopening always notifies, because it is how a reporter says a fix did not work, and that is the message that must not be swallowed.
+
+Attachments live in a **private** storage bucket, unlike the public buckets used for avatars and store logos. A support photo may show a damaged order, a room, or a face, so the files are readable only by that thread's participants and are served through short-lived signed links.
 
 ---
 
@@ -229,7 +262,7 @@ When a report is filed, every administrator is notified and the customer receive
 <tr><td><b>Drone Code</b></td><td>DRN-001</td></tr>
 <tr><td><b>Drone Name</b></td><td>AeroCarrier Alpha</td></tr>
 <tr><td><b>Model</b></td><td>Prototype 001</td></tr>
-<tr><td><b>Maximum Payload</b></td><td>0.5 kg</td></tr>
+<tr><td><b>Maximum Payload</b></td><td>0.5 kg per trip (up to 1.0 kg across two trips)</td></tr>
 <tr><td><b>Minimum Battery for Dispatch</b></td><td>15%</td></tr>
 <tr><td><b>Statuses</b></td><td>Available, Assigned, Busy, Returning, Charging, Maintenance, Offline</td></tr>
 </table>
@@ -243,6 +276,8 @@ Every delivery runs in three legs:
 | **1** | Base hub to Vendor | Empty |
 | **2** | Vendor to Customer | Loaded |
 | **3** | Customer to Base hub | Empty |
+
+An order needing two trips inserts an extra pair of legs before the last one: Customer to Vendor empty, then Vendor to Customer loaded again.
 
 Flight time comes from the **real distance** between campus coordinates divided by the drone's effective speed, with sensible minimum and maximum durations. Carrying a payload reduces speed and increases battery drain on the loaded leg only. Caution weather slows flights further. A recovery mechanism returns the drone to service if a return flight is interrupted.
 
@@ -291,7 +326,9 @@ Cancelling a paid order marks it refunded and restores stock. Refunds are simula
 
 ## Delivery Fees
 
-The fee is calculated from a **base fee**, the **real distance** between vendor and drop-off, the **package weight** (capped at 0.5 kg), and a **surcharge during Caution weather**. The full breakdown is shown at checkout before payment, and again on the receipt and order details.
+The fee is calculated from a **base fee** charged once, the **real distance** between vendor and drop-off charged **per trip**, the **package weight**, a flat **extra-trip charge** for each flight beyond the first, and a **surcharge during Caution weather**. The full breakdown is shown at checkout before payment, and again on the receipt and order details.
+
+The extra-trip charge exists because distance alone would make a second flight free when the vendor and the drop-off are in the same building, even though it is another launch, another battery cycle and another handover.
 
 ---
 
@@ -317,9 +354,19 @@ Access control lives in the database, not in the interface, so a modified client
 
 - **Row level security** on every table. Customers reach their own records, vendors reach their own store and the orders placed with it, and administrators reach what their role requires.
 - **Security-definer functions** for operations that must cross those boundaries — placing an order, cancelling one, submitting reviews, notifying administrators, resolving a chat counterpart's name. Each one re-checks the caller's right to act before doing anything.
-- **Immutable records** where a history matters: chat messages have no update or delete path at all.
+- **Immutable records** where a history matters: order chat and support messages have no update or delete path at all.
+- **Private storage for sensitive files.** Avatars and store logos sit in public buckets; support attachments do not. They are readable only by that thread's participants and are served through short-lived signed links.
+- **Recorded consent.** Accepting the Terms and Privacy Policy at registration is stored against the account, and both documents are readable before acceptance rather than only after signing in.
 - **Explicit grants.** Supabase stopped auto-granting Data API access to new tables in October 2026, so every table's privileges are declared in the migrations. This keeps the migration history self-sufficient: a fresh project rebuilt from `supabase/migrations` works without manual repair.
 - **Secrets stay server-side.** The payment gateway key, callback token, and mail credentials live in Supabase configuration and are never bundled into the app.
+
+---
+
+## Web Companion
+
+A browser version of AeroDrop lives in [`website/`](website), built with React, Vite and TypeScript and deployed on Vercel. It talks to the same Supabase project as the app, so the same accounts, orders and row level security apply.
+
+It covers browsing, ordering, tracking and the vendor console. Features built most recently in the app, such as support conversations, may not have reached it yet.
 
 ---
 
@@ -356,6 +403,10 @@ Access control lives in the database, not in the interface, so a modified client
 - Xendit (payments, sandbox)
 - Open-Meteo (weather)
 - OpenStreetMap (map tiles)
+
+**Web Companion**
+- React, Vite, TypeScript
+- Vercel
 
 </td>
 </tr>

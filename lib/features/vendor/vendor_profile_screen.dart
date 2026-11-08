@@ -432,6 +432,12 @@ class _VendorProfileScreenState extends ConsumerState<VendorProfileScreen> {
           ),
           const SizedBox(height: 8),
           _ActionTile(
+            icon: Icons.privacy_tip_outlined,
+            label: 'Privacy Policy',
+            onTap: () => context.push('/shared/privacy-policy'),
+          ),
+          const SizedBox(height: 8),
+          _ActionTile(
             icon: Icons.info_outline_rounded,
             label: 'About AeroDrop',
             onTap: () => context.push('/shared/about'),

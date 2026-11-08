@@ -49,6 +49,7 @@ import '../../features/shared/about_page.dart';
 import '../../features/shared/help_support_page.dart';
 import '../../features/shared/privacy_policy_page.dart';
 import '../../features/shared/terms_conditions_page.dart';
+import '../../features/support/support_thread_screen.dart';
 
 // Marketplace
 import '../../features/vendors/vendors_screen.dart';
@@ -74,6 +75,15 @@ import '../../features/vendor/vendor_notifications_screen.dart';
 
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
+/// Legal pages a signed-out user must be able to open: the register screen
+/// asks them to accept these. Exact paths rather than a '/shared/' prefix, so
+/// nothing else under /shared/ (help, support threads) becomes public. Kept
+/// apart from isLoggingIn, which also sends signed-in users home.
+const signedOutLegalPaths = {
+  '/shared/terms-conditions',
+  '/shared/privacy-policy',
+};
+
 final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     navigatorKey: rootNavigatorKey,
@@ -94,9 +104,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           state.uri.path == '/verification' ||
           state.uri.path == '/complete-profile' ||
           state.uri.path == '/splash';
+      final isLegal = signedOutLegalPaths.contains(state.uri.path);
 
       if (user == null) {
-        if (!isLoggingIn) {
+        if (!isLoggingIn && !isLegal) {
           return '/welcome';
         }
         return null;
@@ -111,7 +122,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       }
 
       if (!authState.sessionUnlocked) {
-        if (!isLoggingIn) {
+        if (!isLoggingIn && !isLegal) {
           return '/welcome';
         }
         return null;
@@ -634,6 +645,15 @@ final routerProvider = Provider<GoRouter>((ref) {
             ),
           );
         },
+      ),
+      // One thread screen for every role, outside the shells: pushing another
+      // role's route is what crashed the navigator (see notification_route).
+      GoRoute(
+        path: '/shared/support/:id',
+        pageBuilder: (context, state) => _slide(
+          state,
+          SupportThreadScreen(reportId: state.pathParameters['id'] ?? ''),
+        ),
       ),
       GoRoute(
         path: '/shared/privacy-policy',

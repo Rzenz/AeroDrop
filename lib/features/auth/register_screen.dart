@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import '../../core/widgets/neu_feedback.dart';
 import 'package:flutter/services.dart';
@@ -52,6 +53,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
   // Role Selection
   bool _isVendorRole = false;
   bool _acceptTerms = false;
+
+  // Links in the agreement text; disposed with the screen.
+  late final TapGestureRecognizer _termsLink = TapGestureRecognizer()
+    ..onTap = () => context.push('/shared/terms-conditions');
+  late final TapGestureRecognizer _privacyLink = TapGestureRecognizer()
+    ..onTap = () => context.push('/shared/privacy-policy');
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
 
@@ -128,6 +135,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
   @override
   void dispose() {
     _intro.dispose();
+    _termsLink.dispose();
+    _privacyLink.dispose();
     _nameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
@@ -333,6 +342,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
             businessDescription: _businessDescController.text.trim(),
             campusLocationId: locationId,
             logoFile: _selectedLogoFile,
+            termsAcceptedAt: DateTime.now(),
           );
 
       if (mounted) {
@@ -379,6 +389,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
             _passwordController.text,
             'user',
             phoneText,
+            termsAcceptedAt: DateTime.now(),
           );
 
       if (mounted) {
@@ -592,15 +603,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
                 checkColor: AppColors.bgDark,
                 onChanged: (val) => setState(() => _acceptTerms = val ?? false),
               ),
-              Expanded(
-                child: Text(
-                  'I agree to the AeroDrop Terms of Service and Privacy Policy.',
-                  style: AppTextStyles.caption(
-                    fontSize: 11.5,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ),
+              Expanded(child: _agreementText('I agree to the AeroDrop ')),
             ],
           ),
           const SizedBox(height: 24),
@@ -1479,17 +1482,49 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
               onChanged: (val) => setState(() => _acceptTerms = val ?? false),
             ),
             Expanded(
-              child: Text(
-                'I certify that all store and location parameters are correct.',
-                style: AppTextStyles.caption(
-                  fontSize: 11.5,
-                  color: AppColors.textSecondary,
-                ),
+              child: _agreementText(
+                'I certify that all store and location parameters are correct, '
+                'and agree to the AeroDrop ',
               ),
             ),
           ],
         ),
       ],
+    );
+  }
+
+  /// "[lead]Terms of Service and Privacy Policy." with both names tappable.
+  Widget _agreementText(String lead) {
+    final base = AppTextStyles.caption(
+      fontSize: 11.5,
+      color: AppColors.textSecondary,
+    );
+    final link = base.copyWith(
+      color: AppColors.accentText,
+      fontWeight: FontWeight.w600,
+      decoration: TextDecoration.underline,
+    );
+    return Text.rich(
+      TextSpan(
+        style: base,
+        children: [
+          TextSpan(text: lead),
+          TextSpan(
+            text: 'Terms of Service',
+            style: link,
+            recognizer: _termsLink,
+          ),
+          const TextSpan(text: ' and '),
+          TextSpan(
+            text: 'Privacy Policy',
+            style: link,
+            recognizer: _privacyLink,
+          ),
+          const TextSpan(text: '.'),
+        ],
+      ),
+      maxLines: 3,
+      overflow: TextOverflow.ellipsis,
     );
   }
 

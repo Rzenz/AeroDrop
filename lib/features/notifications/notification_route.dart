@@ -55,10 +55,17 @@ NotificationTarget? notificationTarget(
   final isVendor = currentPath.startsWith('/vendor');
 
   switch (n.type) {
-    // Customers have no screen listing their own reports, so only admins move
+    // Every role opens the same shared thread. Migration 28 writes the id as
+    // report_id; migration 19's notifications carry support_report_id.
+    case 'support_message':
     case 'support_report':
     case 'support_report_update':
-      return isAdmin ? (location: '/admin/support', isShellTab: true) : null;
+      final reportId =
+          (n.metadata?['report_id'] ?? n.metadata?['support_report_id'])
+              ?.toString() ??
+          '';
+      if (reportId.isEmpty) return null;
+      return (location: '/shared/support/$reportId', isShellTab: false);
 
     case 'order_message':
       final orderId = n.metadata?['order_id']?.toString() ?? '';

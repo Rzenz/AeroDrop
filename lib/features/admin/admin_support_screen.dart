@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/glass_card.dart';
@@ -117,6 +118,14 @@ class _AdminSupportScreenState extends ConsumerState<AdminSupportScreen> {
       if (!mounted) return;
       showNeuSnack(context, 'Update failed: $e', tone: NeuToneKind.error);
     }
+  }
+
+  /// Opens the report's conversation, then reloads: a reporter's reply while
+  /// the thread was open may have reopened the report.
+  Future<void> _openThread(String reportId) async {
+    if (reportId.isEmpty) return;
+    await context.push('/shared/support/$reportId');
+    if (mounted) _fetchReports();
   }
 
   Future<void> _editAdminNotes(String reportId, String currentNotes) async {
@@ -521,9 +530,26 @@ class _AdminSupportScreenState extends ConsumerState<AdminSupportScreen> {
                                   ),
                                 ],
                                 const SizedBox(height: 12),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.end,
+                                Wrap(
+                                  alignment: WrapAlignment.end,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  spacing: 8,
+                                  runSpacing: 4,
                                   children: [
+                                    TextButton.icon(
+                                      style: TextButton.styleFrom(
+                                        foregroundColor: AppColors.accent,
+                                        visualDensity: VisualDensity.compact,
+                                      ),
+                                      icon: const Icon(Icons.forum_outlined, size: 16),
+                                      label: Text(
+                                        'Open Thread',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: AppTextStyles.caption(fontSize: 12),
+                                      ),
+                                      onPressed: () => _openThread(reportId),
+                                    ),
                                     TextButton.icon(
                                       style: TextButton.styleFrom(
                                         foregroundColor: Colors.white70,
@@ -538,7 +564,6 @@ class _AdminSupportScreenState extends ConsumerState<AdminSupportScreen> {
                                       ),
                                       onPressed: () => _editAdminNotes(reportId, adminNotes?.toString() ?? ''),
                                     ),
-                                    const SizedBox(width: 8),
                                     if (!isResolved)
                                       ElevatedButton.icon(
                                         style: ElevatedButton.styleFrom(

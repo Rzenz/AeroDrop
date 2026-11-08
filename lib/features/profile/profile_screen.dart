@@ -108,6 +108,18 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   onTap: () => context.push('/shared/help'),
                 ),
                 NeuListTile(
+                  icon: Icons.article_outlined,
+                  title: 'Terms and conditions',
+                  iconColor: AppColors.textSecondary,
+                  onTap: () => context.push('/shared/terms-conditions'),
+                ),
+                NeuListTile(
+                  icon: Icons.privacy_tip_outlined,
+                  title: 'Privacy policy',
+                  iconColor: AppColors.textSecondary,
+                  onTap: () => context.push('/shared/privacy-policy'),
+                ),
+                NeuListTile(
                   icon: Icons.info_outline_rounded,
                   title: 'About AeroDrop',
                   iconColor: AppColors.textSecondary,

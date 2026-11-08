@@ -47,7 +47,7 @@ class TermsConditionsPage extends StatelessWidget {
                         children: [
                           _buildSectionTitle('1. Payload Responsibilities'),
                           _buildSectionText(
-                            'Users are solely responsible for verifying that their delivery items do not exceed the 5.0 kg maximum weight threshold and are non-hazardous, dry, and securely sealed before handing them to the drone deck loader.',
+                            'Users are solely responsible for verifying that their delivery items do not exceed the 0.5 kg per-trip maximum weight threshold (orders up to 1.0 kg are flown in two trips) and are non-hazardous, dry, and securely sealed before handing them to the drone deck loader.',
                           ),
                           const SizedBox(height: 20),
                           _buildSectionTitle('2. Automated Flight Paths'),

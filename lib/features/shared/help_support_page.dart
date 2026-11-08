@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import '../../core/models/support_report_model.dart';
+import '../../core/providers/support_chat_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/neu_card.dart';
@@ -10,7 +14,9 @@ import '../../core/widgets/neu_feedback.dart';
 import '../../core/widgets/custom_text_field.dart';
 import '../../core/services/supabase_service.dart';
 
-class HelpSupportPage extends StatelessWidget {
+/// The customer's and vendor's support home: their own reports, a "New
+/// report" action that opens the submit form, and the help content.
+class HelpSupportPage extends ConsumerStatefulWidget {
   final String? orderId;
   final String? deliveryId;
 
@@ -19,6 +25,28 @@ class HelpSupportPage extends StatelessWidget {
     this.orderId,
     this.deliveryId,
   });
+
+  @override
+  ConsumerState<HelpSupportPage> createState() => _HelpSupportPageState();
+}
+
+class _HelpSupportPageState extends ConsumerState<HelpSupportPage> {
+  // Opened from an order or delivery, the user came to report something, so
+  // the form starts open with that link filled in.
+  late bool _showForm =
+      (widget.orderId?.isNotEmpty ?? false) ||
+      (widget.deliveryId?.isNotEmpty ?? false);
+
+  Future<void> _openThread(String reportId) async {
+    await context.push('/shared/support/$reportId');
+    if (mounted) ref.invalidate(mySupportReportsProvider);
+  }
+
+  void _onReportSubmitted(String reportId) {
+    setState(() => _showForm = false);
+    ref.invalidate(mySupportReportsProvider);
+    _openThread(reportId);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -31,7 +59,7 @@ class HelpSupportPage extends StatelessWidget {
       {
         'q': 'What payloads can be delivered?',
         'a':
-            'We support academic documents, books, laboratory samples, medical aid kits, and electronics up to a maximum chassis weight limit of 5.0 kg.',
+            'We support academic documents, books, laboratory samples, medical aid kits, and electronics up to 0.5 kg per drone trip. Orders up to 1.0 kg are flown in two trips.',
       },
       {
         'q': 'What happens in severe weather?',
@@ -55,12 +83,16 @@ class HelpSupportPage extends StatelessWidget {
                   children: [
                     const NeuBackButton(),
                     const SizedBox(width: 16),
-                    Text(
-                      'Help & Campus Support',
-                      style: AppTextStyles.title(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
+                    Expanded(
+                      child: Text(
+                        'Help & Campus Support',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.title(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
                       ),
                     ),
                   ],
@@ -74,6 +106,9 @@ class HelpSupportPage extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        _buildMyReports(),
+                        const SizedBox(height: 28),
+
                         // Quick contact card
                         NeuCard(
                           padding: const EdgeInsets.all(16),
@@ -192,22 +227,6 @@ class HelpSupportPage extends StatelessWidget {
                             ],
                           ),
                         ).animate(delay: 400.ms).fadeIn(),
-                        const SizedBox(height: 28),
-
-                        // Support report form
-                        Text(
-                          'Submit a Support Request',
-                          style: AppTextStyles.title(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        _SupportReportForm(
-                          orderId: orderId,
-                          deliveryId: deliveryId,
-                        ),
                         const SizedBox(height: 24),
                       ],
                     ),
@@ -221,14 +240,116 @@ class HelpSupportPage extends StatelessWidget {
     );
   }
 
+  Widget _buildMyReports() {
+    final reports = ref.watch(mySupportReportsProvider);
+    final Widget list = reports.when(
+      loading: () => const Padding(
+        padding: EdgeInsets.symmetric(vertical: 24),
+        child: Center(
+          child: CircularProgressIndicator(color: AppColors.accent),
+        ),
+      ),
+      error: (e, _) => _ReportsNotice(
+        icon: Icons.cloud_off_rounded,
+        text: 'Could not load your reports. Tap to try again.',
+        onTap: () => ref.invalidate(mySupportReportsProvider),
+      ),
+      data: (items) => items.isEmpty
+          ? const _ReportsNotice(
+              icon: Icons.inbox_outlined,
+              text:
+                  'No reports yet. Start one and our team will reply here.',
+            )
+          : Column(
+              children: [
+                for (final r in items)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: _ReportTile(
+                      report: r,
+                      onTap: () => _openThread(r.id),
+                    ),
+                  ),
+              ],
+            ),
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'My Reports',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: AppTextStyles.title(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 12),
+        if (_showForm) ...[
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Submit a Support Request',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.title(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: () => setState(() => _showForm = false),
+                child: Text(
+                  'Cancel',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.caption(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _SupportReportForm(
+            orderId: widget.orderId,
+            deliveryId: widget.deliveryId,
+            onSubmitted: _onReportSubmitted,
+          ),
+        ] else
+          NeuButton(
+            text: 'New Report',
+            icon: Icons.add_comment_outlined,
+            onPressed: () => setState(() => _showForm = true),
+          ),
+        const SizedBox(height: 16),
+        list,
+      ],
+    ).animate(delay: 50.ms).fadeIn();
+  }
+
   Widget _buildContactRow(IconData icon, String text) {
     return Row(
       children: [
         Icon(icon, color: AppColors.primary, size: 20),
         const SizedBox(width: 12),
-        Text(
-          text,
-          style: AppTextStyles.body(fontSize: 13, color: AppColors.textPrimary),
+        Expanded(
+          child: Text(
+            text,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: AppTextStyles.body(
+              fontSize: 13,
+              color: AppColors.textPrimary,
+            ),
+          ),
         ),
       ],
     );
@@ -239,9 +360,13 @@ class _SupportReportForm extends StatefulWidget {
   final String? orderId;
   final String? deliveryId;
 
+  /// Called with the new report's id once it is saved.
+  final ValueChanged<String> onSubmitted;
+
   const _SupportReportForm({
     this.orderId,
     this.deliveryId,
+    required this.onSubmitted,
   });
 
   @override
@@ -322,7 +447,11 @@ class _SupportReportFormState extends State<_SupportReportForm> {
         payload['delivery_id'] = widget.deliveryId;
       }
 
-      await SupabaseService.client.from('support_reports').insert(payload);
+      final inserted = await SupabaseService.client
+          .from('support_reports')
+          .insert(payload)
+          .select('id')
+          .single();
 
       if (!mounted) return;
       _subjectController.clear();
@@ -337,6 +466,8 @@ class _SupportReportFormState extends State<_SupportReportForm> {
         'Support ticket submitted successfully! Our campus fleet team will review it.',
         tone: NeuToneKind.success,
       );
+      final reportId = inserted['id']?.toString() ?? '';
+      if (reportId.isNotEmpty) widget.onSubmitted(reportId);
     } catch (e) {
       if (!mounted) return;
       setState(() => _submitting = false);
@@ -446,5 +577,139 @@ class _SupportReportFormState extends State<_SupportReportForm> {
         ],
       ),
     ).animate(delay: 450.ms).fadeIn();
+  }
+}
+
+/// One of the user's reports in the My Reports list.
+class _ReportTile extends StatelessWidget {
+  final SupportReportModel report;
+  final VoidCallback onTap;
+  const _ReportTile({required this.report, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final statusColor = report.isResolved
+        ? AppColors.success
+        : AppColors.warning;
+    return NeuCard(
+      padding: const EdgeInsets.all(14),
+      onTap: onTap,
+      semanticLabel: 'Open report ${report.subject}',
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  report.subject.isEmpty ? 'Support report' : report.subject,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.title(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${report.categoryLabel} · ${_lastActivity(report.lastActivityAt)}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.caption(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          if (report.unreadCount > 0) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+              decoration: BoxDecoration(
+                color: AppColors.accent,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '${report.unreadCount}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                semanticsLabel: '${report.unreadCount} unread',
+                style: AppTextStyles.caption(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.bgDark,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: statusColor.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: statusColor.withValues(alpha: 0.5)),
+            ),
+            child: Text(
+              report.statusLabel,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.caption(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: statusColor,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static String _lastActivity(DateTime at) {
+    final diff = DateTime.now().difference(at);
+    if (diff.inMinutes < 1) return 'Just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes} min ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    if (diff.inDays < 7) return '${diff.inDays}d ago';
+    return '${at.day}/${at.month}/${at.year}';
+  }
+}
+
+/// Inline empty and error state for the My Reports list. The shared empty
+/// and error widgets bring their own scroll view, which cannot sit inside
+/// this page's.
+class _ReportsNotice extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  final VoidCallback? onTap;
+  const _ReportsNotice({required this.icon, required this.text, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return NeuCard(
+      padding: const EdgeInsets.all(16),
+      onTap: onTap,
+      child: Row(
+        children: [
+          Icon(icon, color: AppColors.textSecondary, size: 22),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.body(
+                fontSize: 13,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

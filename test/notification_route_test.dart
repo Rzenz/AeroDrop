@@ -42,20 +42,35 @@ void main() {
     });
   });
 
-  group('support reports never open a tracking page', () {
-    for (final type in ['support_report', 'support_report_update']) {
-      final n = _n(type, deliveryId: 'd1');
-      test('$type: admin opens Support', () {
-        expect(notificationTarget(n, _admin), (
-          location: '/admin/support',
-          isShellTab: true,
-        ));
+  group('support notifications open the shared thread for every role', () {
+    for (final type in [
+      'support_message',
+      'support_report',
+      'support_report_update',
+    ]) {
+      test('$type opens /shared/support, never tracking', () {
+        final n = _n(type, deliveryId: 'd1', metadata: {'report_id': 'r1'});
+        for (final path in [_admin, _vendor, _user]) {
+          expect(notificationTarget(n, path), (
+            location: '/shared/support/r1',
+            isShellTab: false,
+          ));
+        }
       });
-      test('$type: customer and vendor stay put', () {
-        expect(notificationTarget(n, _user), isNull);
-        expect(notificationTarget(n, _vendor), isNull);
+
+      test('$type does nothing without a report id', () {
+        expect(notificationTarget(_n(type, deliveryId: 'd1'), _admin), isNull);
+        expect(notificationTarget(_n(type, metadata: {}), _user), isNull);
       });
     }
+
+    test("migration 19's support_report_id key is read too", () {
+      final n = _n('support_report', metadata: {'support_report_id': 'r9'});
+      expect(notificationTarget(n, _user), (
+        location: '/shared/support/r9',
+        isShellTab: false,
+      ));
+    });
   });
 
   group('order_message', () {
@@ -124,6 +139,7 @@ void main() {
 
   test('the routed, delivery and inert type sets do not overlap', () {
     const routed = {
+      'support_message',
       'support_report',
       'support_report_update',
       'order_message',

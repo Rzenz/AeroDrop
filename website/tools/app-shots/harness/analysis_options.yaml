@@ -1,0 +1,7 @@
+include: ../../../../analysis_options.yaml
+
+analyzer:
+  errors:
+    # capture.sh copies the app's assets/ in just before building, and the
+    # copy is gitignored, so the folders are missing the rest of the time.
+    asset_directory_does_not_exist: ignore

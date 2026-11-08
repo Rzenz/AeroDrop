@@ -585,6 +585,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final authUser = response.user;
       if (authUser == null) throw Exception('Login failed');
 
+      await _recordTermsAcceptance(authUser);
+
       final userRow = await SupabaseService.client
           .from('users')
           .select()
@@ -886,6 +888,26 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = state.copyWith(otpDeliveryMethod: method);
   }
 
+  /// Copies the terms acceptance recorded at sign-up into
+  /// users.terms_accepted_at. A new account usually has no session until it
+  /// is verified, so sign-up keeps the time in the auth metadata and this
+  /// writes it once a session exists. Only the first write lands, and accounts
+  /// without that metadata (everyone who registered before) stay NULL.
+  /// Failure is logged and never blocks registration or sign-in.
+  Future<void> _recordTermsAcceptance(User authUser) async {
+    final acceptedAt = authUser.userMetadata?['terms_accepted_at'];
+    if (acceptedAt is! String || acceptedAt.isEmpty) return;
+    try {
+      await SupabaseService.client
+          .from('users')
+          .update({'terms_accepted_at': acceptedAt})
+          .eq('id', authUser.id)
+          .isFilter('terms_accepted_at', null);
+    } catch (e) {
+      debugPrint('Recording terms acceptance failed: $e');
+    }
+  }
+
   // ── Register ──────────────────────────────────────────────────────────────
 
   Future<bool> register(
@@ -899,6 +921,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     String? businessDescription,
     String? campusLocationId,
     XFile? logoFile,
+    DateTime? termsAcceptedAt,
   }) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
 
@@ -926,6 +949,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
           if (businessDescription != null)
             'business_description': businessDescription.trim(),
           'campus_location_id': ?campusLocationId,
+          // Kept on the auth account until the profile can be written; see
+          // _recordTermsAcceptance.
+          if (termsAcceptedAt != null)
+            'terms_accepted_at': termsAcceptedAt.toUtc().toIso8601String(),
         },
       );
 
@@ -935,6 +962,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       // Trigger handles public.users insertion — no client-side write needed.
 
       final sessionCreated = response.session != null;
+      if (sessionCreated) await _recordTermsAcceptance(authUser);
       if (sessionCreated && logoFile != null) {
         try {
           final validation = await ImageUtils.validateImage(logoFile);
@@ -1088,6 +1116,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
       if (authUser == null) {
         throw const AuthException('Invalid verification code.');
       }
+
+      await _recordTermsAcceptance(authUser);
 
       String? uploadedLogoUrl;
       String? logoUploadWarning;

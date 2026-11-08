@@ -1,12 +1,13 @@
-import { CheckCircle2, LifeBuoy, RotateCcw } from 'lucide-react'
+import { CheckCircle2, LifeBuoy, MessagesSquare, RotateCcw } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AnimatedTabs } from '@/components/forgeui/animated-tabs'
-import { Button } from '@/components/ui/button'
+import { Button, ButtonLink } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/loader'
 import { Badge, Card, EmptyState, Field, Textarea } from '@/components/ui/primitives'
 import { toast } from '@/components/ui/toast'
 import { api } from '@/data/api'
+import { reportCategoryLabel } from '@/lib/constants'
 import { formatDateTime, shortId, timeAgo } from '@/lib/format'
 import { errorMessage, invalidate, useQuery } from '@/lib/store'
 import { cn } from '@/lib/utils'
@@ -53,9 +54,17 @@ export default function AdminSupport() {
                   <button type="button" onClick={() => setSelected(r.id)} aria-current={current?.id === r.id || undefined} className={cn('w-full rounded-xl px-3 py-3 text-left transition-colors duration-150', current?.id === r.id ? 'bg-info-bg' : 'hover:bg-sunken')}>
                     <span className="flex items-center justify-between gap-2">
                       <span className="truncate font-medium text-ink">{r.subject}</span>
-                      <span className="shrink-0 text-xs text-ink-3">{timeAgo(r.created_at)}</span>
+                      <span className="flex shrink-0 items-center gap-2 text-xs text-ink-3">
+                        {r.unread_count ? (
+                          <span className="grid h-5 min-w-5 place-items-center rounded-full bg-brand px-1.5 text-[11px] font-bold text-on-brand tabular-nums">
+                            {r.unread_count}
+                            <span className="sr-only"> unread replies</span>
+                          </span>
+                        ) : null}
+                        {timeAgo(r.last_message_at && r.last_message_at > r.created_at ? r.last_message_at : r.created_at)}
+                      </span>
                     </span>
-                    <span className="mt-0.5 block truncate text-xs text-ink-3">{r.reporter_name ?? 'Customer'} · {r.category}</span>
+                    <span className="mt-0.5 block truncate text-xs text-ink-3">{r.reporter_name ?? 'Customer'} · {reportCategoryLabel(r.category)}</span>
                   </button>
                 </li>
               ))}
@@ -69,7 +78,7 @@ export default function AdminSupport() {
                   <p className="mt-1 text-sm text-ink-3">{current.reporter_name ?? 'Customer'} · {formatDateTime(current.created_at)}</p>
                 </div>
                 <div className="flex gap-2">
-                  <Badge tone="info">{current.category}</Badge>
+                  <Badge tone="info">{reportCategoryLabel(current.category)}</Badge>
                   <Badge tone={current.status === 'resolved' ? 'success' : 'warning'}>{current.status === 'resolved' ? 'Resolved' : 'Open'}</Badge>
                 </div>
               </div>
@@ -77,6 +86,9 @@ export default function AdminSupport() {
               {current.order_id ? <Link to={`/admin/deliveries/details?id=${current.order_id}`} className="mt-3 inline-block text-sm font-semibold text-brand-ink hover:underline">Open order {shortId(current.order_id)} and its chat</Link> : null}
               <Field label="Internal notes" hint="Saving notes alone does not notify the customer." className="mt-6">{(p) => <Textarea {...p} value={notes} onChange={(e) => setNotes(e.target.value)} className="min-h-28" />}</Field>
               <div className="mt-4 flex flex-wrap gap-2">
+                <ButtonLink to={`/admin/support/${current.id}`} icon={<MessagesSquare aria-hidden className="size-4" />}>
+                  Open Thread{current.unread_count ? ` (${current.unread_count} new)` : ''}
+                </ButtonLink>
                 <Button variant="secondary" loading={busy} disabled={notes === (current.admin_notes ?? '')} onClick={() => update({ admin_notes: notes }, 'Notes saved.')}>Save notes</Button>
                 {current.status === 'open' ? (
                   <Button loading={busy} icon={<CheckCircle2 aria-hidden className="size-4" />} onClick={() => update({ status: 'resolved', admin_notes: notes }, 'Report resolved. The customer was notified.')}>Resolve</Button>

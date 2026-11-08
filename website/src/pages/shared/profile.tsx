@@ -1,4 +1,4 @@
-import { Camera, Cookie, KeyRound, LifeBuoy, Mail, Moon, ReceiptText, Store, Trash2 } from 'lucide-react'
+import { Camera, Cookie, FileText, KeyRound, LifeBuoy, Mail, Moon, ReceiptText, ShieldCheck, Store, Trash2 } from 'lucide-react'
 import { useRef, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth, useMe } from '@/auth/auth'
@@ -96,10 +96,14 @@ export default function Profile() {
                 { to: '/vendor/orders', icon: ReceiptText, label: 'Incoming orders' },
                 { to: '/vendor/products', icon: Store, label: 'Products' },
                 { to: '/vendor/help', icon: LifeBuoy, label: 'Help and support' },
+                { to: '/terms', icon: FileText, label: 'Terms and conditions' },
+                { to: '/privacy', icon: ShieldCheck, label: 'Privacy policy' },
               ]
             : [
                 { to: '/user/orders', icon: ReceiptText, label: 'Order history' },
                 { to: '/user/help', icon: LifeBuoy, label: 'Help and support' },
+                { to: '/terms', icon: FileText, label: 'Terms and conditions' },
+                { to: '/privacy', icon: ShieldCheck, label: 'Privacy policy' },
               ]
           ).map((l) => (
             <Link key={l.to} to={l.to} className="flex h-12 items-center gap-3 rounded-xl px-3 text-sm font-medium text-ink-2 hover:bg-sunken hover:text-ink">

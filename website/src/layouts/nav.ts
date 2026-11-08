@@ -118,4 +118,6 @@ export const extraTitles: [RegExp, string][] = [
   [/^\/admin\/notifications/, 'Notifications'],
   [/^\/admin\/deliveries\/details/, 'Delivery Details'],
   [/^\/admin\/users\/[^/]+/, 'Account Details'],
+  [/^\/(user|vendor)\/help\/[^/]+/, 'Support Conversation'],
+  [/^\/admin\/support\/[^/]+/, 'Support Conversation'],
 ]

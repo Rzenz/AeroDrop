@@ -24,6 +24,7 @@ export default function SignUp() {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [formError, setFormError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [acceptTerms, setAcceptTerms] = useState(false)
   const [step, setStep] = useState<'form' | 'code'>('form')
   const [code, setCode] = useState('')
   const [logo, setLogo] = useState<File | null>(null)
@@ -57,6 +58,8 @@ export default function SignUp() {
       if (form.businessCategory === 'Other' && !form.otherCategory.trim()) e.otherCategory = 'Name your category.'
       if (!form.campusLocationId) e.campusLocationId = 'Choose where your stall is.'
     }
+    // register_screen.dart's two messages.
+    if (!acceptTerms) e.terms = role === 'vendor' ? 'You must agree to the Terms of Service to list your store.' : 'You must accept the terms & conditions.'
     setErrors(e)
     return Object.keys(e).length === 0
   }
@@ -73,6 +76,7 @@ export default function SignUp() {
         password: form.password,
         phone: normalizePhone(form.phone)!,
         role,
+        termsAcceptedAt: new Date().toISOString(),
         ...(role === 'vendor'
           ? {
               businessName: form.businessName,
@@ -264,6 +268,38 @@ export default function SignUp() {
           </fieldset>
         ) : null}
 
+        <div>
+          <label className="flex cursor-pointer items-start gap-3 text-sm text-ink-2">
+            <input
+              type="checkbox"
+              checked={acceptTerms}
+              onChange={(e) => {
+                setAcceptTerms(e.target.checked)
+                if (e.target.checked) setErrors(({ terms: _t, ...rest }) => rest)
+              }}
+              aria-invalid={!!errors.terms}
+              aria-describedby={errors.terms ? 'terms-error' : undefined}
+              className="mt-0.5 size-[18px] shrink-0 accent-[var(--brand)]"
+            />
+            <span>
+              {role === 'vendor' ? 'I certify that all store and location parameters are correct, and agree to the AeroDrop ' : 'I agree to the AeroDrop '}
+              <Link to="/terms" target="_blank" rel="noopener" className="font-semibold text-brand-ink underline underline-offset-2">
+                Terms of Service
+              </Link>{' '}
+              and{' '}
+              <Link to="/privacy" target="_blank" rel="noopener" className="font-semibold text-brand-ink underline underline-offset-2">
+                Privacy Policy
+              </Link>
+              .
+            </span>
+          </label>
+          {errors.terms ? (
+            <p id="terms-error" className="mt-1.5 pl-[30px] text-xs font-medium text-danger">
+              {errors.terms}
+            </p>
+          ) : null}
+        </div>
+
         {formError ? (
           <p role="alert" className="rounded-xl bg-danger-bg px-4 py-3 text-sm font-medium text-danger">
             {formError}
@@ -290,11 +326,6 @@ export default function SignUp() {
             />
           </>
         ) : null}
-        <p className="text-center text-xs text-ink-3">
-          By signing up you agree to the{' '}
-          <Link to="/terms" className="underline">Terms</Link> and{' '}
-          <Link to="/privacy" className="underline">Privacy Policy</Link>.
-        </p>
       </form>
     </AuthShell>
   )

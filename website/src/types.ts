@@ -11,6 +11,8 @@ export interface Profile {
   phone_number: string | null
   role: Role
   account_status: AccountStatus
+  /** When the user accepted the Terms and Privacy Policy (migration 28). Null means never recorded. */
+  terms_accepted_at?: string | null
   vendor_status: VendorStatus | null
   business_name: string | null
   business_category: string | null
@@ -178,9 +180,27 @@ export interface SupportReport {
   status: 'open' | 'resolved'
   admin_notes: string | null
   order_id: string | null
+  delivery_id?: string | null
   created_at: string
   resolved_at: string | null
   reporter_name?: string | null
+  /** Newest reply (support_messages), when loaded with the report. */
+  last_message_at?: string | null
+  /** Replies from the other side the viewer has not read. */
+  unread_count?: number
+}
+
+/** One reply on a support report (public.support_messages, migration 28). */
+export interface SupportMessage {
+  id: string
+  report_id: string
+  sender_id: string
+  /** May be empty when the message carries only photos. */
+  message: string
+  /** Paths in the private support-attachments bucket, at most three. */
+  attachments: string[]
+  created_at: string
+  read_at: string | null
 }
 
 export interface OrderMessage {

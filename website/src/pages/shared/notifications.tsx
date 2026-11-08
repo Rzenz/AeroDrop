@@ -28,7 +28,12 @@ function routeFor(n: AppNotification, role: Role): string | null {
   const m = (n.metadata ?? {}) as Record<string, string | undefined>
   const t = n.notification_type ?? ''
   const base = role === 'vendor' ? '/vendor' : role === 'admin' ? '/admin' : '/user'
-  if (t.startsWith('support_report')) return role === 'admin' ? '/admin/support' : `${base}/help`
+  // Every role opens the report's thread. Migration 28 writes report_id;
+  // migration 19's older alerts carry support_report_id.
+  if (t === 'support_message' || t === 'support_report' || t === 'support_report_update') {
+    const reportId = m.report_id ?? m.support_report_id
+    return reportId ? (role === 'admin' ? `/admin/support/${reportId}` : `${base}/help/${reportId}`) : null
+  }
   if (t === 'vendor_application') return role === 'admin' ? (m.user_id ? `/admin/users/${m.user_id}` : '/admin/users') : '/vendor'
   if (t.startsWith('weather')) return role === 'admin' ? '/admin/weather' : null
   if (t.startsWith('drone_')) return role === 'admin' ? '/admin/drones' : m.order_id ? `${base}/orders/${m.order_id}` : null

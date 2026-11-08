@@ -1,5 +1,5 @@
 import { ArrowLeft, Settings2 } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Logo } from '@/components/brand'
 import { openCookieSettings } from '@/lib/consent'
 
@@ -17,8 +17,7 @@ const content = {
   terms: {
     title: 'Terms & Conditions',
     sections: [
-      // The app's copy says 5.0 kg; the system limit is 0.5 kg per trip.
-      ['1. Payload Responsibilities', 'Users are solely responsible for verifying that their delivery items do not exceed the 0.5 kg per-trip maximum weight threshold and are non-hazardous, dry, and securely sealed before handing them to the drone deck loader.'],
+      ['1. Payload Responsibilities', 'Users are solely responsible for verifying that their delivery items do not exceed the 0.5 kg per-trip maximum weight threshold (orders up to 1.0 kg are flown in two trips) and are non-hazardous, dry, and securely sealed before handing them to the drone deck loader.'],
       ['2. Automated Flight Paths', 'Flights are controlled by autonomous autopilot firmware following safe campus corridors. Users must not interfere with flight corridors, geofenced areas, or attempt unauthorized remote commands.'],
       ['3. Liability and Accidents', 'UCLM and the drone fleet logistics team hold final authority for flight overrides. In the event of emergency landing, payload recovery will be handled by the nearest designated fleet support ground crew.'],
     ],
@@ -27,13 +26,23 @@ const content = {
 
 export default function Legal({ page }: { page: keyof typeof content }) {
   const c = content[page]
+  const navigate = useNavigate()
+  // React Router numbers in-app history entries; 0 means this tab started here.
+  const canGoBack = ((window.history.state as { idx?: number } | null)?.idx ?? 0) > 0
   return (
     <div className="min-h-dvh bg-bg px-4 py-6 sm:px-6">
       <div className="mx-auto max-w-2xl">
         <Logo />
-        <Link to="/" className="mt-10 inline-flex items-center gap-1.5 text-sm font-semibold text-ink-2 hover:text-ink">
-          <ArrowLeft aria-hidden className="size-4" /> Home
-        </Link>
+        {/* Back to wherever it was opened from (profile, sign-up, cookie banner); Home in a fresh tab. */}
+        {canGoBack ? (
+          <button type="button" onClick={() => navigate(-1)} className="mt-10 inline-flex items-center gap-1.5 text-sm font-semibold text-ink-2 hover:text-ink">
+            <ArrowLeft aria-hidden className="size-4" /> Back
+          </button>
+        ) : (
+          <Link to="/" className="mt-10 inline-flex items-center gap-1.5 text-sm font-semibold text-ink-2 hover:text-ink">
+            <ArrowLeft aria-hidden className="size-4" /> Home
+          </Link>
+        )}
         <h1 className="mt-4 font-display text-4xl font-extrabold text-ink">{c.title}</h1>
         <div className="mt-8 space-y-6">
           {c.sections.map(([h, body]) => (

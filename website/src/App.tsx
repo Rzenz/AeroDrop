@@ -33,6 +33,7 @@ const OrderDetail = lazy(() => import('@/pages/shared/order-detail'))
 const Notifications = lazy(() => import('@/pages/shared/notifications'))
 const Profile = lazy(() => import('@/pages/shared/profile'))
 const Help = lazy(() => import('@/pages/shared/help'))
+const SupportThread = lazy(() => import('@/pages/shared/support-thread'))
 
 const VendorDashboard = lazy(() => import('@/pages/vendor/dashboard'))
 const VendorProducts = lazy(() => import('@/pages/vendor/products'))
@@ -106,6 +107,7 @@ const router = createBrowserRouter([
           { path: 'notifications', element: page(<Notifications />) },
           { path: 'profile', element: page(<Profile />) },
           { path: 'help', element: page(<Help />) },
+          { path: 'help/:reportId', element: page(<SupportThread />) },
         ],
       },
       {
@@ -119,6 +121,7 @@ const router = createBrowserRouter([
           { path: 'notifications', element: page(<Notifications />) },
           { path: 'profile', element: page(<Profile />) },
           { path: 'help', element: page(<Help />) },
+          { path: 'help/:reportId', element: page(<SupportThread />) },
         ],
       },
       {
@@ -133,6 +136,7 @@ const router = createBrowserRouter([
           { path: 'users', element: page(<AdminUsers />) },
           { path: 'users/:id', element: page(<AdminUserDetail />) },
           { path: 'support', element: page(<AdminSupport />) },
+          { path: 'support/:reportId', element: page(<SupportThread />) },
           { path: 'analytics', element: page(<Analytics />) },
           { path: 'reports', element: page(<ActivityLogs />) },
           { path: 'weather', element: page(<AdminWeather />) },

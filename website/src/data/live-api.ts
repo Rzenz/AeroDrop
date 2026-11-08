@@ -1,5 +1,6 @@
 import { isAdminEmail, supabase } from '@/lib/config'
-import type { Delivery, Order, OrderItem, Product, Profile, SupportReport, Vendor, Weather } from '@/types'
+import type { Delivery, Order, OrderItem, Product, Profile, SupportMessage, SupportReport, Vendor, Weather } from '@/types'
+import { SUPPORT_MAX_PHOTOS, SUPPORT_MESSAGE_MAX } from '@/lib/constants'
 import { DEFAULT_HUB, type Coords } from '@/lib/flight-calc'
 import type { Api, SimDelivery, Telemetry } from './api'
 
@@ -51,6 +52,54 @@ async function upload(bucket: string, path: string, file: File) {
   // Cache-bust so an overwritten avatar or logo shows the new image.
   return `${sb().storage.from(bucket).getPublicUrl(path).data.publicUrl}?v=${Date.now()}`
 }
+// ── Support threads (support_chat_provider.dart) ──────────────────────────
+/** Private bucket; objects live at <report_id>/<uuid>.<ext> (the policy reads the folder as the report id). */
+const SUPPORT_BUCKET = 'support-attachments'
+const SUPPORT_COLUMNS = 'id, report_id, sender_id, message, attachments, created_at, read_at'
+const SIGNED_URL_SECONDS = 60 * 60
+const SIGNED_URL_REUSE_MS = 50 * 60 * 1000
+const signedUrls = new Map<string, { url: Promise<string>; signedAt: number }>()
+
+const toSupportMessage = (r: Record<string, unknown>): SupportMessage => ({
+  id: String(r.id ?? ''),
+  report_id: String(r.report_id ?? ''),
+  sender_id: String(r.sender_id ?? ''),
+  message: String(r.message ?? ''),
+  attachments: Array.isArray(r.attachments) ? r.attachments.map(String).filter(Boolean) : [],
+  created_at: String(r.created_at ?? nowIso()),
+  read_at: (r.read_at as string | null) ?? null,
+})
+
+/** SupportReportModel.fromMap: last reply time and unread count from the embedded replies. */
+function withThreadStats(row: Record<string, unknown>, viewerId: string): SupportReport {
+  const { support_messages: replies, ...report } = row
+  let last: string | null = null
+  let unread = 0
+  for (const m of (Array.isArray(replies) ? replies : []) as { created_at: string; sender_id: string; read_at: string | null }[]) {
+    if (!last || m.created_at > last) last = m.created_at
+    if (m.sender_id !== viewerId && !m.read_at) unread++
+  }
+  return { ...(report as unknown as SupportReport), last_message_at: last, unread_count: unread }
+}
+const lastActivity = (r: SupportReport) => (r.last_message_at && r.last_message_at > r.created_at ? r.last_message_at : r.created_at)
+
+/**
+ * AuthNotifier._recordTermsAcceptance: a new account usually has no session
+ * until it is verified, so sign-up keeps the acceptance time in the auth
+ * metadata and the first signed-in session copies it to the profile. Only the
+ * first write lands; older accounts without it stay NULL. Never blocks sign-in.
+ */
+async function recordTermsAcceptance() {
+  try {
+    const { data } = await sb().auth.getUser()
+    const at = data.user?.user_metadata?.terms_accepted_at
+    if (!data.user || typeof at !== 'string' || !at) return
+    await sb().from('users').update({ terms_accepted_at: at }).eq('id', data.user.id).is('terms_accepted_at', null)
+  } catch {
+    /* logged in the app; never fatal */
+  }
+}
+
 async function uid() {
   const { data } = await sb().auth.getUser()
   if (!data.user) throw new Error('Your session has ended. Please sign in again.')
@@ -149,6 +198,7 @@ export const liveApi: Api = {
     // Vendor login rules from AuthNotifier.login.
     if (profile.role === 'vendor' && profile.vendor_status === 'suspended') await reject('Your vendor account has been suspended. Please contact the administrator.')
     if (profile.role === 'vendor' && profile.vendor_status === 'rejected') await reject('Your vendor application was rejected. Please contact the administrator.')
+    await recordTermsAcceptance()
     return profile
   },
   async isGoogleOnlyAccount(email) {
@@ -192,6 +242,7 @@ export const liveApi: Api = {
   },
   async verifyLoginCode(email, code) {
     ok(await sb().auth.verifyOtp({ type: 'email', email: email.trim().toLowerCase(), token: code.trim() }))
+    await recordTermsAcceptance()
   },
   async signUp(input) {
     if (isAdminEmail(input.email)) throw new Error('Admin accounts cannot be registered through this form.')
@@ -209,6 +260,8 @@ export const liveApi: Api = {
             business_category: input.businessCategory,
             business_description: input.businessDescription?.trim(),
             campus_location_id: input.campusLocationId,
+            // Copied to users.terms_accepted_at once a session exists.
+            terms_accepted_at: input.termsAcceptedAt,
           },
         },
       }),
@@ -216,6 +269,7 @@ export const liveApi: Api = {
   },
   async verifySignUpCode(email, code) {
     ok(await sb().auth.verifyOtp({ type: 'signup', email: email.trim().toLowerCase(), token: code.trim() }))
+    await recordTermsAcceptance()
   },
   async sendPasswordReset(email) {
     ok(await sb().auth.resetPasswordForEmail(email.trim().toLowerCase()))
@@ -387,8 +441,8 @@ export const liveApi: Api = {
 
   async submitReport(input) {
     const viewer = await me()
-    // help_support_page.dart payload.
-    ok(
+    // help_support_page.dart payload; the new id opens the report's thread.
+    const row = ok(
       await sb().from('support_reports').insert({
         user_id: viewer.id,
         subject: input.subject.trim(),
@@ -397,18 +451,83 @@ export const liveApi: Api = {
         status: 'open',
         ...(input.orderId ? { order_id: input.orderId } : {}),
         ...(input.deliveryId ? { delivery_id: input.deliveryId } : {}),
-      }),
-    )
+      }).select('id').single(),
+    ) as { id: string }
+    return row.id
   },
   async reports() {
     const viewer = await me()
-    let q = sb().from('support_reports').select('*').order('created_at', { ascending: false })
+    // mySupportReportsProvider: each report with its replies' times and read state.
+    let q = sb().from('support_reports').select('*, support_messages(created_at, sender_id, read_at)').order('created_at', { ascending: false })
     if (viewer.role !== 'admin') q = q.eq('user_id', viewer.id)
-    const rows = ok(await q) as SupportReport[]
+    const rows = (ok(await q) as Record<string, unknown>[]).map((r) => withThreadStats(r, viewer.id))
+    // Most recently active first, as the app lists them.
+    if (viewer.role !== 'admin') rows.sort((a, b) => lastActivity(b).localeCompare(lastActivity(a)))
     if (viewer.role !== 'admin' || !rows.length) return rows
     const people = ok(await sb().from('users').select('id, full_name').in('id', [...new Set(rows.map((r) => r.user_id))])) as Pick<Profile, 'id' | 'full_name'>[]
     const names = new Map(people.map((p) => [p.id, p.full_name]))
     return rows.map((r) => ({ ...r, reporter_name: names.get(r.user_id) ?? null }))
+  },
+  async report(id) {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) return null
+    return (ok(await sb().from('support_reports').select('*').eq('id', id).maybeSingle()) as SupportReport | null) ?? null
+  },
+  async supportMessages(reportId) {
+    const rows = ok(await sb().from('support_messages').select(SUPPORT_COLUMNS).eq('report_id', reportId).order('created_at', { ascending: true })) as Record<string, unknown>[]
+    return rows.map(toSupportMessage)
+  },
+  async sendSupportMessage(reportId, text, photos) {
+    // Everything checkable locally is checked before any upload, as in the app.
+    if (photos.length > SUPPORT_MAX_PHOTOS) throw new Error(`You can attach up to ${SUPPORT_MAX_PHOTOS} photos per message.`)
+    const trimmed = text.trim()
+    if (!trimmed && !photos.length) throw new Error('Write a message or attach a photo.')
+    if (trimmed.length > SUPPORT_MESSAGE_MAX) throw new Error(`Message is too long (${trimmed.length}/${SUPPORT_MESSAGE_MAX} characters).`)
+    const exts = photos.map(checkImage)
+    const sender = await uid()
+    const paths: string[] = []
+    for (const [i, file] of photos.entries()) {
+      const path = `${reportId}/${crypto.randomUUID()}${exts[i]}`
+      const res = await sb().storage.from(SUPPORT_BUCKET).upload(path, file, { contentType: file.type })
+      if (res.error) throw new Error(`Photo upload failed: ${res.error.message}`)
+      paths.push(path)
+    }
+    const row = ok(
+      await sb().from('support_messages').insert({ report_id: reportId, sender_id: sender, message: trimmed, attachments: paths }).select(SUPPORT_COLUMNS).single(),
+    ) as Record<string, unknown>
+    return toSupportMessage(row)
+  },
+  supportAttachmentUrl(path) {
+    const cached = signedUrls.get(path)
+    if (cached && Date.now() - cached.signedAt < SIGNED_URL_REUSE_MS) return cached.url
+    const url = sb()
+      .storage.from(SUPPORT_BUCKET)
+      .createSignedUrl(path, SIGNED_URL_SECONDS)
+      .then((res) => {
+        if (res.error || !res.data?.signedUrl) throw new Error(res.error?.message ?? 'This photo could not be loaded.')
+        return res.data.signedUrl
+      })
+    signedUrls.set(path, { url, signedAt: Date.now() })
+    // A failed signing is dropped so a retry asks again.
+    url.catch(() => signedUrls.delete(path))
+    return url
+  },
+  async markSupportRead(reportId) {
+    // Also clears the report's bell notifications (migration 29 matches both metadata keys).
+    await sb().rpc('mark_support_messages_read', { p_report_id: reportId })
+  },
+  subscribeSupportMessages(reportId, cb) {
+    const channel = sb()
+      .channel(`support-chat-${reportId}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'support_messages', filter: `report_id=eq.${reportId}` }, () => cb())
+      .subscribe()
+    return () => {
+      sb().removeChannel(channel)
+    }
+  },
+  async supportUserName(userId) {
+    const row = ok(await sb().from('users').select('full_name, business_name, email').eq('id', userId).maybeSingle()) as Record<string, string | null> | null
+    for (const k of ['business_name', 'full_name', 'email']) if (row?.[k]?.trim()) return row[k]!.trim()
+    return null
   },
   async updateReport(id, patch) {
     const body: Record<string, unknown> = { ...patch }
@@ -608,7 +727,7 @@ export const liveApi: Api = {
 
   // ── Realtime: the tables the app's channels listen to ──────────────────
   subscribeChanges(scope, cb) {
-    const tables = ['orders', 'deliveries', 'drones', 'weather_safety', 'order_messages', 'products', 'support_reports', 'users']
+    const tables = ['orders', 'deliveries', 'drones', 'weather_safety', 'order_messages', 'products', 'support_reports', 'support_messages', 'users']
     if (scope.role === 'admin') tables.push('drone_telemetry', 'delivery_status_logs')
     let ch = sb().channel(`aerodrop-web-${scope.userId}`)
     for (const table of tables) ch = ch.on('postgres_changes', { event: '*', schema: 'public', table }, () => cb())

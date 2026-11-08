@@ -14,6 +14,7 @@ import type {
   Profile,
   StatusLog,
   SupportReport,
+  SupportMessage,
   Vendor,
   VendorStatus,
   Weather,
@@ -31,6 +32,8 @@ export interface SignUpInput {
   businessCategory?: string
   businessDescription?: string
   campusLocationId?: string
+  /** When the Terms and Privacy Policy box was ticked; stored on users.terms_accepted_at once signed in. */
+  termsAcceptedAt: string
 }
 
 export interface PlaceOrderInput {
@@ -196,8 +199,22 @@ export interface Api {
   markAllNotificationsRead(): Promise<void>
 
   // Support
-  submitReport(input: { subject: string; message: string; category: string; orderId?: string; deliveryId?: string }): Promise<void>
+  /** Returns the new report's id, so the caller can open its thread. */
+  submitReport(input: { subject: string; message: string; category: string; orderId?: string; deliveryId?: string }): Promise<string>
   reports(): Promise<SupportReport[]>
+  /** One report, or null when it doesn't exist or RLS hides it. */
+  report(id: string): Promise<SupportReport | null>
+
+  // Support threads (support_messages, migrations 28-30)
+  supportMessages(reportId: string): Promise<SupportMessage[]>
+  /** Up to three JPEG/PNG/WebP photos under 5 MB; a reporter's reply reopens a resolved report server side. */
+  sendSupportMessage(reportId: string, text: string, photos: File[]): Promise<SupportMessage>
+  /** A signed URL for a private attachment path, cached for 50 minutes. */
+  supportAttachmentUrl(path: string): Promise<string>
+  markSupportRead(reportId: string): Promise<void>
+  subscribeSupportMessages(reportId: string, cb: () => void): () => void
+  /** Display name for a reporter, for the admin's view of a thread. */
+  supportUserName(userId: string): Promise<string | null>
   updateReport(id: string, patch: { status?: 'open' | 'resolved'; admin_notes?: string }): Promise<void>
 
   // Vendor

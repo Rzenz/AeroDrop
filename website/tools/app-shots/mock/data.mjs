@@ -184,5 +184,5 @@ const store_reviews = [
 export const db = {
   campus_locations, users, vendor_ratings_summary, products, product_ratings_summary, drones, orders, order_items,
   deliveries, drone_telemetry, weather_safety, notifications, order_messages, store_reviews,
-  no_fly_zones: [], delivery_status_logs: [], support_reports: [],
+  no_fly_zones: [], delivery_status_logs: [], support_reports: [], support_messages: [],
 }

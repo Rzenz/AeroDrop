@@ -51,7 +51,8 @@ function embed(fromTable, row, e) {
     const hit = target.find((r) => r.id === row[fk])
     return hit ? shape(e.table, hit, e.select) : null
   }
-  const back = `${singular(fromTable)}_id`
+  // Child tables whose FK to the parent isn't named <parent>_id.
+  const back = { support_messages: 'report_id' }[e.table] ?? `${singular(fromTable)}_id`
   const many = target.filter((r) => r[back] === row.id).map((r) => shape(e.table, r, e.select))
   // deliveries.order_id is UNIQUE, so PostgREST returns one object.
   return e.table === 'deliveries' && fromTable === 'orders' ? (many[0] ?? null) : many
@@ -143,6 +144,13 @@ const rpc = {
     const u = db.users.find((x) => x.id === otherId)
     return [{ counterpart_id: otherId, display_name: u?.role === 'vendor' ? u.business_name : u?.full_name, counterpart_role: u?.role, avatar_url: null }]
   },
+  // 28/29: read receipts plus the report's bell notifications.
+  mark_support_messages_read: ({ p_report_id }, uid) => {
+    let n = 0
+    ;(db.support_messages ?? []).forEach((m) => m.report_id === p_report_id && m.sender_id !== uid && !m.read_at && ((m.read_at = now()), n++))
+    db.notifications.forEach((x) => x.user_id === uid && !x.is_read && (x.metadata?.report_id ?? x.metadata?.support_report_id) === p_report_id && (x.is_read = true))
+    return n
+  },
   mark_order_messages_read: ({ p_order_id }, uid) => {
     db.order_messages.forEach((m) => m.order_id === p_order_id && m.sender_id !== uid && !m.read_at && (m.read_at = now()))
     return null
@@ -218,6 +226,31 @@ function send(res, status, body, headers = {}) {
   res.end(body === undefined ? '' : JSON.stringify(body))
 }
 
+// ── Storage (support attachments etc.), kept in memory ─────────────────────
+const objects = new Map()
+const readRaw = (req) => new Promise((r) => {
+  const chunks = []
+  req.on('data', (c) => chunks.push(c))
+  req.on('end', () => r(Buffer.concat(chunks)))
+})
+/** The file part of a multipart upload, or the raw body. */
+function fileFrom(buf, type = '') {
+  const m = type.match(/boundary=(.+)$/)
+  if (!m) return { bytes: buf, type }
+  const sep = Buffer.from(`--${m[1]}`)
+  let start = buf.indexOf(sep)
+  while (start !== -1) {
+    const next = buf.indexOf(sep, start + sep.length)
+    const part = buf.subarray(start + sep.length, next === -1 ? buf.length : next)
+    const headEnd = part.indexOf('\r\n\r\n')
+    const head = part.subarray(0, headEnd).toString()
+    const ct = head.match(/Content-Type:\s*([^\r\n]+)/i)
+    if (ct && !/text\/plain/i.test(ct[1])) return { bytes: part.subarray(headEnd + 4, part.length - 2), type: ct[1].trim() }
+    start = next
+  }
+  return { bytes: buf, type: 'application/octet-stream' }
+}
+
 const readBody = (req) => new Promise((r) => {
   let s = ''
   req.on('data', (c) => (s += c))
@@ -287,6 +320,13 @@ createServer(async (req, res) => {
           const i = db[table].findIndex((x) => x.id === r.id)
           if (i >= 0) Object.assign(db[table][i], r)
           else db[table].push(r)
+          // Migration 28's trigger: a reporter replying to a resolved report reopens it.
+          if (table === 'support_messages') {
+            r.read_at ??= null
+            const rep = db.support_reports.find((x) => x.id === r.report_id)
+            if (rep && rep.status === 'resolved' && rep.user_id === r.sender_id) Object.assign(rep, { status: 'open', resolved_at: null })
+          }
+          if (table === 'support_reports') Object.assign(r, { admin_notes: r.admin_notes ?? null, resolved_at: r.resolved_at ?? null, order_id: r.order_id ?? null, delivery_id: r.delivery_id ?? null })
         }
         if (!prefer.includes('return=representation')) return send(res, 201)
         return send(res, 201, wantsObject ? rows[0] : rows)
@@ -302,6 +342,31 @@ createServer(async (req, res) => {
         db[table] = db[table].filter((r) => !all.includes(r))
         return send(res, 204)
       }
+    }
+
+    if (p.startsWith('/storage/v1/object/')) {
+      const rest = decodeURIComponent(p.slice('/storage/v1/object/'.length))
+      if (rest.startsWith('sign/')) {
+        const key = rest.slice('sign/'.length)
+        if (req.method === 'POST') {
+          await readBody(req)
+          if (!objects.has(key)) return send(res, 400, { statusCode: '404', error: 'not_found', message: 'Object not found' })
+          return send(res, 200, { signedURL: `/object/sign/${key}?token=mock` })
+        }
+        const o = objects.get(key)
+        if (!o) return send(res, 404, { message: 'Object not found' })
+        res.writeHead(200, { 'Content-Type': o.type, 'Access-Control-Allow-Origin': '*' })
+        return res.end(o.bytes)
+      }
+      if (req.method === 'POST' || req.method === 'PUT') {
+        const file = fileFrom(await readRaw(req), req.headers['content-type'])
+        objects.set(rest, file)
+        return send(res, 200, { Key: rest, Id: uuid() })
+      }
+      const o = objects.get(rest.replace(/^public\//, ''))
+      if (!o) return send(res, 404, { message: 'Object not found' })
+      res.writeHead(200, { 'Content-Type': o.type, 'Access-Control-Allow-Origin': '*' })
+      return res.end(o.bytes)
     }
 
     if (p.startsWith('/realtime/') || p.startsWith('/storage/') || p.startsWith('/functions/')) return send(res, 404, { message: 'not in mock' })

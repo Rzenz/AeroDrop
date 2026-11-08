@@ -50,7 +50,13 @@ The website uses the app's back end directly. It has no server and no API of its
 - **Orders.**
   - Online payment uses `create-xendit-payment` and the 15-minute "Waiting for Payment" window.
   - Reviews go through `submit_order_reviews`. The store rating, the per-product ratings and editing an existing review all work as in the app.
-  - Support reports carry `order_id` and `delivery_id`.
+  - Support reports carry `order_id` and `delivery_id`, and use the app's categories (`general`, `order_issue`, `delivery_issue`, `account`, `other`).
+- **Support conversations** (migrations 28 to 30).
+  - Every report is a thread at `/user/help/:id`, `/vendor/help/:id` and `/admin/support/:id`. The report's own message opens it; replies live in `support_messages`.
+  - Each message can carry text and up to three JPEG, PNG or WebP photos under 5 MB. Photos go to the private `support-attachments` bucket at `<report_id>/<uuid>.<ext>` and are shown through signed URLs that last an hour.
+  - A reporter replying to a resolved report reopens it, and admins are always notified of a reopen. Both are done by the database trigger, not the website.
+  - Opening a thread calls `mark_support_messages_read`, which also clears that report's bell notifications. Support notifications open the thread.
+- **Terms.** The sign-up checkbox links to the Terms and Privacy Policy, which can be read while signed out. Its time goes into the auth metadata and is copied to `users.terms_accepted_at` at the first signed-in session, as the app does. Both profile menus link to the Terms and the Privacy Policy.
 - **Admin.**
   - Drone control is Recharge only, on the single drone DRN-001.
   - Weather overrides last 2 hours.

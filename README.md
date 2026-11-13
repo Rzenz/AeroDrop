@@ -47,7 +47,7 @@ The system connects campus users with approved vendors. Users browse products, p
 | **Support conversations** | Reporters and admins exchange messages and photos on a ticket, not a one-way form |
 | **Verified accounts** | Email one-time codes, plus Google sign-in for customers |
 | **Real payment gateway** | GCash and card through Xendit in sandbox mode, confirmed by webhook |
-| **Transparent fees** | Distance and weight based, with a full breakdown before you pay |
+| **Transparent fees** | Distance and weight based, priced by the server, with a full breakdown before you pay |
 | **Reviews and ratings** | Store and product ratings from verified deliveries |
 | **Analytics export** | Admin reports exportable to CSV and PDF |
 
@@ -330,6 +330,8 @@ The fee is calculated from a **base fee** charged once, the **real distance** be
 
 The extra-trip charge exists because distance alone would make a second flight free when the vendor and the drop-off are in the same building, even though it is another launch, another battery cycle and another handover.
 
+**Every amount is calculated in the database.** The app and the website do not price an order; they ask the server for a quote and display what it returns, so the figure on screen is the figure that will be charged. Item prices, weights, distance and trip count are read from the stored product and location rows rather than from anything the client sends.
+
 ---
 
 ## Campus Locations
@@ -353,6 +355,8 @@ The Campus Drone Hub is the drone's home base and cannot be selected as a custom
 Access control lives in the database, not in the interface, so a modified client gains nothing.
 
 - **Row level security** on every table. Customers reach their own records, vendors reach their own store and the orders placed with it, and administrators reach what their role requires.
+- **Server-side pricing.** No client decides what an order costs. Orders can only be created through `place_order`, which derives the subtotal, weight, trip count, distance and every fee component from the stored product and location rows. Clients ask for a quote through the same function so they display the price they will be charged, and a tampered request is priced the same as an honest one.
+- **Rate limits in the database.** Orders, support reports, order chat and support chat each carry an insert limit per account, enforced by triggers rather than by the interface, so the limit holds for any client. Administrators are exempt, since working a support queue means many messages in a short burst.
 - **Security-definer functions** for operations that must cross those boundaries — placing an order, cancelling one, submitting reviews, notifying administrators, resolving a chat counterpart's name. Each one re-checks the caller's right to act before doing anything.
 - **Immutable records** where a history matters: order chat and support messages have no update or delete path at all.
 - **Private storage for sensitive files.** Avatars and store logos sit in public buckets; support attachments do not. They are readable only by that thread's participants and are served through short-lived signed links.
@@ -366,7 +370,7 @@ Access control lives in the database, not in the interface, so a modified client
 
 A browser version of AeroDrop lives in [`website/`](website), built with React, Vite and TypeScript and deployed on Vercel. It talks to the same Supabase project as the app, so the same accounts, orders and row level security apply.
 
-It covers browsing, ordering, tracking and the vendor console. Features built most recently in the app, such as support conversations, may not have reached it yet.
+It covers browsing, ordering, tracking, support conversations and the vendor console, and prices every order through the same server quote the app uses. Placing an order there ends on a printed receipt that feeds out of a printer, the same moment the app gives after payment. Features built most recently in the app may not have reached it yet.
 
 ---
 

@@ -1,5 +1,3 @@
-include: ../../../../analysis_options.yaml
-
 analyzer:
   errors:
     # capture.sh copies the app's assets/ in just before building, and the

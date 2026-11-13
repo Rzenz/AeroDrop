@@ -1,6 +1,6 @@
 import { ArrowLeft, CircleCheck, Printer, ReceiptText } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import { useMe } from '@/auth/auth'
 import { Money } from '@/components/orders'
 import { Button, ButtonLink } from '@/components/ui/button'
@@ -11,11 +11,6 @@ import { effectiveStatus, formatDateTime, orderStatusMeta, paymentLabel, shortId
 import { useQuery } from '@/lib/store'
 import { cn } from '@/lib/utils'
 import type { Order } from '@/types'
-
-/** Navigation state the checkout sets, so only a fresh order plays the print. */
-export interface ReceiptLocationState {
-  justPlaced?: boolean
-}
 
 type Stage = 'processing' | 'printing' | 'complete'
 
@@ -34,16 +29,14 @@ const prefersReducedMotion = () => typeof window !== 'undefined' && window.match
  * The printed record of one order, read from the stored order: every price
  * comes from order_items and the order row, never from the cart.
  *
- * Right after checkout the sheet feeds out of a printer, as in the app:
- * processing while the order loads, printing for the feed, then complete.
- * Opened any other way, or with reduced motion, it is simply already printed.
+ * Every visit feeds the sheet out of a printer, as the app does whenever its
+ * receipt opens: processing while the order loads, printing for the feed,
+ * then complete. With reduced motion on, it is simply already printed.
  */
 export default function Receipt() {
   const { id = '' } = useParams()
   const me = useMe()
-  const navigate = useNavigate()
-  const location = useLocation()
-  const [animate] = useState(() => (location.state as ReceiptLocationState | null)?.justPlaced === true && !prefersReducedMotion())
+  const [animate] = useState(() => !prefersReducedMotion())
 
   const order = useQuery(() => api.order(id), [id])
   const locations = useQuery(() => api.locations())
@@ -54,13 +47,9 @@ export default function Receipt() {
 
   useEffect(() => {
     if (printed || !o) return
-    const t = window.setTimeout(() => {
-      setPrinted(true)
-      // Drop the flag so a reload or a return visit shows the finished receipt
-      navigate(location.pathname, { replace: true, state: null })
-    }, FEED_MS)
+    const t = window.setTimeout(() => setPrinted(true), FEED_MS)
     return () => window.clearTimeout(t)
-  }, [printed, o, navigate, location.pathname])
+  }, [printed, o])
 
   if (order.loading && !animate) return <PageLoader />
 

@@ -15,7 +15,6 @@ import { isHub } from '@/lib/flight'
 import { errorMessage, invalidate, useQuery } from '@/lib/store'
 import { cn } from '@/lib/utils'
 import type { PaymentMethod } from '@/types'
-import type { ReceiptLocationState } from './receipt'
 
 const methods: { value: PaymentMethod; label: string; body: string; icon: typeof Globe }[] = [
   { value: 'xendit_online', label: 'Pay online (GCash or Card)', body: 'Pay on Xendit’s secure checkout page.', icon: Globe },
@@ -148,8 +147,7 @@ export default function Checkout() {
       // simulated payment. Online payments still open the order page, where
       // the payment is tracked; several orders go to the list.
       if (placed.length === 1 && method !== 'xendit_online') {
-        const state: ReceiptLocationState = { justPlaced: true }
-        navigate(`/user/orders/${placed[0]}/receipt`, { replace: true, state })
+        navigate(`/user/orders/${placed[0]}/receipt`, { replace: true })
       } else {
         navigate(placed.length === 1 ? `/user/orders/${placed[0]}` : '/user/orders', { replace: true })
       }

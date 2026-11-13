@@ -47,6 +47,28 @@ export interface PlaceOrderInput {
   items: { product_id: string; product_name: string; quantity: number; unit_price: number }[]
 }
 
+/** What to price: the same vendor, drop-off and items place_order receives. */
+export interface QuoteOrderInput {
+  vendorId: string
+  dropoffLocationId: string
+  items: { product_id: string; quantity: number }[]
+}
+
+/**
+ * An order's price from quote_order_fee(), the function place_order charges
+ * with. The site never computes these figures itself.
+ */
+export interface OrderQuote {
+  subtotal: number
+  deliveryFee: number
+  totalAmount: number
+  totalWeightGrams: number
+  tripsRequired: number
+  distanceKm: number
+  isCaution: boolean
+  breakdown: { base: number; distance: number; weight: number; extraTrip: number; weather: number }
+}
+
 export interface ProductInput {
   id?: string
   name: string
@@ -176,6 +198,8 @@ export interface Api {
   // Orders (scoped by role: customers see theirs, vendors their store's, admins all)
   orders(): Promise<Order[]>
   order(id: string): Promise<Order | null>
+  /** quote_order_fee: the server's price for an order, to display before placing it. */
+  quoteOrderFee(input: QuoteOrderInput): Promise<OrderQuote>
   placeOrder(input: PlaceOrderInput): Promise<string>
   startOnlinePayment(orderId: string): Promise<string>
   cancelOrder(id: string): Promise<void>

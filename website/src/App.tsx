@@ -27,6 +27,7 @@ const ProductPage = lazy(() => import('@/pages/user/product'))
 const Cart = lazy(() => import('@/pages/user/cart'))
 const Checkout = lazy(() => import('@/pages/user/checkout'))
 const UserOrders = lazy(() => import('@/pages/user/orders'))
+const Receipt = lazy(() => import('@/pages/user/receipt'))
 const Track = lazy(() => import('@/pages/user/track'))
 
 const OrderDetail = lazy(() => import('@/pages/shared/order-detail'))
@@ -103,6 +104,7 @@ const router = createBrowserRouter([
           { path: 'orders', element: page(<UserOrders />) },
           { path: 'history', element: <Navigate to="/user/orders" replace /> },
           { path: 'orders/:id', element: page(<OrderDetail />) },
+          { path: 'orders/:id/receipt', element: page(<Receipt />) },
           { path: 'track', element: page(<Track />) },
           { path: 'notifications', element: page(<Notifications />) },
           { path: 'profile', element: page(<Profile />) },

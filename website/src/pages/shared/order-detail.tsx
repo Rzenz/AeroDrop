@@ -1,4 +1,4 @@
-import { ArrowLeft, Ban, Check, ChefHat, CreditCard, LifeBuoy, PackageCheck, PlaneTakeoff, Star, X } from 'lucide-react'
+import { ArrowLeft, Ban, Check, ChefHat, CreditCard, LifeBuoy, PackageCheck, PlaneTakeoff, ReceiptText, Star, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useMe } from '@/auth/auth'
@@ -137,6 +137,9 @@ function Actions({ order: o }: { order: Order }) {
       <div className="flex flex-wrap gap-2">
         {cancellable ? <ConfirmDialog trigger={<Button variant="outline" icon={<Ban aria-hidden className="size-4" />}>Cancel order</Button>} title="Cancel this order?" body="You can cancel until the order is ready for drone pickup. Payment is refunded and stock restored." confirmLabel="Cancel order" onConfirm={() => run('cancel', () => api.cancelOrder(o.id), 'Order cancelled.')} /> : null}
         {status === 'delivered' ? <Button variant="secondary" icon={<Star aria-hidden className="size-4" />} onClick={() => setReview(true)}>{reviewed ? 'Edit your review' : 'Rate this order'}</Button> : null}
+        <Link to={`/user/orders/${o.id}/receipt`} className="inline-flex h-11 items-center gap-2 rounded-xl px-4 text-sm font-semibold text-ink-2 hover:bg-sunken hover:text-ink">
+          <ReceiptText aria-hidden className="size-4" /> View receipt
+        </Link>
         <Link to={`/user/help?orderId=${o.id}${o.delivery ? `&deliveryId=${o.delivery.id}` : ''}`} className={cn('inline-flex h-11 items-center gap-2 rounded-xl px-4 text-sm font-semibold text-ink-2 hover:bg-sunken hover:text-ink')}>
           <LifeBuoy aria-hidden className="size-4" /> Report a problem
         </Link>

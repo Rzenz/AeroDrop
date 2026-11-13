@@ -346,6 +346,35 @@ export const liveApi: Api = {
     if (!row) return null
     return (await hydrate([row as unknown as OrderRow], viewer))[0] ?? null
   },
+  async quoteOrderFee(input) {
+    const raw = ok(
+      await sb().rpc('quote_order_fee', {
+        p_vendor_id: input.vendorId,
+        p_delivery_location_id: input.dropoffLocationId,
+        p_items: input.items,
+      }),
+    ) as Record<string, unknown> | null
+    // Postgres numerics may arrive as strings. A missing price is an error,
+    // never a zero shown as if it were the charge.
+    const num = (v: unknown) => (typeof v === 'number' ? v : Number(v ?? NaN))
+    const need = (key: string) => {
+      const n = num(raw?.[key])
+      if (!Number.isFinite(n)) throw new Error('The delivery fee could not be calculated.')
+      return n
+    }
+    const opt = (v: unknown) => (Number.isFinite(num(v)) ? num(v) : 0)
+    const b = (raw?.breakdown ?? {}) as Record<string, unknown>
+    return {
+      subtotal: need('subtotal'),
+      deliveryFee: need('delivery_fee'),
+      totalAmount: need('total_amount'),
+      totalWeightGrams: opt(raw?.total_weight_grams),
+      tripsRequired: Math.max(1, Math.round(opt(raw?.trips_required))),
+      distanceKm: opt(raw?.distance_km),
+      isCaution: raw?.is_caution === true,
+      breakdown: { base: opt(b.base), distance: opt(b.distance), weight: opt(b.weight), extraTrip: opt(b.extra_trip), weather: opt(b.weather) },
+    }
+  },
   async placeOrder(input) {
     const id = ok(
       await sb().rpc('place_order', {

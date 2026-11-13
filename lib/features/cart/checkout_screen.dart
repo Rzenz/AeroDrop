@@ -11,8 +11,10 @@ import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/neu_card.dart';
 import '../../core/providers/order_provider.dart';
 import '../../core/models/cart_model.dart';
+import '../../core/models/order_quote_model.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/providers/location_provider.dart';
+import '../../core/providers/order_quote_provider.dart';
 import '../../core/providers/vendor_provider.dart';
 import '../../core/providers/weather_provider.dart';
 import '../../core/services/delivery_fee_calculator.dart';
@@ -49,9 +51,17 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   @override
   Widget build(BuildContext context) {
     final cart = cartNotifier.value;
-    final feeBreakdown = _getFeeBreakdown(cart, isWatch: true);
-    final deliveryFee = feeBreakdown.totalFee;
-    final total = cartNotifier.totalAmount + deliveryFee;
+    // Priced by the server (quote_order_fee), the same function place_order
+    // charges with. Never computed here: a failed quote shows as unavailable
+    // and blocks the order rather than falling back to a local figure.
+    final quoteRequest = orderQuoteRequestFor(cart, _selectedLocationId);
+    final quoteAsync = quoteRequest == null
+        ? const AsyncValue<OrderQuote>.loading()
+        : ref.watch(orderQuoteProvider(quoteRequest));
+    final quote = quoteAsync.asData?.value;
+    final quoteFailed = quote == null && quoteAsync.hasError;
+    final feeBreakdown = quote?.toFeeBreakdown();
+    final pendingFigure = quoteFailed ? 'Unavailable' : 'Calculating…';
     final totalWeightGrams = cart.fold<int>(
       0,
       (sum, item) => sum + ((item.weightKg * 1000).round() * item.quantity),
@@ -274,15 +284,31 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                       children: [
                         _SummaryRow(
                           label: 'Subtotal',
-                          value:
-                              '₱${cartNotifier.totalAmount.toStringAsFixed(2)}',
+                          value: quote != null
+                              ? '₱${quote.subtotal.toStringAsFixed(2)}'
+                              : pendingFigure,
                         ),
                         const SizedBox(height: 6),
                         _SummaryRow(
                           label: 'Drone Delivery Fee',
-                          value: '₱${deliveryFee.toStringAsFixed(2)}',
+                          value: quote != null
+                              ? '₱${quote.deliveryFee.toStringAsFixed(2)}'
+                              : pendingFigure,
+                          valueColor: quoteFailed
+                              ? AppColors.danger
+                              : Colors.white,
                         ),
-                        if (feeBreakdown.breakdownText.isNotEmpty) ...[
+                        if (quoteFailed)
+                          _QuoteError(
+                            message: _quoteErrorText(quoteAsync.error),
+                            onRetry: quoteRequest == null
+                                ? null
+                                : () => ref.invalidate(
+                                    orderQuoteProvider(quoteRequest),
+                                  ),
+                          ),
+                        if (feeBreakdown != null &&
+                            feeBreakdown.breakdownText.isNotEmpty) ...[
                           const SizedBox(height: 3),
                           Align(
                             alignment: Alignment.centerLeft,
@@ -333,8 +359,12 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                         const SizedBox(height: 10),
                         _SummaryRow(
                           label: 'Total',
-                          value: '₱${total.toStringAsFixed(2)}',
-                          valueColor: AppColors.accent,
+                          value: quote != null
+                              ? '₱${quote.totalAmount.toStringAsFixed(2)}'
+                              : pendingFigure,
+                          valueColor: quoteFailed
+                              ? AppColors.danger
+                              : AppColors.accent,
                           bold: true,
                         ),
                       ],
@@ -420,13 +450,15 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
 
                   // Confirm button
                   FilledButton(
-                    onPressed: (_placing || isOverweight || isGrounded)
+                    onPressed:
+                        (_placing || isOverweight || isGrounded || quote == null)
                         ? null
                         : _placeOrder,
                     style: FilledButton.styleFrom(
                       backgroundColor: AppColors.accent,
                       foregroundColor: AppColors.bgDark,
-                      disabledBackgroundColor: (isOverweight || isGrounded)
+                      disabledBackgroundColor:
+                          (isOverweight || isGrounded || quoteFailed)
                           ? AppColors.cardDark
                           : null,
                       minimumSize: const Size(double.infinity, 56),
@@ -446,13 +478,20 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                         : Text(
                             isOverweight
                                 ? 'Order Too Heavy'
-                                : (isGrounded
-                                      ? 'Flight Grounded'
-                                      : 'Confirm Order'),
+                                : isGrounded
+                                ? 'Flight Grounded'
+                                : quoteFailed
+                                ? 'Fee Unavailable'
+                                : quote == null
+                                ? 'Calculating Fee…'
+                                : 'Confirm Order',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: AppTextStyles.subHead(
                               fontSize: 17,
                               fontWeight: FontWeight.bold,
-                              color: (isOverweight || isGrounded)
+                              color:
+                                  (isOverweight || isGrounded || quoteFailed)
                                   ? Colors.grey
                                   : null,
                             ),
@@ -508,9 +547,31 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       return;
     }
 
-    final feeBreakdown = _getFeeBreakdown(cart, isWatch: false);
-    final deliveryFee = feeBreakdown.totalFee;
-    final totalAmount = cartNotifier.totalAmount + deliveryFee;
+    // Fetch a fresh quote rather than trusting the one on screen: the weather
+    // or the drop-off may have moved since it loaded, and the server charges
+    // its current figure. No quote, no order.
+    final OrderQuote quote;
+    try {
+      quote = await ref.refresh(
+        orderQuoteProvider(
+          orderQuoteRequestFor(cart, _selectedLocationId)!,
+        ).future,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _placing = false);
+      showNeuSnack(
+        context,
+        '${_quoteErrorText(e)} Your order was not placed.',
+        tone: NeuToneKind.error,
+      );
+      return;
+    }
+    if (!mounted) return;
+
+    final feeBreakdown = quote.toFeeBreakdown();
+    final deliveryFee = quote.deliveryFee;
+    final totalAmount = quote.totalAmount;
     final dropoffName = _dropoffName() ?? 'Selected Campus Pad';
     final paymentLabel = switch (_paymentMethod) {
       'xendit' => 'Pay online (GCash or Card)',
@@ -585,7 +646,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         .placeOrder(
           vendorId: cart.first.vendorId,
           dropoffLocationId: _selectedLocationId!,
-          subtotal: cartNotifier.totalAmount,
+          // Ignored by the server since migration 31, which prices the order
+          // itself; passed so the place_order signature stays unchanged.
+          subtotal: quote.subtotal,
           deliveryFee: deliveryFee,
           totalAmount: totalAmount,
           paymentMethod: dbPaymentMethod,
@@ -659,6 +722,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       cart,
       totalAmount,
       deliveryFee,
+      subtotal: quote.subtotal,
       feeBreakdown: feeBreakdown,
     );
     cartNotifier.clear();
@@ -682,77 +746,13 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     return null;
   }
 
-  /// Computes distance and weight based delivery fee with caution weather surcharge
-  DeliveryFeeBreakdown _getFeeBreakdown(
-    List<CartItem> cart, {
-    bool isWatch = false,
-  }) {
-    if (cart.isEmpty) {
-      return DeliveryFeeCalculator.calculateOrderFee();
-    }
-    final allCampusLocations =
-        (isWatch
-            ? ref.watch(campusLocationsProvider).value
-            : ref.read(campusLocationsProvider).value) ??
-        [];
-    final dropoffLocations =
-        (isWatch
-            ? ref.watch(dropoffLocationsProvider).value
-            : ref.read(dropoffLocationsProvider).value) ??
-        allCampusLocations;
-    final vendors = (isWatch
-        ? ref.watch(vendorProvider).vendors
-        : ref.read(vendorProvider).vendors);
-    final vendor = vendors
-        .where((v) => v.id == cart.first.vendorId)
-        .firstOrNull;
-
-    CampusLocation? vendorLoc;
-    if (vendor != null) {
-      if (vendor.campusLocationId != null &&
-          vendor.campusLocationId!.isNotEmpty) {
-        vendorLoc = allCampusLocations
-            .where((l) => l.id == vendor.campusLocationId)
-            .firstOrNull;
-      }
-      if (vendorLoc == null && vendor.building.isNotEmpty) {
-        final bLower = vendor.building.toLowerCase();
-        vendorLoc = allCampusLocations.where((l) {
-          final lName = l.name.toLowerCase();
-          final lCode = l.locationCode.toLowerCase();
-          return lName.contains(bLower) ||
-              bLower.contains(lName) ||
-              lCode == bLower;
-        }).firstOrNull;
-      }
-    }
-
-    final dropoffLoc = dropoffLocations
-        .where((l) => l.id == _selectedLocationId)
-        .firstOrNull;
-
-    final distanceKm = DeliveryFeeCalculator.calculateDistanceKm(
-      startLat: vendorLoc?.latitude,
-      startLng: vendorLoc?.longitude,
-      endLat: dropoffLoc?.latitude,
-      endLng: dropoffLoc?.longitude,
-    );
-
-    final totalWeightGrams = cart.fold<int>(
-      0,
-      (sum, item) => sum + ((item.weightKg * 1000).round() * item.quantity),
-    );
-    final weightKg = totalWeightGrams / 1000.0;
-    final weather = isWatch
-        ? ref.watch(weatherProvider)
-        : ref.read(weatherProvider);
-
-    return DeliveryFeeCalculator.calculateOrderFee(
-      distanceKm: distanceKm,
-      weightKg: weightKg,
-      isCaution: weather.isCaution,
-      trips: DeliveryFeeCalculator.tripsForWeight(weightKg),
-    );
+  /// A quote failure as a sentence for the checkout.
+  static String _quoteErrorText(Object? error) {
+    final detail = error is StateError ? error.message : null;
+    return detail != null && detail.isNotEmpty
+        ? 'The delivery fee could not be calculated: $detail'
+        : 'The delivery fee could not be calculated. Check your connection '
+              'and try again.';
   }
 
   /// Builds the printed record from the order just placed.
@@ -765,6 +765,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     List<CartItem> cart,
     double totalAmount,
     double deliveryFee, {
+    required double subtotal,
     DeliveryFeeBreakdown? feeBreakdown,
   }) {
     final placed = ref.read(orderProvider).orders;
@@ -801,7 +802,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
             unitPrice: item.unitPrice,
           ),
       ],
-      subtotal: cartNotifier.totalAmount,
+      subtotal: subtotal,
       deliveryFee: deliveryFee,
       feeBreakdown: feeBreakdown,
       total: totalAmount,
@@ -814,6 +815,60 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       customerNote: note,
       orderStatus: 'Pending Confirmation',
       deliveryId: firstOrder?.deliveryId,
+    );
+  }
+}
+
+/// Why the fee is missing, with a way to ask again.
+class _QuoteError extends StatelessWidget {
+  final String message;
+  final VoidCallback? onRetry;
+  const _QuoteError({required this.message, this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(
+            Icons.error_outline_rounded,
+            size: 16,
+            color: AppColors.danger,
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              message,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.caption(
+                fontSize: 11,
+                color: AppColors.danger,
+              ),
+            ),
+          ),
+          if (onRetry != null)
+            TextButton(
+              onPressed: onRetry,
+              style: TextButton.styleFrom(
+                minimumSize: const Size(0, 32),
+                visualDensity: VisualDensity.compact,
+              ),
+              child: Text(
+                'Retry',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTextStyles.caption(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.accentText,
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

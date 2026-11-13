@@ -148,32 +148,7 @@ class DeliveryFeeCalculator {
       (rawTotal < baseFee ? baseFee : rawTotal).toStringAsFixed(2),
     );
 
-    // Build short breakdown text: e.g. "Base ₱15.00 + Distance 0.21 km ₱8.40 + Weight 0.32 kg ₱3.20"
-    final parts = <String>[
-      'Base ₱${baseFee.toStringAsFixed(2)}',
-    ];
-    if (dist > 0) {
-      parts.add(
-        tripCount > 1
-            ? 'Distance ${dist.toStringAsFixed(2)} km × $tripCount trips ₱${distFee.toStringAsFixed(2)}'
-            : 'Distance ${dist.toStringAsFixed(2)} km ₱${distFee.toStringAsFixed(2)}',
-      );
-    }
-    if (cappedWeight > 0) {
-      parts.add('Weight ${cappedWeight.toStringAsFixed(2)} kg ₱${wFee.toStringAsFixed(2)}');
-    }
-    if (tripFee > 0) {
-      parts.add(
-        'Extra drone ${tripCount - 1 == 1 ? 'trip' : 'trips'} ₱${tripFee.toStringAsFixed(2)}',
-      );
-    }
-    if (weaFee > 0) {
-      parts.add('Weather ₱${weaFee.toStringAsFixed(2)}');
-    }
-
-    final breakdown = parts.join(' + ');
-
-    return DeliveryFeeBreakdown(
+    return breakdownFrom(
       baseFee: baseFee,
       distanceKm: dist,
       distanceFee: distFee,
@@ -182,7 +157,59 @@ class DeliveryFeeCalculator {
       weatherFee: weaFee,
       extraTripFee: tripFee,
       totalFee: total,
-      breakdownText: breakdown,
+      trips: tripCount,
+    );
+  }
+
+  /// Labels a fee whose parts are already known, without computing any of
+  /// them. Checkout uses this for the server's quote_order_fee() figures, so
+  /// the breakdown reads the same whichever side priced it.
+  static DeliveryFeeBreakdown breakdownFrom({
+    required double baseFee,
+    required double distanceKm,
+    required double distanceFee,
+    required double weightKg,
+    required double weightFee,
+    required double weatherFee,
+    required double extraTripFee,
+    required double totalFee,
+    required int trips,
+  }) {
+    final tripCount = trips < 1 ? 1 : trips;
+
+    // Build short breakdown text: e.g. "Base ₱15.00 + Distance 0.21 km ₱8.40 + Weight 0.32 kg ₱3.20"
+    final parts = <String>[
+      'Base ₱${baseFee.toStringAsFixed(2)}',
+    ];
+    if (distanceKm > 0) {
+      parts.add(
+        tripCount > 1
+            ? 'Distance ${distanceKm.toStringAsFixed(2)} km × $tripCount trips ₱${distanceFee.toStringAsFixed(2)}'
+            : 'Distance ${distanceKm.toStringAsFixed(2)} km ₱${distanceFee.toStringAsFixed(2)}',
+      );
+    }
+    if (weightKg > 0) {
+      parts.add('Weight ${weightKg.toStringAsFixed(2)} kg ₱${weightFee.toStringAsFixed(2)}');
+    }
+    if (extraTripFee > 0) {
+      parts.add(
+        'Extra drone ${tripCount - 1 == 1 ? 'trip' : 'trips'} ₱${extraTripFee.toStringAsFixed(2)}',
+      );
+    }
+    if (weatherFee > 0) {
+      parts.add('Weather ₱${weatherFee.toStringAsFixed(2)}');
+    }
+
+    return DeliveryFeeBreakdown(
+      baseFee: baseFee,
+      distanceKm: distanceKm,
+      distanceFee: distanceFee,
+      weightKg: weightKg,
+      weightFee: weightFee,
+      weatherFee: weatherFee,
+      extraTripFee: extraTripFee,
+      totalFee: totalFee,
+      breakdownText: parts.join(' + '),
       trips: tripCount,
     );
   }

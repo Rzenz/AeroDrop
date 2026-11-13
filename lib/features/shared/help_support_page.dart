@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/models/support_report_model.dart';
 import '../../core/providers/support_chat_provider.dart';
 import '../../core/theme/app_colors.dart';
@@ -471,7 +472,14 @@ class _SupportReportFormState extends State<_SupportReportForm> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _submitting = false);
-      showNeuSnack(context, 'Failed to submit report: $e', tone: NeuToneKind.error);
+      // A rate limit or policy refusal arrives as the server's own sentence;
+      // show that, not the exception's debug dump.
+      final reason = e is PostgrestException ? e.message : '$e';
+      showNeuSnack(
+        context,
+        'Failed to submit report: $reason',
+        tone: NeuToneKind.error,
+      );
     }
   }
 

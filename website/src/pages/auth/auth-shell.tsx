@@ -61,18 +61,17 @@ function Brand({ light }: { light?: boolean }) {
 }
 
 /**
- * The page behind the card: the UCLM campus, softly blurred and washed into
- * the page colour, a faint dot grid and two quiet brand glows. Static, so it
- * costs nothing after the first paint.
+ * The page behind the card: the University of Cebu Lapu-Lapu and Mandaue
+ * building, blurred so it reads as a place rather than a picture, with a
+ * light tint (white in light mode, black in dark) to keep the card crisp.
+ * Static, so it costs nothing after the first paint.
  */
 function Backdrop() {
   return (
     <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-bg">
-      <img src="/img/uclm-campus.jpg" alt="" className="no-outline absolute inset-0 size-full scale-110 object-cover opacity-70 blur-2xl dark:opacity-50" />
-      <div className="absolute inset-0 bg-bg/75 dark:bg-bg/70" />
-      <div className="absolute inset-0 [background-image:radial-gradient(var(--line)_1px,transparent_1px)] [background-size:22px_22px] [mask-image:radial-gradient(ellipse_80%_70%_at_50%_50%,black,transparent)]" />
-      <div className="absolute -top-40 -left-40 size-[520px] rounded-full bg-[var(--sky)] opacity-20 blur-[120px]" />
-      <div className="absolute -right-40 -bottom-40 size-[520px] rounded-full bg-[var(--brand)] opacity-15 blur-[120px]" />
+      {/* scale hides the soft edge the blur leaves at the borders */}
+      <img src="/img/uclm-campus.jpg" alt="" className="no-outline absolute inset-0 size-full scale-110 object-cover blur-[10px]" />
+      <div className="absolute inset-0 bg-white/40 dark:bg-black/60" />
     </div>
   )
 }

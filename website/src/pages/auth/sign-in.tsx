@@ -5,16 +5,16 @@ import { homeFor, markUnlocked, useAuth } from '@/auth/auth'
 import { Button } from '@/components/ui/button'
 import { Field } from '@/components/ui/primitives'
 import { api, EmailNotVerifiedError } from '@/data/api'
-import { isAdminEmail } from '@/lib/config'
 import { errorMessage } from '@/lib/store'
 import { AuthInput, AuthShell, CodeInput, FormNote, GoogleButton, OrDivider, PasswordInput, ResendCode } from './auth-shell'
 
 /**
- * login_screen.dart. Password first; then customers and vendors confirm with
- * an emailed code. An email that never finished sign-up gets its sign-up code
- * instead (AuthNotifier.login), so the account can be verified from here.
+ * login_screen.dart. Password only, for everyone, as in the app: no code at
+ * sign-in. Proving the email is a separate step from the banner or profile.
+ * An email that never finished sign-up (only possible with "Confirm email"
+ * on) gets its sign-up code instead (AuthNotifier.login).
  */
-type Step = 'password' | 'login-code' | 'signup-code'
+type Step = 'password' | 'signup-code'
 
 export default function SignIn() {
   const { user, ready, refresh } = useAuth()
@@ -48,8 +48,6 @@ export default function SignIn() {
   }
 
   function backToPassword() {
-    // Drop any half-finished session so the password step starts clean.
-    if (step === 'login-code') api.signOut()
     setStep('password')
     setCode('')
     setError(null)
@@ -64,23 +62,11 @@ export default function SignIn() {
     setBusy(true)
     try {
       const profile = await api.signIn(email, password)
-      if (profile.role === 'admin' || isAdminEmail(profile.email)) {
-        markUnlocked(profile.id)
-        await refresh()
-        navigate(homeFor(profile), { replace: true })
-        return
-      }
-      // Migration 35: an unverified account goes straight in and verifies
-      // from its profile (it can't order until then). Verified accounts
-      // still confirm every sign-in with an emailed code, as in the app.
-      if (profile.email_verified_at === null) {
-        markUnlocked(profile.id)
-        await refresh()
-        navigate(homeFor(profile), { replace: true })
-        return
-      }
-      await api.sendLoginCode(email)
-      toCodeStep('login-code', null)
+      // Everyone goes straight in. An unverified account sees the banner and
+      // verifies from there; only ordering waits for it (migration 35).
+      markUnlocked(profile.id)
+      await refresh()
+      navigate(homeFor(profile), { replace: true })
     } catch (err) {
       if (err instanceof EmailNotVerifiedError) toCodeStep('signup-code', err.message)
       else setError(errorMessage(err))
@@ -95,8 +81,7 @@ export default function SignIn() {
     if (code.length !== 6) return setError('Enter all 6 digits.')
     setBusy(true)
     try {
-      if (step === 'signup-code') await api.verifySignUpCode(email, code)
-      else await api.verifyLoginCode(email, code)
+      await api.verifySignUpCode(email, code)
       const id = await api.currentUserId()
       if (id) markUnlocked(id)
       await refresh()
@@ -113,8 +98,7 @@ export default function SignIn() {
     setResending(true)
     setError(null)
     try {
-      if (step === 'signup-code') await api.resendSignUpCode(email)
-      else await api.sendLoginCode(email)
+      await api.resendSignUpCode(email)
       setNotice('We sent you a new code.')
       setCooldown(60)
     } catch (err) {
@@ -140,7 +124,7 @@ export default function SignIn() {
   if (step !== 'password') {
     return (
       <AuthShell
-        title={step === 'signup-code' ? 'Verify your email' : 'Check your email'}
+        title="Verify your email"
         subtitle={
           <>
             Enter the 6-digit code we sent to <b className="font-semibold break-words text-ink">{email.trim().toLowerCase()}</b>.
@@ -150,7 +134,7 @@ export default function SignIn() {
       >
         <form onSubmit={submitCode} noValidate className="flex flex-col gap-5">
           {notice ? <FormNote tone="info">{notice}</FormNote> : null}
-          <Field label={step === 'signup-code' ? 'Verification code' : 'Sign-in code'} error={error}>
+          <Field label="Verification code" error={error}>
             {(p) => <CodeInput id={p.id} value={code} onChange={setCode} invalid={!!error} describedBy={p['aria-describedby']} />}
           </Field>
           <Button type="submit" size="lg" loading={busy} className="w-full">

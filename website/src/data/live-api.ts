@@ -250,14 +250,6 @@ export const liveApi: Api = {
   async resendSignUpCode(email) {
     authOk(await sb().auth.resend({ type: 'signup', email: email.trim().toLowerCase() }))
   },
-  async sendLoginCode(email) {
-    if (isAdminEmail(email)) return
-    authOk(await sb().auth.signInWithOtp({ email: email.trim().toLowerCase(), options: { shouldCreateUser: false } }))
-  },
-  async verifyLoginCode(email, code) {
-    authOk(await sb().auth.verifyOtp({ type: 'email', email: email.trim().toLowerCase(), token: code.trim() }))
-    await recordTermsAcceptance()
-  },
   async sendEmailVerificationCode() {
     const { data } = await sb().auth.getUser()
     const email = data.user?.email
@@ -309,14 +301,9 @@ export const liveApi: Api = {
       },
     })
     if (res.error) {
-      // AuthNotifier.register: an email that signed up but never verified
-      // gets a new code instead of an error.
-      if (isAlreadyRegistered(res.error)) {
-        const resend = await sb().auth.resend({ type: 'signup', email })
-        if (!resend.error) return { verify: true, notice: "Your email isn't verified yet. We sent you a new code." }
-        if (isRateLimited(resend.error)) return { verify: true, notice: "Your email isn't verified yet. Please enter the code sent to your email." }
-        throw new Error(authMessage(resend.error))
-      }
+      // An address that already has an account: say so, send nothing, and
+      // open no code step (AuthNotifier.register does the same).
+      if (isAlreadyRegistered(res.error)) throw new Error('This email is already registered. Sign in instead, or use a different email.')
       throw new Error(authMessage(res.error))
     }
     // With email confirmation on, Supabase answers a verified address with a

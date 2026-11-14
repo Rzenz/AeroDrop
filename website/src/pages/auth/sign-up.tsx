@@ -132,7 +132,7 @@ export default function SignUp() {
         await finish()
         return
       }
-      setNotice(result.notice ?? null)
+      setNotice(null)
       setStep('code')
       setCode('')
       setCooldown(60)

@@ -46,6 +46,7 @@ The website uses the app's back end directly. It has no server and no API of its
   - The Google-only account check on sign-in and password reset.
   - `/complete-profile` for accounts without a phone number, using the app's PH number rules.
   - The 6-character password minimum. Sign-up shows a strength bar and tips (length, mixed case, a number, a symbol) and warns about common passwords or ones containing the person's name or email. The bar advises; only the minimum is enforced, as in the app.
+  - Verify later (migration 35). With Supabase's "Confirm email" off, sign-up signs people straight in. Until the email is verified, customers and vendors see a banner, and the database refuses their orders. **Verify email** on the banner or on the profile emails a 6-digit code and opens the code card. Entering it sets `users.email_verified_at`. An emailed-code sign-in in the app also counts, through a trigger. Unverified accounts sign in with just their password; verified accounts still confirm each sign-in with a code. If "Confirm email" is still on, sign-up falls back to asking for the code straight away.
   - Real email addresses only (migration 34). Before an account is made, the app and the website both call the `check-email` Edge Function. It refuses malformed addresses, domains that don't exist or can't receive mail (DNS MX lookup), throwaway inboxes and common typos, which get a "Did you mean …?" fix. A database trigger refuses the same throwaway and typo domains even if the auth API is called directly, and the emailed code still has to be entered.
 - **Storage.** The app's buckets and paths: `avatars/<uid>/avatar.<ext>`, `vendor-logos/<uid>/logo.<ext>` (or `business_logo.<ext>` at sign-up), and `product-images/<uid>/prod_<ms>.<ext>`. Files must be JPEG, PNG or WebP and under 5 MB.
 - **Orders.**
@@ -139,6 +140,13 @@ The build writes a Content-Security-Policy into `index.html` that names the conf
 The CLI works too: from `website/`, run `npx vercel` for a preview or `npx vercel --prod` for production. Set the variables first with `npx vercel env add`.
 
 ## Before going live
+
+- Email verification (migration 35), in this order:
+  1. Apply migration 35. Its backfill marks every account that exists now as verified.
+  2. Turn off **Authentication → Providers → Email → Confirm email** so new accounts are signed in straight away.
+  3. Make sure the **Magic Link** email template includes `{{ .Token }}`: the Verify email card and the sign-in code both use it.
+
+  The Flutter app was not changed for this. With "Confirm email" off, its own sign-up screen still waits for a code that Supabase no longer sends. Its existing code-at-sign-in still verifies the email.
 
 - Set up custom SMTP so sign-up and sign-in codes reach everyone. Supabase's built-in sender only emails members of the project's team, two messages an hour; every other address is refused ("Email address not authorized"), so the account is created but no code arrives. In Supabase, open **Authentication → Emails → SMTP Settings**, enable custom SMTP and enter a provider's details (Gmail with an App Password, Brevo, Resend, Postmark, AWS SES…). Then raise **Authentication → Rate Limits → emails per hour** (custom SMTP starts at 30). The **Confirm signup**, **Magic Link** and **Reset Password** templates must include `{{ .Token }}`, since both clients ask for the 6-digit code.
 

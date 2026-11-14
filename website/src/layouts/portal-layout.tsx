@@ -8,6 +8,7 @@ import { Logo } from '@/components/brand'
 import { IconButton } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/dialog'
 import { Avatar } from '@/components/ui/primitives'
+import { VerifyEmailBanner } from '@/components/verify-email'
 import { api } from '@/data/api'
 import { cartCount, useCart } from '@/lib/cart'
 import { effectiveStatus } from '@/lib/format'
@@ -128,6 +129,7 @@ export function PortalLayout({ role }: { role: Role }) {
         </header>
 
         <main id="main" className="flex-1 px-4 pt-2 pb-16 sm:px-6 lg:px-8">
+          {role !== 'admin' ? <VerifyEmailBanner me={me} /> : null}
           <motion.div
             key={location.pathname}
             initial={reduce ? false : { opacity: 0, y: 6 }}

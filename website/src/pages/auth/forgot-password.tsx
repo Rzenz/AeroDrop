@@ -64,7 +64,7 @@ export default function ForgotPassword() {
           : undefined
       }
       title={step === 'email' ? 'Reset your password' : 'Choose a new password'}
-      subtitle={step === 'email' ? 'We will email you a 6-digit code.' : <>Enter the code sent to <b className="font-semibold break-all text-ink">{email}</b>.</>}
+      subtitle={step === 'email' ? 'We will email you a 6-digit code.' : <>Enter the code sent to <b className="font-semibold break-words text-ink">{email}</b>.</>}
       footer={<Link to="/sign-in" className="font-semibold text-brand-ink hover:underline">Back to sign in</Link>}
     >
       {step === 'email' ? (

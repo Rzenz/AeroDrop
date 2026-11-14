@@ -70,6 +70,15 @@ export default function SignIn() {
         navigate(homeFor(profile), { replace: true })
         return
       }
+      // Migration 35: an unverified account goes straight in and verifies
+      // from its profile (it can't order until then). Verified accounts
+      // still confirm every sign-in with an emailed code, as in the app.
+      if (profile.email_verified_at === null) {
+        markUnlocked(profile.id)
+        await refresh()
+        navigate(homeFor(profile), { replace: true })
+        return
+      }
       await api.sendLoginCode(email)
       toCodeStep('login-code', null)
     } catch (err) {
@@ -134,7 +143,7 @@ export default function SignIn() {
         title={step === 'signup-code' ? 'Verify your email' : 'Check your email'}
         subtitle={
           <>
-            Enter the 6-digit code we sent to <b className="font-semibold break-all text-ink">{email.trim().toLowerCase()}</b>.
+            Enter the 6-digit code we sent to <b className="font-semibold break-words text-ink">{email.trim().toLowerCase()}</b>.
           </>
         }
         onBack={backToPassword}
@@ -158,6 +167,7 @@ export default function SignIn() {
 
   return (
     <AuthShell
+      split
       title="Welcome back"
       subtitle="Sign in with the account you use in the AeroDrop app."
       footer={

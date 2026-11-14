@@ -134,6 +134,19 @@ const rpc = {
   // Another device "holds" the flight, so this phone only views it: the
   // telemetry stays as seeded and every theme pass sees the same moment.
   claim_drone_sim_lease: () => false,
+  // Migration 35: the session was made by an emailed code, so mark it verified.
+  confirm_email_verified: (_args, uid) => {
+    const u = db.users.find((x) => x.id === uid)
+    if (!u) return new Error('Not authenticated')
+    u.email_verified_at ??= now()
+    return u.email_verified_at
+  },
+  // Only the migration 35 guard is modelled: unverified accounts cannot order.
+  place_order: (_args, uid) => {
+    const u = db.users.find((x) => x.id === uid)
+    if (u && u.email_verified_at === null) return new Error('Verify your email before placing an order. Open your profile and choose Verify email.')
+    return uuid()
+  },
   check_google_only_account: () => false,
   get_product_reviews: () => [],
   get_vendor_reviews: ({ p_vendor_id }) => (db.store_reviews ?? []).filter((r) => r.vendor_id === p_vendor_id),
@@ -300,9 +313,13 @@ createServer(async (req, res) => {
         }
         row._password = body?.password
         row._meta = m
-        row._unconfirmed = true
         row._signup = true
+        row.email_verified_at = null
         if (!existing) db.users.push(row)
+        // "Confirm email" off (the default here): signed in at once, verified
+        // later. An address containing +confirm acts as if the setting is on.
+        if (!email.includes('+confirm')) return send(res, 200, session(row))
+        row._unconfirmed = true
         return send(res, 200, { ...session(row).user, email_confirmed_at: null, identities: [{ id: row.id, provider: 'email' }] })
       }
       if (p === '/auth/v1/resend' || p === '/auth/v1/otp' || p === '/auth/v1/recover') return send(res, 200, {})
@@ -311,6 +328,8 @@ createServer(async (req, res) => {
         if (!u) return send(res, 400, { message: 'Invalid verification code.' })
         if (u._signup && body?.token !== '123456') return send(res, 403, { code: 'otp_expired', message: 'Token has expired or is invalid' })
         delete u._unconfirmed
+        // Migration 35's triggers: a session made by an emailed code verifies the email.
+        if (u.email_verified_at === null) u.email_verified_at = now()
         return send(res, 200, session(u))
       }
       if (p === '/auth/v1/user') {
@@ -339,6 +358,7 @@ createServer(async (req, res) => {
       const args = (await readBody(req)) ?? Object.fromEntries(url.searchParams)
       const me = userFromToken(req.headers.authorization)
       const out = rpc[fn] ? rpc[fn](args, me?.id) : null
+      if (out instanceof Error) return send(res, 400, { code: 'P0001', message: out.message })
       return send(res, 200, out)
     }
 

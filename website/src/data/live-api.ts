@@ -258,6 +258,22 @@ export const liveApi: Api = {
     authOk(await sb().auth.verifyOtp({ type: 'email', email: email.trim().toLowerCase(), token: code.trim() }))
     await recordTermsAcceptance()
   },
+  async sendEmailVerificationCode() {
+    const { data } = await sb().auth.getUser()
+    const email = data.user?.email
+    if (!email) throw new Error('Your session has ended. Please sign in again.')
+    // The same emailed code as sign-in (the Magic Link template's {{ .Token }}).
+    authOk(await sb().auth.signInWithOtp({ email, options: { shouldCreateUser: false } }))
+  },
+  async verifyEmailCode(code) {
+    const { data } = await sb().auth.getUser()
+    const email = data.user?.email
+    if (!email) throw new Error('Your session has ended. Please sign in again.')
+    authOk(await sb().auth.verifyOtp({ type: 'email', email, token: code.trim() }))
+    // The new session was made by the code, so the database accepts it as proof.
+    const res = await sb().rpc('confirm_email_verified')
+    if (res.error && !/could not find the function|does not exist/i.test(res.error.message)) throw new Error(res.error.message)
+  },
   async checkEmail(email) {
     // Never blocks on an outage: the emailed code still proves the inbox.
     try {

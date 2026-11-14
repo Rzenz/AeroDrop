@@ -10,6 +10,7 @@ import { toast } from '@/components/ui/toast'
 import { weatherMeta } from '@/components/weather-card'
 import { api, type OrderQuote } from '@/data/api'
 import { clearVendor, groupByVendor, useCart } from '@/lib/cart'
+import { needsEmailVerification } from '@/lib/email-verification'
 import { MAX_TRIPS, tripsForWeight } from '@/lib/fees'
 import { isHub } from '@/lib/flight'
 import { errorMessage, invalidate, useQuery } from '@/lib/store'
@@ -36,6 +37,7 @@ const luhn = (n: string) => {
 
 export default function Checkout() {
   const me = useMe()
+  const unverified = needsEmailVerification(me)
   const navigate = useNavigate()
   const items = useCart()
   const groups = groupByVendor(items)
@@ -92,6 +94,7 @@ export default function Checkout() {
     e.preventDefault()
     setError(null)
     if (!dropoff) return setError('Choose where the drone should drop your order.')
+    if (unverified) return setError('Verify your email before placing an order. Use the Verify email button above.')
     if (grounded) return setError('Drones are grounded by weather. Try again when conditions improve.')
     if (tooHeavy) return setError(`One order is over the ${MAX_TRIPS}-trip weight limit. Adjust your cart first.`)
     if (method === 'card_simulated') {
@@ -266,7 +269,12 @@ export default function Checkout() {
               {error}
             </p>
           ) : null}
-          <Button type="submit" size="lg" loading={busy} disabled={grounded || !quoted} className="mt-4 w-full">
+          {unverified ? (
+            <p role="status" className="mt-4 rounded-xl bg-warning-bg px-3 py-2.5 text-sm font-medium text-warning">
+              Verify your email to place this order.
+            </p>
+          ) : null}
+          <Button type="submit" size="lg" loading={busy} disabled={grounded || !quoted || unverified} className="mt-4 w-full">
             {method === 'xendit_online' ? 'Continue to payment' : 'Place order'}
           </Button>
           {method === 'xendit_online' && groups.length > 1 ? <p className="mt-2 text-xs text-ink-3">Online payment opens one invoice per order from each order’s page.</p> : null}

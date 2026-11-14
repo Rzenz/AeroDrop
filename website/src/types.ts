@@ -13,6 +13,8 @@ export interface Profile {
   account_status: AccountStatus
   /** When the user accepted the Terms and Privacy Policy (migration 28). Null means never recorded. */
   terms_accepted_at?: string | null
+  /** When the email was proven with an emailed code (migration 35). Null = unverified, cannot order; undefined = column not there yet. */
+  email_verified_at?: string | null
   vendor_status: VendorStatus | null
   business_name: string | null
   business_category: string | null

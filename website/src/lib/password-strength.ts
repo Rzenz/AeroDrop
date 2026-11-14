@@ -9,6 +9,8 @@ export type StrengthLevel = 0 | 1 | 2 | 3 | 4
 export interface PasswordTip {
   id: 'length' | 'case' | 'number' | 'symbol'
   label: string
+  /** The same tip as a phrase: "Add a number and a symbol." */
+  hint: string
   met: boolean
 }
 
@@ -39,10 +41,10 @@ function isSequence(lower: string) {
 
 export function passwordStrength(password: string, personal: string[] = []): PasswordStrength {
   const tips: PasswordTip[] = [
-    { id: 'length', label: 'At least 8 characters', met: password.length >= 8 },
-    { id: 'case', label: 'Upper and lower case letters', met: /[a-z]/.test(password) && /[A-Z]/.test(password) },
-    { id: 'number', label: 'At least one number', met: /\d/.test(password) },
-    { id: 'symbol', label: 'A symbol, like ! # or @', met: /[^A-Za-z0-9]/.test(password) },
+    { id: 'length', label: 'At least 8 characters', hint: 'more characters (8 or more)', met: password.length >= 8 },
+    { id: 'case', label: 'Upper and lower case letters', hint: 'upper and lower case letters', met: /[a-z]/.test(password) && /[A-Z]/.test(password) },
+    { id: 'number', label: 'At least one number', hint: 'a number', met: /\d/.test(password) },
+    { id: 'symbol', label: 'A symbol, like ! # or @', hint: 'a symbol like ! or #', met: /[^A-Za-z0-9]/.test(password) },
   ]
   if (!password) return { level: 0, label: '', tips }
 

@@ -2,6 +2,7 @@ import { Camera, Cookie, FileText, KeyRound, LifeBuoy, Mail, Moon, ReceiptText, 
 import { useRef, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth, useMe } from '@/auth/auth'
+import { EmailVerificationStatus } from '@/components/verify-email'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/dialog'
 import { Avatar, Badge, Card, CardHeader, Field, Input, Select, Switch, Textarea } from '@/components/ui/primitives'
@@ -87,6 +88,9 @@ export default function Profile() {
           <div className="mt-3 flex gap-2">
             <Badge tone="info">{isVendor ? 'Vendor' : 'Customer'}</Badge>
             {isVendor && me.business_category ? <Badge>{me.business_category}</Badge> : null}
+          </div>
+          <div className="mt-4">
+            <EmailVerificationStatus me={me} />
           </div>
           <p className="mt-4 text-xs text-ink-3">Member since {formatDate(me.created_at)}</p>
         </Card>

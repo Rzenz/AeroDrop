@@ -175,6 +175,10 @@ export interface Api {
   signIn(email: string, password: string): Promise<Profile>
   sendLoginCode(email: string): Promise<void>
   verifyLoginCode(email: string, code: string): Promise<void>
+  /** Emails a 6-digit code to the signed-in account's address. */
+  sendEmailVerificationCode(): Promise<void>
+  /** Checks that code and records the email as verified (migration 35). */
+  verifyEmailCode(code: string): Promise<void>
   /** Real, mail-receiving address? (check-email Edge Function; fails open). */
   checkEmail(email: string): Promise<EmailCheck>
   /** `verify` is false when the project returns a session straight away (email confirmation off). */

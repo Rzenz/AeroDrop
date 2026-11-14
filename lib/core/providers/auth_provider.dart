@@ -299,9 +299,12 @@ class AuthState {
     XFile? pendingLogoFile,
     bool clearPendingLogo = false,
     bool clearErrorMessage = false,
+    // `user: null` means "keep the current user" in copyWith, so dropping a
+    // restored account needs its own flag.
+    bool clearUser = false,
   }) {
     return AuthState(
-      user: user ?? this.user,
+      user: clearUser ? null : (user ?? this.user),
       isLoading: isLoading ?? this.isLoading,
       errorMessage: clearErrorMessage
           ? null
@@ -326,6 +329,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
   final Ref? ref;
   StreamSubscription? _authSubscription;
   bool _isGoogleSignInActive = false;
+
+  /// The emailed code a new account must enter: a "Confirm signup" code
+  /// (Supabase's "Confirm email" on) or a sign-in code that AeroDrop sends
+  /// itself when Supabase signs the new account in straight away.
+  OtpType _registrationOtpType = OtpType.signup;
 
   AuthNotifier([this.ref]) : super(const AuthState()) {
     _initializeSession();
@@ -751,7 +759,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
           }
 
           state = state.copyWith(
-            user: null,
+            clearUser: true,
             sessionUnlocked: false,
             requiresVerification: true,
             isVerified: false,
@@ -955,7 +963,23 @@ class AuthNotifier extends StateNotifier<AuthState> {
     XFile? logoFile,
     DateTime? termsAcceptedAt,
   }) async {
-    state = state.copyWith(isLoading: true, errorMessage: null);
+    // The app restores the last signed-in account at launch (locked until
+    // its sign-in code is entered). A new sign-up must not inherit it:
+    // otherwise the router sends the person to that account's code screen
+    // and the code goes to that account's email.
+    if (SupabaseService.isConfigured &&
+        SupabaseService.client.auth.currentSession != null) {
+      _loggingOut = true;
+      try {
+        await SupabaseService.client.auth.signOut(scope: SignOutScope.local);
+      } catch (e) {
+        debugPrint('Clearing the restored session before sign-up failed: $e');
+      } finally {
+        _loggingOut = false;
+      }
+    }
+    _registrationOtpType = OtpType.signup;
+    state = AuthState(isLoading: true, isVerified: false);
 
     try {
       final normalizedEmail = normalizeEmail(email);
@@ -1008,6 +1032,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
       final sessionCreated = response.session != null;
       if (sessionCreated) await _recordTermsAcceptance(authUser);
+      if (sessionCreated) {
+        // "Confirm email" is off, so Supabase sent nothing. Email the new
+        // address a 6-digit code so it is still verified before first use.
+        await SupabaseService.client.auth.signInWithOtp(
+          email: normalizedEmail,
+          shouldCreateUser: false,
+        );
+        _registrationOtpType = OtpType.email;
+      }
       if (sessionCreated && logoFile != null) {
         try {
           final validation = await ImageUtils.validateImage(logoFile);
@@ -1047,7 +1080,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       }
 
       state = state.copyWith(
-        user: null,
+        clearUser: true,
         sessionUnlocked: false,
         requiresVerification: true,
         isVerified: false,
@@ -1079,7 +1112,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
                 email: normalizedEmail,
               );
               state = state.copyWith(
-                user: null,
+                clearUser: true,
                 sessionUnlocked: false,
                 requiresVerification: true,
                 isVerified: false,
@@ -1101,7 +1134,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
                   resendMsg.contains('security purposes') ||
                   resendMsg.contains('seconds')) {
                 state = state.copyWith(
-                  user: null,
+                  clearUser: true,
                   sessionUnlocked: false,
                   requiresVerification: true,
                   isVerified: false,
@@ -1160,7 +1193,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       } else {
         final normalizedEmail = normalizeEmail(email);
         response = await SupabaseService.client.auth.verifyOTP(
-          type: OtpType.signup,
+          type: _registrationOtpType,
           token: cleanToken,
           email: normalizedEmail,
         );
@@ -1169,6 +1202,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final authUser = response.user;
       if (authUser == null) {
         throw const AuthException('Invalid verification code.');
+      }
+      // Never finish sign-up as some other account.
+      final expectedEmail = normalizeEmail(email);
+      if (!viaSms &&
+          authUser.email != null &&
+          authUser.email!.toLowerCase() != expectedEmail) {
+        throw const AuthException('That code belongs to a different account.');
       }
 
       await _recordTermsAcceptance(authUser);
@@ -1294,10 +1334,17 @@ class AuthNotifier extends StateNotifier<AuthState> {
           );
           return false;
         }
-        await SupabaseService.client.auth.resend(
-          type: OtpType.signup,
-          email: normalizedEmail,
-        );
+        if (_registrationOtpType == OtpType.email) {
+          await SupabaseService.client.auth.signInWithOtp(
+            email: normalizedEmail,
+            shouldCreateUser: false,
+          );
+        } else {
+          await SupabaseService.client.auth.resend(
+            type: OtpType.signup,
+            email: normalizedEmail,
+          );
+        }
       }
       return true;
     } catch (e) {

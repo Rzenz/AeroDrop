@@ -129,6 +129,7 @@ AS $$
 $$;
 
 REVOKE ALL ON FUNCTION public.blocked_email_domain(text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.blocked_email_domain(text) TO service_role;
 
 -- ----------------------------------------------------------------------------
 -- Refuse blocked domains when an auth account is created or its email

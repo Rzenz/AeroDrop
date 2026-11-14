@@ -22,6 +22,23 @@ import type {
 } from '@/types'
 import { liveApi } from './live-api'
 
+/** What happened after `signUp`: whether a code is needed, and a note to show beside it. */
+/** The check-email Edge Function's answer. `unchecked` means DNS could not be reached. */
+export interface EmailCheck {
+  ok: boolean
+  reason?: 'invalid' | 'disposable' | 'typo' | 'no_domain' | 'no_mail'
+  message?: string
+  suggestion?: string
+  unchecked?: boolean
+}
+
+export interface SignUpResult {
+  verify: boolean
+  notice?: string
+}
+
+export { EmailNotVerifiedError, EmailRejectedError } from './auth-errors'
+
 export interface SignUpInput {
   fullName: string
   email: string
@@ -158,7 +175,10 @@ export interface Api {
   signIn(email: string, password: string): Promise<Profile>
   sendLoginCode(email: string): Promise<void>
   verifyLoginCode(email: string, code: string): Promise<void>
-  signUp(input: SignUpInput): Promise<void>
+  /** Real, mail-receiving address? (check-email Edge Function; fails open). */
+  checkEmail(email: string): Promise<EmailCheck>
+  /** `verify` is false when the project returns a session straight away (email confirmation off). */
+  signUp(input: SignUpInput): Promise<SignUpResult>
   verifySignUpCode(email: string, code: string): Promise<void>
   sendPasswordReset(email: string): Promise<void>
   resetPassword(email: string, code: string, newPassword: string): Promise<void>

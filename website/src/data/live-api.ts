@@ -2,7 +2,8 @@ import { isAdminEmail, supabase } from '@/lib/config'
 import type { Delivery, Order, OrderItem, Product, Profile, SupportMessage, SupportReport, Vendor, Weather } from '@/types'
 import { SUPPORT_MAX_PHOTOS, SUPPORT_MESSAGE_MAX } from '@/lib/constants'
 import { DEFAULT_HUB, type Coords } from '@/lib/flight-calc'
-import type { Api, SimDelivery, Telemetry } from './api'
+import type { Api, EmailCheck, SimDelivery, Telemetry } from './api'
+import { authMessage, authOk, EmailNotVerifiedError, EmailRejectedError, isAlreadyRegistered, isRateLimited } from './auth-errors'
 
 // Supabase implementation of Api. Every call mirrors what the Flutter app does
 // (same tables, RPCs and edge function), so row level security behaves the
@@ -178,12 +179,25 @@ export const liveApi: Api = {
     const normalized = email.trim().toLowerCase()
     const res = await sb().auth.signInWithPassword({ email: normalized, password })
     if (res.error) {
-      // AuthNotifier.login: a Google-only account gets told why its password failed.
+      const code = res.error.code?.toLowerCase() ?? ''
       const msg = res.error.message.toLowerCase()
-      if (msg.includes('invalid login credentials') || res.error.code === 'invalid_credentials') {
+      // AuthNotifier.login: an unverified email gets a fresh sign-up code
+      // and the verification step, not a dead end.
+      if ((code === 'email_not_confirmed' || msg.includes('email not confirmed')) && !isAdminEmail(normalized)) {
+        const resend = await sb().auth.resend({ type: 'signup', email: normalized })
+        // Only claim a code was sent when one was.
+        if (resend.error && !isRateLimited(resend.error)) throw new Error(`Your email isn't verified yet. ${authMessage(resend.error)}`)
+        throw new EmailNotVerifiedError(
+          resend.error
+            ? "Your email isn't verified yet. Please enter the code sent to your email."
+            : "Your email isn't verified yet. We sent you a new code.",
+        )
+      }
+      // A Google-only account gets told why its password failed.
+      if (msg.includes('invalid login credentials') || code === 'invalid_credentials') {
         if (await liveApi.isGoogleOnlyAccount(normalized)) throw new Error('This account uses Google sign-in. Use Continue with Google to sign in.')
       }
-      throw new Error(res.error.message)
+      throw new Error(authMessage(res.error))
     }
     const profile = await me().catch(async (e) => {
       await sb().auth.signOut()
@@ -207,7 +221,7 @@ export const liveApi: Api = {
   },
   async signInWithGoogle() {
     // The web equivalent of the app's OAuth deep link: Google returns here.
-    ok(await sb().auth.signInWithOAuth({ provider: 'google', options: { redirectTo: `${window.location.origin}/auth/callback` } }))
+    authOk(await sb().auth.signInWithOAuth({ provider: 'google', options: { redirectTo: `${window.location.origin}/auth/callback` } }))
   },
   async completeGoogleSignIn() {
     const { data } = await sb().auth.getSession()
@@ -234,49 +248,83 @@ export const liveApi: Api = {
     return row?.account_status ?? null
   },
   async resendSignUpCode(email) {
-    ok(await sb().auth.resend({ type: 'signup', email: email.trim().toLowerCase() }))
+    authOk(await sb().auth.resend({ type: 'signup', email: email.trim().toLowerCase() }))
   },
   async sendLoginCode(email) {
     if (isAdminEmail(email)) return
-    ok(await sb().auth.signInWithOtp({ email: email.trim().toLowerCase(), options: { shouldCreateUser: false } }))
+    authOk(await sb().auth.signInWithOtp({ email: email.trim().toLowerCase(), options: { shouldCreateUser: false } }))
   },
   async verifyLoginCode(email, code) {
-    ok(await sb().auth.verifyOtp({ type: 'email', email: email.trim().toLowerCase(), token: code.trim() }))
+    authOk(await sb().auth.verifyOtp({ type: 'email', email: email.trim().toLowerCase(), token: code.trim() }))
     await recordTermsAcceptance()
+  },
+  async checkEmail(email) {
+    // Never blocks on an outage: the emailed code still proves the inbox.
+    try {
+      const { data, error } = await sb().functions.invoke('check-email', { body: { email: email.trim().toLowerCase() } })
+      if (error || !data || typeof (data as EmailCheck).ok !== 'boolean') return { ok: true, unchecked: true }
+      return data as EmailCheck
+    } catch {
+      return { ok: true, unchecked: true }
+    }
   },
   async signUp(input) {
     if (isAdminEmail(input.email)) throw new Error('Admin accounts cannot be registered through this form.')
+    const email = input.email.trim().toLowerCase()
+    // Migration 34: only real addresses that can receive mail.
+    const check = await liveApi.checkEmail(email)
+    if (!check.ok) throw new EmailRejectedError(check.message ?? "This email address can't receive mail.", check.suggestion)
     // The handle_new_auth_user trigger writes public.users from this metadata.
-    ok(
-      await sb().auth.signUp({
-        email: input.email.trim().toLowerCase(),
-        password: input.password,
-        options: {
-          data: {
-            full_name: input.fullName.trim(),
-            phone_number: input.phone,
-            requested_role: input.role,
-            business_name: input.businessName?.trim(),
-            business_category: input.businessCategory,
-            business_description: input.businessDescription?.trim(),
-            campus_location_id: input.campusLocationId,
-            // Copied to users.terms_accepted_at once a session exists.
-            terms_accepted_at: input.termsAcceptedAt,
-          },
+    const res = await sb().auth.signUp({
+      email,
+      password: input.password,
+      options: {
+        data: {
+          full_name: input.fullName.trim(),
+          phone_number: input.phone,
+          requested_role: input.role,
+          business_name: input.businessName?.trim(),
+          business_category: input.businessCategory,
+          business_description: input.businessDescription?.trim(),
+          campus_location_id: input.campusLocationId,
+          // Copied to users.terms_accepted_at once a session exists.
+          terms_accepted_at: input.termsAcceptedAt,
         },
-      }),
-    )
+      },
+    })
+    if (res.error) {
+      // AuthNotifier.register: an email that signed up but never verified
+      // gets a new code instead of an error.
+      if (isAlreadyRegistered(res.error)) {
+        const resend = await sb().auth.resend({ type: 'signup', email })
+        if (!resend.error) return { verify: true, notice: "Your email isn't verified yet. We sent you a new code." }
+        if (isRateLimited(resend.error)) return { verify: true, notice: "Your email isn't verified yet. Please enter the code sent to your email." }
+        throw new Error(authMessage(resend.error))
+      }
+      throw new Error(authMessage(res.error))
+    }
+    // With email confirmation on, Supabase answers a verified address with a
+    // user that has no identities and sends nothing.
+    if (res.data.user && !res.data.session && res.data.user.identities?.length === 0) {
+      throw new Error('This email is already registered. Sign in instead, or use a different email.')
+    }
+    // With email confirmation off, the account is signed in already.
+    if (res.data.session) {
+      await recordTermsAcceptance()
+      return { verify: false }
+    }
+    return { verify: true }
   },
   async verifySignUpCode(email, code) {
-    ok(await sb().auth.verifyOtp({ type: 'signup', email: email.trim().toLowerCase(), token: code.trim() }))
+    authOk(await sb().auth.verifyOtp({ type: 'signup', email: email.trim().toLowerCase(), token: code.trim() }))
     await recordTermsAcceptance()
   },
   async sendPasswordReset(email) {
-    ok(await sb().auth.resetPasswordForEmail(email.trim().toLowerCase()))
+    authOk(await sb().auth.resetPasswordForEmail(email.trim().toLowerCase()))
   },
   async resetPassword(email, code, newPassword) {
-    ok(await sb().auth.verifyOtp({ type: 'recovery', email: email.trim().toLowerCase(), token: code.trim() }))
-    ok(await sb().auth.updateUser({ password: newPassword }))
+    authOk(await sb().auth.verifyOtp({ type: 'recovery', email: email.trim().toLowerCase(), token: code.trim() }))
+    authOk(await sb().auth.updateUser({ password: newPassword }))
     await sb().auth.signOut()
   },
   async changePassword(currentPassword, newPassword) {

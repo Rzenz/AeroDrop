@@ -1,11 +1,12 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
-import { Field, Input } from '@/components/ui/primitives'
+import { Lock, Mail } from 'lucide-react'
+import { Field } from '@/components/ui/primitives'
 import { toast } from '@/components/ui/toast'
 import { api } from '@/data/api'
 import { errorMessage } from '@/lib/store'
-import { AuthShell, CodeInput } from './auth-shell'
+import { AuthInput, AuthShell, CodeInput, FormNote, PasswordInput } from './auth-shell'
 
 export default function ForgotPassword() {
   const navigate = useNavigate()
@@ -63,13 +64,13 @@ export default function ForgotPassword() {
           : undefined
       }
       title={step === 'email' ? 'Reset your password' : 'Choose a new password'}
-      subtitle={step === 'email' ? 'We will email you a 6-digit code.' : <>Enter the code sent to <b className="text-ink">{email}</b>.</>}
+      subtitle={step === 'email' ? 'We will email you a 6-digit code.' : <>Enter the code sent to <b className="font-semibold break-all text-ink">{email}</b>.</>}
       footer={<Link to="/sign-in" className="font-semibold text-brand-ink hover:underline">Back to sign in</Link>}
     >
       {step === 'email' ? (
         <form onSubmit={send} noValidate className="flex flex-col gap-5">
-          <Field label="Email" error={error}>{(p) => <Input {...p} type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />}</Field>
-          <Button type="submit" size="lg" loading={busy}>
+          <Field label="Email" error={error}>{(p) => <AuthInput {...p} icon={<Mail aria-hidden />} type="email" autoComplete="email" inputMode="email" placeholder="name@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />}</Field>
+          <Button type="submit" size="lg" loading={busy} className="w-full">
             Send code
           </Button>
         </form>
@@ -82,9 +83,9 @@ export default function ForgotPassword() {
             </div>
           ) : null}
           <Field label="Reset code">{(p) => <CodeInput id={p.id} value={code} onChange={setCode} />}</Field>
-          <Field label="New password" hint="At least 6 characters.">{(p) => <Input {...p} type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} />}</Field>
-          {error ? <p role="alert" className="rounded-xl bg-danger-bg px-4 py-3 text-sm font-medium text-danger">{error}</p> : null}
-          <Button type="submit" size="lg" loading={busy}>
+          <Field label="New password" hint="At least 6 characters.">{(p) => <PasswordInput {...p} icon={<Lock aria-hidden />} autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} />}</Field>
+          {error ? <FormNote tone="error">{error}</FormNote> : null}
+          <Button type="submit" size="lg" loading={busy} className="w-full">
             Update password
           </Button>
         </form>

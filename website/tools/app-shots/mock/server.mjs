@@ -201,7 +201,7 @@ function session(user) {
   const exp = Math.floor(Date.now() / 1000) + 86_400
   const authUser = {
     id: user.id, aud: 'authenticated', role: 'authenticated', email: user.email, email_confirmed_at: user.created_at,
-    phone: '', app_metadata: { provider: 'email', providers: ['email'] }, user_metadata: { full_name: user.full_name },
+    phone: '', app_metadata: { provider: 'email', providers: ['email'] }, user_metadata: { full_name: user.full_name, ...(user._meta ?? {}) },
     identities: [], created_at: user.created_at, updated_at: now(),
   }
   return {
@@ -274,12 +274,44 @@ createServer(async (req, res) => {
           ? db.users.find((x) => `refresh-${x.id}` === body?.refresh_token)
           : db.users.find((x) => x.email === body?.email?.toLowerCase())
         if (!u) return send(res, 400, { code: 'invalid_credentials', message: 'Invalid login credentials' })
+        // Accounts made through /signup keep their password and need verifying first.
+        if (u._password !== undefined && body?.password !== undefined && u._password !== body.password) return send(res, 400, { code: 'invalid_credentials', message: 'Invalid login credentials' })
+        if (u._unconfirmed && url.searchParams.get('grant_type') === 'password') return send(res, 400, { code: 'email_not_confirmed', message: 'Email not confirmed' })
         return send(res, 200, session(u))
       }
-      if (p === '/auth/v1/otp') return send(res, 200, {})
+      // Sign-up, as Supabase does it with email confirmation on: the
+      // handle_new_auth_user trigger writes public.users from the metadata, the
+      // account stays unconfirmed until the emailed code (always 123456 here)
+      // is entered, and a confirmed address gets a user with no identities.
+      if (p === '/auth/v1/signup') {
+        const email = body?.email?.toLowerCase()
+        // Supabase's built-in sender refuses anyone outside the project team.
+        if (email?.includes('+notteam')) return send(res, 400, { code: 'email_address_not_authorized', message: `Email address "${email}" cannot be used as it is not authorized` })
+        const existing = db.users.find((x) => x.email === email)
+        if (existing && !existing._unconfirmed) return send(res, 200, { ...session(existing).user, identities: [] })
+        const m = body?.data ?? {}
+        const row = existing ?? {
+          id: uuid(), email, full_name: m.full_name ?? '', phone_number: m.phone_number ?? null,
+          role: m.requested_role === 'vendor' ? 'vendor' : 'user', account_status: 'active',
+          vendor_status: m.requested_role === 'vendor' ? 'pending' : null,
+          business_name: m.business_name ?? null, business_category: m.business_category ?? null,
+          business_description: m.business_description ?? null, business_logo_url: null, avatar_url: null,
+          campus_location_id: m.campus_location_id ?? null, terms_accepted_at: null, created_at: now(), updated_at: now(),
+        }
+        row._password = body?.password
+        row._meta = m
+        row._unconfirmed = true
+        row._signup = true
+        if (!existing) db.users.push(row)
+        return send(res, 200, { ...session(row).user, email_confirmed_at: null, identities: [{ id: row.id, provider: 'email' }] })
+      }
+      if (p === '/auth/v1/resend' || p === '/auth/v1/otp' || p === '/auth/v1/recover') return send(res, 200, {})
       if (p === '/auth/v1/verify') {
         const u = db.users.find((x) => x.email === body?.email?.toLowerCase())
-        return u ? send(res, 200, session(u)) : send(res, 400, { message: 'Invalid verification code.' })
+        if (!u) return send(res, 400, { message: 'Invalid verification code.' })
+        if (u._signup && body?.token !== '123456') return send(res, 403, { code: 'otp_expired', message: 'Token has expired or is invalid' })
+        delete u._unconfirmed
+        return send(res, 200, session(u))
       }
       if (p === '/auth/v1/user') {
         const u = userFromToken(req.headers.authorization)
@@ -287,6 +319,19 @@ createServer(async (req, res) => {
       }
       if (p === '/auth/v1/logout') return send(res, 204)
       return send(res, 200, {})
+    }
+
+    // A stand-in for supabase/functions/check-email: same answers, but a fixed
+    // list instead of live DNS, so tests never depend on the network.
+    if (p === '/functions/v1/check-email') {
+      const email = String((await readBody(req))?.email ?? '').trim().toLowerCase()
+      const [local, domain = ''] = email.split('@')
+      if (!/^[^\s@]+@[^\s@]+\.[a-z]{2,}$/.test(email)) return send(res, 200, { ok: false, reason: 'invalid', message: 'Enter a valid email address.' })
+      const typos = { 'gmial.com': 'gmail.com', 'yaho.com': 'yahoo.com' }
+      if (typos[domain]) return send(res, 200, { ok: false, reason: 'typo', suggestion: `${local}@${typos[domain]}`, message: `Did you mean ${local}@${typos[domain]}?` })
+      if (['mailinator.com', 'yopmail.com'].includes(domain)) return send(res, 200, { ok: false, reason: 'disposable', message: "Temporary email addresses can't be used. Use your personal or school email." })
+      if (domain.endsWith('.invalid') || domain === 'nonexistent-aerodrop-xyz.com') return send(res, 200, { ok: false, reason: 'no_domain', message: `${domain} doesn't exist. Check the spelling of your email.` })
+      return send(res, 200, { ok: true })
     }
 
     if (p.startsWith('/rest/v1/rpc/')) {

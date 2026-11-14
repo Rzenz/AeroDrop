@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import '../constants/auth_constants.dart';
 import '../models/user_model.dart';
 import '../services/desktop_oauth.dart';
+import '../services/email_check_service.dart';
 import '../services/supabase_service.dart';
 import '../utils/image_utils.dart';
 
@@ -107,6 +108,21 @@ String normalizePhoneNumber(String phone) {
   throw const FormatException('Invalid phone number format.');
 }
 
+/// Supabase accepted the request but could not email the code. With the
+/// built-in sender this is "Email address not authorized" for anyone outside
+/// the project's team; a broken custom SMTP gives "Error sending ...".
+bool isEmailDeliveryFailure(AuthException error) {
+  final code = error.code?.toLowerCase() ?? '';
+  final msg = error.message.toLowerCase();
+  return code == 'email_address_not_authorized' ||
+      msg.contains('not authorized') ||
+      msg.contains('error sending');
+}
+
+const emailNotSentMessage =
+    "We couldn't email your code. AeroDrop's email service isn't accepting "
+    'this address yet. Please try again later or contact the AeroDrop team.';
+
 String formatAuthErrorMessage(Object error) {
   if (error is AuthException) {
     final code = error.code?.toLowerCase() ?? '';
@@ -116,7 +132,8 @@ String formatAuthErrorMessage(Object error) {
         msg.contains('testing mode') ||
         msg.contains('not completed the google verification') ||
         msg.contains('access blocked') ||
-        (code == 'access_denied' && (msg.contains('test') || msg.contains('developer')))) {
+        (code == 'access_denied' &&
+            (msg.contains('test') || msg.contains('developer')))) {
       return "This Google account isn't a test user yet. Please contact the administrator.";
     }
     if (code == 'user_cancelled' ||
@@ -151,6 +168,13 @@ String formatAuthErrorMessage(Object error) {
     }
     if (code == 'email_address_invalid') {
       return 'Please enter a valid email address.';
+    }
+    if (isEmailDeliveryFailure(error)) {
+      return emailNotSentMessage;
+    }
+    // Migration 34's trigger refused a throwaway or misspelled email domain.
+    if (msg.contains('database error saving new user')) {
+      return "This email address can't be used to register. Use your personal or school email.";
     }
     if (code == 'over_email_send_rate_limit' ||
         code == 'rate_limit_exceeded' ||
@@ -279,7 +303,9 @@ class AuthState {
     return AuthState(
       user: user ?? this.user,
       isLoading: isLoading ?? this.isLoading,
-      errorMessage: clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
+      errorMessage: clearErrorMessage
+          ? null
+          : (errorMessage ?? this.errorMessage),
       requiresVerification: requiresVerification ?? this.requiresVerification,
       isVerified: isVerified ?? this.isVerified,
       sessionUnlocked: sessionUnlocked ?? this.sessionUnlocked,
@@ -287,7 +313,9 @@ class AuthState {
       pendingEmail: pendingEmail ?? this.pendingEmail,
       pendingPhone: pendingPhone ?? this.pendingPhone,
       pendingRole: pendingRole ?? this.pendingRole,
-      pendingLogoFile: clearPendingLogo ? null : (pendingLogoFile ?? this.pendingLogoFile),
+      pendingLogoFile: clearPendingLogo
+          ? null
+          : (pendingLogoFile ?? this.pendingLogoFile),
     );
   }
 }
@@ -307,31 +335,30 @@ class AuthNotifier extends StateNotifier<AuthState> {
   void _setupAuthListener() {
     if (!SupabaseService.isConfigured) return;
     _authSubscription?.cancel();
-    _authSubscription = SupabaseService.client.auth.onAuthStateChange.listen(
-      (data) async {
-        final event = data.event;
-        final session = data.session;
+    _authSubscription = SupabaseService.client.auth.onAuthStateChange.listen((
+      data,
+    ) async {
+      final event = data.event;
+      final session = data.session;
 
-        if (event == AuthChangeEvent.signedIn && session != null) {
-          if (state.user?.id == session.user.id && state.sessionUnlocked) {
-            return;
-          }
-          final isGoogle =
-              session.user.appMetadata['provider'] == 'google' ||
-              session.user.identities?.any((i) => i.provider == 'google') ==
-                  true;
-
-          if (isGoogle && (_isGoogleSignInActive || kIsWeb)) {
-            _isGoogleSignInActive = false;
-            await _handleOAuthSignInSuccess(session.user);
-          }
-        } else if (event == AuthChangeEvent.signedOut) {
-          if (state.user != null && !_loggingOut && mounted) {
-            state = const AuthState();
-          }
+      if (event == AuthChangeEvent.signedIn && session != null) {
+        if (state.user?.id == session.user.id && state.sessionUnlocked) {
+          return;
         }
-      },
-    );
+        final isGoogle =
+            session.user.appMetadata['provider'] == 'google' ||
+            session.user.identities?.any((i) => i.provider == 'google') == true;
+
+        if (isGoogle && (_isGoogleSignInActive || kIsWeb)) {
+          _isGoogleSignInActive = false;
+          await _handleOAuthSignInSuccess(session.user);
+        }
+      } else if (event == AuthChangeEvent.signedOut) {
+        if (state.user != null && !_loggingOut && mounted) {
+          state = const AuthState();
+        }
+      }
+    });
   }
 
   @override
@@ -401,9 +428,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
     try {
       if (kIsWeb) {
-        await SupabaseService.client.auth.signInWithOAuth(
-          OAuthProvider.google,
-        );
+        await SupabaseService.client.auth.signInWithOAuth(OAuthProvider.google);
         return true;
       } else if (defaultTargetPlatform == TargetPlatform.windows ||
           defaultTargetPlatform == TargetPlatform.linux) {
@@ -711,6 +736,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
               debugPrint(
                 'Resend signup OTP on unconfirmed login error: $resendErr',
               );
+              // The code never left: say so instead of "We sent you a new code".
+              if (isEmailDeliveryFailure(resendErr)) {
+                state = state.copyWith(
+                  isLoading: false,
+                  errorMessage:
+                      "Your email isn't verified yet. $emailNotSentMessage",
+                );
+                return false;
+              }
             } catch (e) {
               debugPrint('Resend signup OTP error: $e');
             }
@@ -870,16 +904,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
         final m = e.message.toLowerCase();
         if (code.contains('otp_expired') || m.contains('expired')) {
           msg = 'That code has expired. Request a new code.';
-        } else if (code.contains('over_rate_limit') || m.contains('rate limit')) {
+        } else if (code.contains('over_rate_limit') ||
+            m.contains('rate limit')) {
           msg = 'Please wait before requesting another code.';
         } else {
           msg = e.message;
         }
       }
-      state = state.copyWith(
-        isLoading: false,
-        errorMessage: msg,
-      );
+      state = state.copyWith(isLoading: false, errorMessage: msg);
       return false;
     }
   }
@@ -932,7 +964,20 @@ class AuthNotifier extends StateNotifier<AuthState> {
       if (AuthConstants.isAdminEmail(normalizedEmail)) {
         state = state.copyWith(
           isLoading: false,
-          errorMessage: 'Admin accounts cannot be registered through this form.',
+          errorMessage:
+              'Admin accounts cannot be registered through this form.',
+        );
+        return false;
+      }
+
+      // Migration 34: only a real address that can receive mail. Refuses
+      // made-up or misspelled domains and throwaway inboxes before an
+      // account exists; the database trigger enforces the throwaway list too.
+      final emailCheck = await checkEmailIsReal(normalizedEmail);
+      if (!emailCheck.ok) {
+        state = state.copyWith(
+          isLoading: false,
+          errorMessage: emailCheck.errorText,
         );
         return false;
       }
@@ -1069,6 +1114,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
                 );
                 return true;
               }
+              if (isEmailDeliveryFailure(resendErr)) {
+                state = state.copyWith(
+                  isLoading: false,
+                  errorMessage: emailNotSentMessage,
+                );
+                return false;
+              }
             } catch (_) {}
           }
         }
@@ -1095,7 +1147,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
       if (viaSms) {
         if (phone == null || phone.trim().isEmpty) {
-          throw const FormatException('Phone number is required for SMS verification.');
+          throw const FormatException(
+            'Phone number is required for SMS verification.',
+          );
         }
         final normalizedPhone = normalizePhoneNumber(phone);
         response = await SupabaseService.client.auth.verifyOTP(
@@ -1155,14 +1209,18 @@ class AuthNotifier extends StateNotifier<AuthState> {
                 .select();
 
             if (updateRes.isEmpty) {
-              debugPrint('Warning: business_logo_url update returned empty result');
+              debugPrint(
+                'Warning: business_logo_url update returned empty result',
+              );
             }
           } else {
             logoUploadWarning =
                 "Account verified, but your store logo couldn't be uploaded. You can add it from your store profile.";
           }
         } catch (logoErr) {
-          debugPrint('Error uploading pending registration business logo: $logoErr');
+          debugPrint(
+            'Error uploading pending registration business logo: $logoErr',
+          );
           logoUploadWarning =
               "Account verified, but your store logo couldn't be uploaded. You can add it from your store profile.";
         }
@@ -1218,7 +1276,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
     try {
       if (viaSms) {
         if (phone == null || phone.trim().isEmpty) {
-          throw const FormatException('Phone number is required for SMS verification.');
+          throw const FormatException(
+            'Phone number is required for SMS verification.',
+          );
         }
         final normalizedPhone = normalizePhoneNumber(phone);
         await SupabaseService.client.auth.resend(
@@ -1303,10 +1363,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         throw const AuthException('Invalid password reset code.');
       }
 
-      state = state.copyWith(
-        isLoading: false,
-        errorMessage: null,
-      );
+      state = state.copyWith(isLoading: false, errorMessage: null);
       return true;
     } catch (e) {
       debugPrint('Password reset verifyOTP failed: $e');
@@ -1493,7 +1550,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
         if (!validation.isValid) {
           state = state.copyWith(
             isLoading: false,
-            errorMessage: validation.errorMessage ??
+            errorMessage:
+                validation.errorMessage ??
                 'Unsupported image format. Please choose a JPG, PNG, or WebP image.',
           );
           return false;
@@ -1574,7 +1632,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
         if (!validation.isValid) {
           state = state.copyWith(
             isLoading: false,
-            errorMessage: validation.errorMessage ??
+            errorMessage:
+                validation.errorMessage ??
                 'Unsupported image format. Please choose a JPG, PNG, or WebP image.',
           );
           return false;

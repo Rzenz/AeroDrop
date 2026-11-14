@@ -45,7 +45,8 @@ The website uses the app's back end directly. It has no server and no API of its
   - Google OAuth. It returns to `/auth/callback` and refuses admin, suspended and deleted accounts.
   - The Google-only account check on sign-in and password reset.
   - `/complete-profile` for accounts without a phone number, using the app's PH number rules.
-  - The 6-character password minimum.
+  - The 6-character password minimum. Sign-up shows a strength bar and tips (length, mixed case, a number, a symbol) and warns about common passwords or ones containing the person's name or email. The bar advises; only the minimum is enforced, as in the app.
+  - Real email addresses only (migration 34). Before an account is made, the app and the website both call the `check-email` Edge Function. It refuses malformed addresses, domains that don't exist or can't receive mail (DNS MX lookup), throwaway inboxes and common typos, which get a "Did you mean …?" fix. A database trigger refuses the same throwaway and typo domains even if the auth API is called directly, and the emailed code still has to be entered.
 - **Storage.** The app's buckets and paths: `avatars/<uid>/avatar.<ext>`, `vendor-logos/<uid>/logo.<ext>` (or `business_logo.<ext>` at sign-up), and `product-images/<uid>/prod_<ms>.<ext>`. Files must be JPEG, PNG or WebP and under 5 MB.
 - **Orders.**
   - Online payment uses `create-xendit-payment` and the 15-minute "Waiting for Payment" window.
@@ -138,6 +139,15 @@ The build writes a Content-Security-Policy into `index.html` that names the conf
 The CLI works too: from `website/`, run `npx vercel` for a preview or `npx vercel --prod` for production. Set the variables first with `npx vercel env add`.
 
 ## Before going live
+
+- Set up custom SMTP so sign-up and sign-in codes reach everyone. Supabase's built-in sender only emails members of the project's team, two messages an hour; every other address is refused ("Email address not authorized"), so the account is created but no code arrives. In Supabase, open **Authentication → Emails → SMTP Settings**, enable custom SMTP and enter a provider's details (Gmail with an App Password, Brevo, Resend, Postmark, AWS SES…). Then raise **Authentication → Rate Limits → emails per hour** (custom SMTP starts at 30). The **Confirm signup**, **Magic Link** and **Reset Password** templates must include `{{ .Token }}`, since both clients ask for the 6-digit code.
+
+- Apply migration 34 and deploy the email check. Until the function is deployed, both clients carry on without it (the emailed code still applies):
+  ```bash
+  supabase db push
+  supabase functions deploy check-email --no-verify-jwt
+  ```
+  `--no-verify-jwt` is needed because people call it before they have an account. To block another domain, add a row to `public.blocked_email_domains`.
 
 - Set `VITE_PLAY_STORE_URL` to the real listing once the app is published.
 - In Supabase Auth, add the website's domain to the allowed redirect URLs, including `https://<your-domain>/auth/callback` for Google sign-in. Enable the Google provider if it is not already on.

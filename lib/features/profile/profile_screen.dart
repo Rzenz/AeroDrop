@@ -13,6 +13,7 @@ import '../../core/widgets/neu_avatar.dart';
 import '../../core/widgets/neu_card.dart';
 import '../../core/widgets/neu_list_tile.dart';
 import '../../core/widgets/neu_surface.dart';
+import '../../core/widgets/verify_email_banner.dart';
 
 /// The customer's account screen.
 ///
@@ -56,6 +57,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               role: user?.role,
               onTap: () => context.push('/user/profile/edit'),
             ),
+            if (user != null &&
+                user.role != 'admin' &&
+                user.emailVerificationKnown) ...[
+              const SizedBox(height: AppSpacing.lg),
+              const NeuTileGroup(
+                label: 'Email',
+                children: [EmailVerificationTile()],
+              ),
+            ],
             const SizedBox(height: AppSpacing.xl),
             NeuTileGroup(
               label: 'Account',

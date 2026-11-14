@@ -9,6 +9,8 @@ import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/neu_card.dart';
+import '../../core/widgets/neu_button.dart';
+import '../../core/widgets/verify_email_banner.dart';
 import '../../core/providers/order_provider.dart';
 import '../../core/models/cart_model.dart';
 import '../../core/models/order_quote_model.dart';
@@ -73,6 +75,10 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     final locationsAsync = ref.watch(dropoffLocationsProvider);
     final weather = ref.watch(weatherProvider);
     final isGrounded = weather.isGrounded;
+    // Migration 35: the database refuses orders from unverified accounts;
+    // stop here instead of letting the person get that far.
+    final needsVerification =
+        ref.watch(authProvider).user?.needsEmailVerification == true;
 
     return Scaffold(
       backgroundColor: AppColors.base,
@@ -409,6 +415,49 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                     ),
                   ],
 
+                  if (needsVerification) ...[
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.warning.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: AppColors.warning.withValues(alpha: 0.5),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.mark_email_unread_outlined,
+                            color: AppColors.warning,
+                            size: 24,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Verify your email to place this order.',
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTextStyles.body(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          NeuButton(
+                            text: 'Verify email',
+                            expand: false,
+                            height: 36,
+                            onPressed: () => showVerifyEmailSheet(context),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+
                   // Overweight warning banner
                   if (isOverweight) ...[
                     const SizedBox(height: 16),
@@ -451,14 +500,21 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                   // Confirm button
                   FilledButton(
                     onPressed:
-                        (_placing || isOverweight || isGrounded || quote == null)
+                        (_placing ||
+                            isOverweight ||
+                            isGrounded ||
+                            needsVerification ||
+                            quote == null)
                         ? null
                         : _placeOrder,
                     style: FilledButton.styleFrom(
                       backgroundColor: AppColors.accent,
                       foregroundColor: AppColors.bgDark,
                       disabledBackgroundColor:
-                          (isOverweight || isGrounded || quoteFailed)
+                          (isOverweight ||
+                              isGrounded ||
+                              needsVerification ||
+                              quoteFailed)
                           ? AppColors.cardDark
                           : null,
                       minimumSize: const Size(double.infinity, 56),
@@ -480,6 +536,8 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                                 ? 'Order Too Heavy'
                                 : isGrounded
                                 ? 'Flight Grounded'
+                                : needsVerification
+                                ? 'Verify Email First'
                                 : quoteFailed
                                 ? 'Fee Unavailable'
                                 : quote == null
@@ -491,7 +549,10 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                               fontSize: 17,
                               fontWeight: FontWeight.bold,
                               color:
-                                  (isOverweight || isGrounded || quoteFailed)
+                                  (isOverweight ||
+                              isGrounded ||
+                              needsVerification ||
+                              quoteFailed)
                                   ? Colors.grey
                                   : null,
                             ),

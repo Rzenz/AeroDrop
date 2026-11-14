@@ -182,30 +182,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         await Future.delayed(const Duration(milliseconds: 150));
         if (!mounted) return;
 
+        // Password only: straight into the app. The router sends a pending
+        // vendor applicant on to the account-pending page.
         final user = ref.read(authProvider).user;
-        if (user != null && user.isAdmin) {
-          context.go('/admin');
-        } else {
-          context.go('/verification');
-        }
+        context.go(
+          user == null
+              ? '/user'
+              : user.isAdmin
+              ? '/admin'
+              : user.isVendor
+              ? '/vendor'
+              : '/user',
+        );
       } else if (!success && mounted) {
         final authState = ref.read(authProvider);
-        if (authState.pendingEmail != null &&
-            authState.requiresVerification &&
-            authState.user == null) {
-          final message = authState.errorMessage ??
-              "Your email isn't verified yet. We sent you a new code.";
-          showNeuSnack(context, message, tone: NeuToneKind.info);
-          context.push(
-            '/email-sent',
-            extra: <String, String>{
-              'email': authState.pendingEmail!,
-              'role': expectedRole,
-              'type': 'verification',
-            },
-          );
-          return;
-        }
         final errorMsg =
             authState.errorMessage ??
             'Login failed. Please try again.';

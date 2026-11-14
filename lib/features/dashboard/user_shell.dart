@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'widgets/aerodrop_bottom_navigation.dart';
+import '../../core/widgets/verify_email_banner.dart';
 import '../../core/models/cart_model.dart';
 import '../../core/services/supabase_service.dart';
 import '../../core/providers/auth_provider.dart';
@@ -227,7 +228,8 @@ class _UserShellState extends ConsumerState<UserShell>
 
     return Scaffold(
       extendBody: true,
-      body: widget.child,
+      // Until the email is verified (migration 35); never in the admin shell
+      body: VerifyEmailBannerFrame(child: widget.child),
       bottomNavigationBar: SafeArea(
         bottom: true,
         child: Padding(

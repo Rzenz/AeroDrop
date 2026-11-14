@@ -347,7 +347,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
 
       if (mounted) {
         setState(() => _vendorSubmitted = false);
-        if (success) {
+        if (success && ref.read(authProvider).sessionUnlocked) {
+          // Signed in straight away ("Confirm email" off): into the app,
+          // where the banner offers email verification. The router sends a
+          // vendor applicant on to the account-pending page.
+          context.go('/vendor');
+        } else if (success) {
           context.push(
             '/email-sent',
             extra: <String, String>{
@@ -393,7 +398,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
           );
 
       if (mounted) {
-        if (success) {
+        if (success && ref.read(authProvider).sessionUnlocked) {
+          // Signed in straight away ("Confirm email" off): into the app,
+          // where the banner offers email verification. The router sends a
+          // vendor applicant on to the account-pending page.
+          context.go('/user');
+        } else if (success) {
           context.push(
             '/email-sent',
             extra: <String, String>{

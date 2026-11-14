@@ -17,6 +17,15 @@ class AeroDropUser {
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
+  /// When the email was proven with an emailed code (migration 35's
+  /// email_verified_at). Null means not verified, so the account cannot order.
+  final DateTime? emailVerifiedAt;
+
+  /// Whether the profile row carried email_verified_at at all. False before
+  /// migration 35 is applied: the website treats a missing column as verified
+  /// so nothing is blocked, and a Dart map can't tell missing from null.
+  final bool emailVerificationKnown;
+
   const AeroDropUser._internal({
     required this.id,
     required this.fullName,
@@ -33,6 +42,8 @@ class AeroDropUser {
     this.businessLogoUrl,
     this.createdAt,
     this.updatedAt,
+    this.emailVerifiedAt,
+    this.emailVerificationKnown = false,
   });
 
   factory AeroDropUser({
@@ -51,6 +62,8 @@ class AeroDropUser {
     String? businessLogoUrl,
     DateTime? createdAt,
     DateTime? updatedAt,
+    DateTime? emailVerifiedAt,
+    bool emailVerificationKnown = false,
   }) {
     String roleStr = 'user';
     if (role is UserRole) {
@@ -80,6 +93,8 @@ class AeroDropUser {
       businessLogoUrl: businessLogoUrl,
       createdAt: createdAt,
       updatedAt: updatedAt,
+      emailVerifiedAt: emailVerifiedAt,
+      emailVerificationKnown: emailVerificationKnown,
     );
   }
 
@@ -100,6 +115,11 @@ class AeroDropUser {
   bool get isActive => accountStatus == 'active';
 
   /// Display name: business name for vendors, full name otherwise.
+  /// Same rule as the website's needsEmailVerification: admins are exempt,
+  /// and an unknown column (migration 35 not applied) never blocks anyone.
+  bool get needsEmailVerification =>
+      emailVerificationKnown && role != 'admin' && emailVerifiedAt == null;
+
   String get displayName =>
       (role == 'vendor' && businessName != null && businessName!.isNotEmpty)
       ? businessName!
@@ -128,6 +148,10 @@ class AeroDropUser {
       updatedAt: map['updated_at'] != null
           ? DateTime.tryParse(map['updated_at'].toString())
           : null,
+      emailVerifiedAt: map['email_verified_at'] != null
+          ? DateTime.tryParse(map['email_verified_at'].toString())
+          : null,
+      emailVerificationKnown: map.containsKey('email_verified_at'),
     );
   }
 
@@ -151,6 +175,8 @@ class AeroDropUser {
     bool clearBusinessLogo = false,
     DateTime? createdAt,
     DateTime? updatedAt,
+    DateTime? emailVerifiedAt,
+    bool? emailVerificationKnown,
   }) {
     return AeroDropUser._internal(
       id: id ?? this.id,
@@ -170,6 +196,9 @@ class AeroDropUser {
           : (businessLogoUrl ?? this.businessLogoUrl),
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      emailVerifiedAt: emailVerifiedAt ?? this.emailVerifiedAt,
+      emailVerificationKnown:
+          emailVerificationKnown ?? this.emailVerificationKnown,
     );
   }
 }

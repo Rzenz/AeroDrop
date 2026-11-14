@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/widgets/neu_nav_dock.dart';
+import '../../core/widgets/verify_email_banner.dart';
 import '../../core/providers/notification_provider.dart';
 import '../../core/providers/order_provider.dart';
 
@@ -60,7 +61,8 @@ class VendorShell extends ConsumerWidget {
 
     return Scaffold(
       extendBody: true,
-      body: child,
+      // Until the email is verified (migration 35); never in the admin shell
+      body: VerifyEmailBannerFrame(child: child),
       bottomNavigationBar: SafeArea(
         bottom: true,
         child: Padding(

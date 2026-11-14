@@ -14,6 +14,8 @@ import '../../core/providers/vendor_provider.dart';
 import '../../core/providers/product_provider.dart';
 import '../../core/utils/image_utils.dart';
 import '../../core/utils/logout_helper.dart';
+import '../../core/widgets/neu_list_tile.dart';
+import '../../core/widgets/verify_email_banner.dart';
 
 class VendorProfileScreen extends ConsumerStatefulWidget {
   const VendorProfileScreen({super.key});
@@ -411,6 +413,15 @@ class _VendorProfileScreenState extends ConsumerState<VendorProfileScreen> {
                   ),
           ).animate().fadeIn(delay: 130.ms),
           const SizedBox(height: 16),
+
+          // Email verification, as on the customer profile
+          if (user.role != 'admin' && user.emailVerificationKnown) ...[
+            const NeuTileGroup(
+              label: 'Email',
+              children: [EmailVerificationTile()],
+            ),
+            const SizedBox(height: 16),
+          ],
 
           // Quick Links
           _ActionTile(

@@ -335,6 +335,32 @@ class AuthNotifier extends StateNotifier<AuthState> {
   /// itself when Supabase signs the new account in straight away.
   OtpType _registrationOtpType = OtpType.signup;
 
+  /// When the last verification code went out, and to which address. Kept
+  /// here rather than in the sheet so closing and reopening it cannot send
+  /// another one early: Supabase's email rate limit is shared by the whole
+  /// project, and stray sends can lock out real sign-ins.
+  DateTime? _verificationCodeSentAt;
+  String? _verificationCodeEmail;
+
+  static const Duration verificationCodeCooldown = Duration(seconds: 60);
+
+  static const String _accountExistsMessage =
+      'An account with this email already exists. Sign in instead.';
+
+  /// Time left before another verification code may be sent to the signed-in
+  /// account; zero when one can go now.
+  Duration get verificationCodeCooldownRemaining {
+    final sentAt = _verificationCodeSentAt;
+    final email = SupabaseService.isConfigured
+        ? SupabaseService.client.auth.currentUser?.email
+        : null;
+    if (sentAt == null || email == null || email != _verificationCodeEmail) {
+      return Duration.zero;
+    }
+    final left = verificationCodeCooldown - DateTime.now().difference(sentAt);
+    return left.isNegative ? Duration.zero : left;
+  }
+
   AuthNotifier([this.ref]) : super(const AuthState()) {
     _initializeSession();
     _setupAuthListener();
@@ -599,6 +625,18 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  /// The signed-in person's public.users row, or null when there is none.
+  Future<AeroDropUser?> _loadProfile(String userId) async {
+    final userRow = await SupabaseService.client
+        .from('users')
+        .select()
+        .eq('id', userId)
+        .maybeSingle();
+    return userRow == null
+        ? null
+        : AeroDropUser.fromMap(Map<String, dynamic>.from(userRow));
+  }
+
   // ── Login ─────────────────────────────────────────────────────────────────
 
   Future<bool> login(
@@ -620,13 +658,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
       await _recordTermsAcceptance(authUser);
 
-      final userRow = await SupabaseService.client
-          .from('users')
-          .select()
-          .eq('id', authUser.id)
-          .maybeSingle();
+      final aeroUser = await _loadProfile(authUser.id);
 
-      if (userRow == null) {
+      if (aeroUser == null) {
         await SupabaseService.client.auth.signOut();
         state = const AuthState().copyWith(
           errorMessage:
@@ -634,8 +668,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
         );
         return false;
       }
-
-      final aeroUser = AeroDropUser.fromMap(Map<String, dynamic>.from(userRow));
 
       if (aeroUser.accountStatus == 'suspended') {
         await SupabaseService.client.auth.signOut();
@@ -700,29 +732,17 @@ class AuthNotifier extends StateNotifier<AuthState> {
         }
       }
 
-      // Admin role is excluded from OTP verification
-      if (aeroUser.isAdmin || AuthConstants.isAdminEmail(aeroUser.email)) {
-        state = state.copyWith(
-          user: aeroUser,
-          sessionUnlocked: true,
-          requiresVerification: false,
-          isVerified: true,
-          isLoading: false,
-          errorMessage: null,
-        );
-        return true;
-      }
-
-      // Customer / Vendor requires OTP verification step
+      // Password only: everyone finishes signed in. Proving the email is a
+      // separate, explicit step (sendEmailVerificationCode), as on the
+      // website, and only ordering waits for it.
       state = state.copyWith(
         user: aeroUser,
-        sessionUnlocked: false,
-        requiresVerification: true,
-        isVerified: false,
+        sessionUnlocked: true,
+        requiresVerification: false,
+        isVerified: true,
         isLoading: false,
         errorMessage: null,
       );
-
       return true;
     } catch (error) {
       debugPrint('Supabase login failed: $error');
@@ -758,14 +778,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
             }
           }
 
+          // Only reachable if "Confirm email" is switched back on. The
+          // message stays; login itself never routes to a code screen.
           state = state.copyWith(
-            clearUser: true,
-            sessionUnlocked: false,
-            requiresVerification: true,
-            isVerified: false,
             isLoading: false,
-            pendingEmail: normalizedEmail,
-            pendingRole: expectedRole ?? 'user',
             errorMessage:
                 "Your email isn't verified yet. We sent you a new code.",
           );
@@ -790,6 +806,108 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = state.copyWith(
         isLoading: false,
         errorMessage: formatAuthErrorMessage(error),
+      );
+      return false;
+    }
+  }
+
+  // ── Email verification (migration 35) ─────────────────────────────────────
+
+  /// Emails the signed-in account a 6-digit code, the same one the website
+  /// sends. The only email the app sends a customer or vendor; never sent for
+  /// an admin, whose address is not a real inbox.
+  Future<bool> sendEmailVerificationCode() async {
+    final email = SupabaseService.isConfigured
+        ? SupabaseService.client.auth.currentUser?.email
+        : null;
+    if (email == null || email.isEmpty) {
+      state = state.copyWith(
+        errorMessage: 'Your session has ended. Please sign in again.',
+      );
+      return false;
+    }
+    if (state.user?.isAdmin == true || AuthConstants.isAdminEmail(email)) {
+      return false;
+    }
+    final wait = verificationCodeCooldownRemaining;
+    if (wait > Duration.zero) {
+      state = state.copyWith(
+        errorMessage:
+            'A code was sent recently. Please wait ${wait.inSeconds + 1}s '
+            'before asking for another.',
+      );
+      return false;
+    }
+    try {
+      await SupabaseService.client.auth.signInWithOtp(
+        email: normalizeEmail(email),
+        shouldCreateUser: false,
+      );
+      _verificationCodeSentAt = DateTime.now();
+      _verificationCodeEmail = email;
+      state = state.copyWith(clearErrorMessage: true);
+      return true;
+    } catch (e) {
+      debugPrint('Sending the email verification code failed: $e');
+      state = state.copyWith(errorMessage: formatAuthErrorMessage(e));
+      return false;
+    }
+  }
+
+  /// Checks the emailed [code], then has the database record the email as
+  /// verified. The code creates a fresh session for the same account;
+  /// onAuthStateChange ignores it because the person is already signed in.
+  Future<bool> confirmEmailVerification(String code) async {
+    final email = SupabaseService.isConfigured
+        ? SupabaseService.client.auth.currentUser?.email
+        : null;
+    if (email == null || email.isEmpty) {
+      state = state.copyWith(
+        errorMessage: 'Your session has ended. Please sign in again.',
+      );
+      return false;
+    }
+    try {
+      final response = await SupabaseService.client.auth.verifyOTP(
+        type: OtpType.email,
+        email: normalizeEmail(email),
+        token: code.trim(),
+      );
+      final authUser = response.user;
+      if (authUser == null) {
+        throw const AuthException('Invalid verification code.');
+      }
+
+      // The new session was made by the code, so the database accepts it as
+      // proof. Before migration 35 the function does not exist; that alone
+      // is not an error, as on the website.
+      try {
+        await SupabaseService.client.rpc('confirm_email_verified');
+      } on PostgrestException catch (e) {
+        final missing = RegExp(
+          'could not find the function|does not exist',
+          caseSensitive: false,
+        ).hasMatch(e.message);
+        if (!missing) rethrow;
+      }
+
+      final profile = await _loadProfile(authUser.id);
+      if (mounted) {
+        state = state.copyWith(
+          user: profile,
+          sessionUnlocked: true,
+          requiresVerification: false,
+          isVerified: true,
+          clearErrorMessage: true,
+        );
+      }
+      return true;
+    } catch (e) {
+      debugPrint('Email verification failed: $e');
+      state = state.copyWith(
+        errorMessage: e is PostgrestException
+            ? e.message
+            : formatAuthErrorMessage(e),
       );
       return false;
     }
@@ -1028,19 +1146,22 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final authUser = response.user;
       if (authUser == null) throw Exception('Registration failed');
 
+      // An address that already has an account. With "Confirm email" off,
+      // Supabase does not reliably raise an error: it answers with a user that
+      // has no identities and no session, and sends nothing. Say so, as the
+      // website's signUp does; never email or open a code screen.
+      if (response.session == null && (authUser.identities?.isEmpty ?? false)) {
+        state = state.copyWith(
+          isLoading: false,
+          errorMessage: _accountExistsMessage,
+        );
+        return false;
+      }
+
       // Trigger handles public.users insertion — no client-side write needed.
 
       final sessionCreated = response.session != null;
       if (sessionCreated) await _recordTermsAcceptance(authUser);
-      if (sessionCreated) {
-        // "Confirm email" is off, so Supabase sent nothing. Email the new
-        // address a 6-digit code so it is still verified before first use.
-        await SupabaseService.client.auth.signInWithOtp(
-          email: normalizedEmail,
-          shouldCreateUser: false,
-        );
-        _registrationOtpType = OtpType.email;
-      }
       if (sessionCreated && logoFile != null) {
         try {
           final validation = await ImageUtils.validateImage(logoFile);
@@ -1079,6 +1200,31 @@ class AuthNotifier extends StateNotifier<AuthState> {
         }
       }
 
+      if (sessionCreated) {
+        // "Confirm email" is off: Supabase signed the new account in. Finish
+        // signed in, like login. No email is sent now; the person verifies
+        // later from the banner or their profile, before their first order.
+        final profile = await _loadProfile(authUser.id);
+        state = state.copyWith(
+          user:
+              profile ??
+              AeroDropUser(
+                id: authUser.id,
+                email: authUser.email ?? normalizedEmail,
+                phoneNumber: normalizedPhone,
+                role: requestedRole,
+              ),
+          sessionUnlocked: true,
+          requiresVerification: false,
+          isVerified: true,
+          isLoading: false,
+          errorMessage: null,
+        );
+        return true;
+      }
+
+      // "Confirm email" is on: Supabase emailed a sign-up code, and the
+      // account cannot sign in until it is entered.
       state = state.copyWith(
         clearUser: true,
         sessionUnlocked: false,
@@ -1095,67 +1241,22 @@ class AuthNotifier extends StateNotifier<AuthState> {
       return true;
     } catch (error) {
       debugPrint('Supabase register failed: $error');
-      final normalizedEmail = normalizeEmail(email);
 
       if (error is AuthException) {
         final code = error.code?.toLowerCase() ?? '';
         final msg = error.message.toLowerCase();
 
+        // Registering an address that already has an account sends no email
+        // and opens no code screen: the person signs in instead.
         if (code == 'user_already_exists' ||
             code == 'email_exists' ||
             msg.contains('already registered') ||
             msg.contains('already exists')) {
-          if (!AuthConstants.isAdminEmail(normalizedEmail)) {
-            try {
-              await SupabaseService.client.auth.resend(
-                type: OtpType.signup,
-                email: normalizedEmail,
-              );
-              state = state.copyWith(
-                clearUser: true,
-                sessionUnlocked: false,
-                requiresVerification: true,
-                isVerified: false,
-                isLoading: false,
-                pendingEmail: normalizedEmail,
-                pendingPhone: normalizePhoneNumber(phoneNumber),
-                pendingRole: requestedRole,
-                errorMessage:
-                    "Your email isn't verified yet. We sent you a new code.",
-              );
-              return true;
-            } on AuthException catch (resendErr) {
-              final resendCode = resendErr.code?.toLowerCase() ?? '';
-              final resendMsg = resendErr.message.toLowerCase();
-
-              if (resendCode == 'over_email_send_rate_limit' ||
-                  resendCode == 'rate_limit_exceeded' ||
-                  resendMsg.contains('rate limit') ||
-                  resendMsg.contains('security purposes') ||
-                  resendMsg.contains('seconds')) {
-                state = state.copyWith(
-                  clearUser: true,
-                  sessionUnlocked: false,
-                  requiresVerification: true,
-                  isVerified: false,
-                  isLoading: false,
-                  pendingEmail: normalizedEmail,
-                  pendingPhone: normalizePhoneNumber(phoneNumber),
-                  pendingRole: requestedRole,
-                  errorMessage:
-                      "Your email isn't verified yet. Please enter the code sent to your email.",
-                );
-                return true;
-              }
-              if (isEmailDeliveryFailure(resendErr)) {
-                state = state.copyWith(
-                  isLoading: false,
-                  errorMessage: emailNotSentMessage,
-                );
-                return false;
-              }
-            } catch (_) {}
-          }
+          state = state.copyWith(
+            isLoading: false,
+            errorMessage: _accountExistsMessage,
+          );
+          return false;
         }
       }
 

@@ -69,6 +69,9 @@ export function AnimatedTabs<T extends string>({ tabs, value, onChange, variant 
             {active && (
               <motion.span
                 layoutId={`${id}-pill`}
+                // Animate only when the selection changes, not when the page
+                // around the tabs shifts (e.g. a centred card growing).
+                layoutDependency={value}
                 aria-hidden
                 className={cn('absolute bg-brand', underline ? 'inset-x-0 bottom-0 h-0.5' : 'inset-0 rounded-full')}
                 initial={false}

@@ -2,6 +2,7 @@ import { Camera, Cookie, FileText, KeyRound, LifeBuoy, Mail, Moon, ReceiptText, 
 import { useRef, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth, useMe } from '@/auth/auth'
+import { PhPhoneInput } from '@/components/phone-input'
 import { EmailVerificationStatus } from '@/components/verify-email'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/dialog'
@@ -11,6 +12,7 @@ import { api } from '@/data/api'
 import { openCookieSettings } from '@/lib/consent'
 import { VENDOR_CATEGORIES } from '@/lib/constants'
 import { formatDate } from '@/lib/format'
+import { formatPhLocal, phLocalDigits, PH_PHONE_ERROR, toPhE164 } from '@/lib/phone'
 import { isHub } from '@/lib/flight'
 import { errorMessage, useQuery } from '@/lib/store'
 import { setTheme, useTheme } from '@/lib/theme'
@@ -23,7 +25,7 @@ export default function Profile() {
   const isVendor = me.role === 'vendor'
   const [form, setForm] = useState({
     full_name: me.full_name,
-    phone_number: me.phone_number ?? '',
+    phone_number: formatPhLocal(phLocalDigits(me.phone_number ?? '')),
     campus_location_id: me.campus_location_id ?? '',
     business_name: me.business_name ?? '',
     business_category: me.business_category ?? VENDOR_CATEGORIES[0]!,
@@ -43,11 +45,12 @@ export default function Profile() {
     setError(null)
     if (form.full_name.trim().length < 2) return setError('Enter your full name.')
     if (isVendor && form.business_name.trim().length < 2) return setError('Enter your store name.')
+    if (form.phone_number && !toPhE164(form.phone_number)) return setError(PH_PHONE_ERROR)
     setSaving(true)
     try {
       await api.updateProfile(me.id, {
         full_name: form.full_name.trim(),
-        phone_number: form.phone_number.trim() || null,
+        phone_number: toPhE164(form.phone_number),
         campus_location_id: form.campus_location_id || null,
         ...(isVendor ? { business_name: form.business_name.trim(), business_category: form.business_category, business_description: form.business_description.trim() || null } : {}),
       })
@@ -130,7 +133,7 @@ export default function Profile() {
           <CardHeader title={isVendor ? 'Vendor Information' : 'Edit profile details'} description={isVendor ? 'Shown to customers on your store page.' : 'Name, phone and default drop-off.'} />
           <form onSubmit={save} noValidate className="grid gap-4 p-5 sm:grid-cols-2">
             <Field label={isVendor ? 'Owner' : 'Full name'}>{(p) => <Input {...p} autoComplete="name" value={form.full_name} onChange={set('full_name')} />}</Field>
-            <Field label="Phone">{(p) => <Input {...p} type="tel" autoComplete="tel" value={form.phone_number} onChange={set('phone_number')} />}</Field>
+            <Field label="Phone">{(p) => <PhPhoneInput {...p} size="md" value={form.phone_number} onChange={(v) => setForm((f) => ({ ...f, phone_number: v }))} />}</Field>
             <Field label="Email" hint="Change it in Account security below.">{(p) => <Input {...p} value={me.email} disabled />}</Field>
             <Field label={isVendor ? 'Stall location' : 'Default drop-off'}>
               {(p) => (

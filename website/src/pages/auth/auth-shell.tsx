@@ -1,7 +1,7 @@
 import { AlertTriangle, ArrowLeft, Check, Eye, EyeOff, Moon, Sun } from 'lucide-react'
 import { motion } from 'motion/react'
 import { useRef, useState, type InputHTMLAttributes, type ReactNode } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { IconButton } from '@/components/ui/button'
 import { passwordStrength } from '@/lib/password-strength'
 import { setTheme, useTheme } from '@/lib/theme'
@@ -11,12 +11,15 @@ import { cn } from '@/lib/utils'
  * Back control for a step inside an auth screen (code entry → form). A real
  * button with a visible label; the arrow nudges left on hover.
  */
-export function BackButton({ onClick, label = 'Back' }: { onClick: () => void; label?: string }) {
+export function BackButton({ onClick, label = 'Back', light }: { onClick: () => void; label?: string; light?: boolean }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="group -ml-2.5 inline-flex h-9 w-fit items-center gap-1.5 rounded-xl ps-2 pe-3 text-sm font-semibold text-ink-2 transition-[background-color,color,scale] duration-150 ease-out hover:bg-sunken hover:text-ink active:scale-[0.96]"
+      className={cn(
+        'group -ml-2.5 inline-flex h-9 w-fit items-center gap-1.5 rounded-xl ps-2 pe-3 text-sm font-semibold transition-[background-color,color,scale] duration-150 ease-out active:scale-[0.96]',
+        light ? 'text-white/85 hover:bg-white/10 hover:text-white' : 'text-ink-2 hover:bg-sunken hover:text-ink',
+      )}
     >
       <ArrowLeft aria-hidden strokeWidth={2.25} className="size-4 transition-transform duration-150 ease-out group-hover:-translate-x-0.5" />
       {label}
@@ -24,10 +27,24 @@ export function BackButton({ onClick, label = 'Back' }: { onClick: () => void; l
   )
 }
 
-function ThemeSwitch() {
+/** Previous page in this tab, or the landing page when the visit started here. */
+function useGoBack() {
+  const navigate = useNavigate()
+  return () => {
+    const idx = (window.history.state as { idx?: number } | null)?.idx ?? 0
+    if (idx > 0) navigate(-1)
+    else navigate('/')
+  }
+}
+
+function ThemeSwitch({ light }: { light?: boolean }) {
   const theme = useTheme()
   return (
-    <IconButton label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'} onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
+    <IconButton
+      className={light ? 'text-white/85 hover:bg-white/10 hover:text-white' : undefined}
+      label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+      onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+    >
       {theme === 'dark' ? <Sun aria-hidden className="size-5" /> : <Moon aria-hidden className="size-5" />}
     </IconButton>
   )
@@ -40,6 +57,23 @@ function Brand({ light }: { light?: boolean }) {
       <img src="/img/brand-mark.png" alt="" width={36} height={36} className="size-9 rounded-[11px]" />
       <span className={cn('font-display text-lg font-extrabold', light ? 'text-white' : 'text-ink')}>AeroDrop</span>
     </Link>
+  )
+}
+
+/**
+ * The page behind the card: the UCLM campus, softly blurred and washed into
+ * the page colour, a faint dot grid and two quiet brand glows. Static, so it
+ * costs nothing after the first paint.
+ */
+function Backdrop() {
+  return (
+    <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-bg">
+      <img src="/img/uclm-campus.jpg" alt="" className="no-outline absolute inset-0 size-full scale-110 object-cover opacity-70 blur-2xl dark:opacity-50" />
+      <div className="absolute inset-0 bg-bg/75 dark:bg-bg/70" />
+      <div className="absolute inset-0 [background-image:radial-gradient(var(--line)_1px,transparent_1px)] [background-size:22px_22px] [mask-image:radial-gradient(ellipse_80%_70%_at_50%_50%,black,transparent)]" />
+      <div className="absolute -top-40 -left-40 size-[520px] rounded-full bg-[var(--sky)] opacity-20 blur-[120px]" />
+      <div className="absolute -right-40 -bottom-40 size-[520px] rounded-full bg-[var(--brand)] opacity-15 blur-[120px]" />
+    </div>
   )
 }
 
@@ -60,6 +94,7 @@ export function AuthShell({
   backLabel,
   split = false,
   wide = false,
+  pageBack,
 }: {
   title: string
   subtitle?: ReactNode
@@ -73,7 +108,13 @@ export function AuthShell({
   split?: boolean
   /** A wider form pane (create account). */
   wide?: boolean
+  /** Back to the previous page (defaults on for `split` pages). */
+  pageBack?: boolean
 }) {
+  const goBack = useGoBack()
+  const showPageBack = pageBack ?? split
+  // A step's own back wins over leaving the page.
+  const back = onBack ?? (showPageBack ? goBack : undefined)
   const heading = (light?: boolean) => (
     <>
       <h1 className={cn('font-display text-[26px] leading-tight font-extrabold text-balance lg:text-[30px]', light ? 'text-white' : 'text-ink')}>{title}</h1>
@@ -82,10 +123,13 @@ export function AuthShell({
   )
 
   return (
-    <div className="relative grid min-h-dvh place-items-center bg-sunken px-4 pt-16 pb-4 md:py-5">
-      <div className="absolute top-[max(0.75rem,env(safe-area-inset-top))] right-3 sm:right-5">
-        <ThemeSwitch />
-      </div>
+    <div className={cn('relative isolate grid min-h-dvh place-items-center px-4', split ? 'py-4 md:py-5' : 'pt-16 pb-4')}>
+      <Backdrop />
+      {split ? null : (
+        <div className="absolute top-[max(0.75rem,env(safe-area-inset-top))] right-3 sm:right-5">
+          <ThemeSwitch />
+        </div>
+      )}
 
       <motion.main
         // Opacity only: a moving card would offset the tab pill's layout measurement.
@@ -101,7 +145,11 @@ export function AuthShell({
           <aside data-theme="dark" className="relative hidden flex-col justify-between overflow-hidden bg-black p-8 md:flex lg:p-10">
             <img src="/img/uclm-campus.jpg" alt="" className="no-outline absolute inset-0 size-full object-cover opacity-45" />
             <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/55 to-black/90" />
-            <div className="relative">
+            <div className="relative flex flex-col gap-6">
+              <div className="flex items-center justify-between gap-3">
+                {back ? <BackButton onClick={back} label={backLabel} light /> : <span />}
+                <ThemeSwitch light />
+              </div>
               <Brand light />
             </div>
             <div className="relative mt-16">
@@ -114,17 +162,18 @@ export function AuthShell({
         <div className={cn('flex flex-col justify-center', split ? 'p-6 sm:px-8 sm:py-7 lg:px-10' : 'p-6 sm:p-8')}>
           {/* The heading above the form: always on the single card, phones only on split. */}
           <div className={cn('mb-6', split && 'md:hidden')}>
+            {split ? (
+              <div className="mb-5 flex items-center justify-between gap-3">
+                {back ? <BackButton onClick={back} label={backLabel} /> : <span />}
+                <ThemeSwitch />
+              </div>
+            ) : null}
             <div className="flex items-center justify-between gap-3">
               <Brand />
-              {onBack ? <BackButton onClick={onBack} label={backLabel} /> : null}
+              {!split && back ? <BackButton onClick={back} label={backLabel} /> : null}
             </div>
             <div className="mt-6">{heading()}</div>
           </div>
-          {split && onBack ? (
-            <div className="mb-4 hidden md:block">
-              <BackButton onClick={onBack} label={backLabel} />
-            </div>
-          ) : null}
           {children}
           {footer ? <div className={cn('mt-6 text-center text-sm text-ink-2', split && 'md:hidden')}>{footer}</div> : null}
         </div>

@@ -1,4 +1,3 @@
-import { Phone } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { homeFor, useAuth } from '@/auth/auth'
@@ -7,9 +6,10 @@ import { Button } from '@/components/ui/button'
 import { PageLoader } from '@/components/ui/loader'
 import { toast } from '@/components/ui/toast'
 import { api } from '@/data/api'
-import { normalizePhone } from '@/lib/phone'
+import { PhPhoneInput } from '@/components/phone-input'
+import { PH_PHONE_ERROR, toPhE164 } from '@/lib/phone'
 import { errorMessage } from '@/lib/store'
-import { AuthInput, AuthShell } from './auth-shell'
+import { AuthShell } from './auth-shell'
 
 /**
  * complete_profile_screen.dart: accounts without a mobile number (Google
@@ -31,8 +31,8 @@ export default function CompleteProfile() {
     e.preventDefault()
     setError(null)
     if (!phone.trim()) return setError('Please enter your mobile number')
-    const normalized = normalizePhone(phone)
-    if (!normalized) return setError('Please enter a valid format (e.g. 0917 123 4567)')
+    const normalized = toPhE164(phone)
+    if (!normalized) return setError(PH_PHONE_ERROR)
     setBusy(true)
     try {
       await api.updateProfile(user!.id, { full_name: user!.full_name || 'Customer', phone_number: normalized })
@@ -56,9 +56,9 @@ export default function CompleteProfile() {
         </div>
       </div>
       <form onSubmit={submit} noValidate className="flex flex-col gap-5">
-        <Field label="Mobile number" error={error} hint="Format: 09XX XXX XXXX or +63 9XX XXX XXXX">
+        <Field label="Mobile number" error={error} hint="Philippine mobile numbers only.">
           {(p) => (
-            <AuthInput {...p} icon={<Phone aria-hidden />} type="tel" inputMode="tel" autoComplete="tel" placeholder="0917 123 4567" value={phone} onChange={(e) => setPhone(e.target.value)} />
+            <PhPhoneInput {...p} value={phone} onChange={setPhone} />
           )}
         </Field>
         <Button type="submit" size="lg" loading={busy} className="w-full">Save and continue</Button>

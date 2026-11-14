@@ -1,4 +1,4 @@
-import { ImagePlus, Lock, Mail, Phone, Store, UserRound, X } from 'lucide-react'
+import { ImagePlus, Lock, Mail, Store, UserRound, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { homeFor, markUnlocked, useAuth } from '@/auth/auth'
@@ -8,7 +8,8 @@ import { Field, Select, Textarea } from '@/components/ui/primitives'
 import { api, EmailRejectedError } from '@/data/api'
 import { VENDOR_CATEGORIES } from '@/lib/constants'
 import { isHub } from '@/lib/flight'
-import { normalizePhone } from '@/lib/phone'
+import { PhPhoneInput } from '@/components/phone-input'
+import { isPhMobile, PH_PHONE_ERROR, toPhE164 } from '@/lib/phone'
 import { errorMessage, useQuery } from '@/lib/store'
 import { AuthInput, AuthShell, CodeInput, FormNote, GoogleButton, OrDivider, PasswordInput, PasswordStrengthMeter, ResendCode } from './auth-shell'
 
@@ -78,7 +79,7 @@ export default function SignUp() {
     const e: Record<string, string> = {}
     if (form.fullName.trim().length < 2) e.fullName = 'Enter your full name.'
     if (!/^\S+@\S+\.\S+$/.test(form.email)) e.email = 'Enter a valid email address.'
-    if (!normalizePhone(form.phone)) e.phone = 'Use a PH mobile number, like 0917 123 4567.'
+    if (!isPhMobile(form.phone)) e.phone = PH_PHONE_ERROR
     if (form.password.length < 6) e.password = 'Password must be at least 6 characters.'
     if (form.confirm !== form.password) e.confirm = 'Passwords do not match.'
     if (scope === 'all' && role === 'vendor') {
@@ -114,7 +115,7 @@ export default function SignUp() {
         fullName: form.fullName,
         email: form.email,
         password: form.password,
-        phone: normalizePhone(form.phone)!,
+        phone: toPhE164(form.phone)!,
         role,
         termsAcceptedAt: new Date().toISOString(),
         ...(role === 'vendor'
@@ -260,7 +261,19 @@ export default function SignUp() {
           <>
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="Full name" error={errors.fullName}>{(p) => <AuthInput {...p} icon={<UserRound aria-hidden />} autoComplete="name" placeholder="Juan dela Cruz" value={form.fullName} onChange={set('fullName')} />}</Field>
-              <Field label="Mobile number" error={errors.phone}>{(p) => <AuthInput {...p} icon={<Phone aria-hidden />} type="tel" autoComplete="tel" inputMode="tel" placeholder="0917 123 4567" value={form.phone} onChange={set('phone')} />}</Field>
+              <Field label="Mobile number" error={errors.phone}>
+                {(p) => (
+                  <PhPhoneInput
+                    {...p}
+                    value={form.phone}
+                    onChange={(v) => {
+                      setForm((f) => ({ ...f, phone: v }))
+                      if (isPhMobile(v)) setErrors(({ phone: _p, ...rest }) => rest)
+                    }}
+                    onBlur={() => form.phone && !isPhMobile(form.phone) && setErrors((x) => ({ ...x, phone: PH_PHONE_ERROR }))}
+                  />
+                )}
+              </Field>
             </div>
             <div className="flex flex-col gap-1.5">
               <Field label="Email" error={errors.email} hint={emailCheck?.checking ? 'Checking this address…' : undefined}>

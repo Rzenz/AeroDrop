@@ -36,7 +36,7 @@ final campusLocationsProvider = FutureProvider<List<CampusLocation>>((
   if (!SupabaseService.isConfigured) {
     return [
       CampusLocation(
-        id: '10000000-0000-0000-0000-000000000001',
+        id: '0b29ab20-8522-4778-a9d8-827516a57a6a',
         name: 'UCLM Main Building',
         locationCode: 'MAIN',
         latitude: 10.325210,
@@ -44,7 +44,7 @@ final campusLocationsProvider = FutureProvider<List<CampusLocation>>((
         isActive: true,
       ),
       CampusLocation(
-        id: '10000000-0000-0000-0000-000000000002',
+        id: '19f9571d-9c16-47d2-b54b-632d9f7a37c2',
         name: 'UCLM Annex 2',
         locationCode: 'ANNEX-2',
         latitude: 10.325633,
@@ -52,7 +52,7 @@ final campusLocationsProvider = FutureProvider<List<CampusLocation>>((
         isActive: true,
       ),
       CampusLocation(
-        id: '10000000-0000-0000-0000-000000000003',
+        id: '20e78551-c5a0-4d6f-8607-40628693589b',
         name: 'UCLM Basic Education',
         locationCode: 'BASIC-ED',
         latitude: 10.325133,
@@ -60,7 +60,7 @@ final campusLocationsProvider = FutureProvider<List<CampusLocation>>((
         isActive: true,
       ),
       CampusLocation(
-        id: '10000000-0000-0000-0000-000000000004',
+        id: 'b59b7f2d-07a2-44a4-a552-fb945c18452e',
         name: 'UCLM Maritime Building',
         locationCode: 'MARITIME',
         latitude: 10.326184,
@@ -68,7 +68,7 @@ final campusLocationsProvider = FutureProvider<List<CampusLocation>>((
         isActive: true,
       ),
       CampusLocation(
-        id: '10000000-0000-0000-0000-000000000005',
+        id: 'd637fc1f-64af-4911-9edb-b80ee587bb1e',
         name: 'Campus Base Hub',
         locationCode: 'BASE-HUB',
         latitude: 10.325152,
@@ -103,7 +103,10 @@ final dropoffLocationsProvider = FutureProvider<List<CampusLocation>>((
       .toList();
 });
 
-/// Resolves the campus Base Hub location from database, falling back safely to 10.325152, 123.953046.
+/// Resolves the campus drone hub from the database. When no BASE-HUB row is
+/// found, falls back to the real hub row (migration 37): id
+/// d637fc1f-64af-4911-9edb-b80ee587bb1e at 10.3251520, 123.9530460, so
+/// anything keyed by id, like campus_distance_km, still resolves to the hub.
 final baseHubLocationProvider = FutureProvider<CampusLocation>((
   ref,
 ) async {
@@ -114,11 +117,11 @@ final baseHubLocationProvider = FutureProvider<CampusLocation>((
         loc.locationCode.toUpperCase() == 'BASE_HUB' ||
         loc.name.toLowerCase().contains('base hub'),
     orElse: () => CampusLocation(
-      id: '10000000-0000-0000-0000-000000000005',
-      name: 'Campus Base Hub',
+      id: 'd637fc1f-64af-4911-9edb-b80ee587bb1e',
+      name: 'Campus Drone Hub',
       locationCode: 'BASE-HUB',
-      latitude: 10.325152,
-      longitude: 123.953046,
+      latitude: 10.3251520,
+      longitude: 123.9530460,
       isActive: true,
     ),
   );

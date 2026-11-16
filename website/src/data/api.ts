@@ -54,20 +54,36 @@ export interface SignUpInput {
 
 export interface PlaceOrderInput {
   vendorId: string
-  dropoffLocationId: string
+  /** Null when the customer pinned the drop-off; the dropoff* fields are then set. */
+  dropoffLocationId: string | null
   subtotal: number
   deliveryFee: number
   totalAmount: number
   paymentMethod: PaymentMethod
   notes?: string
   items: { product_id: string; product_name: string; quantity: number; unit_price: number }[]
+  /** A pinned drop-off (migration 40). Sent only when both are set. */
+  dropoffLat?: number
+  dropoffLng?: number
+  dropoffLabel?: string | null
 }
 
 /** What to price: the same vendor, drop-off and items place_order receives. */
 export interface QuoteOrderInput {
   vendorId: string
-  dropoffLocationId: string
+  dropoffLocationId: string | null
   items: { product_id: string; quantity: number }[]
+  /** A pinned drop-off (migration 39). Sent only when both are set. */
+  dropoffLat?: number
+  dropoffLng?: number
+}
+
+/** delivery_zone_info(): the circle a customer may pin a drop-off inside. */
+export interface DeliveryZone {
+  centerLatitude: number
+  centerLongitude: number
+  centerName: string
+  radiusMeters: number
 }
 
 /**
@@ -223,6 +239,8 @@ export interface Api {
   order(id: string): Promise<Order | null>
   /** quote_order_fee: the server's price for an order, to display before placing it. */
   quoteOrderFee(input: QuoteOrderInput): Promise<OrderQuote>
+  /** Null when it can't be loaded or is incomplete: the pin option is then not offered. */
+  deliveryZone(): Promise<DeliveryZone | null>
   placeOrder(input: PlaceOrderInput): Promise<string>
   startOnlinePayment(orderId: string): Promise<string>
   cancelOrder(id: string): Promise<void>

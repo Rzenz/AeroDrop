@@ -1,7 +1,8 @@
-import { CreditCard, Globe, Smartphone } from 'lucide-react'
+import { Building2, CreditCard, Flag, Globe, MapPin, Smartphone } from 'lucide-react'
 import { useMemo, useRef, useState, type FormEvent } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useMe } from '@/auth/auth'
+import { DropoffMapPicker, type PinnedDropoff } from '@/components/dropoff-map-picker'
 import { Money } from '@/components/orders'
 import { Button } from '@/components/ui/button'
 import { PageLoader } from '@/components/ui/loader'
@@ -12,7 +13,7 @@ import { api, type OrderQuote } from '@/data/api'
 import { clearVendor, groupByVendor, useCart } from '@/lib/cart'
 import { needsEmailVerification } from '@/lib/email-verification'
 import { MAX_TRIPS, tripsForWeight } from '@/lib/fees'
-import { isHub } from '@/lib/flight'
+import { isHub, PINNED_DROPOFF_NAME } from '@/lib/flight'
 import { errorMessage, invalidate, useQuery } from '@/lib/store'
 import { cn } from '@/lib/utils'
 import type { PaymentMethod } from '@/types'
@@ -45,6 +46,13 @@ export default function Checkout() {
   const weather = useQuery(() => api.weather())
 
   const [dropoff, setDropoff] = useState(me.campus_location_id ?? '')
+  // A drop-off pinned on the map, as an alternative to the campus points.
+  // Null zone: delivery_zone_info() failed or was incomplete, so the option is
+  // not offered and checkout is the campus-only form it always was.
+  const zone = useQuery(() => api.deliveryZone()).data ?? null
+  const [mode, setMode] = useState<'campus' | 'pin'>('campus')
+  const [pin, setPin] = useState<PinnedDropoff | null>(null)
+  const [picking, setPicking] = useState(false)
   const [notes, setNotes] = useState('')
   const [method, setMethod] = useState<PaymentMethod>('gcash_simulated') // checkout_screen.dart defaults to GCash
   const [card, setCard] = useState({ number: '', expiry: '', cvc: '' })
@@ -54,6 +62,11 @@ export default function Checkout() {
   const placedRef = useRef(false)
 
   const locs = useMemo(() => locations.data ?? [], [locations.data])
+  // The pin in effect: only in pin mode and while the zone is known.
+  const activePin = mode === 'pin' && zone ? pin : null
+  const hasDropoff = activePin ? true : !!dropoff
+  // A pin replaces the location id; a building sends exactly what it always did.
+  const target = activePin ? { dropoffLocationId: null, dropoffLat: activePin.lat, dropoffLng: activePin.lng } : { dropoffLocationId: dropoff }
   const safety = weather.data?.safety_status
   const grounded = safety === 'grounded'
 
@@ -66,7 +79,7 @@ export default function Checkout() {
       groups.map((g) =>
         api.quoteOrderFee({
           vendorId: g.vendorId,
-          dropoffLocationId: dropoff,
+          ...target,
           items: g.items.map((i) => ({ product_id: i.productId, quantity: i.quantity })),
         }),
       ),
@@ -75,13 +88,15 @@ export default function Checkout() {
   // adds its caution surcharge then. useQuery keeps the last result while it
   // refetches, so each result carries the inputs it priced and is shown only
   // while they still match: never the previous drop-off's price.
-  const quoteKey = `${dropoff}|${cartKey}|${safety ?? ''}`
+  // A pin is keyed on its coordinates and label, so moving it re-quotes.
+  const dropoffKey = activePin ? `pin:${activePin.lat},${activePin.lng},${activePin.label ?? ''}` : dropoff
+  const quoteKey = `${dropoffKey}|${cartKey}|${safety ?? ''}`
   const quotes = useQuery<{ key: string; quotes: OrderQuote[] } | null>(
-    () => (dropoff && groups.length ? quoteAll().then((q) => ({ key: quoteKey, quotes: q })) : Promise.resolve(null)),
+    () => (hasDropoff && groups.length ? quoteAll().then((q) => ({ key: quoteKey, quotes: q })) : Promise.resolve(null)),
     [quoteKey],
   )
-  const quoted = dropoff && quotes.data?.key === quoteKey && quotes.data.quotes.length === groups.length ? quotes.data.quotes : null
-  const quoteFailed = !!dropoff && !quoted && !!quotes.error
+  const quoted = hasDropoff && quotes.data?.key === quoteKey && quotes.data.quotes.length === groups.length ? quotes.data.quotes : null
+  const quoteFailed = hasDropoff && !quoted && !!quotes.error
 
   if (!items.length && !placedRef.current) return <Navigate to="/user/cart" replace />
   if (locations.loading) return <PageLoader />
@@ -93,7 +108,7 @@ export default function Checkout() {
   async function place(e: FormEvent) {
     e.preventDefault()
     setError(null)
-    if (!dropoff) return setError('Choose where the drone should drop your order.')
+    if (!hasDropoff) return setError('Choose where the drone should drop your order.')
     if (unverified) return setError('Verify your email before placing an order. Use the Verify email button above.')
     if (grounded) return setError('Drones are grounded by weather. Try again when conditions improve.')
     if (tooHeavy) return setError(`One order is over the ${MAX_TRIPS}-trip weight limit. Adjust your cart first.`)
@@ -118,7 +133,8 @@ export default function Checkout() {
         const q = fresh[n]!
         const id = await api.placeOrder({
           vendorId: g.vendorId,
-          dropoffLocationId: dropoff,
+          ...target,
+          ...(activePin ? { dropoffLabel: activePin.label } : {}),
           // Ignored by the server since migration 31, which prices the order
           // itself; sent so the place_order signature stays unchanged.
           subtotal: q.subtotal,
@@ -174,18 +190,74 @@ export default function Checkout() {
         <Card className="p-5">
           <h2 className="font-semibold text-ink">Drop-off</h2>
           <div className="mt-4 grid gap-4">
-            <Field label="Building" hint="The Campus Drone Hub is the drone’s base and can’t be a drop-off.">
-              {(p) => (
-                <Select {...p} value={dropoff} onChange={(e) => setDropoff(e.target.value)}>
-                  <option value="">Choose your drop-off</option>
-                  {locs.filter((l) => !isHub(l)).map((l) => (
-                    <option key={l.id} value={l.id}>
-                      {l.name}
-                    </option>
-                  ))}
-                </Select>
-              )}
-            </Field>
+            {zone ? (
+              <fieldset className="grid gap-3 sm:grid-cols-2">
+                <legend className="sr-only">Drop-off type</legend>
+                {(
+                  [
+                    { value: 'campus', label: 'Campus drop-off point', icon: Building2 },
+                    { value: 'pin', label: 'Pin on map', icon: MapPin },
+                  ] as const
+                ).map((m) => (
+                  <label
+                    key={m.value}
+                    className={cn(
+                      'flex cursor-pointer items-center gap-3 rounded-xl p-4 shadow-[inset_0_0_0_1px_var(--line)] transition-shadow duration-150',
+                      (activePin ? 'pin' : 'campus') === m.value && 'shadow-[inset_0_0_0_2px_var(--brand)]',
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name="dropoff-mode"
+                      value={m.value}
+                      checked={(activePin ? 'pin' : 'campus') === m.value}
+                      // checkout_screen.dart: the first "Pin on map" opens the picker; pin mode starts once one is confirmed
+                      onChange={() => (m.value === 'campus' ? setMode('campus') : pin ? setMode('pin') : setPicking(true))}
+                      className="accent-[var(--brand)]"
+                    />
+                    <m.icon aria-hidden className="size-5 text-brand" />
+                    <span className="font-medium text-ink">{m.label}</span>
+                  </label>
+                ))}
+              </fieldset>
+            ) : null}
+            {activePin ? (
+              <div className="flex items-center gap-3 rounded-xl bg-sunken px-4 py-3">
+                <Flag aria-hidden className="size-5 shrink-0 text-success" />
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold break-words text-ink">{activePin.label ?? PINNED_DROPOFF_NAME}</p>
+                  <p className="text-xs text-ink-3">Your pin on the campus map</p>
+                </div>
+                <Button type="button" variant="ghost" size="sm" onClick={() => setPicking(true)}>
+                  Edit
+                </Button>
+              </div>
+            ) : (
+              <Field label="Building" hint="The Campus Drone Hub is the drone’s base and can’t be a drop-off.">
+                {(p) => (
+                  <Select {...p} value={dropoff} onChange={(e) => setDropoff(e.target.value)}>
+                    <option value="">Choose your drop-off</option>
+                    {locs.filter((l) => !isHub(l)).map((l) => (
+                      <option key={l.id} value={l.id}>
+                        {l.name}
+                      </option>
+                    ))}
+                  </Select>
+                )}
+              </Field>
+            )}
+            {picking && zone ? (
+              <DropoffMapPicker
+                zone={zone}
+                initial={pin}
+                onCancel={() => setPicking(false)}
+                onConfirm={(p) => {
+                  setPin(p)
+                  setMode('pin')
+                  setPicking(false)
+                }}
+              />
+            ) : null}
             <Field label="Note for the vendor" hint="Optional.">{(p) => <Textarea {...p} value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={300} placeholder="Less ice, please." />}</Field>
           </div>
         </Card>
@@ -246,7 +318,7 @@ export default function Checkout() {
                   </dl>
                 ) : (
                   <p className="mt-2 text-ink-3">
-                    {!dropoff ? 'Choose a drop-off to see the delivery fee.' : quoteFailed ? 'Delivery fee unavailable.' : 'Calculating the delivery fee…'}
+                    {!hasDropoff ? 'Choose a drop-off to see the delivery fee.' : quoteFailed ? 'Delivery fee unavailable.' : 'Calculating the delivery fee…'}
                   </p>
                 )}
               </div>

@@ -3,7 +3,7 @@ import type { Delivery, Order, OrderItem, Product, Profile, SupportMessage, Supp
 import { SUPPORT_MAX_PHOTOS, SUPPORT_MESSAGE_MAX } from '@/lib/constants'
 import { DEFAULT_HUB, type Coords } from '@/lib/flight-calc'
 import { PINNED_DROPOFF_NAME } from '@/lib/flight'
-import type { Api, EmailCheck, SimDelivery, Telemetry } from './api'
+import type { Api, DeliveryZone, EmailCheck, SimDelivery, Telemetry } from './api'
 import { authMessage, authOk, EmailNotVerifiedError, EmailRejectedError, isAlreadyRegistered, isRateLimited } from './auth-errors'
 
 // Supabase implementation of Api. Every call mirrors what the Flutter app does
@@ -406,6 +406,9 @@ export const liveApi: Api = {
         p_vendor_id: input.vendorId,
         p_delivery_location_id: input.dropoffLocationId,
         p_items: input.items,
+        // Sent only for a pinned drop-off, so a fixed-point quote is the
+        // same call it has always been.
+        ...(input.dropoffLat != null && input.dropoffLng != null ? { p_dropoff_lat: input.dropoffLat, p_dropoff_lng: input.dropoffLng } : {}),
       }),
     ) as Record<string, unknown> | null
     // Postgres numerics may arrive as strings. A missing price is an error,
@@ -440,9 +443,32 @@ export const liveApi: Api = {
         p_payment_method: input.paymentMethod,
         p_items: input.items,
         p_notes: input.notes ?? null,
+        // Sent only for a pinned drop-off (migration 40), so a fixed-point
+        // order is the same call it has always been.
+        ...(input.dropoffLat != null && input.dropoffLng != null
+          ? { p_dropoff_lat: input.dropoffLat, p_dropoff_lng: input.dropoffLng, p_dropoff_label: input.dropoffLabel ?? null }
+          : {}),
       }),
     )
     return String(id)
+  },
+  async deliveryZone(): Promise<DeliveryZone | null> {
+    // DeliveryZone.fromMap: nothing is filled in with a guess; without the
+    // server's figures there is no zone.
+    try {
+      const { data, error } = await sb().rpc('delivery_zone_info')
+      if (error || !data || typeof data !== 'object') return null
+      const r = data as Record<string, unknown>
+      const num = (v: unknown) => (v == null || v === '' ? NaN : Number(v))
+      const lat = num(r.center_latitude)
+      const lng = num(r.center_longitude)
+      const radius = num(r.radius_meters)
+      if (!Number.isFinite(lat) || !Number.isFinite(lng) || !Number.isFinite(radius) || radius <= 0) return null
+      const name = String(r.center_name ?? '').trim()
+      return { centerLatitude: lat, centerLongitude: lng, centerName: name || 'the campus hub', radiusMeters: radius }
+    } catch {
+      return null
+    }
   },
   async startOnlinePayment(orderId) {
     const { data, error } = await sb().functions.invoke('create-xendit-payment', { body: { order_id: orderId } })

@@ -10,6 +10,7 @@ import { ConfirmDialog, Dialog } from '@/components/ui/dialog'
 import { PageLoader } from '@/components/ui/loader'
 import { Card, CardHeader, EmptyState, Field, Textarea } from '@/components/ui/primitives'
 import { toast } from '@/components/ui/toast'
+import { isPinnedDropoff, orderDropoffName, pinnedDropoffLabel } from '@/lib/flight'
 import { markOrderReadyAndDispatch } from '@/lib/flight-sim'
 import { api, type ExistingReviews } from '@/data/api'
 import { effectiveStatus, formatDateTime, paymentLabel, shortId } from '@/lib/format'
@@ -31,7 +32,8 @@ export default function OrderDetail({ orderId }: { orderId?: string }) {
   if (!o) return <EmptyState title="Order not found" body="It may belong to another account." action={<Link to={back} className="font-semibold text-brand-ink hover:underline">Back to orders</Link>} />
 
   const status = effectiveStatus(o)
-  const dropoff = locations.data?.find((l) => l.id === o.delivery_location_id)
+  const dropoff = orderDropoffName(o, locations.data)
+  const pinnedLabel = pinnedDropoffLabel(o)
 
   return (
     <div className="flex flex-col gap-6">
@@ -47,11 +49,19 @@ export default function OrderDetail({ orderId }: { orderId?: string }) {
               <OrderStatusBadge order={o} />
             </div>
             <p className="mt-1 text-sm text-ink-3">
-              <span className="font-mono">{shortId(o.id)}</span> · Placed {formatDateTime(o.created_at)} · Drop-off at {dropoff?.name ?? '—'}
+              <span className="font-mono">{shortId(o.id)}</span> · Placed {formatDateTime(o.created_at)} · Drop-off at {dropoff ?? '—'}
             </p>
           </div>
           <Actions order={o} />
         </div>
+        {/* order_details_screen.dart: the vendor dispatches as usual; this only says what kind of drop-off it is. */}
+        {me.role === 'vendor' && isPinnedDropoff(o) ? (
+          <p className="mt-4 rounded-xl bg-warning-bg px-4 py-3 text-sm text-ink">
+            {pinnedLabel
+              ? `The customer chose this drop-off point on the map; it is not one of the campus pads. They described it as: "${pinnedLabel}". You can prepare and dispatch this order as usual.`
+              : 'The customer chose this drop-off point on the map; it is not one of the campus pads, and they did not describe it. You can prepare and dispatch this order as usual.'}
+          </p>
+        ) : null}
         {status !== 'cancelled' && status !== 'rejected' ? (
           <div className="mt-6">
             <OrderTimeline order={o} />

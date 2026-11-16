@@ -1,7 +1,7 @@
 import type { MapDrone } from '@/components/campus-map'
 import type { Telemetry } from '@/data/api'
 import type { CampusLocation, Drone, Order } from '@/types'
-import { findHub, legProgress, phaseOf, positionFor } from './flight'
+import { findHub, legProgress, orderDropoff, phaseOf, positionFor } from './flight'
 
 /**
  * Where each drone is right now, like the app's radar: its latest telemetry
@@ -21,7 +21,7 @@ export function droneMarkers(drones: Drone[], orders: Order[], locs: CampusLocat
       if (t && busy) return { id: d.id, label, active: true, latitude: t.latitude, longitude: t.longitude }
       if (o?.delivery) {
         const pickup = locs.find((l) => l.id === o.delivery!.pickup_location_id) ?? hub
-        const dropoff = locs.find((l) => l.id === (o.delivery!.dropoff_location_id ?? o.delivery_location_id)) ?? hub
+        const dropoff = orderDropoff(o, locs) ?? hub
         return { id: d.id, label, active: true, ...positionFor(phaseOf(o.delivery), legProgress(o.delivery), hub, pickup, dropoff) }
       }
       return { id: d.id, label, active: d.status === 'returning', latitude: hub.latitude, longitude: hub.longitude }

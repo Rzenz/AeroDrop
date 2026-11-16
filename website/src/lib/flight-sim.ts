@@ -102,7 +102,7 @@ export function startFlightSimulator(api: Api, role: Role, onChange: () => void)
       for (const delivery of active) {
         if (completingDeliveries.has(delivery.id)) continue
         const vendorLoc = coordinatesForLocation(delivery.pickup_name, hub)
-        const customerLoc = coordinatesForLocation(delivery.dropoff_name, hub)
+        const customerLoc = delivery.dropoff_coords ?? coordinatesForLocation(delivery.dropoff_name, hub)
 
         if (delivery.status === 'assigning') {
           // ── Leg 1: hub -> vendor, empty ──

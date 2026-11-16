@@ -92,6 +92,9 @@ export interface Delivery {
   delivery_completed_at: string | null
   trips_required: number
   trips_completed: number
+  /** Copied from the order for a pinned drop-off (migrations 39/40). */
+  custom_dropoff_lat?: number | null
+  custom_dropoff_lng?: number | null
   created_at: string
 }
 
@@ -99,7 +102,12 @@ export interface Order {
   id: string
   user_id: string | null
   vendor_id: string | null
+  /** Null for a drop-off the customer pinned on the map; see custom_dropoff_*. */
   delivery_location_id: string | null
+  /** A point the customer pinned on the map in the app (migrations 39/40). The website only displays these. */
+  custom_dropoff_lat?: number | null
+  custom_dropoff_lng?: number | null
+  custom_dropoff_label?: string | null
   order_status: OrderStatus
   payment_status: 'pending' | 'paid' | 'refunded' | 'failed' | 'expired'
   payment_method: PaymentMethod | null

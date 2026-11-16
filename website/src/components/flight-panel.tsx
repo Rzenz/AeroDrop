@@ -1,6 +1,6 @@
 import { api } from '@/data/api'
 import { deliveryStatusMeta } from '@/lib/format'
-import { findHub, legProgress, phaseOf, positionFor, type Phase } from '@/lib/flight'
+import { findHub, legProgress, orderDropoff, phaseOf, pinnedDropoff, positionFor, type Phase } from '@/lib/flight'
 import { useQuery } from '@/lib/store'
 import type { Order } from '@/types'
 import { CampusMap } from './campus-map'
@@ -30,10 +30,12 @@ export function FlightPanel({ order, mapClassName = 'h-80' }: { order: Order; ma
 
   if (!locations.data) return <Skeleton className={`${mapClassName} rounded-2xl`} />
   if (!d) return null
-  const locs = locations.data
+  // A pinned drop-off is not a campus location; add it as a point so the map marks it.
+  const pin = pinnedDropoff(order)
+  const locs = pin ? [...locations.data, pin] : locations.data
   const hub = findHub(locs)!
   const pickup = locs.find((l) => l.id === d.pickup_location_id) ?? hub
-  const dropoff = locs.find((l) => l.id === (d.dropoff_location_id ?? order.delivery_location_id)) ?? hub
+  const dropoff = orderDropoff(order, locs) ?? hub
   const phase = phaseOf(d)
   const progress = legProgress(d)
   const live = telemetry.data

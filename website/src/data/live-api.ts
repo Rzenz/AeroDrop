@@ -2,6 +2,7 @@ import { isAdminEmail, supabase } from '@/lib/config'
 import type { Delivery, Order, OrderItem, Product, Profile, SupportMessage, SupportReport, Vendor, Weather } from '@/types'
 import { SUPPORT_MAX_PHOTOS, SUPPORT_MESSAGE_MAX } from '@/lib/constants'
 import { DEFAULT_HUB, type Coords } from '@/lib/flight-calc'
+import { PINNED_DROPOFF_NAME } from '@/lib/flight'
 import type { Api, EmailCheck, SimDelivery, Telemetry } from './api'
 import { authMessage, authOk, EmailNotVerifiedError, EmailRejectedError, isAlreadyRegistered, isRateLimited } from './auth-errors'
 
@@ -38,6 +39,8 @@ type OrderRow = Omit<Order, 'items' | 'delivery' | 'vendor_name' | 'customer_nam
   deliveries: Delivery | Delivery[] | null
 }
 
+// The order's `*` includes custom_dropoff_lat/lng/label (migration 39), and
+// deliveries(*) its copied custom_dropoff_lat/lng.
 const ORDER_SELECT = '*, order_items(*), deliveries(*)'
 
 // ImageUtils.validateImage: JPEG, PNG or WebP, under 5 MB.
@@ -736,6 +739,10 @@ export const liveApi: Api = {
         const items = (o.order_items ?? []) as { weight_grams?: number; quantity?: number }[]
         const grams = items.reduce((s, i) => s + (i.weight_grams ?? 0) * (i.quantity ?? 1), 0)
         const sender = o.vendor?.business_name ?? o.vendor?.full_name ?? 'Vendor Shop'
+        // DeliveryNotifier: a pinned drop-off's point is on the delivery, else on the order.
+        const pinLat = d.custom_dropoff_lat ?? o.custom_dropoff_lat
+        const pinLng = d.custom_dropoff_lng ?? o.custom_dropoff_lng
+        const pin: [number, number] | null = pinLat != null && pinLng != null && Number.isFinite(Number(pinLat)) && Number.isFinite(Number(pinLng)) ? [Number(pinLat), Number(pinLng)] : null
         return {
           id: String(d.id),
           order_id: String(d.order_id ?? o.id),
@@ -745,7 +752,8 @@ export const liveApi: Api = {
           trips_required: Number(d.trips_required ?? 1),
           trips_completed: Number(d.trips_completed ?? 0),
           pickup_name: d.pickup_loc?.name ?? sender,
-          dropoff_name: d.dropoff_loc?.name ?? o.campus_locations?.name ?? 'UCLM Campus',
+          dropoff_name: d.dropoff_loc?.name ?? o.campus_locations?.name ?? (pin ? (o.custom_dropoff_label?.trim() || PINNED_DROPOFF_NAME) : 'UCLM Campus'),
+          dropoff_coords: pin,
           payload_kg: grams / 1000,
           delivered_at: d.delivery_completed_at ?? null,
           created_at: d.created_at,

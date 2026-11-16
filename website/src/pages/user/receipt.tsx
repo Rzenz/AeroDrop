@@ -8,6 +8,7 @@ import { PageLoader, Spinner } from '@/components/ui/loader'
 import { EmptyState, ErrorNote } from '@/components/ui/primitives'
 import { api } from '@/data/api'
 import { effectiveStatus, formatDateTime, orderStatusMeta, paymentLabel, shortId } from '@/lib/format'
+import { orderDropoffName } from '@/lib/flight'
 import { useQuery } from '@/lib/store'
 import { cn } from '@/lib/utils'
 import type { Order } from '@/types'
@@ -66,7 +67,7 @@ export default function Receipt() {
     )
   }
 
-  const dropoff = o ? locations.data?.find((l) => l.id === o.delivery_location_id)?.name : undefined
+  const dropoff = o ? orderDropoffName(o, locations.data) : undefined
 
   return (
     <div className="mx-auto flex w-full max-w-md flex-col items-center gap-5">

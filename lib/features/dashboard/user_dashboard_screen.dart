@@ -18,6 +18,9 @@ import '../../core/models/order_model.dart';
 import '../../core/models/product_model.dart';
 import '../../core/providers/order_provider.dart';
 import '../../core/providers/location_provider.dart';
+import '../../core/providers/delivery_zone_provider.dart';
+import '../cart/dropoff_choice.dart';
+import '../cart/dropoff_map_picker.dart';
 
 import '../../core/providers/notification_provider.dart';
 import '../../core/providers/weather_provider.dart';
@@ -93,8 +96,8 @@ class UserDashboardScreen extends ConsumerWidget {
                       alignment: Alignment.center,
                       semanticLabel: 'Your profile',
                       onTap: () => context.go('/user/profile'),
-                      child: user?.avatarUrl != null &&
-                              user!.avatarUrl!.isNotEmpty
+                      child:
+                          user?.avatarUrl != null && user!.avatarUrl!.isNotEmpty
                           ? ClipRRect(
                               borderRadius: BorderRadius.circular(22),
                               child: Image.network(
@@ -218,19 +221,36 @@ class _AvatarInitial extends StatelessWidget {
 
 // ─── Drop-off control ──────────────────────────────────────────────────────
 
-/// The user's saved drop-off point. Tapping opens a picker; the choice is
-/// saved to the profile's campus location and becomes checkout's default.
+/// Returned by the sheet's "Pin on map" row, which is not a campus location.
+class _PinRowTapped {
+  const _PinRowTapped();
+}
+
+/// The user's drop-off. Tapping opens a picker. A building is saved to the
+/// profile's campus location and becomes checkout's default; a pin goes to
+/// dropoffChoiceProvider, the same state checkout reads, and never to the
+/// profile.
 class _DropoffControl extends ConsumerWidget {
   const _DropoffControl();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final savedId = ref.watch(authProvider.select((s) => s.user?.campusLocationId));
+    final savedId = ref.watch(
+      authProvider.select((s) => s.user?.campusLocationId),
+    );
     final locations = ref.watch(dropoffLocationsProvider).value ?? const [];
+    // As at checkout: a pin counts only while the zone is known.
+    final zone = ref.watch(deliveryZoneProvider).asData?.value;
+    final choice = ref.watch(dropoffChoiceProvider);
+    final activePin = choice.usePin && zone != null ? choice.pin : null;
 
     String? savedName;
-    for (final l in locations) {
-      if (l.id == savedId) savedName = l.name;
+    if (activePin != null) {
+      savedName = activePin.label ?? OrderModel.pinnedDropoffName;
+    } else {
+      for (final l in locations) {
+        if (l.id == savedId) savedName = l.name;
+      }
     }
     // A saved id that is no longer a selectable drop-off reads as unset
     final hasSaved = savedName != null;
@@ -240,7 +260,7 @@ class _DropoffControl extends ConsumerWidget {
       label: hasSaved ? 'Drop-off: $savedName. Change' : 'Set drop-off',
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
-        onTap: () => _openPicker(context, ref, savedId),
+        onTap: () => _openPicker(context, ref, savedId, activePin != null),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
           child: Column(
@@ -295,18 +315,29 @@ class _DropoffControl extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
     String? savedId,
+    bool pinActive,
   ) async {
-    final picked = await showNeuSheet<CampusLocation>(
+    // The zone is cached for the session. If an earlier load failed, try
+    // again now, as checkout does, rather than hiding the pin row until the
+    // app restarts.
+    final zoneNow = ref.read(deliveryZoneProvider);
+    if (zoneNow.hasValue && zoneNow.value == null) {
+      ref.invalidate(deliveryZoneProvider);
+    }
+
+    // A building row returns its CampusLocation; the pin row returns
+    // _PinRowTapped.
+    final picked = await showNeuSheet<Object>(
       context,
       title: 'Choose your drop-off',
       child: Consumer(
         builder: (sheetContext, sheetRef, _) {
           final async = sheetRef.watch(dropoffLocationsProvider);
+          // Null while loading or when it failed: the pin row is then absent.
+          final zone = sheetRef.watch(deliveryZoneProvider).asData?.value;
           return async.when(
-            loading: () => const Padding(
-              padding: EdgeInsets.all(24),
-              child: NeuLoader(),
-            ),
+            loading: () =>
+                const Padding(padding: EdgeInsets.all(24), child: NeuLoader()),
             error: (_, _) => Padding(
               padding: const EdgeInsets.all(16),
               child: Text(
@@ -336,35 +367,20 @@ class _DropoffControl extends ConsumerWidget {
                     shrinkWrap: true,
                     children: [
                       for (final loc in locations)
-                        ListTile(
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 4,
-                          ),
-                          leading: Icon(
-                            Icons.location_on_outlined,
-                            color: loc.id == savedId
-                                ? AppColors.accent
-                                : AppColors.textSecondary,
-                          ),
-                          title: Text(
-                            loc.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: AppTextStyles.body(
-                              fontSize: 14,
-                              color: AppColors.textPrimary,
-                              fontWeight: loc.id == savedId
-                                  ? FontWeight.bold
-                                  : FontWeight.normal,
-                            ),
-                          ),
-                          trailing: loc.id == savedId
-                              ? const Icon(
-                                  Icons.check_rounded,
-                                  color: AppColors.accent,
-                                )
-                              : null,
+                        _DropoffRow(
+                          icon: Icons.location_on_outlined,
+                          label: loc.name,
+                          selected: !pinActive && loc.id == savedId,
                           onTap: () => Navigator.of(sheetContext).pop(loc),
+                        ),
+                      if (zone != null)
+                        _DropoffRow(
+                          icon: Icons.push_pin_outlined,
+                          label: 'Pin on map',
+                          selected: pinActive,
+                          onTap: () => Navigator.of(
+                            sheetContext,
+                          ).pop(const _PinRowTapped()),
                         ),
                     ],
                   ),
@@ -373,7 +389,23 @@ class _DropoffControl extends ConsumerWidget {
       ),
     );
 
-    if (picked == null || picked.id == savedId) return;
+    if (picked is _PinRowTapped) {
+      // The sheet has closed; open the same picker checkout uses.
+      final zone = ref.read(deliveryZoneProvider).asData?.value;
+      if (zone == null || !context.mounted) return;
+      final pin = await DropoffMapPicker.open(
+        context,
+        zone: zone,
+        initial: ref.read(dropoffChoiceProvider).pin,
+      );
+      if (pin != null) ref.read(dropoffChoiceProvider.notifier).choosePin(pin);
+      return;
+    }
+    if (picked is! CampusLocation) return;
+
+    // A building replaces any pin, here and at checkout.
+    ref.read(dropoffChoiceProvider.notifier).forgetPin();
+    if (picked.id == savedId) return;
 
     final user = ref.read(authProvider).user;
     if (user == null) return;
@@ -382,11 +414,7 @@ class _DropoffControl extends ConsumerWidget {
     // state keeps the previous user, so the control keeps its old value.
     final ok = await ref
         .read(authProvider.notifier)
-        .updateProfile(
-          user.fullName,
-          user.email,
-          campusLocationId: picked.id,
-        );
+        .updateProfile(user.fullName, user.email, campusLocationId: picked.id);
     if (!context.mounted) return;
     showNeuSnack(
       context,
@@ -395,6 +423,46 @@ class _DropoffControl extends ConsumerWidget {
           : (ref.read(authProvider).errorMessage ??
                 'Could not save your drop-off. Please try again.'),
       tone: ok ? NeuToneKind.success : NeuToneKind.error,
+    );
+  }
+}
+
+/// One row of the drop-off sheet: a building, or "Pin on map".
+class _DropoffRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _DropoffRow({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+      leading: Icon(
+        icon,
+        color: selected ? AppColors.accent : AppColors.textSecondary,
+      ),
+      title: Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: AppTextStyles.body(
+          fontSize: 14,
+          color: AppColors.textPrimary,
+          fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+        ),
+      ),
+      trailing: selected
+          ? const Icon(Icons.check_rounded, color: AppColors.accent)
+          : null,
+      onTap: onTap,
     );
   }
 }
@@ -439,20 +507,23 @@ class _FeaturedProductsState extends ConsumerState<_FeaturedProducts> {
     final categories = {
       for (final p in inStock)
         if (p.category.trim().isNotEmpty) p.category.trim(),
-    }.toList()
-      ..sort();
+    }.toList()..sort();
 
     // A chip whose category has since disappeared falls back to All
-    final selected =
-        _category == _all || categories.contains(_category) ? _category : _all;
+    final selected = _category == _all || categories.contains(_category)
+        ? _category
+        : _all;
 
-    final featured = inStock
-        .where((p) => selected == _all || p.category.trim() == selected)
-        .toList()
-      ..sort((a, b) {
-        final byRating = b.rating.compareTo(a.rating);
-        return byRating != 0 ? byRating : b.reviewCount.compareTo(a.reviewCount);
-      });
+    final featured =
+        inStock
+            .where((p) => selected == _all || p.category.trim() == selected)
+            .toList()
+          ..sort((a, b) {
+            final byRating = b.rating.compareTo(a.rating);
+            return byRating != 0
+                ? byRating
+                : b.reviewCount.compareTo(a.reviewCount);
+          });
     final top = featured.take(_maxFeatured).toList();
 
     return Column(
@@ -496,9 +567,7 @@ class _FeaturedProductsState extends ConsumerState<_FeaturedProducts> {
         else if (top.length < 2)
           // A one-card carousel looks broken; a plain row does not
           Row(
-            children: [
-              Expanded(child: _FeaturedCard(product: top.first)),
-            ],
+            children: [Expanded(child: _FeaturedCard(product: top.first))],
           )
         else ...[
           SizedBox(
@@ -950,9 +1019,7 @@ class _RecentOrderRow extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: statusColor.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: statusColor.withValues(alpha: 0.3),
-                  ),
+                  border: Border.all(color: statusColor.withValues(alpha: 0.3)),
                 ),
                 child: Text(
                   order.statusDisplay,
@@ -1251,7 +1318,8 @@ class AeroDropWeatherWidget extends ConsumerWidget {
               child: _WeatherMetric(
                 icon: Icons.air_rounded,
                 value: windStr,
-                label: (weather.windGusts != null &&
+                label:
+                    (weather.windGusts != null &&
                         weather.windSpeed != null &&
                         weather.windGusts! > weather.windSpeed!)
                     ? 'Wind & Gusts'

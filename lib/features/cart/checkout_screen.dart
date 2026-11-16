@@ -26,6 +26,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/services/supabase_service.dart';
 import '../payment/widgets/simulated_card_dialog.dart';
 import 'widgets/order_confirmation_dialog.dart';
+import 'dropoff_choice.dart';
 import 'dropoff_map_picker.dart';
 
 class CheckoutScreen extends ConsumerStatefulWidget {
@@ -38,10 +39,9 @@ class CheckoutScreen extends ConsumerStatefulWidget {
 class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   String? _selectedLocationId;
 
-  // A drop-off the customer pinned on the map, as an alternative to the
-  // fixed campus points. The campus list stays the default.
-  bool _usePin = false;
-  PinnedDropoff? _pin;
+  // A drop-off pinned on the map, as an alternative to the fixed campus
+  // points, lives in dropoffChoiceProvider: shared with the home "Deliver to"
+  // control, so a pin picked there arrives here already selected.
   String _paymentMethod = 'gcash';
   bool _placing = false;
   late final TextEditingController _notesController;
@@ -63,20 +63,17 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
 
   /// The pin in effect: only while "Pin on map" is selected and the zone is
   /// known. Null means the order goes to the selected campus location.
-  PinnedDropoff? _activePin(DeliveryZone? zone) =>
-      _usePin && zone != null ? _pin : null;
+  PinnedDropoff? _activePin(DeliveryZone? zone, DropoffChoice choice) =>
+      choice.usePin && zone != null ? choice.pin : null;
 
   Future<void> _pickPin(DeliveryZone zone) async {
     final picked = await DropoffMapPicker.open(
       context,
       zone: zone,
-      initial: _pin,
+      initial: ref.read(dropoffChoiceProvider).pin,
     );
     if (!mounted || picked == null) return;
-    setState(() {
-      _pin = picked;
-      _usePin = true;
-    });
+    ref.read(dropoffChoiceProvider.notifier).choosePin(picked);
   }
 
   @override
@@ -93,7 +90,8 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     // and blocks the order rather than falling back to a local figure.
     // Null when the zone could not be loaded: the pin option is then absent.
     final zone = ref.watch(deliveryZoneProvider).asData?.value;
-    final activePin = _activePin(zone);
+    final choice = ref.watch(dropoffChoiceProvider);
+    final activePin = _activePin(zone, choice);
     final quoteRequest = orderQuoteRequestFor(
       cart,
       _selectedLocationId,
@@ -160,7 +158,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                             icon: Icons.apartment_rounded,
                             label: 'Campus drop-off point',
                             color: AppColors.accent,
-                            onChanged: (_) => setState(() => _usePin = false),
+                            onChanged: (_) => ref
+                                .read(dropoffChoiceProvider.notifier)
+                                .chooseCampusPoint(),
                           ),
                           _PaymentOption(
                             value: 'pin',
@@ -169,10 +169,13 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                             label: 'Pin on map',
                             color: AppColors.success,
                             onChanged: (_) {
-                              if (_pin == null) {
+                              final pin = choice.pin;
+                              if (pin == null) {
                                 _pickPin(zone);
                               } else {
-                                setState(() => _usePin = true);
+                                ref
+                                    .read(dropoffChoiceProvider.notifier)
+                                    .choosePin(pin);
                               }
                             },
                           ),
@@ -687,7 +690,10 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       return;
     }
 
-    final pin = _activePin(ref.read(deliveryZoneProvider).asData?.value);
+    final pin = _activePin(
+      ref.read(deliveryZoneProvider).asData?.value,
+      ref.read(dropoffChoiceProvider),
+    );
 
     if (pin == null && _selectedLocationId == null) {
       setState(() => _placing = false);

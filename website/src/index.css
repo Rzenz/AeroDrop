@@ -125,6 +125,14 @@
   img.no-outline {
     outline: none;
   }
+  /* The OS draws a native select's popup in the page's color-scheme, so the
+     options must not inherit the control's text colour: in light theme that
+     left them light text on a white popup. Own colours keep both themes legible. */
+  select option,
+  select optgroup {
+    background-color: var(--surface);
+    color: var(--ink);
+  }
 }
 
 /* ── Uiverse: knob switch (elijahwgummer-poc / giant-panda-93, MIT) ────────

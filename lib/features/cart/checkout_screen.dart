@@ -13,8 +13,10 @@ import '../../core/widgets/neu_button.dart';
 import '../../core/widgets/verify_email_banner.dart';
 import '../../core/providers/order_provider.dart';
 import '../../core/models/cart_model.dart';
+import '../../core/models/order_model.dart';
 import '../../core/models/order_quote_model.dart';
 import '../../core/providers/auth_provider.dart';
+import '../../core/providers/delivery_zone_provider.dart';
 import '../../core/providers/location_provider.dart';
 import '../../core/providers/order_quote_provider.dart';
 import '../../core/providers/vendor_provider.dart';
@@ -24,6 +26,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/services/supabase_service.dart';
 import '../payment/widgets/simulated_card_dialog.dart';
 import 'widgets/order_confirmation_dialog.dart';
+import 'dropoff_map_picker.dart';
 
 class CheckoutScreen extends ConsumerStatefulWidget {
   const CheckoutScreen({super.key});
@@ -34,6 +37,11 @@ class CheckoutScreen extends ConsumerStatefulWidget {
 
 class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   String? _selectedLocationId;
+
+  // A drop-off the customer pinned on the map, as an alternative to the
+  // fixed campus points. The campus list stays the default.
+  bool _usePin = false;
+  PinnedDropoff? _pin;
   String _paymentMethod = 'gcash';
   bool _placing = false;
   late final TextEditingController _notesController;
@@ -42,6 +50,33 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   void initState() {
     super.initState();
     _notesController = TextEditingController();
+    // The zone is cached for the session. If an earlier load failed, try
+    // again now rather than hiding the pin option until the app restarts.
+    Future.microtask(() {
+      if (!mounted) return;
+      final zone = ref.read(deliveryZoneProvider);
+      if (zone.hasValue && zone.value == null) {
+        ref.invalidate(deliveryZoneProvider);
+      }
+    });
+  }
+
+  /// The pin in effect: only while "Pin on map" is selected and the zone is
+  /// known. Null means the order goes to the selected campus location.
+  PinnedDropoff? _activePin(DeliveryZone? zone) =>
+      _usePin && zone != null ? _pin : null;
+
+  Future<void> _pickPin(DeliveryZone zone) async {
+    final picked = await DropoffMapPicker.open(
+      context,
+      zone: zone,
+      initial: _pin,
+    );
+    if (!mounted || picked == null) return;
+    setState(() {
+      _pin = picked;
+      _usePin = true;
+    });
   }
 
   @override
@@ -56,7 +91,14 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     // Priced by the server (quote_order_fee), the same function place_order
     // charges with. Never computed here: a failed quote shows as unavailable
     // and blocks the order rather than falling back to a local figure.
-    final quoteRequest = orderQuoteRequestFor(cart, _selectedLocationId);
+    // Null when the zone could not be loaded: the pin option is then absent.
+    final zone = ref.watch(deliveryZoneProvider).asData?.value;
+    final activePin = _activePin(zone);
+    final quoteRequest = orderQuoteRequestFor(
+      cart,
+      _selectedLocationId,
+      pin: activePin == null ? null : (activePin.lat, activePin.lng),
+    );
     final quoteAsync = quoteRequest == null
         ? const AsyncValue<OrderQuote>.loading()
         : ref.watch(orderQuoteProvider(quoteRequest));
@@ -105,95 +147,142 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
 
                   // Delivery Location
                   _SectionCard(
-                    title: 'Campus Drop-off Location',
+                    title: 'Drop-off',
                     icon: Icons.location_on_outlined,
-                    child: locationsAsync.when(
-                      data: (locations) {
-                        if (locations.isEmpty) {
-                          return Text(
-                            'No campus locations available.',
-                            style: AppTextStyles.body(
-                              fontSize: 13,
-                              color: AppColors.danger,
-                            ),
-                          );
-                        }
-                        // Default to the drop-off saved on the profile when
-                        // it is still selectable. Only a default: picking a
-                        // different one here changes this order alone.
-                        final savedId =
-                            ref.watch(authProvider).user?.campusLocationId;
-                        final defaultId =
-                            locations.any((l) => l.id == savedId)
-                            ? savedId!
-                            : locations.first.id;
-
-                        // Initialize selection if null
-                        if (_selectedLocationId == null ||
-                            !locations.any(
-                              (l) => l.id == _selectedLocationId,
-                            )) {
-                          WidgetsBinding.instance.addPostFrameCallback((_) {
-                            setState(() {
-                              _selectedLocationId = defaultId;
-                            });
-                          });
-                        }
-
-                        return DropdownButtonFormField<String>(
-                          initialValue: _selectedLocationId ?? defaultId,
-                          dropdownColor: AppColors.surfaceRaised,
-                          style: AppTextStyles.body(
-                            fontSize: 13,
-                            color: AppColors.textPrimary,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // Offered only when the delivery zone is known
+                        if (zone != null) ...[
+                          _PaymentOption(
+                            value: 'campus',
+                            groupValue: activePin != null ? 'pin' : 'campus',
+                            icon: Icons.apartment_rounded,
+                            label: 'Campus drop-off point',
+                            color: AppColors.accent,
+                            onChanged: (_) => setState(() => _usePin = false),
                           ),
-                          decoration: InputDecoration(
-                            filled: true,
-                            fillColor: AppColors.bgDark,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: AppColors.border),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: AppColors.border),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 12,
-                            ),
+                          _PaymentOption(
+                            value: 'pin',
+                            groupValue: activePin != null ? 'pin' : 'campus',
+                            icon: Icons.push_pin_outlined,
+                            label: 'Pin on map',
+                            color: AppColors.success,
+                            onChanged: (_) {
+                              if (_pin == null) {
+                                _pickPin(zone);
+                              } else {
+                                setState(() => _usePin = true);
+                              }
+                            },
                           ),
-                          items: locations
-                              .map(
-                                (loc) => DropdownMenuItem(
-                                  value: loc.id,
-                                  child: Text(
-                                    loc.name,
-                                    style: AppTextStyles.body(fontSize: 13),
+                          const SizedBox(height: 8),
+                        ],
+                        if (activePin != null && zone != null)
+                          _PinSummary(
+                            pin: activePin,
+                            onEdit: () => _pickPin(zone),
+                          )
+                        else
+                          locationsAsync.when(
+                            data: (locations) {
+                              if (locations.isEmpty) {
+                                return Text(
+                                  'No campus locations available.',
+                                  style: AppTextStyles.body(
+                                    fontSize: 13,
+                                    color: AppColors.danger,
+                                  ),
+                                );
+                              }
+                              // Default to the drop-off saved on the profile when
+                              // it is still selectable. Only a default: picking a
+                              // different one here changes this order alone.
+                              final savedId = ref
+                                  .watch(authProvider)
+                                  .user
+                                  ?.campusLocationId;
+                              final defaultId =
+                                  locations.any((l) => l.id == savedId)
+                                  ? savedId!
+                                  : locations.first.id;
+
+                              // Initialize selection if null
+                              if (_selectedLocationId == null ||
+                                  !locations.any(
+                                    (l) => l.id == _selectedLocationId,
+                                  )) {
+                                WidgetsBinding.instance.addPostFrameCallback((
+                                  _,
+                                ) {
+                                  setState(() {
+                                    _selectedLocationId = defaultId;
+                                  });
+                                });
+                              }
+
+                              return DropdownButtonFormField<String>(
+                                initialValue: _selectedLocationId ?? defaultId,
+                                dropdownColor: AppColors.surfaceRaised,
+                                style: AppTextStyles.body(
+                                  fontSize: 13,
+                                  color: AppColors.textPrimary,
+                                ),
+                                decoration: InputDecoration(
+                                  filled: true,
+                                  fillColor: AppColors.bgDark,
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(
+                                      color: AppColors.border,
+                                    ),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(
+                                      color: AppColors.border,
+                                    ),
+                                  ),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 14,
+                                    vertical: 12,
                                   ),
                                 ),
-                              )
-                              .toList(),
-                          onChanged: (v) =>
-                              setState(() => _selectedLocationId = v),
-                        );
-                      },
-                      loading: () => const SizedBox(
-                        height: 48,
-                        child: Center(
-                          child: CircularProgressIndicator(
-                            color: AppColors.accent,
-                            strokeWidth: 2,
+                                items: locations
+                                    .map(
+                                      (loc) => DropdownMenuItem(
+                                        value: loc.id,
+                                        child: Text(
+                                          loc.name,
+                                          style: AppTextStyles.body(
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                      ),
+                                    )
+                                    .toList(),
+                                onChanged: (v) =>
+                                    setState(() => _selectedLocationId = v),
+                              );
+                            },
+                            loading: () => const SizedBox(
+                              height: 48,
+                              child: Center(
+                                child: CircularProgressIndicator(
+                                  color: AppColors.accent,
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                            ),
+                            error: (err, _) => Text(
+                              'Failed to load locations: $err',
+                              style: AppTextStyles.body(
+                                fontSize: 13,
+                                color: AppColors.danger,
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
-                      error: (err, _) => Text(
-                        'Failed to load locations: $err',
-                        style: AppTextStyles.body(
-                          fontSize: 13,
-                          color: AppColors.danger,
-                        ),
-                      ),
+                      ],
                     ),
                   ).animate().fadeIn(delay: 100.ms),
                   const SizedBox(height: 16),
@@ -550,9 +639,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                               fontWeight: FontWeight.bold,
                               color:
                                   (isOverweight ||
-                              isGrounded ||
-                              needsVerification ||
-                              quoteFailed)
+                                      isGrounded ||
+                                      needsVerification ||
+                                      quoteFailed)
                                   ? Colors.grey
                                   : null,
                             ),
@@ -598,7 +687,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       return;
     }
 
-    if (_selectedLocationId == null) {
+    final pin = _activePin(ref.read(deliveryZoneProvider).asData?.value);
+
+    if (pin == null && _selectedLocationId == null) {
       setState(() => _placing = false);
       showNeuSnack(
         context,
@@ -615,7 +706,11 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     try {
       quote = await ref.refresh(
         orderQuoteProvider(
-          orderQuoteRequestFor(cart, _selectedLocationId)!,
+          orderQuoteRequestFor(
+            cart,
+            _selectedLocationId,
+            pin: pin == null ? null : (pin.lat, pin.lng),
+          )!,
         ).future,
       );
     } catch (e) {
@@ -633,7 +728,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     final feeBreakdown = quote.toFeeBreakdown();
     final deliveryFee = quote.deliveryFee;
     final totalAmount = quote.totalAmount;
-    final dropoffName = _dropoffName() ?? 'Selected Campus Pad';
+    final dropoffName = pin != null
+        ? (pin.label ?? OrderModel.pinnedDropoffName)
+        : (_dropoffName() ?? 'Selected Campus Pad');
     final paymentLabel = switch (_paymentMethod) {
       'xendit' => 'Pay online (GCash or Card)',
       'gcash' => 'Simulated GCash',
@@ -706,7 +803,12 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         .read(orderProvider.notifier)
         .placeOrder(
           vendorId: cart.first.vendorId,
-          dropoffLocationId: _selectedLocationId!,
+          // A pinned order carries coordinates instead of a campus location;
+          // the server refuses a pin outside the delivery area.
+          dropoffLocationId: pin == null ? _selectedLocationId! : null,
+          dropoffLat: pin?.lat,
+          dropoffLng: pin?.lng,
+          dropoffLabel: pin?.label,
           // Ignored by the server since migration 31, which prices the order
           // itself; passed so the place_order signature stays unchanged.
           subtotal: quote.subtotal,
@@ -783,6 +885,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       cart,
       totalAmount,
       deliveryFee,
+      dropoffName: dropoffName,
       subtotal: quote.subtotal,
       feeBreakdown: feeBreakdown,
     );
@@ -826,6 +929,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     List<CartItem> cart,
     double totalAmount,
     double deliveryFee, {
+    required String dropoffName,
     required double subtotal,
     DeliveryFeeBreakdown? feeBreakdown,
   }) {
@@ -871,11 +975,79 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
           ? 'GCash (Simulated)'
           : 'Cash on delivery',
       placedAt: now,
-      dropoffName: _dropoffName(),
+      dropoffName: dropoffName,
       totalWeightGrams: totalWeightGrams,
       customerNote: note,
       orderStatus: 'Pending Confirmation',
       deliveryId: firstOrder?.deliveryId,
+    );
+  }
+}
+
+/// The pinned drop-off the customer confirmed, with a way to change it.
+class _PinSummary extends StatelessWidget {
+  final PinnedDropoff pin;
+  final VoidCallback onEdit;
+  const _PinSummary({required this.pin, required this.onEdit});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
+      decoration: BoxDecoration(
+        color: AppColors.bgDark,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.flag_rounded, size: 18, color: AppColors.success),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  pin.label ?? OrderModel.pinnedDropoffName,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.body(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                Text(
+                  'Your pin on the campus map',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.caption(
+                    fontSize: 11,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: onEdit,
+            style: TextButton.styleFrom(
+              minimumSize: const Size(0, 36),
+              visualDensity: VisualDensity.compact,
+            ),
+            child: Text(
+              'Edit',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.caption(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: AppColors.accentText,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -359,9 +359,38 @@ class _OrderDetailsScreenState extends ConsumerState<OrderDetailsScreen> {
                   child: Column(
                     children: [
                       _InfoRow(
-                        label: 'Campus Dropoff Pad',
+                        label: order.hasCustomDropoff
+                            ? 'Pinned drop-off'
+                            : 'Campus Dropoff Pad',
                         value: order.dropoffLocationName ?? 'Drop-off Pad',
                       ),
+                      // The vendor dispatches as usual; this only says what
+                      // kind of drop-off it is.
+                      if (order.hasCustomDropoff && isVendor) ...[
+                        const SizedBox(height: 10),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: AppColors.warning.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: AppColors.warning.withValues(alpha: 0.4),
+                            ),
+                          ),
+                          child: Text(
+                            order.customDropoffLabel != null
+                                ? 'The customer chose this drop-off point on the map; it is not one of the campus pads. They described it as: "${order.customDropoffLabel}". You can prepare and dispatch this order as usual.'
+                                : 'The customer chose this drop-off point on the map; it is not one of the campus pads, and they did not describe it. You can prepare and dispatch this order as usual.',
+                            maxLines: 6,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTextStyles.caption(
+                              fontSize: 12,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                        ),
+                      ],
                       if (order.customerPhone.isNotEmpty) ...[
                         const SizedBox(height: 8),
                         _InfoRow(

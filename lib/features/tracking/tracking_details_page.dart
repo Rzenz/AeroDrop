@@ -16,6 +16,7 @@ import '../../core/providers/order_provider.dart';
 import '../orders/widgets/order_chat_entry.dart';
 import '../../core/providers/telemetry_provider.dart';
 import '../../core/models/delivery_model.dart';
+import '../../core/models/order_model.dart';
 import '../../core/services/supabase_service.dart';
 import '../../core/services/drone_flight_calculator.dart';
 
@@ -120,9 +121,10 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
 
     try {
       // 1. Fetch latest delivery details from deliveries table
+      // The order is joined only for the label of a pinned drop-off
       final delResponse = await SupabaseService.client
           .from('deliveries')
-          .select()
+          .select('*, orders!order_id(custom_dropoff_label)')
           .eq('id', widget.deliveryId)
           .maybeSingle();
 
@@ -165,6 +167,24 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
           etaStr = 'En route to vendor';
         }
 
+        // A drop-off the customer pinned on the map: coordinates on the
+        // delivery row, their description on the order.
+        double? coord(dynamic v) =>
+            v is num ? v.toDouble() : double.tryParse(v?.toString() ?? '');
+        final pinLat = coord(data['custom_dropoff_lat']);
+        final pinLng = coord(data['custom_dropoff_lng']);
+        final hasPin = pinLat != null && pinLng != null;
+        final orderJoin = data['orders'];
+        final rawPinLabel = orderJoin is Map
+            ? (orderJoin['custom_dropoff_label']?.toString().trim() ?? '')
+            : '';
+        final pinLabel = hasPin && rawPinLabel.isNotEmpty ? rawPinLabel : null;
+        if (hasPin && mounted) {
+          setState(
+            () => _dropoffName = pinLabel ?? OrderModel.pinnedDropoffName,
+          );
+        }
+
         final model = DeliveryModel(
           id: data['id'].toString(),
           senderName: data['sender_name']?.toString() ?? 'Unknown Sender',
@@ -200,6 +220,12 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
           tripsRequired: (data['trips_required'] as num?)?.toInt() ?? 1,
           tripsCompleted: (data['trips_completed'] as num?)?.toInt() ?? 0,
           orderId: data['order_id']?.toString(),
+          customDropoffLat: hasPin ? pinLat : null,
+          customDropoffLng: hasPin ? pinLng : null,
+          customDropoffLabel: pinLabel,
+          dropoffLocationName: hasPin
+              ? (pinLabel ?? OrderModel.pinnedDropoffName)
+              : null,
         );
 
         if (mounted) {

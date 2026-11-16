@@ -169,13 +169,17 @@ class OrderNotifier extends StateNotifier<OrderState> {
 
   Future<String?> placeOrder({
     required String vendorId,
-    required String dropoffLocationId,
+    // Null only for a pinned drop-off, which sends dropoffLat/Lng instead
+    required String? dropoffLocationId,
     required double subtotal,
     required double deliveryFee,
     required double totalAmount,
     required String paymentMethod,
     required List<CartItem> items,
     String? notes,
+    double? dropoffLat,
+    double? dropoffLng,
+    String? dropoffLabel,
   }) async {
     final user = ref.read(authProvider).user;
     if (user == null) return null;
@@ -233,6 +237,13 @@ class OrderNotifier extends StateNotifier<OrderState> {
           'p_payment_method': paymentMethod,
           'p_items': itemsPayload,
           'p_notes': notes,
+          // Sent only for a pinned drop-off (migration 40), so a fixed-point
+          // order is the same call it has always been.
+          if (dropoffLat != null && dropoffLng != null) ...{
+            'p_dropoff_lat': dropoffLat,
+            'p_dropoff_lng': dropoffLng,
+            'p_dropoff_label': dropoffLabel,
+          },
         },
       );
 

@@ -235,6 +235,43 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
     }
   }
 
+  /// Where a pinned drop-off sits on the campus picture. The picture is a
+  /// drawing, not a map, so this is approximate: the pin is interpolated
+  /// between two buildings whose real coordinates and drawn positions are
+  /// both known (Main and Maritime), then kept on the canvas. Null when the
+  /// row has no pin or the reference buildings are not loaded.
+  Offset? _offsetForPin(Map<String, dynamic>? row, Size size) {
+    double? coord(dynamic v) =>
+        v is num ? v.toDouble() : double.tryParse(v?.toString() ?? '');
+    final lat = coord(row?['custom_dropoff_lat']);
+    final lng = coord(row?['custom_dropoff_lng']);
+    if (lat == null || lng == null) return null;
+
+    Map<String, dynamic>? byCode(String code) {
+      for (final l in _locations) {
+        if (l['location_code']?.toString().toUpperCase() == code) return l;
+      }
+      return null;
+    }
+
+    final a = byCode('MAIN'), b = byCode('MARITIME');
+    final aLat = coord(a?['latitude']), aLng = coord(a?['longitude']);
+    final bLat = coord(b?['latitude']), bLng = coord(b?['longitude']);
+    if (aLat == null || aLng == null || bLat == null || bLng == null) {
+      return null;
+    }
+    if (aLat == bLat || aLng == bLng) return null;
+
+    final pa = _displayOffset(a!['name']?.toString() ?? '', const Size(1, 1));
+    final pb = _displayOffset(b!['name']?.toString() ?? '', const Size(1, 1));
+    final x = pa.dx + (lng - aLng) / (bLng - aLng) * (pb.dx - pa.dx);
+    final y = pa.dy + (lat - aLat) / (bLat - aLat) * (pb.dy - pa.dy);
+    return Offset(
+      x.clamp(0.06, 0.94) * size.width,
+      y.clamp(0.06, 0.94) * size.height,
+    );
+  }
+
   Offset? _offsetForLocationId(String? id, Size size) {
     if (id == null || _locations.isEmpty) return null;
     final loc = _locations.firstWhere(
@@ -303,10 +340,12 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
               String messageText = 'No active deliveries in progress.';
 
               final row = _activeDeliveryRow;
+              // A pinned drop-off has coordinates instead of a location id
+              final pinOffset = _offsetForPin(row, size);
               final bool hasRoute =
                   row != null &&
                   row['pickup_location_id'] != null &&
-                  row['dropoff_location_id'] != null;
+                  (row['dropoff_location_id'] != null || pinOffset != null);
 
               if (activeDelivery != null) {
                 switch (activeDelivery.status) {
@@ -374,10 +413,12 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
                     row['pickup_location_id']?.toString(),
                     size,
                   );
-                  final dropoff = _offsetForLocationId(
-                    row['dropoff_location_id']?.toString(),
-                    size,
-                  );
+                  final dropoff =
+                      pinOffset ??
+                      _offsetForLocationId(
+                        row['dropoff_location_id']?.toString(),
+                        size,
+                      );
                   if (activeDelivery.status == DeliveryStatus.assigning) {
                     final hub = Offset(0.50 * size.width, 0.33 * size.height);
                     if (pickup != null) {
@@ -459,6 +500,22 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
 
                           // building markers
                           for (final loc in _locations) _buildMarker(loc, size),
+
+                          // the customer's pinned drop-off, when there is one
+                          if (activeDelivery != null && pinOffset != null)
+                            Positioned(
+                              left: pinOffset.dx - 12,
+                              top: pinOffset.dy - 24,
+                              child: const Tooltip(
+                                message: 'Pinned drop-off (approximate)',
+                                child: Icon(
+                                  Icons.flag_circle_rounded,
+                                  size: 24,
+                                  color: AppColors.success,
+                                  semanticLabel: 'Pinned drop-off',
+                                ),
+                              ),
+                            ),
 
                           // drone icon (only when flying)
                           if (showDrone)

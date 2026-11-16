@@ -50,6 +50,19 @@ class OrderModel {
   final DateTime? deliveryCompletedAt;
   final int deliveryTripsCompleted;
 
+  // A drop-off point the customer pinned on the map (migrations 39/40). Null
+  // for the usual case, an order going to one of the fixed campus locations.
+  final double? customDropoffLat;
+  final double? customDropoffLng;
+
+  /// The customer's own description of the pinned spot, if they gave one.
+  final String? customDropoffLabel;
+
+  bool get hasCustomDropoff => customDropoffLat != null;
+
+  /// What to call a pinned drop-off wherever a building name would go.
+  static const String pinnedDropoffName = 'Pinned drop-off';
+
   OrderModel({
     required this.id,
     required this.userId,
@@ -83,6 +96,9 @@ class OrderModel {
     this.deliveryStartedAt,
     this.deliveryCompletedAt,
     this.deliveryTripsCompleted = 0,
+    this.customDropoffLat,
+    this.customDropoffLng,
+    this.customDropoffLabel,
   });
 
   bool get isMultiTrip => tripsRequired > 1;
@@ -269,6 +285,15 @@ class OrderModel {
     final locMap = map['campus_locations'] as Map<String, dynamic>?;
     final locName = locMap?['name']?.toString();
 
+    // A pinned order has no campus location; its coordinates are on the row.
+    double? coord(dynamic v) =>
+        v is num ? v.toDouble() : double.tryParse(v?.toString() ?? '');
+    final pinLat = coord(map['custom_dropoff_lat']);
+    final pinLng = coord(map['custom_dropoff_lng']);
+    final hasPin = pinLat != null && pinLng != null;
+    final rawLabel = map['custom_dropoff_label']?.toString().trim() ?? '';
+    final pinLabel = hasPin && rawLabel.isNotEmpty ? rawLabel : null;
+
     // Delivery join: can be a list or single map
     Map<String, dynamic>? deliveryMap;
     final deliveriesRaw = map['deliveries'];
@@ -322,7 +347,8 @@ class OrderModel {
       customerPhone: customerPhone,
       orderStatus: map['order_status']?.toString() ?? 'pending',
       dropoffLocationId: map['delivery_location_id']?.toString() ?? '',
-      dropoffLocationName: locName,
+      dropoffLocationName:
+          locName ?? (hasPin ? (pinLabel ?? pinnedDropoffName) : null),
       subtotal: (map['subtotal'] as num?)?.toDouble() ?? 0.0,
       deliveryFee: (map['delivery_fee'] as num?)?.toDouble() ?? 0.0,
       totalAmount: (map['total_amount'] as num?)?.toDouble() ?? 0.0,
@@ -348,6 +374,9 @@ class OrderModel {
       deliveryStartedAt: deliveryStartedAt,
       deliveryCompletedAt: deliveryCompletedAt,
       deliveryTripsCompleted: deliveryTripsCompleted,
+      customDropoffLat: hasPin ? pinLat : null,
+      customDropoffLng: hasPin ? pinLng : null,
+      customDropoffLabel: pinLabel,
     );
   }
 }

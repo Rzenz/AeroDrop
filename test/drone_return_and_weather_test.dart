@@ -47,6 +47,20 @@ void main() {
       expect(readiness, 'Returning to Base');
     });
 
+    test('DroneModel has no database id until one is given', () {
+      final drone = DroneModel(
+        id: 'DRN-001',
+        name: 'AeroCarrier Alpha',
+        status: DroneStatus.available,
+        batteryLevel: 80.0,
+        maxPayload: 0.5,
+        modelType: 'Hexacopter',
+        currentCoordinates: '10.3156,123.9016',
+      );
+      // Empty, never a stand-in id that matches no row
+      expect(drone.dbId, isEmpty);
+    });
+
     test('DroneModel supports dbId for database UUID and id for code', () {
       final drone = DroneModel(
         id: 'DRN-001',

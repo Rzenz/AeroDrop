@@ -12,7 +12,9 @@ class DroneModel {
 
   DroneModel({
     required this.id,
-    this.dbId = '80000000-0000-0000-0000-000000000001',
+    // Empty means the database id is not known yet; callers check
+    // dbId.isNotEmpty rather than trusting a stand-in id.
+    this.dbId = '',
     required this.name,
     required this.batteryLevel,
     required this.status,

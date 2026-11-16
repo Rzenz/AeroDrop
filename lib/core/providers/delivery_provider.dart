@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 
 import '../models/delivery_model.dart';
+import '../models/order_model.dart';
 import 'drone_provider.dart';
 import '../models/drone_model.dart';
 import '../services/supabase_service.dart';
@@ -275,6 +276,16 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
     }
   }
 
+  /// Where a delivery is dropped: the customer's map pin when the order has
+  /// one, otherwise the fixed building resolved by name. A pinned delivery
+  /// must never go through the name lookup: it has no building, and its
+  /// label is free text that could happen to contain a building's name.
+  (double, double) _dropoffCoordinates(DeliveryModel? delivery) =>
+      delivery?.customDropoffCoords ??
+      _coordinatesForLocation(
+        delivery?.dropoffLocationName ?? delivery?.deliveryAddress,
+      );
+
   (double, double) _coordinatesForLocation(String? locationName) {
     if (locationName == null || locationName.isEmpty) {
       return (10.325210, 123.953201);
@@ -378,8 +389,21 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
     final pickupLocationName =
         pickupLoc?['name']?.toString() ??
         (senderName.isNotEmpty ? senderName : 'Vendor Shop');
-    final dropoffLocationName =
-        dropoffLoc?['name']?.toString() ?? deliveryAddress;
+    // A map pin instead of a building (migrations 39/40). The trigger copies
+    // the coordinates onto the delivery; the label lives on the order.
+    final pinLat =
+        _toDoubleOrNull(data['custom_dropoff_lat']) ??
+        _toDoubleOrNull(order['custom_dropoff_lat']);
+    final pinLng =
+        _toDoubleOrNull(data['custom_dropoff_lng']) ??
+        _toDoubleOrNull(order['custom_dropoff_lng']);
+    final hasPin = pinLat != null && pinLng != null;
+    final rawPinLabel = order['custom_dropoff_label']?.toString().trim() ?? '';
+    final pinLabel = hasPin && rawPinLabel.isNotEmpty ? rawPinLabel : null;
+
+    final dropoffLocationName = hasPin
+        ? (pinLabel ?? OrderModel.pinnedDropoffName)
+        : (dropoffLoc?['name']?.toString() ?? deliveryAddress);
 
     final currentLat =
         _toDoubleOrNull(data['current_latitude']) ??
@@ -437,7 +461,10 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
       senderName: senderName,
       recipientName: recipientName,
       recipientPhone: recipientPhone,
-      deliveryAddress: deliveryAddress,
+      deliveryAddress: hasPin ? dropoffLocationName : deliveryAddress,
+      customDropoffLat: hasPin ? pinLat : null,
+      customDropoffLng: hasPin ? pinLng : null,
+      customDropoffLabel: pinLabel,
       packageName: packageName,
       packageWeight: packageWeight,
       packageType: 'Food', // visual label
@@ -947,7 +974,7 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
       final weatherState = ref.read(weatherProvider);
       final isCaution = weatherState.isCaution;
 
-      String droneUuid = '80000000-0000-0000-0000-000000000001';
+      String? droneUuid;
       if (returningDrone != null && returningDrone.dbId.isNotEmpty) {
         droneUuid = returningDrone.dbId;
       } else if (dronesList.isNotEmpty && dronesList.first.dbId.isNotEmpty) {
@@ -965,6 +992,13 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
         } catch (_) {}
       }
 
+      // No real drone id: skip this tick and let the next one retry. Updates
+      // keyed on an invented id would match no row and fail silently.
+      if (droneUuid == null || droneUuid.isEmpty) {
+        debugPrint('Delivery tick skipped: the drone id is unresolved.');
+        return;
+      }
+
       if (!mounted) {
         timer.cancel();
         return;
@@ -980,9 +1014,7 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
         }
 
         final vendorLoc = _coordinatesForLocation(delivery.pickupLocationName);
-        final customerLoc = _coordinatesForLocation(
-          delivery.dropoffLocationName ?? delivery.deliveryAddress,
-        );
+        final customerLoc = _dropoffCoordinates(delivery);
 
         if (delivery.status == DeliveryStatus.assigning) {
           // ── PHASE 1: PICKUP (Hub -> Vendor, EMPTY) ──
@@ -1630,12 +1662,20 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
             deliveryData['pickup_location_name']?.toString() ??
             'Main Building',
       );
-      final dropoffLoc = _coordinatesForLocation(
-        existingDel?.dropoffLocationName ??
-            existingDel?.deliveryAddress ??
-            deliveryData['delivery_address']?.toString() ??
-            'Campus',
-      );
+      // The pin, from the loaded delivery or straight from the row just read
+      final rowPinLat = _toDoubleOrNull(deliveryData['custom_dropoff_lat']);
+      final rowPinLng = _toDoubleOrNull(deliveryData['custom_dropoff_lng']);
+      final dropoffLoc =
+          existingDel?.customDropoffCoords ??
+          (rowPinLat != null && rowPinLng != null
+              ? (rowPinLat, rowPinLng)
+              : null) ??
+          _coordinatesForLocation(
+            existingDel?.dropoffLocationName ??
+                existingDel?.deliveryAddress ??
+                deliveryData['delivery_address']?.toString() ??
+                'Campus',
+          );
       final distMeters = DroneFlightCalculator.calculateDistanceMeters(
         startLat: pickupLoc.$1,
         startLng: pickupLoc.$2,

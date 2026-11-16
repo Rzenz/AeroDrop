@@ -43,6 +43,24 @@ class DeliveryModel {
   final int tripsRequired;
   final int tripsCompleted;
 
+  // A drop-off point the customer pinned on the map (migrations 39/40),
+  // copied onto the delivery row by a database trigger. Null when the
+  // delivery goes to a fixed campus location.
+  final double? customDropoffLat;
+  final double? customDropoffLng;
+
+  /// The customer's description of the pinned spot, from the order.
+  final String? customDropoffLabel;
+
+  bool get hasCustomDropoff =>
+      customDropoffLat != null && customDropoffLng != null;
+
+  /// The pin, when there is one. The flight simulation and the map take the
+  /// drop-off from here instead of resolving a building by name.
+  (double, double)? get customDropoffCoords => hasCustomDropoff
+      ? (customDropoffLat!, customDropoffLng!)
+      : null;
+
   bool get isMultiTrip => tripsRequired > 1;
 
   /// Trips are owed, so an in_transit status may mean "between trips".
@@ -110,6 +128,9 @@ class DeliveryModel {
     this.orderId,
     this.cancellationReason,
     this.noDroneDispatched = false,
+    this.customDropoffLat,
+    this.customDropoffLng,
+    this.customDropoffLabel,
     this.orderStatus,
     this.tripsRequired = 1,
     this.tripsCompleted = 0,
@@ -149,6 +170,9 @@ class DeliveryModel {
     String? orderStatus,
     int? tripsRequired,
     int? tripsCompleted,
+    double? customDropoffLat,
+    double? customDropoffLng,
+    String? customDropoffLabel,
   }) {
     return DeliveryModel(
       id: id ?? this.id,
@@ -185,6 +209,9 @@ class DeliveryModel {
       orderStatus: orderStatus ?? this.orderStatus,
       tripsRequired: tripsRequired ?? this.tripsRequired,
       tripsCompleted: tripsCompleted ?? this.tripsCompleted,
+      customDropoffLat: customDropoffLat ?? this.customDropoffLat,
+      customDropoffLng: customDropoffLng ?? this.customDropoffLng,
+      customDropoffLabel: customDropoffLabel ?? this.customDropoffLabel,
     );
   }
 }

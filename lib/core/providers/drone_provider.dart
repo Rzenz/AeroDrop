@@ -39,9 +39,11 @@ class DroneNotifier extends StateNotifier<List<DroneModel>> {
                 final statusName = rec['status']?.toString();
                 final battery = _toDouble(rec['battery_level'], 100.0);
                 final droneCode = rec['drone_code']?.toString() ?? 'DRN-001';
-                final dbId = rec['id']?.toString() ?? '80000000-0000-0000-0000-000000000001';
+                // A payload without an id cannot be matched by id; the
+                // drone code still matches.
+                final dbId = rec['id']?.toString();
                 state = state.map((d) {
-                  if (d.id == droneCode || d.dbId == dbId) {
+                  if (d.id == droneCode || (dbId != null && d.dbId == dbId)) {
                     return d.copyWith(
                       status: statusName != null
                           ? _parseDroneStatus(statusName)
@@ -78,10 +80,15 @@ class DroneNotifier extends StateNotifier<List<DroneModel>> {
     _ => DroneStatus.available,
   };
 
-  Future<String> _resolveDroneId() async {
+  /// The database id of DRN-001, or null when it cannot be resolved. Never a
+  /// stand-in id: an invented one matches no row, so the drone would look
+  /// offline and telemetry inserts would fail their foreign key, both without
+  /// saying why. Callers skip their work on null.
+  Future<String?> _resolveDroneId() async {
     if (_resolvedDroneId != null) return _resolvedDroneId!;
+    if (!SupabaseService.isConfigured) return null;
     final authUser = SupabaseService.client.auth.currentUser;
-    if (authUser == null) return '80000000-0000-0000-0000-000000000001';
+    if (authUser == null) return null;
     try {
       final res = await SupabaseService.client
           .from('drones')
@@ -95,7 +102,8 @@ class DroneNotifier extends StateNotifier<List<DroneModel>> {
     } catch (e) {
       debugPrint('Error resolving drone UUID: $e');
     }
-    return '80000000-0000-0000-0000-000000000001'; // fallback
+    debugPrint('Drone DRN-001 could not be resolved to a database id.');
+    return null;
   }
 
   Future<void> loadDronesFromSupabase() async {
@@ -109,7 +117,7 @@ class DroneNotifier extends StateNotifier<List<DroneModel>> {
 
     try {
       final droneId = await _resolveDroneId();
-      if (!mounted) return;
+      if (!mounted || droneId == null) return;
 
       final response = await SupabaseService.client
           .from('drones')
@@ -162,8 +170,17 @@ class DroneNotifier extends StateNotifier<List<DroneModel>> {
   }
 
   Future<String?> editDroneInSupabase(DroneModel drone) async {
-    if (drone.id != 'DRN-001' && drone.dbId != await _resolveDroneId()) {
-      return 'Editing other drones is not permitted.';
+    if (drone.id != 'DRN-001') {
+      // Only the primary drone may be edited. Without its id that cannot be
+      // confirmed, so the edit is refused, and says why, rather than being
+      // let through or blamed on the wrong reason.
+      final primaryId = await _resolveDroneId();
+      if (primaryId == null) {
+        return 'Could not confirm this is the primary drone. Check your connection and try again.';
+      }
+      if (drone.dbId != primaryId) {
+        return 'Editing other drones is not permitted.';
+      }
     }
     if (!SupabaseService.isConfigured) return 'Supabase is not configured.';
     final authUser = SupabaseService.client.auth.currentUser;
@@ -172,6 +189,9 @@ class DroneNotifier extends StateNotifier<List<DroneModel>> {
     try {
       final droneId = drone.dbId.isNotEmpty ? drone.dbId : await _resolveDroneId();
       if (!mounted) return 'Notifier disposed';
+      if (droneId == null) {
+        return 'The drone could not be found. Check your connection and try again.';
+      }
 
       await SupabaseService.client
           .from('drones')
@@ -209,6 +229,9 @@ class DroneNotifier extends StateNotifier<List<DroneModel>> {
     try {
       final droneIdDb = await _resolveDroneId();
       if (!mounted) return 'Notifier disposed';
+      if (droneIdDb == null) {
+        return 'The drone could not be found. Check your connection and try again.';
+      }
 
       await SupabaseService.client
           .from('drones')
@@ -259,6 +282,10 @@ class DroneNotifier extends StateNotifier<List<DroneModel>> {
 
     if (SupabaseService.isConfigured) {
       _resolveDroneId().then((droneId) {
+        if (droneId == null) {
+          debugPrint('Drone status not saved: the drone id is unresolved.');
+          return;
+        }
         SupabaseService.client
             .from('drones')
             .update({

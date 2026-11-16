@@ -163,13 +163,12 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
       final returningDrone = drones
           .where((d) => d.status == DroneStatus.returning)
           .firstOrNull;
-      if (returningDrone != null) {
-        final droneUuid = returningDrone.dbId.isNotEmpty
-            ? returningDrone.dbId
-            : '80000000-0000-0000-0000-000000000001';
+      // Without the drone's real id there is nothing to recover: skip rather
+      // than call the RPC with an id that does not exist.
+      if (returningDrone != null && returningDrone.dbId.isNotEmpty) {
         final res = await SupabaseService.client.rpc(
           'recover_stale_returning_drone',
-          params: {'p_drone_id': droneUuid},
+          params: {'p_drone_id': returningDrone.dbId},
         );
         if (res != null && (res as Map)['recovered'] == true) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -234,6 +233,28 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
       return (10.325210, 123.953201);
     }
     return (10.325210, 123.953201);
+  }
+
+  /// Places a real coordinate on the offline schematic, which is a diagram
+  /// rather than a map: positions are interpolated between two buildings the
+  /// schematic already places (Main and Maritime), then kept on the canvas.
+  /// Approximate by nature; the online map shows the true position.
+  Offset _offsetForCoordinates((double, double) coords, Size size) {
+    Map<String, dynamic> ref(String code) =>
+        _campusLocations.firstWhere((l) => l['code'] == code);
+    final a = ref('MAIN');
+    final b = ref('MARITIME');
+    double lerp(String geo, String axis, double value) {
+      final g0 = a[geo] as double, g1 = b[geo] as double;
+      final p0 = a[axis] as double, p1 = b[axis] as double;
+      if (g1 == g0) return p0;
+      return (p0 + (value - g0) / (g1 - g0) * (p1 - p0)).clamp(0.06, 0.94);
+    }
+
+    return Offset(
+      lerp('lng', 'x', coords.$2) * size.width,
+      lerp('lat', 'y', coords.$1) * size.height,
+    );
   }
 
   LatLng _latLngForBuilding(String? nameOrCode) {
@@ -401,6 +422,12 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
     final String dropoffName = activeOrRecentDel?.dropoffLocationName ??
         activeOrRecentDel?.deliveryAddress ??
         'Campus';
+    // A drop-off the customer pinned on the map: its coordinates come from
+    // the delivery row, never from matching a name. Its label is free text
+    // ("by the main gate") and must not be matched against buildings either.
+    final pinCoords = activeOrRecentDel?.customDropoffCoords;
+    final String dropoffMatchName = pinCoords != null ? '' : dropoffName;
+    final String? pinLabel = activeOrRecentDel?.customDropoffLabel;
 
     // Compute live return progress from coordinates or telemetry
     double returnProgressCalc = 0.0;
@@ -408,7 +435,8 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
       if (telemetry != null &&
           telemetry.latitude != 0.0 &&
           telemetry.longitude != 0.0) {
-        final originCoords = _coordinatesForBuilding(dropoffName);
+        final originCoords =
+            pinCoords ?? _coordinatesForBuilding(dropoffName);
         final targetCoords = returningToVendor
             ? _coordinatesForBuilding(pickupName)
             : _baseHubCoords;
@@ -519,7 +547,9 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
     // Real-world LatLng references
     final hubLatLng = LatLng(_baseHubCoords.$1, _baseHubCoords.$2);
     final vendorLatLng = _latLngForBuilding(pickupName);
-    final customerLatLng = _latLngForBuilding(dropoffName);
+    final customerLatLng = pinCoords != null
+        ? LatLng(pinCoords.$1, pinCoords.$2)
+        : _latLngForBuilding(dropoffName);
 
     LatLng startLatLng;
     LatLng endLatLng;
@@ -711,7 +741,11 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
                             size: size,
                             hubOffsetRatio: hubOffsetRatio,
                             pickupName: pickupName,
-                            dropoffName: dropoffName,
+                            dropoffName: dropoffMatchName,
+                            pinPoint: pinCoords == null
+                                ? null
+                                : _offsetForCoordinates(pinCoords, size),
+                            pinLabel: pinLabel,
                             isReturning: isReturning,
                             returningToVendor: returningToVendor,
                             isAssigning: isAssigning,
@@ -731,7 +765,9 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
                         endLatLng: endLatLng,
                         droneLatLng: droneLatLng,
                         pickupName: pickupName,
-                        dropoffName: dropoffName,
+                        dropoffName: dropoffMatchName,
+                        pinLatLng: pinCoords == null ? null : customerLatLng,
+                        pinLabel: pinLabel,
                         isReturning: isReturning,
                         isAssigning: isAssigning,
                         isInTransit: isInTransit,
@@ -824,6 +860,8 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
     required LatLng droneLatLng,
     required String pickupName,
     required String dropoffName,
+    LatLng? pinLatLng,
+    String? pinLabel,
     required bool isReturning,
     required bool isAssigning,
     required bool isInTransit,
@@ -895,6 +933,19 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
             isPickup: isPickup,
             isDropoff: isDropoff,
           ),
+        ),
+      );
+    }
+
+    // The customer's pinned drop-off, when the order has one
+    if (pinLatLng != null && !isStandby) {
+      markers.add(
+        Marker(
+          point: pinLatLng,
+          width: 120,
+          height: 60,
+          alignment: Alignment.center,
+          child: _buildPinMarker(pinLabel),
         ),
       );
     }
@@ -1055,6 +1106,8 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
     required Offset hubOffsetRatio,
     required String pickupName,
     required String dropoffName,
+    Offset? pinPoint,
+    String? pinLabel,
     required bool isReturning,
     bool returningToVendor = false,
     required bool isAssigning,
@@ -1069,7 +1122,7 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
       hubOffsetRatio.dy * size.height,
     );
     final vendorPoint = _offsetForBuilding(pickupName, size);
-    final customerPoint = _offsetForBuilding(dropoffName, size);
+    final customerPoint = pinPoint ?? _offsetForBuilding(dropoffName, size);
 
     Offset startPoint;
     Offset endPoint;
@@ -1146,6 +1199,15 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
             size,
             pickupName,
             dropoffName,
+          ),
+
+        // The customer's pinned drop-off, when the order has one
+        if (pinPoint != null && !isStandby)
+          Positioned(
+            left: pinPoint.dx - 60,
+            top: pinPoint.dy - 12,
+            width: 120,
+            child: _buildPinMarker(pinLabel),
           ),
 
         // Hub Marker
@@ -1269,6 +1331,59 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
               fontSize: 9,
               fontWeight: FontWeight.bold,
               color: color,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// The customer's pinned drop-off. Same pill family as the building
+  /// markers, but a flag in the success colour with a white ring, so it reads
+  /// as a chosen spot rather than a known building. Labelled with the
+  /// customer's own words when they gave any.
+  Widget _buildPinMarker(String? label) {
+    final text = (label == null || label.trim().isEmpty) ? 'PIN' : label.trim();
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: AppColors.success.withValues(alpha: 0.95),
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white, width: 1.5),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.success.withValues(alpha: 0.45),
+                blurRadius: 6,
+                spreadRadius: 1,
+              ),
+            ],
+          ),
+          child: Icon(
+            Icons.flag_rounded,
+            size: 12,
+            color: AppColors.bgDark,
+            semanticLabel: 'Pinned drop-off',
+          ),
+        ),
+        const SizedBox(height: 2),
+        Container(
+          constraints: const BoxConstraints(maxWidth: 116),
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+          decoration: BoxDecoration(
+            color: Colors.black87,
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppTextStyles.caption(
+              fontSize: 9,
+              fontWeight: FontWeight.bold,
+              color: AppColors.success,
             ),
           ),
         ),

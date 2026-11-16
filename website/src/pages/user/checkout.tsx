@@ -2,7 +2,7 @@ import { Building2, CreditCard, Flag, Globe, MapPin, Smartphone } from 'lucide-r
 import { useMemo, useRef, useState, type FormEvent } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useMe } from '@/auth/auth'
-import { DropoffMapPicker, type PinnedDropoff } from '@/components/dropoff-map-picker'
+import { DropoffMapPicker } from '@/components/dropoff-map-picker'
 import { Money } from '@/components/orders'
 import { Button } from '@/components/ui/button'
 import { PageLoader } from '@/components/ui/loader'
@@ -11,6 +11,7 @@ import { toast } from '@/components/ui/toast'
 import { weatherMeta } from '@/components/weather-card'
 import { api, type OrderQuote } from '@/data/api'
 import { clearVendor, groupByVendor, useCart } from '@/lib/cart'
+import { chooseCampusPoint, choosePin, useDropoffChoice } from '@/lib/dropoff-pin'
 import { needsEmailVerification } from '@/lib/email-verification'
 import { MAX_TRIPS, tripsForWeight } from '@/lib/fees'
 import { isHub, PINNED_DROPOFF_NAME } from '@/lib/flight'
@@ -50,8 +51,9 @@ export default function Checkout() {
   // Null zone: delivery_zone_info() failed or was incomplete, so the option is
   // not offered and checkout is the campus-only form it always was.
   const zone = useQuery(() => api.deliveryZone()).data ?? null
-  const [mode, setMode] = useState<'campus' | 'pin'>('campus')
-  const [pin, setPin] = useState<PinnedDropoff | null>(null)
+  // Shared with the home "Deliver to" chooser (lib/dropoff-pin.ts), so a pin
+  // picked there arrives here already selected.
+  const { mode, pin } = useDropoffChoice()
   const [picking, setPicking] = useState(false)
   const [notes, setNotes] = useState('')
   const [method, setMethod] = useState<PaymentMethod>('gcash_simulated') // checkout_screen.dart defaults to GCash
@@ -212,7 +214,7 @@ export default function Checkout() {
                       value={m.value}
                       checked={(activePin ? 'pin' : 'campus') === m.value}
                       // checkout_screen.dart: the first "Pin on map" opens the picker; pin mode starts once one is confirmed
-                      onChange={() => (m.value === 'campus' ? setMode('campus') : pin ? setMode('pin') : setPicking(true))}
+                      onChange={() => (m.value === 'campus' ? chooseCampusPoint() : pin ? choosePin(pin) : setPicking(true))}
                       className="accent-[var(--brand)]"
                     />
                     <m.icon aria-hidden className="size-5 text-brand" />
@@ -252,8 +254,7 @@ export default function Checkout() {
                 initial={pin}
                 onCancel={() => setPicking(false)}
                 onConfirm={(p) => {
-                  setPin(p)
-                  setMode('pin')
+                  choosePin(p)
                   setPicking(false)
                 }}
               />

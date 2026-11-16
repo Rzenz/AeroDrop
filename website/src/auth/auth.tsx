@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import { Navigate, useLocation } from 'react-router-dom'
 import { api } from '@/data/api'
 import { PageLoader } from '@/components/ui/loader'
+import { forgetPin } from '@/lib/dropoff-pin'
 import type { Profile, Role } from '@/types'
 
 interface AuthState {
@@ -63,6 +64,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     clearUnlocked()
+    // A pinned drop-off belongs to this session's customer, not the next one.
+    forgetPin()
     await api.signOut()
     setUser(null)
   }, [])

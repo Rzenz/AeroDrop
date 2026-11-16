@@ -1,6 +1,8 @@
 import { ArrowRight, MapPin, Navigation, ReceiptText, ShoppingBag } from 'lucide-react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth, useMe } from '@/auth/auth'
+import { DropoffMapPicker } from '@/components/dropoff-map-picker'
 import TextShimmer from '@/components/forgeui/text-shimmer'
 import { OrderRow, OrderStatusBadge, ProgressBar } from '@/components/orders'
 import { ButtonLink } from '@/components/ui/button'
@@ -11,8 +13,13 @@ import { VendorCard } from '@/components/vendor-card'
 import { WeatherCard } from '@/components/weather-card'
 import { api } from '@/data/api'
 import { effectiveStatus, formatPeso } from '@/lib/format'
-import { isHub, legProgress, phaseOf } from '@/lib/flight'
+import { choosePin, forgetPin, useDropoffChoice } from '@/lib/dropoff-pin'
+import { isHub, legProgress, phaseOf, PINNED_DROPOFF_NAME } from '@/lib/flight'
 import { errorMessage, useQuery } from '@/lib/store'
+
+// Select values that are not location ids, so they can never reach the profile.
+const PICK_VALUE = '__pin__'
+const PINNED_VALUE = '__pinned__'
 
 export default function UserHome() {
   const me = useMe()
@@ -20,6 +27,12 @@ export default function UserHome() {
   const locations = useQuery(() => api.locations())
   const vendors = useQuery(() => api.vendors())
   const orders = useQuery(() => api.orders(), [], 5000)
+  // Null when delivery_zone_info() failed: the pin option is then not offered.
+  const zone = useQuery(() => api.deliveryZone()).data ?? null
+  // The same pin checkout uses (lib/dropoff-pin.ts); never written to the profile.
+  const choice = useDropoffChoice()
+  const activePin = choice.mode === 'pin' && zone ? choice.pin : null
+  const [picking, setPicking] = useState(false)
 
   const dropoffs = (locations.data ?? []).filter((l) => !isHub(l))
   const live = (orders.data ?? []).find((o) => !['delivered', 'cancelled', 'rejected'].includes(effectiveStatus(o)))
@@ -27,6 +40,8 @@ export default function UserHome() {
   const hour = new Date().getHours()
 
   async function setDropoff(id: string) {
+    // A building replaces any pin, here and at checkout.
+    forgetPin()
     try {
       await api.updateProfile(me.id, { campus_location_id: id || null })
       await refresh()
@@ -50,15 +65,42 @@ export default function UserHome() {
               <span className="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-ink">
                 <MapPin aria-hidden className="size-4 text-brand" /> Deliver to
               </span>
-              <Select value={me.campus_location_id ?? ''} onChange={(e) => setDropoff(e.target.value)} aria-label="Default drop-off building">
+              <Select
+                value={activePin ? PINNED_VALUE : (me.campus_location_id ?? '')}
+                onChange={(e) => {
+                  const v = e.target.value
+                  // Not a selection: open the picker. The select is controlled,
+                  // so it stays on its previous value until a pin is confirmed.
+                  if (v === PICK_VALUE) return setPicking(true)
+                  if (v !== PINNED_VALUE) void setDropoff(v)
+                }}
+                aria-label="Drop-off"
+              >
                 <option value="">Choose your drop-off</option>
                 {dropoffs.map((l) => (
                   <option key={l.id} value={l.id}>
                     {l.name}
                   </option>
                 ))}
+                {zone ? (
+                  <optgroup label="Your own spot">
+                    {activePin ? <option value={PINNED_VALUE}>{activePin.label ?? PINNED_DROPOFF_NAME}</option> : null}
+                    <option value={PICK_VALUE}>Pin on map…</option>
+                  </optgroup>
+                ) : null}
               </Select>
             </label>
+            {picking && zone ? (
+              <DropoffMapPicker
+                zone={zone}
+                initial={choice.pin}
+                onCancel={() => setPicking(false)}
+                onConfirm={(p) => {
+                  choosePin(p)
+                  setPicking(false)
+                }}
+              />
+            ) : null}
             <ButtonLink to="/user/shop" icon={<ShoppingBag aria-hidden className="size-4" />}>
               Browse vendors
             </ButtonLink>

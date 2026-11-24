@@ -12,6 +12,7 @@ import '../../core/providers/delivery_provider.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/models/delivery_model.dart';
 import '../../core/services/supabase_service.dart';
+import '../../core/utils/telemetry_format.dart';
 
 // ---------------------------------------------------------------------------
 // Display coordinates for the UCLM campus map image (normalized 0.0–1.0).
@@ -200,7 +201,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
       if (drone != null && mounted) {
         final lvl = drone['battery_level'];
         setState(() {
-          _droneBatteryText = lvl != null ? '$lvl%' : '—';
+          _droneBatteryText = formatPercent(lvl);
         });
       }
 
@@ -214,13 +215,13 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
       if (tel != null && mounted) {
         setState(() {
           if (tel['speed'] != null) {
-            _flightSpeed = '${tel['speed']} m/s';
+            _flightSpeed = formatSpeed(tel['speed']);
           }
           if (tel['altitude'] != null) {
-            _flightAltitude = '${tel['altitude']} m';
+            _flightAltitude = formatAltitude(tel['altitude']);
           }
           if (tel['battery_level'] != null) {
-            _droneBatteryText = '${tel['battery_level']}%';
+            _droneBatteryText = formatPercent(tel['battery_level']);
           }
         });
       } else {

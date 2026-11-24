@@ -18,6 +18,7 @@ import '../../core/providers/telemetry_provider.dart';
 import '../../core/models/delivery_model.dart';
 import '../../core/models/order_model.dart';
 import '../../core/services/supabase_service.dart';
+import '../../core/utils/telemetry_format.dart';
 import '../../core/services/drone_flight_calculator.dart';
 
 class TrackingDetailsPage extends ConsumerStatefulWidget {
@@ -100,11 +101,11 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
                 final signal = rec['signal_strength'];
                 final heading = rec['heading'];
 
-                if (speed != null) _flightSpeed = '$speed km/h';
-                if (alt != null) _flightAltitude = '$alt m';
-                if (battery != null) _droneBatteryText = '$battery%';
-                if (signal != null) _signalStrengthText = '$signal%';
-                if (heading != null) _headingText = '$heading°';
+                if (speed != null) _flightSpeed = formatSpeed(speed);
+                if (alt != null) _flightAltitude = formatAltitude(alt);
+                if (battery != null) _droneBatteryText = formatPercent(battery);
+                if (signal != null) _signalStrengthText = formatPercent(signal);
+                if (heading != null) _headingText = formatHeading(heading);
               });
               _fetchDetails();
             },
@@ -281,7 +282,7 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
                   'DRN-001';
               final lvl = drone['battery_level'];
               if (lvl != null) {
-                _droneBatteryText = '$lvl%';
+                _droneBatteryText = formatPercent(lvl);
               }
             });
           }
@@ -303,23 +304,23 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
               final heading = tel['heading'];
 
               if (speed != null) {
-                _flightSpeed = '$speed km/h';
+                _flightSpeed = formatSpeed(speed);
               } else if (status == DeliveryStatus.delivered) {
-                _flightSpeed = '0 km/h';
+                _flightSpeed = formatSpeed(0);
               }
               if (alt != null) {
-                _flightAltitude = '$alt m';
+                _flightAltitude = formatAltitude(alt);
               } else if (status == DeliveryStatus.delivered) {
-                _flightAltitude = '0 m';
+                _flightAltitude = formatAltitude(0);
               }
               if (battery != null) {
-                _droneBatteryText = '$battery%';
+                _droneBatteryText = formatPercent(battery);
               }
               if (signal != null) {
-                _signalStrengthText = '$signal%';
+                _signalStrengthText = formatPercent(signal);
               }
               if (heading != null) {
-                _headingText = '$heading°';
+                _headingText = formatHeading(heading);
               }
             });
           }
@@ -347,7 +348,7 @@ class _TrackingDetailsPageState extends ConsumerState<TrackingDetailsPage> {
       _droneBatteryText.replaceAll('%', '').trim(),
     );
     final double? parsedSpeed = double.tryParse(
-      _flightSpeed.replaceAll('km/h', '').trim(),
+      _flightSpeed.replaceAll('m/s', '').trim(),
     );
     final double? parsedAlt = double.tryParse(
       _flightAltitude.replaceAll('m', '').trim(),

@@ -53,19 +53,19 @@ class _HelpSupportPageState extends ConsumerState<HelpSupportPage> {
   Widget build(BuildContext context) {
     final List<Map<String, String>> faqs = [
       {
-        'q': 'How do I request a delivery?',
+        'q': 'How do I order a delivery?',
         'a':
-            'Navigate to your Dashboard and tap the "+" FAB button or "Request Delivery". Input the recipient details, select the target building landing pad, pick your payment choice, and review before confirming checkout.',
+            'Open Shop, choose a campus store, and add products to your cart. Tap the cart button, choose your drop-off building and payment method, then confirm the order. The vendor prepares it and the drone flies it to your building. You can follow it from Orders or the Home screen.',
       },
       {
         'q': 'What payloads can be delivered?',
         'a':
-            'We support academic documents, books, laboratory samples, medical aid kits, and electronics up to 0.5 kg per drone trip. Orders up to 1.0 kg are flown in two trips.',
+            'Products sold by approved campus vendors, such as meals, drinks, snacks, and school supplies. One drone trip carries up to 0.5 kg; orders up to 1.0 kg are flown in two trips, and heavier orders must be split.',
       },
       {
         'q': 'What happens in severe weather?',
         'a':
-            'The fleet system automatically halts and queues dispatches if wind speeds exceed 15 knots or during heavy rain precipitation.',
+            'Campus weather is checked every 15 minutes. Flights are grounded during thunderstorms, rain of 0.5 mm/h or more, winds above 28 km/h, gusts above 40 km/h, visibility under 1 km, or heat above 40°C: new orders pause, and active ones are cancelled and refunded. In moderate wind, deliveries continue under Caution with slower flights and a ₱5 surcharge.',
       },
     ];
 

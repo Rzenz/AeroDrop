@@ -14,8 +14,8 @@ import type { SupportReport } from '@/types'
 
 // The app's FAQ answers (help_support_page.dart) plus the web's own.
 const faq = [
-  ['What payloads can be delivered?', 'We support academic documents, books, laboratory samples, medical aid kits, and electronics up to 0.5 kg per drone trip. Orders up to 1.0 kg are flown in two trips.'],
-  ['What happens in severe weather?', 'The fleet system automatically halts and queues dispatches if wind speeds exceed 15 knots or during heavy rain precipitation.'],
+  ['What payloads can be delivered?', 'Products sold by approved campus vendors, such as meals, drinks, snacks, and school supplies. One drone trip carries up to 0.5 kg; orders up to 1.0 kg are flown in two trips, and heavier orders must be split.'],
+  ['What happens in severe weather?', 'Campus weather is checked every 15 minutes. Flights are grounded during thunderstorms, rain of 0.5 mm/h or more, winds above 28 km/h, gusts above 40 km/h, visibility under 1 km, or heat above 40°C: new orders pause, and active ones are cancelled and refunded. In moderate wind, deliveries continue under Caution with slower flights and a ₱5 surcharge.'],
   ['How long does a delivery take?', 'Flight time comes from the real distance between the vendor and your building. Most campus flights take a few minutes once the drone picks up.'],
   ['Can I cancel?', 'Yes, until the vendor marks the order ready for drone pickup. Payment is refunded and stock restored.'],
   ['How is the delivery fee calculated?', '₱15 base, plus ₱40 per km and ₱10 per kg. Caution weather adds ₱5 and each extra trip adds ₱25.'],

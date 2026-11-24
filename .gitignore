@@ -49,3 +49,6 @@ config.json
 supabase/.temp/
 
 supabase/remote_backup/
+
+# Manuscript and research documents (kept off GitHub)
+manuscript/

@@ -15,6 +15,7 @@ import '../../core/models/delivery_model.dart';
 import '../../core/services/delivery_fee_calculator.dart';
 import '../../core/widgets/neu_back_button.dart';
 import '../../core/widgets/shared_drone_radar.dart';
+import 'flight_plan_download.dart';
 
 class DeliveryDetailsScreen extends ConsumerWidget {
   final String deliveryId;
@@ -476,6 +477,12 @@ class DeliveryDetailsScreen extends ConsumerWidget {
                         ),
                       ],
                     ).animate(delay: 440.ms).fadeIn(),
+                  ],
+                  // The order's flight plan, for order_to_mission.py. This
+                  // screen is reachable only under /admin.
+                  if (delivery.orderId != null) ...[
+                    const SizedBox(height: 16),
+                    FlightPlanDownloadButton(orderId: delivery.orderId!),
                   ],
                   const SizedBox(height: 32),
                 ],

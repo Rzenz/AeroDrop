@@ -1227,11 +1227,17 @@ class AnalyticsExportService {
 
   /// Saves or shares the exported file across Windows, macOS, Android, iOS, and Web.
   /// Returns the saved file path or name, or null if cancelled.
+  ///
+  /// [dialogTitle] and [shareText] default to the analytics wording, so the
+  /// analytics export is unchanged; other exports (the admin flight plan)
+  /// pass their own.
   static Future<String?> saveOrShareFile({
     required Uint8List bytes,
     required String fileName,
     required String mimeType,
     required BuildContext context,
+    String dialogTitle = 'Save Analytics Report',
+    String? shareText,
   }) async {
     try {
       if (kIsWeb) {
@@ -1239,11 +1245,12 @@ class AnalyticsExportService {
           await Printing.sharePdf(bytes: bytes, filename: fileName);
         } else {
           await FilePicker.platform.saveFile(
-            dialogTitle: 'Save Analytics Report',
+            dialogTitle: dialogTitle,
             fileName: fileName,
             bytes: bytes,
             type: FileType.custom,
-            allowedExtensions: ['csv'],
+            // From the file name, as on desktop: 'csv' for the analytics CSV
+            allowedExtensions: [fileName.split('.').last.toLowerCase()],
           );
         }
         return fileName;
@@ -1252,7 +1259,7 @@ class AnalyticsExportService {
       if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
         final extension = fileName.split('.').last.toLowerCase();
         final selectedPath = await FilePicker.platform.saveFile(
-          dialogTitle: 'Save Analytics Report',
+          dialogTitle: dialogTitle,
           fileName: fileName,
           type: FileType.custom,
           allowedExtensions: [extension],
@@ -1279,7 +1286,7 @@ class AnalyticsExportService {
           await tempFile.writeAsBytes(bytes, flush: true);
           await Share.shareXFiles(
             [XFile(tempFile.path, mimeType: mimeType, name: fileName)],
-            text: 'AeroDrop Analytics Report: $fileName',
+            text: shareText ?? 'AeroDrop Analytics Report: $fileName',
           );
           return fileName;
         }

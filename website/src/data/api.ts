@@ -241,6 +241,8 @@ export interface Api {
   order(id: string): Promise<Order | null>
   /** quote_order_fee: the server's price for an order, to display before placing it. */
   quoteOrderFee(input: QuoteOrderInput): Promise<OrderQuote>
+  /** get_order_flight_plan(): the order's flight plan, exactly as the server returns it. */
+  orderFlightPlan(orderId: string): Promise<unknown>
   /** Null when it can't be loaded or is incomplete: the pin option is then not offered. */
   deliveryZone(): Promise<DeliveryZone | null>
   placeOrder(input: PlaceOrderInput): Promise<string>

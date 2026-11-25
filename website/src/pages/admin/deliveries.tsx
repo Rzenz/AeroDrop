@@ -2,6 +2,7 @@ import { ScrollText, Search, Truck } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { AnimatedTabs } from '@/components/forgeui/animated-tabs'
+import { FlightPlanButton } from '@/components/flight-plan-button'
 import { Money, OrderStatusBadge } from '@/components/orders'
 import { PageLoader, Skeleton } from '@/components/ui/loader'
 import { Card, CardHeader, EmptyState, Input } from '@/components/ui/primitives'
@@ -53,10 +54,10 @@ export default function AdminDeliveries() {
           <div className="space-y-2 p-4">{[0, 1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-12" />)}</div>
         ) : shown.length ? (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[820px] text-sm">
+            <table className="w-full min-w-[1000px] text-sm">
               <thead className="text-left text-xs text-ink-3">
                 <tr className="shadow-[inset_0_-1px_0_var(--line)]">
-                  {['Order', 'Vendor', 'Customer', 'Placed', 'Total', 'Status'].map((h) => <th key={h} scope="col" className={`px-4 py-3 font-medium ${h === 'Total' ? 'text-right' : ''}`}>{h}</th>)}
+                  {['Order', 'Vendor', 'Customer', 'Placed', 'Total', 'Status', 'Flight plan'].map((h) => <th key={h} scope="col" className={`px-4 py-3 font-medium ${h === 'Total' ? 'text-right' : ''}`}>{h}</th>)}
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
@@ -70,6 +71,7 @@ export default function AdminDeliveries() {
                     <td className="px-4 py-3 text-ink-2 tabular-nums">{formatDateTime(o.created_at)}</td>
                     <td className="px-4 py-3 text-right"><Money value={o.total_amount} /></td>
                     <td className="px-4 py-3"><OrderStatusBadge order={o} /></td>
+                    <td className="px-4 py-3"><FlightPlanButton orderId={o.id} size="sm" /></td>
                   </tr>
                 ))}
               </tbody>

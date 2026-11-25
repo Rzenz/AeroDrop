@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useMe } from '@/auth/auth'
 import { FlightPanel } from '@/components/flight-panel'
+import { FlightPlanButton } from '@/components/flight-plan-button'
 import { OrderChat } from '@/components/order-chat'
 import { Money, OrderStatusBadge, OrderTimeline } from '@/components/orders'
 import { Button } from '@/components/ui/button'
@@ -158,10 +159,16 @@ function Actions({ order: o }: { order: Order }) {
     )
   }
 
-  return o.delivery ? (
-    <Link to={`/admin/deliveries/details?id=${o.delivery.id}`} className="inline-flex h-11 items-center gap-2 rounded-xl bg-surface-2 px-4 text-sm font-semibold text-ink shadow-sm">
-      <PackageCheck aria-hidden className="size-4" /> Delivery logs
-    </Link>
+  // Admins only: the customer and vendor branches returned above
+  return me.role === 'admin' ? (
+    <div className="flex flex-wrap items-start gap-2">
+      {o.delivery ? (
+        <Link to={`/admin/deliveries/details?id=${o.delivery.id}`} className="inline-flex h-11 items-center gap-2 rounded-xl bg-surface-2 px-4 text-sm font-semibold text-ink shadow-sm">
+          <PackageCheck aria-hidden className="size-4" /> Delivery logs
+        </Link>
+      ) : null}
+      <FlightPlanButton orderId={o.id} />
+    </div>
   ) : null
 }
 

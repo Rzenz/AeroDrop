@@ -432,6 +432,11 @@ export const liveApi: Api = {
       breakdown: { base: opt(b.base), distance: opt(b.distance), weight: opt(b.weight), extraTrip: opt(b.extra_trip), weather: opt(b.weather) },
     }
   },
+  async orderFlightPlan(orderId) {
+    // Readable by an admin, the order's vendor or its customer; the server
+    // raises 'Unauthorized: caller cannot read this order' otherwise.
+    return ok(await sb().rpc('get_order_flight_plan', { p_order_id: orderId })) as unknown
+  },
   async placeOrder(input) {
     const id = ok(
       await sb().rpc('place_order', {

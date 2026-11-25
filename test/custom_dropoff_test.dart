@@ -225,7 +225,7 @@ void main() {
       testWidgets('no pin yet: confirm is disabled', (tester) async {
         await pump(tester);
         expect(tester.takeException(), isNull);
-        expect(find.textContaining('Tap the map'), findsOneWidget);
+        expect(find.textContaining('tap open ground'), findsOneWidget);
         expect(confirm(tester).onPressed, isNull);
         expect(find.text('Describe the spot (optional)'), findsOneWidget);
       });

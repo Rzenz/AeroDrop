@@ -25,7 +25,8 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
   final Map<String, (double, double)> _leg3Origin = {};
   final Map<String, String> _lastDeliveryIdForDrone = {};
   final Map<String, DateTime> _leaseWriteFailures = {};
-  (double, double) _baseHubCoords = (10.325152, 123.953046);
+  // Until _loadBaseHubLocation() reads BASE-HUB; the database is the source of truth.
+  (double, double) _baseHubCoords = (10.3261338, 123.9546208);
   RealtimeChannel? _deliveriesSubscription;
   RealtimeChannel? _ordersSubscription;
   RealtimeChannel? _telemetrySubscription;
@@ -277,15 +278,27 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
   }
 
   /// Where a delivery is dropped: the customer's map pin when the order has
-  /// one, otherwise the fixed building resolved by name. A pinned delivery
-  /// must never go through the name lookup: it has no building, and its
-  /// label is free text that could happen to contain a building's name.
+  /// one, else the drop-off row's own coordinates, and only as a last resort
+  /// the building resolved by name. A pinned delivery must never go through
+  /// the name lookup: it has no building, and its label is free text that
+  /// could happen to contain a building's name.
   (double, double) _dropoffCoordinates(DeliveryModel? delivery) =>
       delivery?.customDropoffCoords ??
+      delivery?.dropoffLocationCoords ??
       _coordinatesForLocation(
         delivery?.dropoffLocationName ?? delivery?.deliveryAddress,
       );
 
+  /// Where the drone picks up: the pickup row's coordinates when the delivery
+  /// has them, the name lookup otherwise.
+  (double, double) _pickupCoordinates(DeliveryModel? delivery) =>
+      delivery?.pickupLocationCoords ??
+      _coordinatesForLocation(delivery?.pickupLocationName);
+
+  /// LAST-RESORT fallback, for a delivery loaded without its location rows.
+  /// campus_locations is the source of truth and these are copies of it that
+  /// will go stale when a building moves (Maritime and the test drop-off as of
+  /// migration 43).
   (double, double) _coordinatesForLocation(String? locationName) {
     if (locationName == null || locationName.isEmpty) {
       return (10.325210, 123.953201);
@@ -302,8 +315,11 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
       'basic-ed': (10.325133, 123.953853),
       'basic education': (10.325133, 123.953853),
       'basic ed': (10.325133, 123.953853),
-      'maritime building': (10.326184, 123.954843),
-      'maritime': (10.326184, 123.954843),
+      'maritime building': (10.3261650, 123.9543871),
+      'maritime': (10.3261650, 123.9543871),
+      'test drop-off point': (10.3253252, 123.9537220),
+      'test drop-off': (10.3253252, 123.9537220),
+      'test-drop': (10.3253252, 123.9537220),
       'base hub': _baseHubCoords,
       'base-hub': _baseHubCoords,
     };
@@ -404,6 +420,15 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
     final dropoffLocationName = hasPin
         ? (pinLabel ?? OrderModel.pinnedDropoffName)
         : (dropoffLoc?['name']?.toString() ?? deliveryAddress);
+    // The joined rows' own coordinates, used before any lookup by name
+    (double, double)? rowCoords(Map<String, dynamic>? row) {
+      final lat = _toDoubleOrNull(row?['latitude']);
+      final lng = _toDoubleOrNull(row?['longitude']);
+      return lat != null && lng != null ? (lat, lng) : null;
+    }
+
+    final pickupLocationCoords = rowCoords(pickupLoc);
+    final dropoffLocationCoords = hasPin ? null : rowCoords(dropoffLoc);
 
     final currentLat =
         _toDoubleOrNull(data['current_latitude']) ??
@@ -489,6 +514,8 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
       dropoffLocationId: dropoffLocationId,
       pickupLocationName: pickupLocationName,
       dropoffLocationName: dropoffLocationName,
+      pickupLocationCoords: pickupLocationCoords,
+      dropoffLocationCoords: dropoffLocationCoords,
       currentLatitude: currentLat,
       currentLongitude: currentLng,
       currentAltitude: currentAlt,
@@ -1013,7 +1040,7 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
           continue;
         }
 
-        final vendorLoc = _coordinatesForLocation(delivery.pickupLocationName);
+        final vendorLoc = _pickupCoordinates(delivery);
         final customerLoc = _dropoffCoordinates(delivery);
 
         if (delivery.status == DeliveryStatus.assigning) {
@@ -1382,7 +1409,7 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
               )
               .firstOrNull;
           final destination = shuttleDelivery != null
-              ? _coordinatesForLocation(shuttleDelivery.pickupLocationName)
+              ? _pickupCoordinates(shuttleDelivery)
               : hub;
 
           final leg3Start =
@@ -1657,11 +1684,13 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
 
       final existingDel = state.where((d) => d.id == deliveryId).firstOrNull;
       final weather = ref.read(weatherProvider);
-      final pickupLoc = _coordinatesForLocation(
-        existingDel?.pickupLocationName ??
-            deliveryData['pickup_location_name']?.toString() ??
-            'Main Building',
-      );
+      final pickupLoc =
+          existingDel?.pickupLocationCoords ??
+          _coordinatesForLocation(
+            existingDel?.pickupLocationName ??
+                deliveryData['pickup_location_name']?.toString() ??
+                'Main Building',
+          );
       // The pin, from the loaded delivery or straight from the row just read
       final rowPinLat = _toDoubleOrNull(deliveryData['custom_dropoff_lat']);
       final rowPinLng = _toDoubleOrNull(deliveryData['custom_dropoff_lng']);
@@ -1670,6 +1699,7 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
           (rowPinLat != null && rowPinLng != null
               ? (rowPinLat, rowPinLng)
               : null) ??
+          existingDel?.dropoffLocationCoords ??
           _coordinatesForLocation(
             existingDel?.dropoffLocationName ??
                 existingDel?.deliveryAddress ??

@@ -389,23 +389,34 @@ class _DropoffControl extends ConsumerWidget {
       ),
     );
 
+    var building = picked is CampusLocation ? picked : null;
     if (picked is _PinRowTapped) {
       // The sheet has closed; open the same picker checkout uses.
       final zone = ref.read(deliveryZoneProvider).asData?.value;
       if (zone == null || !context.mounted) return;
-      final pin = await DropoffMapPicker.open(
+      final choice = await DropoffMapPicker.open(
         context,
         zone: zone,
         initial: ref.read(dropoffChoiceProvider).pin,
+        locations: ref.read(campusLocationsProvider).asData?.value ?? const [],
       );
-      if (pin != null) ref.read(dropoffChoiceProvider.notifier).choosePin(pin);
-      return;
+      switch (choice) {
+        case DropoffPickPin(:final pin):
+          ref.read(dropoffChoiceProvider.notifier).choosePin(pin);
+          return;
+        // A building tapped on the map is the same choice as its row above
+        case DropoffPickLocation(:final location):
+          building = location;
+        case null:
+          return;
+      }
     }
-    if (picked is! CampusLocation) return;
+    if (building == null) return;
+    final chosen = building;
 
     // A building replaces any pin, here and at checkout.
     ref.read(dropoffChoiceProvider.notifier).forgetPin();
-    if (picked.id == savedId) return;
+    if (chosen.id == savedId) return;
 
     final user = ref.read(authProvider).user;
     if (user == null) return;
@@ -414,12 +425,12 @@ class _DropoffControl extends ConsumerWidget {
     // state keeps the previous user, so the control keeps its old value.
     final ok = await ref
         .read(authProvider.notifier)
-        .updateProfile(user.fullName, user.email, campusLocationId: picked.id);
+        .updateProfile(user.fullName, user.email, campusLocationId: chosen.id);
     if (!context.mounted) return;
     showNeuSnack(
       context,
       ok
-          ? 'Drop-off set to ${picked.name}.'
+          ? 'Drop-off set to ${chosen.name}.'
           : (ref.read(authProvider).errorMessage ??
                 'Could not save your drop-off. Please try again.'),
       tone: ok ? NeuToneKind.success : NeuToneKind.error,

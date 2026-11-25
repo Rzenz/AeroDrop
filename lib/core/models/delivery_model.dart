@@ -26,6 +26,13 @@ class DeliveryModel {
   final String? dropoffLocationId;
   final String? pickupLocationName;
   final String? dropoffLocationName;
+
+  /// The pickup and drop-off campus_locations rows' coordinates, when the
+  /// delivery was loaded with them. The flight simulation and the radar use
+  /// these before any lookup by name, so a building moved in the database
+  /// moves here with no code change.
+  final (double, double)? pickupLocationCoords;
+  final (double, double)? dropoffLocationCoords;
   final double? currentLatitude;
   final double? currentLongitude;
   final double? currentAltitude;
@@ -57,9 +64,8 @@ class DeliveryModel {
 
   /// The pin, when there is one. The flight simulation and the map take the
   /// drop-off from here instead of resolving a building by name.
-  (double, double)? get customDropoffCoords => hasCustomDropoff
-      ? (customDropoffLat!, customDropoffLng!)
-      : null;
+  (double, double)? get customDropoffCoords =>
+      hasCustomDropoff ? (customDropoffLat!, customDropoffLng!) : null;
 
   bool get isMultiTrip => tripsRequired > 1;
 
@@ -120,6 +126,8 @@ class DeliveryModel {
     this.dropoffLocationId,
     this.pickupLocationName,
     this.dropoffLocationName,
+    this.pickupLocationCoords,
+    this.dropoffLocationCoords,
     this.currentLatitude,
     this.currentLongitude,
     this.currentAltitude,
@@ -159,6 +167,8 @@ class DeliveryModel {
     String? dropoffLocationId,
     String? pickupLocationName,
     String? dropoffLocationName,
+    (double, double)? pickupLocationCoords,
+    (double, double)? dropoffLocationCoords,
     double? currentLatitude,
     double? currentLongitude,
     double? currentAltitude,
@@ -198,6 +208,9 @@ class DeliveryModel {
       dropoffLocationId: dropoffLocationId ?? this.dropoffLocationId,
       pickupLocationName: pickupLocationName ?? this.pickupLocationName,
       dropoffLocationName: dropoffLocationName ?? this.dropoffLocationName,
+      pickupLocationCoords: pickupLocationCoords ?? this.pickupLocationCoords,
+      dropoffLocationCoords:
+          dropoffLocationCoords ?? this.dropoffLocationCoords,
       currentLatitude: currentLatitude ?? this.currentLatitude,
       currentLongitude: currentLongitude ?? this.currentLongitude,
       currentAltitude: currentAltitude ?? this.currentAltitude,

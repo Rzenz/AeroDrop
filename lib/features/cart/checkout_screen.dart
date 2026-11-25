@@ -71,9 +71,21 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       context,
       zone: zone,
       initial: ref.read(dropoffChoiceProvider).pin,
+      locations: ref.read(campusLocationsProvider).asData?.value ?? const [],
     );
-    if (!mounted || picked == null) return;
-    ref.read(dropoffChoiceProvider.notifier).choosePin(picked);
+    if (!mounted) return;
+    switch (picked) {
+      // Open ground: the pin goes to the shared pin state
+      case DropoffPickPin(:final pin):
+        ref.read(dropoffChoiceProvider.notifier).choosePin(pin);
+      // A building marker: the same selection as the campus list, so the
+      // order carries its delivery_location_id
+      case DropoffPickLocation(:final location):
+        setState(() => _selectedLocationId = location.id);
+        ref.read(dropoffChoiceProvider.notifier).chooseCampusPoint();
+      case null:
+        break;
+    }
   }
 
   @override

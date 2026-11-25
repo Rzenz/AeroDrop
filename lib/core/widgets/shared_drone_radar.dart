@@ -15,7 +15,9 @@ import '../models/telemetry_model.dart';
 import '../providers/telemetry_provider.dart';
 import '../providers/drone_provider.dart';
 import '../providers/delivery_provider.dart';
+import '../providers/location_provider.dart';
 import '../widgets/neu_card.dart';
+import 'campus_markers.dart';
 
 /// Reusable authoritative Drone Radar widget for Customer, Vendor, and Admin.
 /// Displays live OpenStreetMap campus map (with offline fallback to static asset),
@@ -52,7 +54,12 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
   bool _isMapReady = false;
   LatLng? _lastFollowedLatLng;
 
-  (double, double) _baseHubCoords = (10.325152, 123.953046);
+  // Until _loadBaseHubLocation() reads BASE-HUB; the database is the source of truth.
+  (double, double) _baseHubCoords = (10.3261338, 123.9546208);
+
+  /// The campus_locations rows, read in build from campusLocationsProvider.
+  /// Every name and coordinate the radar draws comes from here.
+  List<CampusLocation> _locations = const [];
 
   static const _campusCenter = LatLng(10.3255, 123.9539);
   static final _campusBounds = LatLngBounds(
@@ -60,40 +67,58 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
     const LatLng(10.3300, 123.9600),
   );
 
-  static const _campusLocations = [
-    {
-      'name': 'Main Building',
-      'code': 'MAIN',
-      'lat': 10.325210,
-      'lng': 123.953201,
-      'x': 0.50,
-      'y': 0.43,
-    },
-    {
-      'name': 'Annex 2 Building',
-      'code': 'ANNEX-2',
-      'lat': 10.325633,
-      'lng': 123.953770,
-      'x': 0.57,
-      'y': 0.49,
-    },
-    {
-      'name': 'Basic Education Building',
-      'code': 'BASIC-ED',
-      'lat': 10.325133,
-      'lng': 123.953853,
-      'x': 0.40,
-      'y': 0.58,
-    },
-    {
-      'name': 'Maritime Building',
-      'code': 'MARITIME',
-      'lat': 10.326184,
-      'lng': 123.954843,
-      'x': 0.60,
-      'y': 0.58,
-    },
-  ];
+  /// Where each campus location sits on the OFFLINE schematic, keyed by
+  /// location_code. Layout only: the schematic is a stylised drawing, not a
+  /// projection, so these cannot be computed from coordinates. Names and
+  /// coordinates come from campus_locations (campusLocationsProvider), so a
+  /// building moved in the database moves on the live map with no code
+  /// change. A code missing here still draws on the live map; it just has no
+  /// place on the schematic.
+  static const _schematicLayout = <String, Offset>{
+    'MAIN': Offset(0.50, 0.43),
+    'ANNEX-2': Offset(0.57, 0.49),
+    'BASIC-ED': Offset(0.40, 0.58),
+    'MARITIME': Offset(0.60, 0.58),
+    // Below BASIC-ED, clear of its marker down to a 320 px wide phone.
+    kTestDropCode: Offset(0.44, 0.76),
+  };
+
+  /// A row whose position is known: the model reads a missing one as 0, 0.
+  static bool _hasPosition(CampusLocation l) =>
+      l.latitude != 0 || l.longitude != 0;
+
+  CampusLocation? _rowByCode(String code) {
+    for (final l in _locations) {
+      if (l.locationCode.toUpperCase() == code && _hasPosition(l)) return l;
+    }
+    return null;
+  }
+
+  /// The campus location a delivery names, matched against the rows: by code
+  /// or exact name first, then by one name containing the other.
+  CampusLocation? _rowFor(String? nameOrCode) {
+    final q = nameOrCode?.trim().toLowerCase() ?? '';
+    if (q.isEmpty) return null;
+    final rows = _locations.where(
+      (l) => _hasPosition(l) && !isHubLocationCode(l.locationCode, l.name),
+    );
+    for (final l in rows) {
+      if (l.locationCode.toLowerCase() == q || l.name.toLowerCase() == q) {
+        return l;
+      }
+    }
+    for (final l in rows) {
+      final name = l.name.toLowerCase();
+      if (name.isNotEmpty && (name.contains(q) || q.contains(name))) return l;
+    }
+    return null;
+  }
+
+  /// The hub: its row when loaded, else what _loadBaseHubLocation() read.
+  (double, double) get _hubCoords {
+    final row = _rowByCode('BASE-HUB');
+    return row != null ? (row.latitude, row.longitude) : _baseHubCoords;
+  }
 
   @override
   void initState() {
@@ -112,25 +137,24 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
       const Duration(seconds: 15),
       (_) => _checkStaleDrone(),
     );
-    _livePollTimer = Timer.periodic(
-      const Duration(seconds: 3),
-      (_) {
+    _livePollTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+      if (!mounted) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted) return;
-          final d = widget.delivery;
-          if (d != null) {
-            try {
-              ref.read(deliveryTelemetryProvider(d.id).notifier).loadLatestTelemetry();
-            } catch (_) {}
-          }
+        final d = widget.delivery;
+        if (d != null) {
           try {
-            ref.read(fleetTelemetryProvider.notifier).loadFleetTelemetry();
-            ref.read(droneProvider.notifier).loadDronesFromSupabase();
+            ref
+                .read(deliveryTelemetryProvider(d.id).notifier)
+                .loadLatestTelemetry();
           } catch (_) {}
-        });
-      },
-    );
+        }
+        try {
+          ref.read(fleetTelemetryProvider.notifier).loadFleetTelemetry();
+          ref.read(droneProvider.notifier).loadDronesFromSupabase();
+        } catch (_) {}
+      });
+    });
   }
 
   void _loadBaseHubLocation() async {
@@ -216,7 +240,15 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
     }
     final query = nameOrCode.toLowerCase();
     if (query.contains('hub') || query.contains('base')) {
-      return _baseHubCoords;
+      return _hubCoords;
+    }
+    final row = _rowFor(nameOrCode);
+    if (row != null) return (row.latitude, row.longitude);
+    // LAST RESORT, before the rows have loaded: stale copies of
+    // campus_locations (positions as of migration 43).
+    // Before the building names: none of them should claim the test point.
+    if (query.contains('test drop') || query.contains('test-drop')) {
+      return (10.3253252, 123.9537220);
     }
     if (query.contains('annex 2') ||
         query.contains('annex2') ||
@@ -227,7 +259,7 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
       return (10.325133, 123.953853);
     }
     if (query.contains('maritime')) {
-      return (10.326184, 123.954843);
+      return (10.3261650, 123.9543871);
     }
     if (query.contains('main') || query.contains('old')) {
       return (10.325210, 123.953201);
@@ -240,20 +272,22 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
   /// schematic already places (Main and Maritime), then kept on the canvas.
   /// Approximate by nature; the online map shows the true position.
   Offset _offsetForCoordinates((double, double) coords, Size size) {
-    Map<String, dynamic> ref(String code) =>
-        _campusLocations.firstWhere((l) => l['code'] == code);
-    final a = ref('MAIN');
-    final b = ref('MARITIME');
-    double lerp(String geo, String axis, double value) {
-      final g0 = a[geo] as double, g1 = b[geo] as double;
-      final p0 = a[axis] as double, p1 = b[axis] as double;
+    final a = _rowByCode('MAIN');
+    final b = _rowByCode('MARITIME');
+    final pa = _schematicLayout['MAIN']!;
+    final pb = _schematicLayout['MARITIME']!;
+    // Without both rows there is nothing to interpolate between
+    if (a == null || b == null) {
+      return Offset(pa.dx * size.width, pa.dy * size.height);
+    }
+    double lerp(double g0, double g1, double p0, double p1, double value) {
       if (g1 == g0) return p0;
       return (p0 + (value - g0) / (g1 - g0) * (p1 - p0)).clamp(0.06, 0.94);
     }
 
     return Offset(
-      lerp('lng', 'x', coords.$2) * size.width,
-      lerp('lat', 'y', coords.$1) * size.height,
+      lerp(a.longitude, b.longitude, pa.dx, pb.dx, coords.$2) * size.width,
+      lerp(a.latitude, b.latitude, pa.dy, pb.dy, coords.$1) * size.height,
     );
   }
 
@@ -270,15 +304,16 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
     if (query.contains('hub') || query.contains('base')) {
       return Offset(0.50 * size.width, 0.33 * size.height);
     }
-    for (final loc in _campusLocations) {
-      final locName = (loc['name'] as String).toLowerCase();
-      final locCode = (loc['code'] as String).toLowerCase();
-      if (locCode == query ||
-          locName.contains(query) ||
-          query.contains(locCode)) {
+    final layout = _schematicLayout[_rowFor(nameOrCode)?.locationCode];
+    if (layout != null) {
+      return Offset(layout.dx * size.width, layout.dy * size.height);
+    }
+    for (final entry in _schematicLayout.entries) {
+      final code = entry.key.toLowerCase();
+      if (code == query || query.contains(code)) {
         return Offset(
-          (loc['x'] as double) * size.width,
-          (loc['y'] as double) * size.height,
+          entry.value.dx * size.width,
+          entry.value.dy * size.height,
         );
       }
     }
@@ -328,13 +363,17 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
   void _followDroneIfNeeded(LatLng droneLatLng) {
     if (!_isMapReady || _userHasPanned || _isOfflineFallback) return;
     if (_lastFollowedLatLng != null &&
-        (_lastFollowedLatLng!.latitude - droneLatLng.latitude).abs() < 0.00001 &&
-        (_lastFollowedLatLng!.longitude - droneLatLng.longitude).abs() < 0.00001) {
+        (_lastFollowedLatLng!.latitude - droneLatLng.latitude).abs() <
+            0.00001 &&
+        (_lastFollowedLatLng!.longitude - droneLatLng.longitude).abs() <
+            0.00001) {
       return;
     }
     _lastFollowedLatLng = droneLatLng;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !_isMapReady || _userHasPanned || _isOfflineFallback) return;
+      if (!mounted || !_isMapReady || _userHasPanned || _isOfflineFallback) {
+        return;
+      }
       try {
         final zoom = _mapController.camera.zoom;
         _mapController.move(droneLatLng, zoom);
@@ -365,15 +404,19 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
       return LatLng(_baseHubCoords.$1, _baseHubCoords.$2);
     }
 
-    final lat = startLatLng.latitude +
+    final lat =
+        startLatLng.latitude +
         (endLatLng.latitude - startLatLng.latitude) * legProgress;
-    final lng = startLatLng.longitude +
+    final lng =
+        startLatLng.longitude +
         (endLatLng.longitude - startLatLng.longitude) * legProgress;
     return LatLng(lat, lng);
   }
 
   @override
   Widget build(BuildContext context) {
+    // The rows every building name and coordinate below comes from
+    _locations = ref.watch(campusLocationsProvider).asData?.value ?? const [];
     final d = widget.delivery;
     final telemetry = d != null
         ? _safeWatchTelemetry(ref, d.id)
@@ -391,11 +434,12 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
     final droneReturning = droneDbStatus != null
         ? droneDbStatus == DroneStatus.returning
         : telemetry?.eventType == 'returning_to_base';
-    final DeliveryModel? activeOrRecentDel = d ??
+    final DeliveryModel? activeOrRecentDel =
+        d ??
         (droneReturning && telemetry?.deliveryId != null
             ? allDeliveries
-                .where((del) => del.id == telemetry!.deliveryId)
-                .firstOrNull
+                  .where((del) => del.id == telemetry!.deliveryId)
+                  .firstOrNull
             : null);
 
     // One phase drives every label below, and the tracking header too
@@ -408,8 +452,7 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
     final bool atVendor = phase == FlightPhase.atVendor;
     final bool isReturning =
         returningToVendor || phase == FlightPhase.returningToBase;
-    final bool isAssigning =
-        atVendor || phase == FlightPhase.headingToPickup;
+    final bool isAssigning = atVendor || phase == FlightPhase.headingToPickup;
     final bool isInTransit = phase == FlightPhase.delivering;
     final bool isDelivered = d?.status == DeliveryStatus.delivered;
     final bool isStandby = phase == FlightPhase.standby;
@@ -419,7 +462,8 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
 
     final String pickupName =
         activeOrRecentDel?.pickupLocationName ?? 'Vendor Shop';
-    final String dropoffName = activeOrRecentDel?.dropoffLocationName ??
+    final String dropoffName =
+        activeOrRecentDel?.dropoffLocationName ??
         activeOrRecentDel?.deliveryAddress ??
         'Campus';
     // A drop-off the customer pinned on the map: its coordinates come from
@@ -436,10 +480,13 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
           telemetry.latitude != 0.0 &&
           telemetry.longitude != 0.0) {
         final originCoords =
-            pinCoords ?? _coordinatesForBuilding(dropoffName);
+            pinCoords ??
+            activeOrRecentDel?.dropoffLocationCoords ??
+            _coordinatesForBuilding(dropoffName);
         final targetCoords = returningToVendor
-            ? _coordinatesForBuilding(pickupName)
-            : _baseHubCoords;
+            ? (activeOrRecentDel?.pickupLocationCoords ??
+                  _coordinatesForBuilding(pickupName))
+            : _hubCoords;
         final baseLat = targetCoords.$1;
         final baseLng = targetCoords.$2;
         final originLat = originCoords.$1;
@@ -458,22 +505,24 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
         }
       }
       if (telemetry?.progress != null && telemetry!.progress > 0) {
-        returnProgressCalc =
-            math.max(returnProgressCalc, telemetry.progress.clamp(0.0, 1.0));
+        returnProgressCalc = math.max(
+          returnProgressCalc,
+          telemetry.progress.clamp(0.0, 1.0),
+        );
       }
     }
 
     final legProgress = isReturning
         ? returnProgressCalc
         : isDelivered
-            ? 1.0
-            : (isStandby
-                ? 0.0
-                : (telemetry?.progress != null && telemetry!.progress > 0
+        ? 1.0
+        : (isStandby
+              ? 0.0
+              : (telemetry?.progress != null && telemetry!.progress > 0
                     ? telemetry.progress.clamp(0.0, 1.0)
                     : (activeOrRecentDel != null
-                        ? activeOrRecentDel.progress.clamp(0.0, 1.0)
-                        : 0.0)));
+                          ? activeOrRecentDel.progress.clamp(0.0, 1.0)
+                          : 0.0)));
 
     final String dbStatusLabel = switch (droneDbStatus) {
       DroneStatus.available => 'Available',
@@ -514,7 +563,8 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
       FlightPhase.standby => AppColors.accent,
     };
 
-    final String droneCodeDisplay = telemetry?.droneCode ??
+    final String droneCodeDisplay =
+        telemetry?.droneCode ??
         (d != null && d.droneId != null && d.droneId!.isNotEmpty
             ? d.droneId!
             : (fallbackDrone?.id ?? '—'));
@@ -545,10 +595,18 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
     final height = widget.isCompact ? 330.0 : 420.0;
 
     // Real-world LatLng references
-    final hubLatLng = LatLng(_baseHubCoords.$1, _baseHubCoords.$2);
-    final vendorLatLng = _latLngForBuilding(pickupName);
+    final hubLatLng = LatLng(_hubCoords.$1, _hubCoords.$2);
+    // The delivery's own pickup and drop-off rows first; names only as a
+    // fallback
+    final pickupRow = activeOrRecentDel?.pickupLocationCoords;
+    final dropoffRow = activeOrRecentDel?.dropoffLocationCoords;
+    final vendorLatLng = pickupRow != null
+        ? LatLng(pickupRow.$1, pickupRow.$2)
+        : _latLngForBuilding(pickupName);
     final customerLatLng = pinCoords != null
         ? LatLng(pinCoords.$1, pinCoords.$2)
+        : dropoffRow != null
+        ? LatLng(dropoffRow.$1, dropoffRow.$2)
         : _latLngForBuilding(dropoffName);
 
     LatLng startLatLng;
@@ -628,7 +686,10 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
                             runSpacing: 4,
                             children: [
                               Text(
-                                widget.title ?? (isStandby ? 'Campus Drone Radar' : 'Live Drone Radar'),
+                                widget.title ??
+                                    (isStandby
+                                        ? 'Campus Drone Radar'
+                                        : 'Live Drone Radar'),
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                                 style: AppTextStyles.subHead(
@@ -661,17 +722,22 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
                                   ),
                                 ),
                               ),
-                              if (isInTransit && (activeOrRecentDel?.packageWeight ?? 0) > 0)
+                              if (isInTransit &&
+                                  (activeOrRecentDel?.packageWeight ?? 0) > 0)
                                 Container(
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 8,
                                     vertical: 2,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: AppColors.accent.withValues(alpha: 0.2),
+                                    color: AppColors.accent.withValues(
+                                      alpha: 0.2,
+                                    ),
                                     borderRadius: BorderRadius.circular(10),
                                     border: Border.all(
-                                      color: AppColors.accent.withValues(alpha: 0.5),
+                                      color: AppColors.accent.withValues(
+                                        alpha: 0.5,
+                                      ),
                                       width: 1,
                                     ),
                                   ),
@@ -802,10 +868,10 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
                       value: telemetry?.batteryLevel != null
                           ? '${telemetry!.batteryLevel!.round()}%'
                           : (d?.batteryLevel != null
-                              ? '${d!.batteryLevel!.round()}%'
-                              : (fallbackDrone?.batteryLevel != null
-                                  ? '${fallbackDrone!.batteryLevel.round()}%'
-                                  : '—')),
+                                ? '${d!.batteryLevel!.round()}%'
+                                : (fallbackDrone?.batteryLevel != null
+                                      ? '${fallbackDrone!.batteryLevel.round()}%'
+                                      : '—')),
                       color: AppColors.success,
                     ),
                     _buildTelemetryItem(
@@ -814,10 +880,10 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
                       value: (!isReturning && (isDelivered || isStandby))
                           ? '0.0 m/s'
                           : (telemetry?.speed != null
-                              ? '${telemetry!.speed!.toStringAsFixed(1)} m/s'
-                              : ((d?.currentSpeed ?? 0) > 0
-                                  ? '${d!.currentSpeed!.toStringAsFixed(1)} m/s'
-                                  : (isReturning ? '5.0 m/s' : '—'))),
+                                ? '${telemetry!.speed!.toStringAsFixed(1)} m/s'
+                                : ((d?.currentSpeed ?? 0) > 0
+                                      ? '${d!.currentSpeed!.toStringAsFixed(1)} m/s'
+                                      : (isReturning ? '5.0 m/s' : '—'))),
                       color: AppColors.info,
                     ),
                     _buildTelemetryItem(
@@ -829,10 +895,10 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
                           : atVendor
                           ? 'At Vendor'
                           : (isStandby
-                              ? 'Status'
-                              : (isAssigning
-                                  ? 'Pickup Progress'
-                                  : 'Delivery Progress')),
+                                ? 'Status'
+                                : (isAssigning
+                                      ? 'Pickup Progress'
+                                      : 'Delivery Progress')),
                       value: atVendor
                           ? 'Collecting $loadLabel'
                           : (isStandby && !isReturning)
@@ -904,10 +970,13 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
 
     final markers = <Marker>[];
 
-    // Campus Landmark Markers (MAIN, ANNEX-2, BASIC-ED, MARITIME)
-    for (final loc in _campusLocations) {
-      final locName = loc['name'] as String;
-      final locCode = loc['code'] as String;
+    // Campus landmark markers: every campus_locations row with a position,
+    // except the hub, which has its own marker below
+    for (final loc in _locations.where(
+      (l) => _hasPosition(l) && !isHubLocationCode(l.locationCode, l.name),
+    )) {
+      final locName = loc.name;
+      final locCode = loc.locationCode;
       final isPickup =
           pickupName.toLowerCase().contains(locCode.toLowerCase()) ||
           pickupName.toLowerCase().contains(locName.toLowerCase());
@@ -923,15 +992,16 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
 
       markers.add(
         Marker(
-          point: LatLng(loc['lat'] as double, loc['lng'] as double),
+          point: LatLng(loc.latitude, loc.longitude),
           width: 64,
           height: 56,
           alignment: Alignment.center,
-          child: _buildCampusMarkerPill(
+          child: CampusMarkerPill(
             code: locCode,
             color: markerColor,
             isPickup: isPickup,
             isDropoff: isDropoff,
+            isTestPoint: locCode == kTestDropCode,
           ),
         ),
       );
@@ -957,7 +1027,7 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
         width: 68,
         height: 56,
         alignment: Alignment.center,
-        child: _buildHubMarker(),
+        child: const HubMarker(),
       ),
     );
 
@@ -1020,19 +1090,14 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
             ),
             // Subtle dark overlay to match AeroDrop's sleek aesthetic while keeping streets and buildings legible
             IgnorePointer(
-              child: Container(
-                color: Colors.black.withValues(alpha: 0.24),
-              ),
+              child: Container(color: Colors.black.withValues(alpha: 0.24)),
             ),
             PolylineLayer(polylines: polylines),
             MarkerLayer(markers: markers),
             const SimpleAttributionWidget(
               source: Text(
                 '© OpenStreetMap contributors',
-                style: TextStyle(
-                  fontSize: 9,
-                  color: Colors.white70,
-                ),
+                style: TextStyle(fontSize: 9, color: Colors.white70),
               ),
               alignment: Alignment.bottomRight,
             ),
@@ -1059,7 +1124,10 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
                 });
               },
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.cardDark2.withValues(alpha: 0.92),
                   borderRadius: BorderRadius.circular(16),
@@ -1165,10 +1233,7 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
         Positioned.fill(
           child: Opacity(
             opacity: 0.88,
-            child: Image.asset(
-              'assets/images/uclm_map.png',
-              fit: BoxFit.cover,
-            ),
+            child: Image.asset('assets/images/uclm_map.png', fit: BoxFit.cover),
           ),
         ),
 
@@ -1192,14 +1257,10 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
             ),
           ),
 
-        // Campus Landmark Markers
-        for (final loc in _campusLocations)
-          _buildCampusMarker(
-            loc,
-            size,
-            pickupName,
-            dropoffName,
-          ),
+        // Campus landmark markers: rows that have a place on the schematic
+        for (final loc in _locations)
+          if (_schematicLayout[loc.locationCode] case final at?)
+            _buildCampusMarker(loc, at, size, pickupName, dropoffName),
 
         // The customer's pinned drop-off, when the order has one
         if (pinPoint != null && !isStandby)
@@ -1214,7 +1275,7 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
         Positioned(
           left: hubPoint.dx - 16,
           top: hubPoint.dy - 16,
-          child: _buildHubMarker(),
+          child: const HubMarker(),
         ),
 
         // Drone Icon with Pulsing Radar
@@ -1248,10 +1309,7 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
                   color: AppColors.warning.withValues(alpha: 0.85),
                 ),
                 boxShadow: const [
-                  BoxShadow(
-                    color: Colors.black45,
-                    blurRadius: 4,
-                  ),
+                  BoxShadow(color: Colors.black45, blurRadius: 4),
                 ],
               ),
               child: Row(
@@ -1279,58 +1337,6 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
                   ),
                 ],
               ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildCampusMarkerPill({
-    required String code,
-    required Color color,
-    required bool isPickup,
-    required bool isDropoff,
-  }) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(4),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.9),
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: color.withValues(alpha: 0.4),
-                blurRadius: 6,
-                spreadRadius: 1,
-              ),
-            ],
-          ),
-          child: Icon(
-            isPickup
-                ? Icons.storefront_rounded
-                : isDropoff
-                ? Icons.location_on_rounded
-                : Icons.apartment_rounded,
-            size: 12,
-            color: AppColors.bgDark,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-          decoration: BoxDecoration(
-            color: Colors.black87,
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: Text(
-            code,
-            style: AppTextStyles.caption(
-              fontSize: 9,
-              fontWeight: FontWeight.bold,
-              color: color,
             ),
           ),
         ),
@@ -1392,15 +1398,16 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
   }
 
   Widget _buildCampusMarker(
-    Map<String, dynamic> loc,
+    CampusLocation loc,
+    Offset at,
     Size size,
     String pickupName,
     String dropoffName,
   ) {
-    final x = (loc['x'] as double) * size.width;
-    final y = (loc['y'] as double) * size.height;
-    final locName = loc['name'] as String;
-    final locCode = loc['code'] as String;
+    final x = at.dx * size.width;
+    final y = at.dy * size.height;
+    final locName = loc.name;
+    final locCode = loc.locationCode;
 
     final isPickup =
         pickupName.toLowerCase().contains(locCode.toLowerCase()) ||
@@ -1418,55 +1425,13 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
     return Positioned(
       left: x - 12,
       top: y - 12,
-      child: _buildCampusMarkerPill(
+      child: CampusMarkerPill(
         code: locCode,
         color: markerColor,
         isPickup: isPickup,
         isDropoff: isDropoff,
+        isTestPoint: locCode == kTestDropCode,
       ),
-    );
-  }
-
-  Widget _buildHubMarker() {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(4),
-          decoration: BoxDecoration(
-            color: AppColors.warning.withValues(alpha: 0.9),
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.warning.withValues(alpha: 0.4),
-                blurRadius: 6,
-                spreadRadius: 1,
-              ),
-            ],
-          ),
-          child: const Icon(
-            Icons.hub_rounded,
-            size: 14,
-            color: AppColors.bgDark,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-          decoration: BoxDecoration(
-            color: Colors.black87,
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: Text(
-            'BASE HUB',
-            style: AppTextStyles.caption(
-              fontSize: 8,
-              fontWeight: FontWeight.bold,
-              color: AppColors.warning,
-            ),
-          ),
-        ),
-      ],
     );
   }
 
@@ -1486,7 +1451,9 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(
-                color: color.withValues(alpha: (1.0 - radarVal).clamp(0.0, 1.0)),
+                color: color.withValues(
+                  alpha: (1.0 - radarVal).clamp(0.0, 1.0),
+                ),
                 width: 1.5,
               ),
             ),

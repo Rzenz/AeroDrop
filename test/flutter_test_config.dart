@@ -14,7 +14,9 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
-// ignore: implementation_imports
+// test_api ships with flutter_test (the SDK pins its version), so it is not
+// listed in pubspec.yaml.
+// ignore: implementation_imports, depend_on_referenced_packages
 import 'package:test_api/src/backend/invoker.dart';
 
 const _keep = 40;

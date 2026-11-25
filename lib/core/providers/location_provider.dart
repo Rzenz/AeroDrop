@@ -34,6 +34,11 @@ final campusLocationsProvider = FutureProvider<List<CampusLocation>>((
   ref,
 ) async {
   if (!SupabaseService.isConfigured) {
+    // A STALE COPY BY DESIGN. Used only when Supabase is not configured
+    // (offline demos and tests), so nothing here follows the database: when a
+    // building moves, campus_locations is the source of truth and this list
+    // is updated by hand, if at all. Positions as of migration 43; the hub,
+    // Maritime and the test drop-off are provisional (+/-5 to 15 m).
     return [
       CampusLocation(
         id: '0b29ab20-8522-4778-a9d8-827516a57a6a',
@@ -63,16 +68,26 @@ final campusLocationsProvider = FutureProvider<List<CampusLocation>>((
         id: 'b59b7f2d-07a2-44a4-a552-fb945c18452e',
         name: 'UCLM Maritime Building',
         locationCode: 'MARITIME',
-        latitude: 10.326184,
-        longitude: 123.954843,
+        latitude: 10.3261650,
+        longitude: 123.9543871,
+        isActive: true,
+      ),
+      // Offline only, so there is no database id to copy; nothing offline can
+      // place an order with it.
+      CampusLocation(
+        id: 'offline-test-drop',
+        name: 'Test Drop-off Point',
+        locationCode: 'TEST-DROP',
+        latitude: 10.3253252,
+        longitude: 123.9537220,
         isActive: true,
       ),
       CampusLocation(
         id: 'd637fc1f-64af-4911-9edb-b80ee587bb1e',
         name: 'Campus Base Hub',
         locationCode: 'BASE-HUB',
-        latitude: 10.325152,
-        longitude: 123.953046,
+        latitude: 10.3261338,
+        longitude: 123.9546208,
         isActive: true,
       ),
     ];
@@ -104,12 +119,11 @@ final dropoffLocationsProvider = FutureProvider<List<CampusLocation>>((
 });
 
 /// Resolves the campus drone hub from the database. When no BASE-HUB row is
-/// found, falls back to the real hub row (migration 37): id
-/// d637fc1f-64af-4911-9edb-b80ee587bb1e at 10.3251520, 123.9530460, so
-/// anything keyed by id, like campus_distance_km, still resolves to the hub.
-final baseHubLocationProvider = FutureProvider<CampusLocation>((
-  ref,
-) async {
+/// found, falls back to the real hub row: id
+/// d637fc1f-64af-4911-9edb-b80ee587bb1e, at the position migration 43 moved
+/// it to, so anything keyed by id, like campus_distance_km, still resolves to
+/// the hub. Provisional, about +/-15 m; the database is the source of truth.
+final baseHubLocationProvider = FutureProvider<CampusLocation>((ref) async {
   final allLocations = await ref.watch(campusLocationsProvider.future);
   return allLocations.firstWhere(
     (loc) =>
@@ -120,8 +134,8 @@ final baseHubLocationProvider = FutureProvider<CampusLocation>((
       id: 'd637fc1f-64af-4911-9edb-b80ee587bb1e',
       name: 'Campus Drone Hub',
       locationCode: 'BASE-HUB',
-      latitude: 10.3251520,
-      longitude: 123.9530460,
+      latitude: 10.3261338,
+      longitude: 123.9546208,
       isActive: true,
     ),
   );

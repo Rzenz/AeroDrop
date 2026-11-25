@@ -143,7 +143,8 @@ class DroneNotifier extends StateNotifier<List<DroneModel>> {
 
       if (!mounted) return;
 
-      String coords = '10.325152,123.953046';
+      // The hub, until telemetry exists; BASE-HUB in the database is the source of truth.
+      String coords = '10.3261338,123.9546208';
       if (telemetryRes != null) {
         coords = '${telemetryRes['latitude']},${telemetryRes['longitude']}';
       }
@@ -187,7 +188,9 @@ class DroneNotifier extends StateNotifier<List<DroneModel>> {
     if (authUser == null) return 'You must be logged in.';
 
     try {
-      final droneId = drone.dbId.isNotEmpty ? drone.dbId : await _resolveDroneId();
+      final droneId = drone.dbId.isNotEmpty
+          ? drone.dbId
+          : await _resolveDroneId();
       if (!mounted) return 'Notifier disposed';
       if (droneId == null) {
         return 'The drone could not be found. Check your connection and try again.';

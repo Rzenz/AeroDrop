@@ -252,9 +252,16 @@ export default function Checkout() {
               <DropoffMapPicker
                 zone={zone}
                 initial={pin}
+                locations={locs}
                 onCancel={() => setPicking(false)}
-                onConfirm={(p) => {
-                  choosePin(p)
+                onConfirm={(pick) => {
+                  if (pick.kind === 'pin') choosePin(pick.pin)
+                  else {
+                    // A building marker: the same selection as the building
+                    // list, so the order carries its delivery_location_id
+                    setDropoff(pick.location.id)
+                    chooseCampusPoint()
+                  }
                   setPicking(false)
                 }}
               />

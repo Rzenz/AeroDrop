@@ -142,7 +142,9 @@ export interface SimDelivery {
   trips_completed: number
   pickup_name: string | null
   dropoff_name: string | null
-  /** A pinned drop-off's point (DeliveryModel.customDropoffCoords); null for a campus building. */
+  /** The pickup row's own coordinates, when the delivery has one. */
+  pickup_coords: [number, number] | null
+  /** Where the drop-off is: the customer's pin, else the drop-off row's own coordinates. */
   dropoff_coords: [number, number] | null
   payload_kg: number
   delivered_at: string | null

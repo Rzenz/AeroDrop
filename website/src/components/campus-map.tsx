@@ -1,6 +1,7 @@
 import L from 'leaflet'
 import { useEffect, useMemo } from 'react'
 import { Circle, MapContainer, Marker, Polyline, TileLayer, Tooltip, useMap, useMapEvents } from 'react-leaflet'
+import { isTestPoint, pin } from '@/lib/campus-markers'
 import { isHub } from '@/lib/flight'
 import { cn } from '@/lib/utils'
 import type { CampusLocation, NoFlyZone } from '@/types'
@@ -12,18 +13,6 @@ export interface MapDrone {
   longitude: number
   active?: boolean
 }
-
-const pin = (kind: 'hub' | 'stop' | 'drop' | 'vendor') =>
-  L.divIcon({
-    className: '',
-    iconSize: [28, 28],
-    iconAnchor: [14, 14],
-    html: `<span style="display:grid;place-items:center;width:28px;height:28px;border-radius:999px;background:${
-      kind === 'hub' ? '#19223B' : kind === 'drop' ? '#3A6FD4' : kind === 'vendor' ? '#2BBE8A' : '#ffffff'
-    };box-shadow:0 0 0 2px ${kind === 'stop' ? '#3A6FD4' : '#ffffff'},0 4px 10px rgba(0,0,0,.25);color:${kind === 'stop' ? '#3A6FD4' : '#fff'};font:700 11px Inter,sans-serif">${
-      kind === 'hub' ? 'H' : kind === 'drop' ? '▼' : kind === 'vendor' ? '◆' : '•'
-    }</span>`,
-  })
 
 const droneIcon = (active: boolean) =>
   L.divIcon({
@@ -110,10 +99,10 @@ export function CampusMap({
         {locations.map((l) => {
           const kind = isHub(l) ? 'hub' : l.id === highlight?.dropoffId ? 'drop' : l.id === highlight?.pickupId ? 'vendor' : 'stop'
           return (
-            <Marker key={l.id} position={[l.latitude, l.longitude]} icon={pin(kind)} keyboard={false}>
+            <Marker key={l.id} position={[l.latitude, l.longitude]} icon={pin(kind, isTestPoint(l))} keyboard={false}>
               <Tooltip direction="top" offset={[0, -12]}>
                 {l.name}
-                {kind === 'drop' ? ' · drop-off' : kind === 'vendor' ? ' · pickup' : ''}
+                {kind === 'drop' ? ' · drop-off' : kind === 'vendor' ? ' · pickup' : isTestPoint(l) ? ' · test point' : ''}
               </Tooltip>
             </Marker>
           )

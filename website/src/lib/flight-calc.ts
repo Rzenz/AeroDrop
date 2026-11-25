@@ -55,16 +55,30 @@ export function formatEta(secs: number) {
   return `${Math.ceil(secs / 60)} mins`
 }
 
-export const DEFAULT_HUB: Coords = [10.325152, 123.953046]
+// PROVISIONAL (migration 43): the hub, Maritime and the test drop-off were
+// placed by hand on the map, good to about +/-5 m. campus_locations in the
+// database is the source of truth; the hub is read from it (hubCoords) and
+// this is only the fallback.
+export const DEFAULT_HUB: Coords = [10.3261338, 123.9546208]
+
+/** The test drop-off (migration 43). Provisional, as above. */
+const TEST_DROP: Coords = [10.3253252, 123.953722]
 
 /**
  * DeliveryNotifier._coordinatesForLocation: the simulator places buildings by
  * name, with these fixed coordinates, matching on either containment.
+ * LAST RESORT: callers use the location rows' own coordinates when they have
+ * them (SimDelivery.pickup_coords / dropoff_coords). These are stale copies
+ * of campus_locations, as of migration 43.
  */
 export function coordinatesForLocation(name: string | null | undefined, hub: Coords): Coords {
   if (!name) return [10.32521, 123.953201]
   const q = name.toLowerCase()
   const table: [string, Coords][] = [
+    // First, so no building name can claim the test point.
+    ['test drop-off point', TEST_DROP],
+    ['test drop-off', TEST_DROP],
+    ['test-drop', TEST_DROP],
     ['old building', [10.32521, 123.953201]],
     ['main', [10.32521, 123.953201]],
     ['uclm main', [10.32521, 123.953201]],
@@ -75,8 +89,8 @@ export function coordinatesForLocation(name: string | null | undefined, hub: Coo
     ['basic-ed', [10.325133, 123.953853]],
     ['basic education', [10.325133, 123.953853]],
     ['basic ed', [10.325133, 123.953853]],
-    ['maritime building', [10.326184, 123.954843]],
-    ['maritime', [10.326184, 123.954843]],
+    ['maritime building', [10.326165, 123.9543871]],
+    ['maritime', [10.326165, 123.9543871]],
     ['base hub', hub],
     ['base-hub', hub],
   ]

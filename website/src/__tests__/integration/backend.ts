@@ -99,6 +99,11 @@ const visibleOrders = (d: Db) => {
   return d.orders.filter((o) => v.role === 'admin' || (v.role === 'vendor' ? o.vendor_id === v.id : o.user_id === v.id))
 }
 const locName = (d: Db, id: string | null) => d.locations.find((l) => l.id === id)?.name ?? null
+// The row's own coordinates, as the live simDeliveries returns them
+const locCoords = (d: Db, id: string | null): [number, number] | null => {
+  const l = d.locations.find((x) => x.id === id)
+  return l ? [l.latitude, l.longitude] : null
+}
 
 const impl: Partial<Api> = {
   // ---------- Auth
@@ -332,7 +337,8 @@ const impl: Partial<Api> = {
       const o = d.orders.find((x) => x.id === dl.order_id)!
       return {
         id: dl.id, order_id: dl.order_id, status: dl.status, progress: dl.progress, drone_id: dl.drone_id, trips_required: dl.trips_required, trips_completed: dl.trips_completed,
-        pickup_name: locName(d, dl.pickup_location_id), dropoff_name: locName(d, dl.dropoff_location_id), dropoff_coords: null,
+        pickup_name: locName(d, dl.pickup_location_id), dropoff_name: locName(d, dl.dropoff_location_id),
+        pickup_coords: locCoords(d, dl.pickup_location_id), dropoff_coords: locCoords(d, dl.dropoff_location_id),
         payload_kg: o.items.reduce((s, i) => s + i.weight_grams * i.quantity, 0) / 1000, delivered_at: dl.delivery_completed_at, created_at: dl.created_at,
       }
     })

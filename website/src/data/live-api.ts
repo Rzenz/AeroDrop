@@ -114,7 +114,7 @@ async function uid() {
 const SIM_SELECT = `*,
   pickup_loc:campus_locations!pickup_location_id(id, name, latitude, longitude),
   dropoff_loc:campus_locations!dropoff_location_id(id, name, latitude, longitude),
-  orders!order_id(*, vendor:users!vendor_id(full_name, business_name), campus_locations!delivery_location_id(name), order_items(product_name, quantity, weight_grams))`
+  orders!order_id(*, vendor:users!vendor_id(full_name, business_name), campus_locations!delivery_location_id(name, latitude, longitude), order_items(product_name, quantity, weight_grams))`
 
 async function hydrate(rows: OrderRow[], viewer: Profile): Promise<Order[]> {
   if (!rows.length) return []
@@ -768,7 +768,12 @@ export const liveApi: Api = {
         // DeliveryNotifier: a pinned drop-off's point is on the delivery, else on the order.
         const pinLat = d.custom_dropoff_lat ?? o.custom_dropoff_lat
         const pinLng = d.custom_dropoff_lng ?? o.custom_dropoff_lng
-        const pin: [number, number] | null = pinLat != null && pinLng != null && Number.isFinite(Number(pinLat)) && Number.isFinite(Number(pinLng)) ? [Number(pinLat), Number(pinLng)] : null
+        const coords = (lat: unknown, lng: unknown): [number, number] | null =>
+          lat != null && lng != null && Number.isFinite(Number(lat)) && Number.isFinite(Number(lng)) ? [Number(lat), Number(lng)] : null
+        const pin = coords(pinLat, pinLng)
+        // The location rows' own coordinates, so a building moved in the
+        // database moves the flight with no code change
+        const dropoffRow = d.dropoff_loc ?? o.campus_locations
         return {
           id: String(d.id),
           order_id: String(d.order_id ?? o.id),
@@ -779,7 +784,8 @@ export const liveApi: Api = {
           trips_completed: Number(d.trips_completed ?? 0),
           pickup_name: d.pickup_loc?.name ?? sender,
           dropoff_name: d.dropoff_loc?.name ?? o.campus_locations?.name ?? (pin ? (o.custom_dropoff_label?.trim() || PINNED_DROPOFF_NAME) : 'UCLM Campus'),
-          dropoff_coords: pin,
+          pickup_coords: coords(d.pickup_loc?.latitude, d.pickup_loc?.longitude),
+          dropoff_coords: pin ?? coords(dropoffRow?.latitude, dropoffRow?.longitude),
           payload_kg: grams / 1000,
           delivered_at: d.delivery_completed_at ?? null,
           created_at: d.created_at,

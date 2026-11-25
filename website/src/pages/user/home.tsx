@@ -94,9 +94,13 @@ export default function UserHome() {
               <DropoffMapPicker
                 zone={zone}
                 initial={choice.pin}
+                locations={locations.data ?? []}
                 onCancel={() => setPicking(false)}
-                onConfirm={(p) => {
-                  choosePin(p)
+                onConfirm={(pick) => {
+                  // A building marker is the same choice as its option above:
+                  // saved to the profile, and any pin forgotten
+                  if (pick.kind === 'pin') choosePin(pick.pin)
+                  else void setDropoff(pick.location.id)
                   setPicking(false)
                 }}
               />

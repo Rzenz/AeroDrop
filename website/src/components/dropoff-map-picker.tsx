@@ -1,10 +1,13 @@
 import L from 'leaflet'
-import { Check, CircleAlert, MapPin } from 'lucide-react'
+import { Building2, Check, CircleAlert, MapPin } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Circle, MapContainer, Marker, TileLayer, useMap, useMapEvents } from 'react-leaflet'
 import type { DeliveryZone } from '@/data/api'
+import { isTestPoint, pin as campusPin } from '@/lib/campus-markers'
+import { isHub } from '@/lib/flight'
 import { distanceMeters } from '@/lib/flight-calc'
 import { cn } from '@/lib/utils'
+import type { CampusLocation } from '@/types'
 import { Button } from './ui/button'
 import { Dialog } from './ui/dialog'
 import { Field, Input } from './ui/primitives'
@@ -18,6 +21,14 @@ export interface PinnedDropoff {
 
 /** Longest description the customer may give the spot (kDropoffLabelMaxLength). */
 export const DROPOFF_LABEL_MAX = 80
+
+/**
+ * What the picker returns (DropoffPick in the app): a campus location when one
+ * of its markers was clicked, or a pin when open ground was. A building goes on
+ * the order as delivery_location_id, never as coordinates, so the order keeps
+ * its link to the building and the vendor sees its name.
+ */
+export type DropoffPick = { kind: 'location'; location: CampusLocation } | { kind: 'pin'; pin: PinnedDropoff }
 
 // Same family as campus-map.tsx's pins; the tip sits on the chosen point.
 const pinIcon = (outside: boolean) =>
@@ -62,13 +73,34 @@ function ClickToPlace({ onPick }: { onPick: (p: [number, number]) => void }) {
 
 /**
  * dropoff_map_picker.dart: choose a drop-off inside the delivery zone.
- * One interaction: click the map to place or move the pin. The circle and the
- * distance are a guide for the customer; the server decides whether the point
- * is allowed when the order is quoted and placed.
+ * Every campus location is drawn with the live map's markers. Clicking a
+ * building selects it as a fixed drop-off; clicking open ground places or
+ * moves a pin. The hub is shown greyed and ignores clicks. The circle and the
+ * distance are a guide for the customer; the server decides whether a pin is
+ * allowed when the order is quoted and placed.
  */
-export function DropoffMapPicker({ zone, initial, onConfirm, onCancel }: { zone: DeliveryZone; initial: PinnedDropoff | null; onConfirm: (pin: PinnedDropoff) => void; onCancel: () => void }) {
+export function DropoffMapPicker({
+  zone,
+  initial,
+  locations = [],
+  onConfirm,
+  onCancel,
+}: {
+  zone: DeliveryZone
+  initial: PinnedDropoff | null
+  /** The campus_locations rows, hub included. */
+  locations?: CampusLocation[]
+  onConfirm: (pick: DropoffPick) => void
+  onCancel: () => void
+}) {
   const [pin, setPin] = useState<[number, number] | null>(initial ? [initial.lat, initial.lng] : null)
   const [label, setLabel] = useState(initial?.label ?? '')
+  // A building chosen by clicking its marker. Exclusive with the pin.
+  const [location, setLocation] = useState<CampusLocation | null>(null)
+  const placePin = (p: [number, number]) => {
+    setPin(p)
+    setLocation(null)
+  }
 
   const center = useMemo<[number, number]>(() => [zone.centerLatitude, zone.centerLongitude], [zone.centerLatitude, zone.centerLongitude])
   // The circle's box with a margin for the first view; a wider one keeps the map on campus.
@@ -77,34 +109,61 @@ export function DropoffMapPicker({ zone, initial, onConfirm, onCancel }: { zone:
 
   const meters = pin ? distanceMeters(center, pin) : null
   const outside = meters != null && meters > zone.radiusMeters
-  const readout =
-    meters == null
-      ? 'Click the map to place your pin inside the circle.'
+  const readout = location
+    ? `${location.name}: a campus drop-off point.`
+    : meters == null
+      ? 'Click a building to choose it, or click open ground inside the circle to place a pin.'
       : outside
         ? `Outside the delivery area: ${Math.round(meters)} m from ${zone.centerName}, and the limit is ${Math.round(zone.radiusMeters)} m.`
         : `${Math.round(meters)} m from ${zone.centerName}. Inside the delivery area.`
 
   return (
-    <Dialog open onOpenChange={(v) => !v && onCancel()} title="Pin your drop-off" description="Click the map to place or move your pin." className="max-w-2xl">
+    <Dialog open onOpenChange={(v) => !v && onCancel()} title="Pin your drop-off" description="Click a building to choose it, or open ground to place a pin." className="max-w-2xl">
       <div className="relative isolate h-80 overflow-hidden rounded-xl bg-sunken sm:h-96">
         <MapContainer bounds={fit} boundsOptions={{ padding: [24, 24] }} minZoom={15} maxZoom={20} maxBounds={limit} maxBoundsViscosity={1} className="size-full cursor-crosshair" attributionControl>
           <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" maxZoom={20} maxNativeZoom={19} />
           <SettleSize bounds={fit} />
-          <ClickToPlace onPick={setPin} />
+          <ClickToPlace onPick={placePin} />
           <Circle center={center} radius={zone.radiusMeters} pathOptions={{ color: '#3A6FD4', weight: 2, fillOpacity: 0.12 }} interactive={false} />
+          {locations.map((l) =>
+            isHub(l) ? (
+              // Shown greyed, and its clicks are swallowed so they never drop a
+              // pin: Leaflet only stops a click at a marker that listens for
+              // it, hence the empty handler. Painted under the buildings: it
+              // sits 26 m from Maritime, and on top it would take their clicks.
+              <Marker key={l.id} position={[l.latitude, l.longitude]} icon={campusPin('hub')} opacity={0.4} zIndexOffset={-1000} keyboard={false} title={`${l.name} (the drone hub, not a drop-off point)`} bubblingMouseEvents={false} eventHandlers={{ click: () => {} }} />
+            ) : (
+              <Marker
+                key={l.id}
+                position={[l.latitude, l.longitude]}
+                icon={campusPin(location?.id === l.id ? 'drop' : 'stop', isTestPoint(l))}
+                title={l.name}
+                bubblingMouseEvents={false}
+                eventHandlers={{
+                  click: () => {
+                    setLocation(l)
+                    setPin(null)
+                  },
+                }}
+              />
+            ),
+          )}
           {/* Not interactive, so a click on the pin still reaches the map and moves it */}
-          {pin ? <Marker position={pin} icon={pinIcon(outside)} interactive={false} keyboard={false} /> : null}
+          {pin ? <Marker position={pin} icon={pinIcon(outside)} interactive={false} keyboard={false} zIndexOffset={1000} /> : null}
         </MapContainer>
       </div>
 
       <p role="status" aria-live="polite" className={cn('mt-4 flex items-start gap-2 text-sm', outside ? 'font-semibold text-danger' : 'font-medium text-ink')}>
-        {outside ? <CircleAlert aria-hidden className="mt-0.5 size-4 shrink-0" /> : <MapPin aria-hidden className="mt-0.5 size-4 shrink-0 text-ink-3" />}
+        {outside ? <CircleAlert aria-hidden className="mt-0.5 size-4 shrink-0" /> : location ? <Building2 aria-hidden className="mt-0.5 size-4 shrink-0 text-brand" /> : <MapPin aria-hidden className="mt-0.5 size-4 shrink-0 text-ink-3" />}
         <span>{readout}</span>
       </p>
 
-      <Field label="Describe the spot (optional)" hint={`${label.length}/${DROPOFF_LABEL_MAX}`} className="mt-4">
-        {(p) => <Input {...p} value={label} maxLength={DROPOFF_LABEL_MAX} placeholder="e.g. by the side gate" onChange={(e) => setLabel(e.target.value)} />}
-      </Field>
+      {/* A building already has a name; only a pin is described */}
+      {location ? null : (
+        <Field label="Describe the spot (optional)" hint={`${label.length}/${DROPOFF_LABEL_MAX}`} className="mt-4">
+          {(p) => <Input {...p} value={label} maxLength={DROPOFF_LABEL_MAX} placeholder="e.g. by the side gate" onChange={(e) => setLabel(e.target.value)} />}
+        </Field>
+      )}
 
       <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
         <Button type="button" variant="secondary" onClick={onCancel}>
@@ -113,8 +172,11 @@ export function DropoffMapPicker({ zone, initial, onConfirm, onCancel }: { zone:
         <Button
           type="button"
           icon={<Check aria-hidden className="size-4" />}
-          disabled={!pin || outside}
-          onClick={() => pin && onConfirm({ lat: pin[0], lng: pin[1], label: label.trim() || null })}
+          disabled={!location && (!pin || outside)}
+          onClick={() => {
+            if (location) onConfirm({ kind: 'location', location })
+            else if (pin) onConfirm({ kind: 'pin', pin: { lat: pin[0], lng: pin[1], label: label.trim() || null } })
+          }}
         >
           Confirm drop-off
         </Button>

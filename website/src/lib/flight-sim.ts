@@ -101,7 +101,8 @@ export function startFlightSimulator(api: Api, role: Role, onChange: () => void)
 
       for (const delivery of active) {
         if (completingDeliveries.has(delivery.id)) continue
-        const vendorLoc = coordinatesForLocation(delivery.pickup_name, hub)
+        // The rows' own coordinates first; the name lookup is the last resort
+        const vendorLoc = delivery.pickup_coords ?? coordinatesForLocation(delivery.pickup_name, hub)
         const customerLoc = delivery.dropoff_coords ?? coordinatesForLocation(delivery.dropoff_name, hub)
 
         if (delivery.status === 'assigning') {
@@ -227,7 +228,7 @@ export function startFlightSimulator(api: Api, role: Role, onChange: () => void)
     if (!hasLease) return false
 
     const shuttle = deliveries.find((d) => d.id === deliveryId && d.status === 'in_transit' && d.trips_completed > 0 && hasTripsRemaining(d))
-    const destination = shuttle ? coordinatesForLocation(shuttle.pickup_name, hub) : hub
+    const destination = shuttle ? (shuttle.pickup_coords ?? coordinatesForLocation(shuttle.pickup_name, hub)) : hub
     const start: Coords = leg3Origin.get(droneId) ?? [10.32521, 123.953201]
 
     const speed = effectiveSpeed({ isLoaded: false, isCaution })

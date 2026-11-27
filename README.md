@@ -11,16 +11,28 @@
 ![Supabase](https://img.shields.io/badge/Supabase-19223B?style=for-the-badge&logo=supabase&logoColor=3ECF8E)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-19223B?style=for-the-badge&logo=postgresql&logoColor=white)
 
+[![Download the Android app](https://img.shields.io/badge/Download%20the%20Android%20app-APK-3ECF8E?style=for-the-badge&logo=android&logoColor=white)](https://github.com/Rzenz/AeroDrop/releases/latest/download/aerodrop.apk)
+
 ![Status](https://img.shields.io/badge/status-working%20prototype-4DB0F5?style=flat-square)
 ![Platforms](https://img.shields.io/badge/platforms-Android%20%C2%B7%20iOS%20%C2%B7%20Windows%20%C2%B7%20macOS%20%C2%B7%20Web-19223B?style=flat-square)
 ![Weather](https://img.shields.io/badge/weather-live%20Open--Meteo-3ECF8E?style=flat-square)
 ![Maps](https://img.shields.io/badge/maps-OpenStreetMap-7EBC6F?style=flat-square)
-![Realtime](https://img.shields.io/badge/chat-realtime-4DB0F5?style=flat-square)
+![Flight](https://img.shields.io/badge/flight-ArduPilot%20%C2%B7%20MAVLink-4DB0F5?style=flat-square)
 ![Payloads](https://img.shields.io/badge/payloads-multi--trip-19223B?style=flat-square)
 
 *Order from campus vendors and have it flown to your drop zone.*
 
 </div>
+
+---
+
+## Install
+
+**[Download the latest Android APK](https://github.com/Rzenz/AeroDrop/releases/latest/download/aerodrop.apk)**
+
+Android will warn that the file comes from outside the Play Store. Allow installation from your browser when prompted. The build already carries the Supabase credentials it needs, so there is nothing to configure — open it and register.
+
+iOS, Windows, macOS and web builds are made from source; see [Getting Started](#getting-started).
 
 ---
 
@@ -31,7 +43,7 @@
 The system connects campus users with approved vendors. Users browse products, place orders, message the vendor, track the drone on a live map, and review what they received. Vendors manage products, inventory, and orders. Administrators oversee accounts, drones, deliveries, weather, support, and analytics.
 
 > [!NOTE]
-> Drone flight and telemetry are **simulated**. Online payments run through the **Xendit sandbox** (no real money). Weather, campus coordinates, authentication, messaging, reviews, and all stored records are **real**.
+> Deliveries are flown by a **real drone**. An administrator exports an order's flight plan, a ground-station bridge uploads it to the aircraft through Mission Planner, and the drone's own telemetry drives the tracking screens. Online payments run through the **Xendit sandbox** (no real money). Weather, campus coordinates, authentication, messaging, reviews, and all stored records are real.
 
 ---
 
@@ -39,9 +51,12 @@ The system connects campus users with approved vendors. Users browse products, p
 
 | | |
 |---|---|
+| **Real drone flight** | Missions are uploaded to an ArduPilot aircraft and flown; position comes from the drone, not a simulation |
 | **Live campus weather** | Real conditions polled every 15 minutes, mapped to drone operating limits |
+| **Choose your own drop-off** | Pick a campus building, or drop a pin anywhere inside the delivery area |
+| **Enforced no-fly zones** | An order whose drop-off falls inside an active zone is refused by the database |
 | **Interactive map tracking** | OpenStreetMap tiles with real campus coordinates and live drone position |
-| **Physics-aware flight** | Flight time from real distance; payload affects speed and battery |
+| **Flight plan export** | Any order downloads as JSON and converts to a Mission Planner waypoint file |
 | **Order chat** | Realtime messaging between customer and vendor while an order is active |
 | **Multi-trip payloads** | Orders too heavy for one flight are carried in two, with the drone shuttling back to the vendor |
 | **Support conversations** | Reporters and admins exchange messages and photos on a ticket, not a one-way form |
@@ -49,7 +64,6 @@ The system connects campus users with approved vendors. Users browse products, p
 | **Real payment gateway** | GCash and card through Xendit in sandbox mode, confirmed by webhook |
 | **Transparent fees** | Distance and weight based, priced by the server, with a full breakdown before you pay |
 | **Reviews and ratings** | Store and product ratings from verified deliveries |
-| **Analytics export** | Admin reports exportable to CSV and PDF |
 
 ---
 
@@ -84,10 +98,12 @@ Staff who manage accounts, drones, deliveries, weather, support, and reports.
 
 | Method | Who | Verification |
 |---|---|---|
-| **Email and password** | Users, Vendors, Admins | One-time code sent by email at registration and at each login |
+| **Email and password** | Users, Vendors, Admins | Signed in immediately; a one-time code verifies the address before the first order |
 | **Continue with Google** | Customers | None required — Google already verified the address |
 
-Vendors register through the full application form because store details are needed, though approved vendors may then sign in with Google. Administrators cannot use Google sign-in. Password reset also uses emailed one time codes.
+Registering signs you straight in. An unverified account can browse and use the app, but a banner appears until the address is confirmed, and ordering is blocked until then. Verification sends a six-digit code on demand from the banner or the profile — it is the only code the system ever sends. Signing in afterwards needs only email and password.
+
+Vendors register through the full application form because store details are needed, though approved vendors may then sign in with Google. Administrators cannot use Google sign-in and are exempt from email verification.
 
 > [!IMPORTANT]
 > SMS verification is **not implemented**. If phone verification is selected, the app honestly reports that SMS is unavailable and directs the user to email.
@@ -101,14 +117,14 @@ Vendors register through the full application form because store details are nee
 
 <br>
 
-- Registration and login with email verification codes
+- Registration and login with email and password, verified by a one-time code before ordering
 - Google sign-in for customer accounts
 - Profile and profile-picture management
 - Browse approved campus vendors, then view each store's products
 - Search products and view detailed information
 - Store and product ratings from real customer reviews
 - Cart management with live totals
-- Order confirmation step before payment
+- **Choose a campus building or drop a pin** anywhere inside the delivery area, from checkout or the home screen
 - Delivery fee from real distance and package weight, with a visible breakdown
 - Warning in the cart when an order is heavier than one drone load, and how many trips it will take
 - Pay online with GCash or card through Xendit (sandbox), or use the simulated payment options
@@ -135,6 +151,7 @@ Vendors register through the full application form because store details are nee
 - Add, edit, and deactivate products with price, weight, and stock
 - Incoming order list with action counts on the navigation bar
 - Confirm or reject orders, mark as preparing, then ready for drone pickup
+- A notice when a customer chose their own pin rather than a known building
 - **Message the customer** about an incoming order, with realtime delivery and unread counts
 - Raise a support report and hold a conversation with an administrator about it
 - Automatic inventory updates on orders and cancellations
@@ -149,16 +166,18 @@ Vendors register through the full application form because store details are nee
 
 <br>
 
-- Secure admin login without verification codes
+- Secure admin login
 - Account management, vendor approval, suspension and reactivation
 - Orders and deliveries, including orders cancelled before dispatch
+- **Download an order's flight plan** as JSON, and send a delivery to the drone
 - Live campus drone radar with route and telemetry
-- Drone availability, battery, and status monitoring
+- Drone availability, battery, cruise altitude, and status monitoring
 - Weather management with temporary manual override
+- **No-fly zones** that actually block orders, with a map of each zone
+- Delivery area centre and radius, adjustable without an app release
 - Support queue: reply to reporters in a thread, attach photos, add private notes, resolve or reopen
 - Read-only access to customer and vendor conversations for dispute handling
 - In-app notification centre covering vendor applications, deliveries, cancellations, expired payments, weather changes, drone battery, and new support reports
-- No-fly-zone records and delivery status logs
 - Reports and analytics, exportable to CSV and PDF
 - Live badge counts for active deliveries
 
@@ -173,17 +192,38 @@ graph LR
     A[Customer<br/>places order] --> B[Vendor<br/>confirms]
     B --> C[Vendor<br/>prepares]
     C --> D[Ready for<br/>drone pickup]
-    D --> E{System checks<br/>stock, weight, drone<br/>battery, weather}
-    E -->|Approved| F[Leg 1<br/>Hub to Vendor]
-    F --> G[Package<br/>picked up]
-    G --> H[Leg 2<br/>Vendor to Customer]
-    H --> I[Delivered]
-    I --> J[Leg 3<br/>Customer to Hub]
-    J --> K[Drone available]
-    I --> L[Customer<br/>reviews order]
+    D --> E{System checks<br/>stock, weight, drone<br/>battery, weather, zones}
+    E -->|Approved| F[Flight plan<br/>uploaded to drone]
+    F --> G[Leg 1<br/>Hub to Vendor]
+    G --> H[Package<br/>picked up]
+    H --> I[Leg 2<br/>Vendor to Customer]
+    I --> J[Delivered]
+    J --> K[Leg 3<br/>Customer to Hub]
+    K --> L[Drone available]
+    J --> M[Customer<br/>reviews order]
 ```
 
 The customer may cancel at any point up to **Ready for drone pickup**. Cancellations automatically restore stock and refund simulated payments. The order chat stays open throughout, from the moment the order is placed until it is delivered or cancelled.
+
+---
+
+## Flying a Delivery
+
+A delivery leaves the software and becomes a flight in four steps.
+
+| Step | Where | What happens |
+|---|---|---|
+| **1. Export** | Admin screen | Download flight plan saves the order as `order-<id>.json`: waypoints, cruise altitude, payload, trip count, the delivery area and every active no-fly zone |
+| **2. Convert** | `python_script/` | The ground-station script turns that JSON into a Mission Planner `.waypoints` file, refusing any drop-off outside the delivery area or inside a no-fly zone |
+| **3. Upload** | Mission Planner | Load WP File, check the route on the map, then Write WPs. The mission travels over the radio link to the flight controller, which stores and flies it |
+| **4. Track** | Bridge → AeroDrop | The bridge reads the drone's MAVLink telemetry and writes position, altitude, speed, battery and heading back to the database every few seconds, which is what the tracking screens display |
+
+The bridge also advances the delivery through the same database functions the rest of the system uses — confirming pickup, completing the delivery — so multi-trip accounting, idempotency and battery checks all behave exactly as they do for any other path.
+
+The exported file is **self-contained**: it carries the zones as well as the route, so the conversion script needs no database access and runs offline.
+
+> [!NOTE]
+> The flight plan reflects the moment you export it, not the moment of the flight. Cruise altitude, delivery status and the no-fly zones are read live. Export at dispatch if you want a file that matches what actually flew.
 
 ---
 
@@ -202,6 +242,25 @@ Hub -> Vendor -> Customer -> Vendor -> Customer -> Hub
 The tracking screen names the stage throughout, so "Returning to Base" never appears while a load is still owed. A single-trip order flies the ordinary route and shows no trip labels at all.
 
 The trip count is derived by the database, never sent by the client, and recomputed at dispatch so a stock or weight change since checkout is caught. Dispatch also requires enough battery for **every** trip, not just the first, and an order left part-flown by grounded weather or a flat battery is retried automatically and reported to administrators if it stays stuck.
+
+---
+
+## Drop-off Points
+
+A customer chooses where an order lands in one of two ways.
+
+**A campus building.** Four buildings and one test point are available, each a row in the database with real coordinates. Picking one keeps the order linked to that place, so the vendor sees a name rather than a coordinate.
+
+**A pin on the map.** For anywhere else — a side gate, a bench, a particular entrance — the customer opens a map, taps a spot inside the delivery area, and optionally describes it in their own words. Tapping an existing building marker selects that building instead of pinning on top of it.
+
+Both are reachable from checkout and from the home screen, and both are priced by the same formula, measured to wherever the order is actually going.
+
+| Boundary | What it does |
+|---|---|
+| **Delivery area** | A circle around a configurable centre. A pin outside it cannot be confirmed, and the server refuses it again at quote and at order time |
+| **No-fly zones** | Circles an administrator draws. An order whose drop-off falls inside an active zone is refused and told which zone blocked it — for a pin at its own coordinates, and for a building at the building's |
+
+Both are stored as data, so the area can be moved or resized and a zone drawn or lifted without an app release.
 
 ---
 
@@ -262,7 +321,10 @@ Attachments live in a **private** storage bucket, unlike the public buckets used
 <tr><td><b>Drone Code</b></td><td>DRN-001</td></tr>
 <tr><td><b>Drone Name</b></td><td>AeroCarrier Alpha</td></tr>
 <tr><td><b>Model</b></td><td>Prototype 001</td></tr>
+<tr><td><b>Flight Controller</b></td><td>ArduPilot on an H743</td></tr>
+<tr><td><b>Radio Link</b></td><td>ExpressLRS in MAVLink mode</td></tr>
 <tr><td><b>Maximum Payload</b></td><td>0.5 kg per trip (up to 1.0 kg across two trips)</td></tr>
+<tr><td><b>Cruise Altitude</b></td><td>Stored per aircraft and used by every exported flight plan</td></tr>
 <tr><td><b>Minimum Battery for Dispatch</b></td><td>15%</td></tr>
 <tr><td><b>Statuses</b></td><td>Available, Assigned, Busy, Returning, Charging, Maintenance, Offline</td></tr>
 </table>
@@ -279,7 +341,7 @@ Every delivery runs in three legs:
 
 An order needing two trips inserts an extra pair of legs before the last one: Customer to Vendor empty, then Vendor to Customer loaded again.
 
-Flight time comes from the **real distance** between campus coordinates divided by the drone's effective speed, with sensible minimum and maximum durations. Carrying a payload reduces speed and increases battery drain on the loaded leg only. Caution weather slows flights further. A recovery mechanism returns the drone to service if a return flight is interrupted.
+Distances come from the **real coordinates** of the campus points, by the same calculation the server uses to price an order. Estimated flight times account for payload: carrying a load reduces speed and increases battery drain on the loaded leg only, and caution weather slows flights further. A recovery mechanism returns the drone to service if a return flight is interrupted.
 
 ---
 
@@ -330,7 +392,7 @@ The fee is calculated from a **base fee** charged once, the **real distance** be
 
 The extra-trip charge exists because distance alone would make a second flight free when the vendor and the drop-off are in the same building, even though it is another launch, another battery cycle and another handover.
 
-**Every amount is calculated in the database.** The app and the website do not price an order; they ask the server for a quote and display what it returns, so the figure on screen is the figure that will be charged. Item prices, weights, distance and trip count are read from the stored product and location rows rather than from anything the client sends.
+**Every amount is calculated in the database.** The app and the website do not price an order; they ask the server for a quote and display what it returns, so the figure on screen is the figure that will be charged. Item prices, weights, distance and trip count are read from the stored product and location rows rather than from anything the client sends. A map pin is priced by exactly the same formula as a building, measured to the pin.
 
 ---
 
@@ -344,9 +406,15 @@ AeroDrop operates inside the University of Cebu Lapu-Lapu and Mandaue campus usi
 | Annex 2 Building | Pickup / Drop-off |
 | Basic Education Building | Pickup / Drop-off |
 | Maritime Building | Pickup / Drop-off |
+| Test Drop-off Point | Drop-off, for field testing |
 | **Campus Drone Hub** | Drone base station |
 
-The Campus Drone Hub is the drone's home base and cannot be selected as a customer drop-off point.
+The Campus Drone Hub is the drone's home base and cannot be selected as a customer drop-off point. Customers may also pin any spot inside the delivery area rather than choosing from this list.
+
+Both clients read these coordinates from the database at launch, so moving a building, the hub or the delivery area is a database change rather than a release.
+
+> [!NOTE]
+> Coordinates are estimated from maps and on-site readings, not surveyed. They are accurate enough to place a marker and measure a distance, and **not** accurate enough to land on. Each landing pad should be re-measured with the drone's own GPS before autonomous approach.
 
 ---
 
@@ -356,13 +424,15 @@ Access control lives in the database, not in the interface, so a modified client
 
 - **Row level security** on every table. Customers reach their own records, vendors reach their own store and the orders placed with it, and administrators reach what their role requires.
 - **Server-side pricing.** No client decides what an order costs. Orders can only be created through `place_order`, which derives the subtotal, weight, trip count, distance and every fee component from the stored product and location rows. Clients ask for a quote through the same function so they display the price they will be charged, and a tampered request is priced the same as an honest one.
+- **Flight boundaries enforced in the database.** A drop-off outside the delivery area, or inside an active no-fly zone, is refused when the price is quoted and again when the order is placed. Neither check can be skipped by a modified client, and both apply to a map pin and a campus building alike.
+- **Verified email before ordering.** An account can browse unverified, but placing an order requires a confirmed address, enforced by a trigger on the orders table rather than by the interface.
 - **Rate limits in the database.** Orders, support reports, order chat and support chat each carry an insert limit per account, enforced by triggers rather than by the interface, so the limit holds for any client. Administrators are exempt, since working a support queue means many messages in a short burst.
 - **Security-definer functions** for operations that must cross those boundaries — placing an order, cancelling one, submitting reviews, notifying administrators, resolving a chat counterpart's name. Each one re-checks the caller's right to act before doing anything.
 - **Immutable records** where a history matters: order chat and support messages have no update or delete path at all.
 - **Private storage for sensitive files.** Avatars and store logos sit in public buckets; support attachments do not. They are readable only by that thread's participants and are served through short-lived signed links.
 - **Recorded consent.** Accepting the Terms and Privacy Policy at registration is stored against the account, and both documents are readable before acceptance rather than only after signing in.
 - **Explicit grants.** Supabase stopped auto-granting Data API access to new tables in October 2026, so every table's privileges are declared in the migrations. This keeps the migration history self-sufficient: a fresh project rebuilt from `supabase/migrations` works without manual repair.
-- **Secrets stay server-side.** The payment gateway key, callback token, and mail credentials live in Supabase configuration and are never bundled into the app.
+- **Secrets stay server-side.** The payment gateway key, callback token, and mail credentials live in Supabase configuration and are never bundled into the app. The ground-station bridge signs in as an ordinary operator account with the public key, never the service role key.
 
 ---
 
@@ -370,7 +440,7 @@ Access control lives in the database, not in the interface, so a modified client
 
 A browser version of AeroDrop lives in [`website/`](website), built with React, Vite and TypeScript and deployed on Vercel. It talks to the same Supabase project as the app, so the same accounts, orders and row level security apply.
 
-It covers browsing, ordering, tracking, support conversations and the vendor console, and prices every order through the same server quote the app uses. Placing an order there ends on a printed receipt that feeds out of a printer, the same moment the app gives after payment. Features built most recently in the app may not have reached it yet.
+It covers browsing, ordering, tracking, support conversations and the vendor console, prices every order through the same server quote the app uses, and offers the same choice of a campus building or a map pin. Placing an order there ends on a printed receipt that feeds out of a printer, the same moment the app gives after payment.
 
 ---
 
@@ -403,6 +473,12 @@ It covers browsing, ordering, tracking, support conversations and the vendor con
 </td>
 <td valign="top" width="33%">
 
+**Ground Station**
+- ArduPilot
+- Mission Planner
+- Python, pymavlink
+- ExpressLRS (MAVLink mode)
+
 **External Services**
 - Xendit (payments, sandbox)
 - Open-Meteo (weather)
@@ -425,6 +501,7 @@ It covers browsing, ordering, tracking, support conversations and the vendor con
 - Flutter with **Dart SDK 3.12.2** or newer
 - A Supabase project with the migrations in `supabase/migrations` applied in order
 - Platform tools for your target (Android Studio, or Xcode and CocoaPods for iOS/macOS)
+- For flying: Python 3, Mission Planner, and an ArduPilot aircraft — see [`python_script/README.md`](python_script/README.md)
 
 ### Setup
 
@@ -462,11 +539,15 @@ flutter build apk --release \
 
 Schema, functions, triggers, policies, and scheduled jobs live in `supabase/migrations`, applied in numeric order. Weather polling requires the **pg_cron** and **pg_net** extensions enabled in the Supabase project, and realtime must be enabled for the tables the migrations add to the `supabase_realtime` publication.
 
+### Ground station
+
+The bridge and the mission converter live in [`python_script/`](python_script). Copy `bridge.env.example` to `bridge.env` and fill it in — it needs the Supabase URL, the public anon key, an operator administrator account, and the MAVLink connection string Mission Planner is forwarding on. `bridge.env` is ignored by git and must never hold the service role key.
+
 ---
 
 ## Attribution
 
-Map data and tiles are provided by **OpenStreetMap contributors**, used under the OpenStreetMap Tile Usage Policy. Weather data is provided by **Open-Meteo**. Online payments are processed by **Xendit** in test mode.
+Map data and tiles are provided by **OpenStreetMap contributors**, used under the OpenStreetMap Tile Usage Policy. Weather data is provided by **Open-Meteo**. Online payments are processed by **Xendit** in test mode. Flight control is **ArduPilot**, with missions prepared in **Mission Planner**.
 
 ---
 
@@ -474,9 +555,11 @@ Map data and tiles are provided by **OpenStreetMap contributors**, used under th
 
 ### Project Status
 
-AeroDrop is a **working prototype**. Drone flight and telemetry are simulated, while online payments run through a real gateway in sandbox mode, and weather, campus coordinates, authentication, messaging, reviews, and all stored records are real.
+AeroDrop is a **working prototype**. Deliveries are flown by a real aircraft through the ground-station bridge, online payments run through a real gateway in sandbox mode, and weather, campus coordinates, authentication, messaging, reviews, and all stored records are real.
 
-**Future work:** SMS verification, live payment processing after business verification, physical drone integration, and public app store release.
+**Known limits:** campus coordinates are estimated rather than surveyed, the fleet is a single drone, refunds are recorded but not sent back through the gateway, and SMS verification is unimplemented.
+
+**Future work:** surveyed landing coordinates, a second aircraft, SMS verification, live payment processing after business verification, and public app store release.
 
 <br>
 

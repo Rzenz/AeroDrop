@@ -87,7 +87,7 @@ Staff who manage accounts, drones, deliveries, weather, support, and reports.
 | **Email and password** | Users, Vendors, Admins | One-time code sent by email at registration and at each login |
 | **Continue with Google** | Customers | None required — Google already verified the address |
 
-Vendors register through the full application form because store details are needed, though approved vendors may then sign in with Google. Administrators cannot use Google sign-in. Password reset also uses emailed one-time codes.
+Vendors register through the full application form because store details are needed, though approved vendors may then sign in with Google. Administrators cannot use Google sign-in. Password reset also uses emailed one time codes.
 
 > [!IMPORTANT]
 > SMS verification is **not implemented**. If phone verification is selected, the app honestly reports that SMS is unavailable and directs the user to email.

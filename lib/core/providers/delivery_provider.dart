@@ -15,29 +15,16 @@ import 'weather_provider.dart';
 
 class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
   final Ref ref;
-  Timer? _simulationTimer;
-  final Map<String, double> _deliveryStartBatteries = {};
-  final Map<String, double> _leg3StartBatteries = {};
-  final Set<String> _confirmingPickupDeliveryIds = {};
-  final Set<String> _completingDeliveryIds = {};
-  final Set<String> _completingReturnDroneIds = {};
-  final Map<String, double> _leg3Progress = {};
-  final Map<String, (double, double)> _leg3Origin = {};
-  final Map<String, String> _lastDeliveryIdForDrone = {};
-  final Map<String, DateTime> _leaseWriteFailures = {};
   // Until _loadBaseHubLocation() reads BASE-HUB; the database is the source of truth.
   (double, double) _baseHubCoords = (10.3261338, 123.9546208);
   RealtimeChannel? _deliveriesSubscription;
   RealtimeChannel? _ordersSubscription;
   RealtimeChannel? _telemetrySubscription;
-  DateTime? _lastTelemetryWriteTime;
 
   DeliveryNotifier(this.ref) : super([]) {
     _loadBaseHubLocation();
     ref.listen<AuthState>(authProvider, (previous, next) {
       if (next.user == null || !next.sessionUnlocked) {
-        _simulationTimer?.cancel();
-        _simulationTimer = null;
         _unsubscribeRealtime();
         state = [];
       } else if (previous?.user?.id != next.user?.id ||
@@ -47,7 +34,6 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
         _refreshDeliveriesForCurrentUser();
         refreshPendingDeliveriesCount();
         _subscribeRealtime();
-        _startSimulation();
       }
     });
 
@@ -62,7 +48,6 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
       }
     });
     _subscribeRealtime();
-    _startSimulation();
   }
 
   Future<bool> _checkIsAdmin() async {
@@ -233,7 +218,6 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
 
   @override
   void dispose() {
-    _simulationTimer?.cancel();
     _unsubscribeRealtime();
     super.dispose();
   }
@@ -276,24 +260,6 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
         return DeliveryStatus.pending;
     }
   }
-
-  /// Where a delivery is dropped: the customer's map pin when the order has
-  /// one, else the drop-off row's own coordinates, and only as a last resort
-  /// the building resolved by name. A pinned delivery must never go through
-  /// the name lookup: it has no building, and its label is free text that
-  /// could happen to contain a building's name.
-  (double, double) _dropoffCoordinates(DeliveryModel? delivery) =>
-      delivery?.customDropoffCoords ??
-      delivery?.dropoffLocationCoords ??
-      _coordinatesForLocation(
-        delivery?.dropoffLocationName ?? delivery?.deliveryAddress,
-      );
-
-  /// Where the drone picks up: the pickup row's coordinates when the delivery
-  /// has them, the name lookup otherwise.
-  (double, double) _pickupCoordinates(DeliveryModel? delivery) =>
-      delivery?.pickupLocationCoords ??
-      _coordinatesForLocation(delivery?.pickupLocationName);
 
   /// LAST-RESORT fallback, for a delivery loaded without its location rows.
   /// campus_locations is the source of truth and these are copies of it that
@@ -730,33 +696,6 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
     }
   }
 
-  Future<void> _insertFirstTelemetry({
-    required String deliveryId,
-    required double batteryLevel,
-  }) async {
-    if (!SupabaseService.isConfigured) return;
-
-    try {
-      await SupabaseService.client.rpc(
-        'record_simulated_telemetry',
-        params: {
-          'p_delivery_id': deliveryId,
-          'p_latitude': _baseHubCoords.$1,
-          'p_longitude': _baseHubCoords.$2,
-          'p_altitude': 0.0,
-          'p_speed': 0.0,
-          'p_battery_level': batteryLevel,
-          'p_signal_strength': 100.0,
-          'p_heading': 0.0,
-          'p_event_type': 'standby',
-          'p_progress': 0.0,
-        },
-      );
-    } catch (error) {
-      debugPrint('First telemetry RPC failed: $error');
-    }
-  }
-
   Future<void> _insertStatusLog({
     required String deliveryId,
     required String status,
@@ -774,799 +713,6 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
     } catch (error) {
       debugPrint('Delivery status log insert failed: $error');
     }
-  }
-
-  Future<void> _confirmPickup({
-    required DeliveryModel delivery,
-    required (double, double) vendorLoc,
-    required double batteryLevel,
-  }) async {
-    if (_confirmingPickupDeliveryIds.contains(delivery.id)) return;
-    _confirmingPickupDeliveryIds.add(delivery.id);
-
-    // Optimistically transition to inTransit with progress 0.0 immediately
-    state = state
-        .map(
-          (d) => d.id == delivery.id
-              ? d.copyWith(
-                  status: DeliveryStatus.inTransit,
-                  progress: 0.0,
-                  currentLatitude: vendorLoc.$1,
-                  currentLongitude: vendorLoc.$2,
-                  currentAltitude: 1.5,
-                  batteryLevel: batteryLevel,
-                )
-              : d,
-        )
-        .toList();
-
-    if (SupabaseService.isConfigured) {
-      try {
-        await SupabaseService.client.rpc(
-          'confirm_package_pickup',
-          params: {'p_delivery_id': delivery.id},
-        );
-      } catch (e) {
-        debugPrint('confirm_package_pickup RPC error: $e');
-        _confirmingPickupDeliveryIds.remove(delivery.id);
-      }
-    }
-
-    try {
-      ref.read(orderProvider.notifier).loadOrders();
-      ref.read(vendorOrdersProvider.notifier).loadOrders();
-      loadDeliveriesFromSupabase();
-    } catch (_) {}
-  }
-
-  Future<void> _completeDelivery({
-    required DeliveryModel delivery,
-    required (double, double) customerLoc,
-    required double batteryLevel,
-    required String droneUuid,
-  }) async {
-    if (_completingDeliveryIds.contains(delivery.id)) return;
-    _completingDeliveryIds.add(delivery.id);
-    _deliveryStartBatteries.remove(delivery.id);
-    _lastDeliveryIdForDrone[droneUuid] = delivery.id;
-    _leg3Origin[droneUuid] = customerLoc;
-    _leg3Progress[droneUuid] = 0.0;
-    _leg3StartBatteries[droneUuid] = batteryLevel;
-
-    // A multi-trip order only becomes delivered on its last trip. Earlier
-    // trips leave it in_transit while the drone returns to base to reload;
-    // the id stays in _completingDeliveryIds until dispatch_next_queued_delivery
-    // sends it back to 'assigning' for the next trip.
-    final isFinalTrip = delivery.tripsCompleted + 1 >= delivery.tripsRequired;
-
-    // Optimistically transition to delivered with progress 1.0
-    state = state
-        .map(
-          (d) => d.id == delivery.id
-              ? d.copyWith(
-                  status: isFinalTrip
-                      ? DeliveryStatus.delivered
-                      : DeliveryStatus.inTransit,
-                  progress: isFinalTrip ? 1.0 : 0.0,
-                  tripsCompleted: delivery.tripsCompleted + 1,
-                  currentLatitude: customerLoc.$1,
-                  currentLongitude: customerLoc.$2,
-                  currentAltitude: 0.0,
-                  batteryLevel: batteryLevel,
-                )
-              : d,
-        )
-        .toList();
-
-    if (SupabaseService.isConfigured) {
-      try {
-        await SupabaseService.client.rpc(
-          'complete_delivery_order',
-          params: {'p_delivery_id': delivery.id},
-        );
-      } catch (e) {
-        debugPrint('complete_delivery_order RPC error: $e');
-        _completingDeliveryIds.remove(delivery.id);
-      }
-    }
-
-    try {
-      ref.read(orderProvider.notifier).loadOrders();
-      ref.read(vendorOrdersProvider.notifier).loadOrders();
-      ref
-          .read(droneProvider.notifier)
-          .updateStatus('DRN-001', DroneStatus.returning);
-      loadDeliveriesFromSupabase();
-    } catch (_) {}
-  }
-
-  /// Parks a multi-trip drone at the vendor after the empty shuttle leg back
-  /// from the customer, so the next trip's pickup starts there instead of at
-  /// the hub.
-  Future<void> _arriveAtVendorForNextTrip({
-    required DeliveryModel delivery,
-    required (double, double) vendorLoc,
-    required double batteryLevel,
-    required String droneId,
-    required String droneUuid,
-  }) async {
-    // The next trip drains from the battery the drone actually has left
-    _deliveryStartBatteries[delivery.id] = batteryLevel;
-
-    // Optimistically park at the vendor: 'assigning' at full progress is what
-    // the leg-1 driver reads as "already at the vendor", so it confirms the
-    // pickup on its next tick rather than flying the hub approach again
-    state = state
-        .map(
-          (d) => d.id == delivery.id
-              ? d.copyWith(
-                  status: DeliveryStatus.assigning,
-                  progress: 1.0,
-                  currentLatitude: vendorLoc.$1,
-                  currentLongitude: vendorLoc.$2,
-                  currentAltitude: 0.0,
-                  batteryLevel: batteryLevel,
-                )
-              : d,
-        )
-        .toList();
-    ref
-        .read(droneProvider.notifier)
-        .updateStatus(droneId, DroneStatus.assigned);
-
-    if (!SupabaseService.isConfigured) return;
-
-    try {
-      await SupabaseService.client.rpc(
-        'arrive_at_vendor_for_next_trip',
-        params: {'p_delivery_id': delivery.id},
-      );
-    } catch (e) {
-      debugPrint('arrive_at_vendor_for_next_trip RPC error: $e');
-      // Fall back to the hub route: freeing the drone lets
-      // dispatch_next_queued_delivery resume the order from the hub
-      try {
-        await SupabaseService.client.rpc(
-          'complete_drone_return',
-          params: {'p_drone_id': droneUuid},
-        );
-      } catch (e) {
-        debugPrint('complete_drone_return RPC error: $e');
-      }
-    }
-  }
-
-  void _startSimulation() {
-    _simulationTimer?.cancel();
-    _simulationTimer = Timer.periodic(const Duration(seconds: 3), (
-      timer,
-    ) async {
-      final currentUser = SupabaseService.client.auth.currentUser;
-      if (currentUser == null) {
-        timer.cancel();
-        _simulationTimer?.cancel();
-        _simulationTimer = null;
-        return;
-      }
-
-      final activeDeliveries = state
-          .where(
-            (d) =>
-                (d.status == DeliveryStatus.assigning ||
-                    d.status == DeliveryStatus.inTransit) &&
-                !_completingDeliveryIds.contains(d.id),
-          )
-          .toList();
-
-      final dronesList = ref.read(droneProvider);
-      _completingReturnDroneIds.removeWhere(
-        (id) => dronesList.any(
-          (d) =>
-              (d.id == id || d.dbId == id) && d.status != DroneStatus.returning,
-        ),
-      );
-      _confirmingPickupDeliveryIds.removeWhere(
-        (id) => state.any(
-          (d) => d.id == id && d.status != DeliveryStatus.assigning,
-        ),
-      );
-      // A multi-trip delivery leaves this set when its next trip is dispatched
-      _completingDeliveryIds.removeWhere(
-        (id) => state.any(
-          (d) =>
-              d.id == id &&
-              (d.status == DeliveryStatus.delivered ||
-                  d.status == DeliveryStatus.assigning),
-        ),
-      );
-      final returningDrone = dronesList
-          .where(
-            (d) =>
-                d.status == DroneStatus.returning &&
-                !_completingReturnDroneIds.contains(d.dbId) &&
-                !_completingReturnDroneIds.contains(d.id),
-          )
-          .firstOrNull;
-
-      if (activeDeliveries.isEmpty && returningDrone == null) return;
-
-      // Single-writer coordination: avoid competing write loops
-      if (_lastTelemetryWriteTime != null &&
-          DateTime.now().difference(_lastTelemetryWriteTime!).inMilliseconds <
-              2200) {
-        return;
-      }
-      _lastTelemetryWriteTime = DateTime.now();
-
-      final weatherState = ref.read(weatherProvider);
-      final isCaution = weatherState.isCaution;
-
-      String? droneUuid;
-      if (returningDrone != null && returningDrone.dbId.isNotEmpty) {
-        droneUuid = returningDrone.dbId;
-      } else if (dronesList.isNotEmpty && dronesList.first.dbId.isNotEmpty) {
-        droneUuid = dronesList.first.dbId;
-      } else if (SupabaseService.isConfigured) {
-        try {
-          final res = await SupabaseService.client
-              .from('drones')
-              .select('id')
-              .eq('drone_code', 'DRN-001')
-              .maybeSingle();
-          if (res != null) {
-            droneUuid = res['id'].toString();
-          }
-        } catch (_) {}
-      }
-
-      // No real drone id: skip this tick and let the next one retry. Updates
-      // keyed on an invented id would match no row and fail silently.
-      if (droneUuid == null || droneUuid.isEmpty) {
-        debugPrint('Delivery tick skipped: the drone id is unresolved.');
-        return;
-      }
-
-      if (!mounted) {
-        timer.cancel();
-        return;
-      }
-
-      final hub = _baseHubCoords;
-
-      for (final delivery in activeDeliveries) {
-        if (_completingDeliveryIds.contains(delivery.id) ||
-            delivery.status == DeliveryStatus.delivered ||
-            delivery.status == DeliveryStatus.cancelled) {
-          continue;
-        }
-
-        final vendorLoc = _pickupCoordinates(delivery);
-        final customerLoc = _dropoffCoordinates(delivery);
-
-        if (delivery.status == DeliveryStatus.assigning) {
-          // ── PHASE 1: PICKUP (Hub -> Vendor, EMPTY) ──
-          final distLeg1 = DroneFlightCalculator.calculateDistanceMeters(
-            startLat: hub.$1,
-            startLng: hub.$2,
-            endLat: vendorLoc.$1,
-            endLng: vendorLoc.$2,
-          );
-          final speedLeg1 = DroneFlightCalculator.calculateEffectiveSpeed(
-            isLoaded: false,
-            isCaution: isCaution,
-          );
-          final durationLeg1 = DroneFlightCalculator.calculateDurationSeconds(
-            distanceMeters: distLeg1,
-            effectiveSpeed: speedLeg1,
-          );
-          final stepLeg1 = DroneFlightCalculator.calculateProgressStep(
-            durationSeconds: durationLeg1,
-          );
-          final batteryDrainLeg1 = DroneFlightCalculator.calculateBatteryDrain(
-            isLoaded: false,
-            isCaution: isCaution,
-          );
-
-          if (delivery.progress >= 1.0) {
-            // Recovery case: already reached 1.0, confirm pickup immediately without sending telemetry
-            await _confirmPickup(
-              delivery: delivery,
-              vendorLoc: vendorLoc,
-              batteryLevel:
-                  _deliveryStartBatteries[delivery.id] ??
-                  delivery.batteryLevel ??
-                  92.0,
-            );
-          } else {
-            final currentLegProgress = delivery.progress.clamp(0.0, 1.0);
-            final newLegProgress = (currentLegProgress + stepLeg1).clamp(
-              0.0,
-              1.0,
-            );
-
-            final lat = hub.$1 + (vendorLoc.$1 - hub.$1) * newLegProgress;
-            final lng = hub.$2 + (vendorLoc.$2 - hub.$2) * newLegProgress;
-            final alt = newLegProgress > 0.85 ? 1.5 : 15.0;
-
-            final startBattery = _deliveryStartBatteries[delivery.id] ?? 98.0;
-            final newBattery =
-                (startBattery - (batteryDrainLeg1 * newLegProgress)).clamp(
-                  0.0,
-                  100.0,
-                );
-
-            _lastDeliveryIdForDrone[droneUuid] = delivery.id;
-            _leg3Origin[droneUuid] = (lat, lng);
-
-            if (newLegProgress >= 1.0) {
-              await _confirmPickup(
-                delivery: delivery,
-                vendorLoc: vendorLoc,
-                batteryLevel: newBattery,
-              );
-            } else {
-              if (SupabaseService.isConfigured) {
-                SupabaseService.client
-                    .rpc(
-                      'record_simulated_telemetry',
-                      params: {
-                        'p_delivery_id': delivery.id,
-                        'p_latitude': lat,
-                        'p_longitude': lng,
-                        'p_altitude': alt,
-                        'p_speed': speedLeg1,
-                        'p_battery_level': newBattery,
-                        'p_signal_strength': 98.0,
-                        'p_heading': 90.0,
-                        'p_event_type': 'traveling_to_pickup',
-                        'p_progress': newLegProgress,
-                      },
-                    )
-                    .catchError(
-                      (e) => debugPrint('Pickup telemetry RPC error: $e'),
-                    );
-
-                SupabaseService.client
-                    .from('drones')
-                    .update({'battery_level': newBattery})
-                    .eq('id', droneUuid)
-                    .catchError(
-                      (e) => debugPrint('Drone battery update error: $e'),
-                    );
-              }
-
-              state = state
-                  .map(
-                    (d) => d.id == delivery.id
-                        ? d.copyWith(
-                            progress: newLegProgress,
-                            currentLatitude: lat,
-                            currentLongitude: lng,
-                            currentAltitude: alt,
-                            currentSpeed: speedLeg1,
-                            batteryLevel: newBattery,
-                            estimatedDeliverySeconds: durationLeg1.round(),
-                          )
-                        : d,
-                  )
-                  .toList();
-            }
-          }
-        } else if (delivery.status == DeliveryStatus.inTransit &&
-            !(delivery.tripsCompleted > 0 &&
-                delivery.hasTripsRemaining &&
-                dronesList.any(
-                  (d) =>
-                      d.status == DroneStatus.returning ||
-                      d.status == DroneStatus.available,
-                ))) {
-          // ── PHASE 2: TRANSIT (Vendor -> Customer, LOADED) ──
-          // Skipped between trips of a multi-trip order: the delivery stays
-          // in_transit while the drone flies home to reload, and flying this
-          // leg then would complete a trip the drone never made.
-          final distLeg2 = DroneFlightCalculator.calculateDistanceMeters(
-            startLat: vendorLoc.$1,
-            startLng: vendorLoc.$2,
-            endLat: customerLoc.$1,
-            endLng: customerLoc.$2,
-          );
-          final speedLeg2 = DroneFlightCalculator.calculateEffectiveSpeed(
-            isLoaded: true,
-            payloadKg: delivery.packageWeight,
-            isCaution: isCaution,
-          );
-          final durationLeg2 = DroneFlightCalculator.calculateDurationSeconds(
-            distanceMeters: distLeg2,
-            effectiveSpeed: speedLeg2,
-          );
-          final stepLeg2 = DroneFlightCalculator.calculateProgressStep(
-            durationSeconds: durationLeg2,
-          );
-          final batteryDrainLeg2 = DroneFlightCalculator.calculateBatteryDrain(
-            isLoaded: true,
-            payloadKg: delivery.packageWeight,
-            isCaution: isCaution,
-          );
-
-          if (delivery.progress >= 1.0) {
-            // Recovery case: already reached 1.0, complete delivery immediately without sending telemetry
-            final fallbackStartBattery =
-                _deliveryStartBatteries[delivery.id] ??
-                (98.0 - batteryDrainLeg2);
-            final fallbackEndBattery = (fallbackStartBattery - batteryDrainLeg2)
-                .clamp(0.0, 100.0);
-            await _completeDelivery(
-              delivery: delivery,
-              customerLoc: customerLoc,
-              batteryLevel: delivery.batteryLevel ?? fallbackEndBattery,
-              droneUuid: droneUuid,
-            );
-          } else {
-            final currentLegProgress = delivery.progress.clamp(0.0, 1.0);
-            final newLegProgress = (currentLegProgress + stepLeg2).clamp(
-              0.0,
-              1.0,
-            );
-
-            final lat =
-                vendorLoc.$1 + (customerLoc.$1 - vendorLoc.$1) * newLegProgress;
-            final lng =
-                vendorLoc.$2 + (customerLoc.$2 - vendorLoc.$2) * newLegProgress;
-            final alt = newLegProgress > 0.85 ? 0.5 : 15.0;
-
-            final startBattery =
-                _deliveryStartBatteries[delivery.id] ??
-                (98.0 - batteryDrainLeg2);
-            final newBattery =
-                (startBattery - (batteryDrainLeg2 * newLegProgress)).clamp(
-                  0.0,
-                  100.0,
-                );
-
-            final remainingSecs =
-                DroneFlightCalculator.calculateRemainingSeconds(
-                  progress: newLegProgress,
-                  totalDurationSeconds: durationLeg2,
-                );
-            final etaStr = DroneFlightCalculator.formatEta(remainingSecs);
-
-            _lastDeliveryIdForDrone[droneUuid] = delivery.id;
-            _leg3Origin[droneUuid] = (lat, lng);
-
-            if (newLegProgress >= 1.0) {
-              await _completeDelivery(
-                delivery: delivery,
-                customerLoc: customerLoc,
-                batteryLevel: newBattery,
-                droneUuid: droneUuid,
-              );
-            } else {
-              // Only send in-flight telemetry while still active and uncompleted (newLegProgress < 1.0)
-              if (SupabaseService.isConfigured &&
-                  !_completingDeliveryIds.contains(delivery.id)) {
-                SupabaseService.client
-                    .rpc(
-                      'record_simulated_telemetry',
-                      params: {
-                        'p_delivery_id': delivery.id,
-                        'p_latitude': lat,
-                        'p_longitude': lng,
-                        'p_altitude': alt,
-                        'p_speed': speedLeg2,
-                        'p_battery_level': newBattery,
-                        'p_signal_strength': 98.0,
-                        'p_heading': 90.0,
-                        'p_event_type': 'in_flight',
-                        'p_progress': newLegProgress,
-                      },
-                    )
-                    .catchError(
-                      (e) => debugPrint('Transit telemetry RPC error: $e'),
-                    );
-
-                SupabaseService.client
-                    .from('drones')
-                    .update({'battery_level': newBattery})
-                    .eq('id', droneUuid)
-                    .catchError(
-                      (e) => debugPrint('Drone battery update error: $e'),
-                    );
-              }
-
-              state = state
-                  .map(
-                    (d) => d.id == delivery.id
-                        ? d.copyWith(
-                            progress: newLegProgress,
-                            currentLatitude: lat,
-                            currentLongitude: lng,
-                            currentAltitude: alt,
-                            currentSpeed: speedLeg2,
-                            batteryLevel: newBattery,
-                            estimatedDeliverySeconds: durationLeg2.round(),
-                            eta: etaStr,
-                          )
-                        : d,
-                  )
-                  .toList();
-            }
-          }
-        }
-      }
-
-      // ── PHASE 3: LEG 3 DRIVER (Customer/Aborted Position -> Base Hub, EMPTY) ──
-      // Between trips of a multi-trip order the destination is the vendor
-      // instead: Customer -> Vendor, then the next trip's pickup.
-      if (returningDrone != null) {
-        final dUuid = returningDrone.dbId.isNotEmpty
-            ? returningDrone.dbId
-            : droneUuid;
-        String? deliveryIdForTelemetry = _lastDeliveryIdForDrone[dUuid];
-
-        // A multi-trip delivery between trips is the flight in progress
-        deliveryIdForTelemetry ??= state
-            .where(
-              (d) =>
-                  d.droneId != null &&
-                  d.status == DeliveryStatus.inTransit &&
-                  d.tripsCompleted > 0 &&
-                  d.hasTripsRemaining,
-            )
-            .firstOrNull
-            ?.id;
-
-        if (deliveryIdForTelemetry == null) {
-          // Find the most recently updated delivery for THIS drone with status 'delivered' OR 'cancelled'
-          final matchingDeliveries = state.where((d) {
-            final matchesDrone =
-                d.droneId == dUuid ||
-                d.droneId == returningDrone.id ||
-                d.droneId == returningDrone.dbId ||
-                d.droneId == returningDrone.name ||
-                d.droneId == 'DRN-001';
-            final isDeliveredOrCancelled =
-                d.status == DeliveryStatus.delivered ||
-                d.status == DeliveryStatus.cancelled;
-            return matchesDrone && isDeliveredOrCancelled;
-          }).toList();
-
-          if (matchingDeliveries.isNotEmpty) {
-            matchingDeliveries.sort((a, b) {
-              final timeA = a.deliveredAt ?? a.createdAt;
-              final timeB = b.deliveredAt ?? b.createdAt;
-              return timeB.compareTo(timeA);
-            });
-            deliveryIdForTelemetry = matchingDeliveries.first.id;
-          } else if (SupabaseService.isConfigured) {
-            try {
-              final res = await SupabaseService.client
-                  .from('deliveries')
-                  .select('id')
-                  .eq('drone_id', dUuid)
-                  .inFilter('status', ['delivered', 'cancelled'])
-                  .order('updated_at', ascending: false)
-                  .limit(1)
-                  .maybeSingle();
-              if (res != null) {
-                deliveryIdForTelemetry = res['id']?.toString();
-              }
-            } catch (_) {}
-          }
-        }
-
-        // If none is found, skip writing telemetry this tick.
-        if (deliveryIdForTelemetry == null) return;
-
-        // Check if current user is authorized to write telemetry for this delivery
-        final authUser = ref.read(authProvider).user;
-        final isAdmin = authUser?.role == 'admin';
-        final isCustomer = ref
-            .read(orderProvider)
-            .orders
-            .any(
-              (o) =>
-                  o.deliveryId == deliveryIdForTelemetry ||
-                  o.id == deliveryIdForTelemetry,
-            );
-        final isVendor = ref
-            .read(vendorOrdersProvider)
-            .orders
-            .any(
-              (o) =>
-                  o.deliveryId == deliveryIdForTelemetry ||
-                  o.id == deliveryIdForTelemetry,
-            );
-
-        final isAuthorized = isAdmin || isCustomer || isVendor;
-
-        final lastFailure = _leaseWriteFailures[dUuid];
-        final isBackoffActive =
-            lastFailure != null &&
-            DateTime.now().difference(lastFailure).inSeconds < 15;
-
-        bool hasLease = false;
-        // Only try to claim/renew lease if authorized and not in 15s failure backoff
-        if (isAuthorized && !isBackoffActive && SupabaseService.isConfigured) {
-          try {
-            final leaseRes = await SupabaseService.client.rpc(
-              'claim_drone_sim_lease',
-              params: {'p_drone_id': dUuid},
-            );
-            hasLease = leaseRes == true;
-          } catch (e) {
-            debugPrint('claim_drone_sim_lease RPC error: $e');
-          }
-        }
-
-        if (hasLease) {
-          final shuttleDelivery = state
-              .where(
-                (d) =>
-                    d.id == deliveryIdForTelemetry &&
-                    d.status == DeliveryStatus.inTransit &&
-                    d.tripsCompleted > 0 &&
-                    d.hasTripsRemaining,
-              )
-              .firstOrNull;
-          final destination = shuttleDelivery != null
-              ? _pickupCoordinates(shuttleDelivery)
-              : hub;
-
-          final leg3Start =
-              _leg3Origin[dUuid] ??
-              (returningDrone.currentCoordinates.contains(',')
-                  ? (
-                      double.tryParse(
-                            returningDrone.currentCoordinates
-                                .split(',')[0]
-                                .trim(),
-                          ) ??
-                          10.325210,
-                      double.tryParse(
-                            returningDrone.currentCoordinates
-                                .split(',')[1]
-                                .trim(),
-                          ) ??
-                          123.953201,
-                    )
-                  : (10.325210, 123.953201));
-
-          final distLeg3 = DroneFlightCalculator.calculateDistanceMeters(
-            startLat: leg3Start.$1,
-            startLng: leg3Start.$2,
-            endLat: destination.$1,
-            endLng: destination.$2,
-          );
-          final speedLeg3 = DroneFlightCalculator.calculateEffectiveSpeed(
-            isLoaded: false,
-            isCaution: isCaution,
-          );
-          final durationLeg3 = DroneFlightCalculator.calculateDurationSeconds(
-            distanceMeters: distLeg3,
-            effectiveSpeed: speedLeg3,
-          );
-          final stepLeg3 = DroneFlightCalculator.calculateProgressStep(
-            durationSeconds: durationLeg3,
-          );
-          final batteryDrainLeg3 = DroneFlightCalculator.calculateBatteryDrain(
-            isLoaded: false,
-            isCaution: isCaution,
-          );
-
-          final currentLeg3Progress = (_leg3Progress[dUuid] ?? 0.0).clamp(
-            0.0,
-            1.0,
-          );
-          final newLeg3Progress = (currentLeg3Progress + stepLeg3).clamp(
-            0.0,
-            1.0,
-          );
-          _leg3Progress[dUuid] = newLeg3Progress;
-
-          final lat =
-              leg3Start.$1 + (destination.$1 - leg3Start.$1) * newLeg3Progress;
-          final lng =
-              leg3Start.$2 + (destination.$2 - leg3Start.$2) * newLeg3Progress;
-          final alt = newLeg3Progress > 0.85 ? 0.0 : 15.0;
-
-          final startBattery =
-              _leg3StartBatteries[dUuid] ?? returningDrone.batteryLevel;
-          if (!_leg3StartBatteries.containsKey(dUuid)) {
-            _leg3StartBatteries[dUuid] = startBattery;
-          }
-          final newBattery =
-              (startBattery - (batteryDrainLeg3 * newLeg3Progress)).clamp(
-                0.0,
-                100.0,
-              );
-
-          if (SupabaseService.isConfigured) {
-            try {
-              await SupabaseService.client.rpc(
-                'record_simulated_telemetry',
-                params: {
-                  'p_delivery_id': deliveryIdForTelemetry,
-                  'p_latitude': lat,
-                  'p_longitude': lng,
-                  'p_altitude': alt,
-                  'p_speed': speedLeg3,
-                  'p_battery_level': newBattery,
-                  'p_signal_strength': 98.0,
-                  'p_heading': 270.0,
-                  'p_event_type': 'returning_to_base',
-                  // No progress: between trips of a multi-trip order the
-                  // delivery is still in_transit, and the server would
-                  // record this return leg as its delivery progress.
-                  'p_progress': null,
-                },
-              );
-              // Telemetry write succeeded: clear failure backoff
-              _leaseWriteFailures.remove(dUuid);
-            } catch (e) {
-              debugPrint('Leg 3 telemetry RPC error: $e');
-              // Record failure time: stop renewing lease for 15s to allow other clients or safety net to take over
-              _leaseWriteFailures[dUuid] = DateTime.now();
-            }
-
-            SupabaseService.client
-                .from('drones')
-                .update({'battery_level': newBattery})
-                .eq('id', dUuid)
-                .catchError(
-                  (e) => debugPrint('Drone battery update error: $e'),
-                );
-          }
-
-          ref
-              .read(droneProvider.notifier)
-              .updateBattery(returningDrone.id, newBattery);
-
-          if (newLeg3Progress >= 1.0) {
-            // Drone arrived back at Campus Base Hub, or at the vendor between trips
-            _completingReturnDroneIds.add(dUuid);
-            _completingReturnDroneIds.add(returningDrone.id);
-            _leg3Progress.remove(dUuid);
-            _leg3Origin.remove(dUuid);
-            _lastDeliveryIdForDrone.remove(dUuid);
-            _leaseWriteFailures.remove(dUuid);
-            _leg3StartBatteries.remove(dUuid);
-
-            if (shuttleDelivery != null) {
-              await _arriveAtVendorForNextTrip(
-                delivery: shuttleDelivery,
-                vendorLoc: destination,
-                batteryLevel: newBattery,
-                droneId: returningDrone.id,
-                droneUuid: dUuid,
-              );
-            } else {
-              // Optimistically set available status so display updates and no more leg 3 ticks write
-              ref
-                  .read(droneProvider.notifier)
-                  .updateStatus(returningDrone.id, DroneStatus.available);
-
-              if (SupabaseService.isConfigured) {
-                try {
-                  await SupabaseService.client.rpc(
-                    'complete_drone_return',
-                    params: {'p_drone_id': dUuid},
-                  );
-                } catch (e) {
-                  debugPrint('complete_drone_return RPC error: $e');
-                }
-              }
-            }
-
-            try {
-              ref.read(droneProvider.notifier).loadDronesFromSupabase();
-              ref.read(orderProvider.notifier).loadOrders();
-              ref.read(vendorOrdersProvider.notifier).loadOrders();
-              loadDeliveriesFromSupabase();
-            } catch (_) {}
-          }
-        }
-      }
-    });
   }
 
   void updateDeliveryStatus(
@@ -1677,9 +823,6 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
         return 'Drone battery is too low. Please recharge the drone before accepting deliveries.';
       }
 
-      // Record battery level at start for progress-based drain simulation
-      _deliveryStartBatteries[deliveryId] = droneBattery;
-
       final nowStr = DateTime.now().toUtc().toIso8601String();
 
       final existingDel = state.where((d) => d.id == deliveryId).firstOrNull;
@@ -1724,10 +867,12 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
 
       final updatedResponse = await SupabaseService.client
           .from('deliveries')
+          // Assigned, not flying: the delivery waits in 'assigning' until
+          // the operator sends it to the drone (python_script/aio.py), and
+          // the bridge moves it to in_transit after takeoff.
           .update({
-            'status': 'in_transit',
+            'status': 'assigning',
             'drone_id': droneUuid,
-            'delivery_started_at': nowStr,
             'estimated_delivery_seconds': estimatedSecs,
             'progress': 0.0,
             'updated_at': nowStr,
@@ -1747,13 +892,8 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
 
       await SupabaseService.client
           .from('drones')
-          .update({'status': 'busy'})
+          .update({'status': 'assigned'})
           .eq('id', droneUuid);
-
-      await _insertFirstTelemetry(
-        deliveryId: deliveryId,
-        batteryLevel: droneBattery,
-      );
 
       await _insertStatusLog(
         deliveryId: deliveryId,
@@ -1761,15 +901,9 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
         message: 'Delivery request accepted by admin.',
       );
 
-      await _insertStatusLog(
-        deliveryId: deliveryId,
-        status: 'in_transit',
-        message: 'Delivery is now in transit.',
-      );
-
       ref
           .read(droneProvider.notifier)
-          .updateStatus('DRN-001', DroneStatus.busy);
+          .updateStatus('DRN-001', DroneStatus.assigned);
 
       final updatedDelivery = _mapToDeliveryModel(
         Map<String, dynamic>.from(updatedResponse),

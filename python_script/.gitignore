@@ -1,0 +1,3 @@
+# Supabase login for the bridge (never commit this file)
+bridge.env
+__pycache__/

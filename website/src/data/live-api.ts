@@ -1,9 +1,7 @@
 import { isAdminEmail, supabase } from '@/lib/config'
 import type { Delivery, Order, OrderItem, Product, Profile, SupportMessage, SupportReport, Vendor, Weather } from '@/types'
 import { SUPPORT_MAX_PHOTOS, SUPPORT_MESSAGE_MAX } from '@/lib/constants'
-import { DEFAULT_HUB, type Coords } from '@/lib/flight-calc'
-import { PINNED_DROPOFF_NAME } from '@/lib/flight'
-import type { Api, DeliveryZone, EmailCheck, SimDelivery, Telemetry } from './api'
+import type { Api, DeliveryZone, EmailCheck, Telemetry } from './api'
 import { authMessage, authOk, EmailNotVerifiedError, EmailRejectedError, isAlreadyRegistered, isRateLimited } from './auth-errors'
 
 // Supabase implementation of Api. Every call mirrors what the Flutter app does
@@ -109,12 +107,6 @@ async function uid() {
   if (!data.user) throw new Error('Your session has ended. Please sign in again.')
   return data.user.id
 }
-
-// The simulator's delivery select (DeliveryNotifier.loadDeliveriesFromSupabase).
-const SIM_SELECT = `*,
-  pickup_loc:campus_locations!pickup_location_id(id, name, latitude, longitude),
-  dropoff_loc:campus_locations!dropoff_location_id(id, name, latitude, longitude),
-  orders!order_id(*, vendor:users!vendor_id(full_name, business_name), campus_locations!delivery_location_id(name, latitude, longitude), order_items(product_name, quantity, weight_grams))`
 
 async function hydrate(rows: OrderRow[], viewer: Profile): Promise<Order[]> {
   if (!rows.length) return []
@@ -752,102 +744,6 @@ export const liveApi: Api = {
   async safetyChecks() {
     const res = await sb().from('delivery_safety_checks').select('*').order('checked_at', { ascending: false }).limit(10)
     return res.error ? null : (res.data as Record<string, unknown>[])
-  },
-
-  // ── Flight simulator primitives: the same calls DeliveryNotifier makes ──
-  async simDeliveries() {
-    const viewer = await me()
-    const data = rows<Record<string, any>>(await sb().from('deliveries').select(SIM_SELECT).order('created_at', { ascending: false }).limit(200))
-    return data
-      .filter((d) => {
-        const o = d.orders
-        if (viewer.role === 'admin') return true
-        if (!o) return false
-        return viewer.role === 'vendor' ? o.vendor_id === viewer.id : o.user_id === viewer.id
-      })
-      .map((d): SimDelivery => {
-        const o = d.orders ?? {}
-        const items = (o.order_items ?? []) as { weight_grams?: number; quantity?: number }[]
-        const grams = items.reduce((s, i) => s + (i.weight_grams ?? 0) * (i.quantity ?? 1), 0)
-        const sender = o.vendor?.business_name ?? o.vendor?.full_name ?? 'Vendor Shop'
-        // DeliveryNotifier: a pinned drop-off's point is on the delivery, else on the order.
-        const pinLat = d.custom_dropoff_lat ?? o.custom_dropoff_lat
-        const pinLng = d.custom_dropoff_lng ?? o.custom_dropoff_lng
-        const coords = (lat: unknown, lng: unknown): [number, number] | null =>
-          lat != null && lng != null && Number.isFinite(Number(lat)) && Number.isFinite(Number(lng)) ? [Number(lat), Number(lng)] : null
-        const pin = coords(pinLat, pinLng)
-        // The location rows' own coordinates, so a building moved in the
-        // database moves the flight with no code change
-        const dropoffRow = d.dropoff_loc ?? o.campus_locations
-        return {
-          id: String(d.id),
-          order_id: String(d.order_id ?? o.id),
-          status: d.status,
-          progress: d.status === 'delivered' ? 1 : Math.min(1, Math.max(0, Number(d.progress ?? 0))),
-          drone_id: d.drone_id ?? null,
-          trips_required: Number(d.trips_required ?? 1),
-          trips_completed: Number(d.trips_completed ?? 0),
-          pickup_name: d.pickup_loc?.name ?? sender,
-          dropoff_name: d.dropoff_loc?.name ?? o.campus_locations?.name ?? (pin ? (o.custom_dropoff_label?.trim() || PINNED_DROPOFF_NAME) : 'UCLM Campus'),
-          pickup_coords: coords(d.pickup_loc?.latitude, d.pickup_loc?.longitude),
-          dropoff_coords: pin ?? coords(dropoffRow?.latitude, dropoffRow?.longitude),
-          payload_kg: grams / 1000,
-          delivered_at: d.delivery_completed_at ?? null,
-          created_at: d.created_at,
-        }
-      })
-  },
-  async hubCoords(): Promise<Coords> {
-    const row = ok(await sb().from('campus_locations').select('latitude, longitude').eq('location_code', 'BASE-HUB').maybeSingle()) as { latitude: number | null; longitude: number | null } | null
-    return row?.latitude != null && row?.longitude != null ? [row.latitude, row.longitude] : DEFAULT_HUB
-  },
-  async recordTelemetry(t) {
-    ok(
-      await sb().rpc('record_simulated_telemetry', {
-        p_delivery_id: t.deliveryId,
-        p_latitude: t.latitude,
-        p_longitude: t.longitude,
-        p_altitude: t.altitude,
-        p_speed: t.speed,
-        p_battery_level: t.battery,
-        p_signal_strength: t.signal,
-        p_heading: t.heading,
-        p_event_type: t.event,
-        p_progress: t.progress,
-      }),
-    )
-  },
-  async setDroneBattery(droneId, battery) {
-    ok(await sb().from('drones').update({ battery_level: battery }).eq('id', droneId))
-  },
-  async setDroneStatus(droneId, status) {
-    ok(await sb().from('drones').update({ status, updated_at: nowIso() }).eq('id', droneId))
-  },
-  async confirmPickup(deliveryId) {
-    ok(await sb().rpc('confirm_package_pickup', { p_delivery_id: deliveryId }))
-  },
-  async completeDelivery(deliveryId) {
-    ok(await sb().rpc('complete_delivery_order', { p_delivery_id: deliveryId }))
-  },
-  async arriveAtVendorForNextTrip(deliveryId) {
-    ok(await sb().rpc('arrive_at_vendor_for_next_trip', { p_delivery_id: deliveryId }))
-  },
-  async completeDroneReturn(droneId) {
-    ok(await sb().rpc('complete_drone_return', { p_drone_id: droneId }))
-  },
-  async claimSimLease(droneId) {
-    const res = await sb().rpc('claim_drone_sim_lease', { p_drone_id: droneId })
-    return !res.error && res.data === true
-  },
-  async lastFinishedDeliveryForDrone(droneId) {
-    const row = ok(
-      await sb().from('deliveries').select('id').eq('drone_id', droneId).in('status', ['delivered', 'cancelled']).order('updated_at', { ascending: false }).limit(1).maybeSingle(),
-    ) as { id: string } | null
-    return row?.id ?? null
-  },
-  async recoverStaleReturningDrone(droneId) {
-    const res = await sb().rpc('recover_stale_returning_drone', { p_drone_id: droneId })
-    return !res.error && (res.data as { recovered?: boolean } | null)?.recovered === true
   },
 
   // ── Realtime: the tables the app's channels listen to ──────────────────

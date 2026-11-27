@@ -202,7 +202,7 @@ describe('Test Case ID: INT-014', () => {
 describe('Test Case ID: INT-015', () => {
   test('Drone Dispatch -> Delivery Tracking | DRN-001 flies to Kape Kanto and picks up the package | Pickup is confirmed, telemetry is recorded and Track shows the drone in flight to the Maritime Building', async () => {
     const id = await dispatchedOrder()
-    await fly(() => delivery(id).status === 'in_transit' && delivery(id).progress > 0.2)
+    await fly(id, () => delivery(id).status === 'in_transit' && delivery(id).progress > 0.2)
     expect(db.current.telemetry.length).toBeGreaterThan(0)
     expect(db.current.logs.some((l) => l.status === 'in_transit')).toBe(true)
 
@@ -215,7 +215,7 @@ describe('Test Case ID: INT-015', () => {
 describe('Test Case ID: INT-016', () => {
   test('Delivery Tracking -> Orders | DRN-001 reaches the Maritime Building | The delivery is completed, the order shows Delivered and the customer receives "Order Delivered"', async () => {
     const id = await dispatchedOrder()
-    await fly(() => delivery(id).status === 'delivered')
+    await fly(id, () => delivery(id).status === 'delivered')
     expect(order(id).order_status).toBe('delivered')
 
     openAs('maria', `/user/orders/${id}`)
@@ -228,7 +228,7 @@ describe('Test Case ID: INT-016', () => {
 describe('Test Case ID: INT-017', () => {
   test('Delivery -> Drone Fleet | DRN-001 completes the delivery and flies back to the hub | The drone is Available again on the admin Drones page', async () => {
     const id = await dispatchedOrder()
-    await fly(() => delivery(id).status === 'delivered' && db.current.drones[0]!.status === 'available')
+    await fly(id, () => delivery(id).status === 'delivered' && db.current.drones[0]!.status === 'available')
 
     openAs('admin', '/admin/drones')
     expect(await screen.findByText('DRN-001', {}, T)).toBeInTheDocument()
@@ -239,7 +239,7 @@ describe('Test Case ID: INT-017', () => {
 describe('Test Case ID: INT-018', () => {
   test('Orders -> Ratings -> Store Page | Customer rates the delivered Kape Kanto order 5 stars with a comment | The review appears on the Kape Kanto store page with the customer name', async () => {
     const id = await dispatchedOrder()
-    await fly(() => delivery(id).status === 'delivered')
+    await fly(id, () => delivery(id).status === 'delivered')
     openAs('maria', `/user/orders/${id}`)
     fireEvent.click(await screen.findByRole('button', { name: /Rate this order/ }, T))
     const dialog = await screen.findByRole('dialog', {}, T)

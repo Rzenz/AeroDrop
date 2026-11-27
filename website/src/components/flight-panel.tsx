@@ -20,7 +20,7 @@ const phaseCopy: Record<Phase, string> = {
 /**
  * Live map and flight stats for one order's delivery. Uses the app's leg
  * model: deliveries.progress is the current leg, and the drone sits where
- * its latest telemetry says (written by whichever client runs the simulator).
+ * its latest telemetry says (written by the ground-station bridge, python_script/aio.py).
  */
 export function FlightPanel({ order, mapClassName = 'h-80' }: { order: Order; mapClassName?: string }) {
   const locations = useQuery(() => api.locations())

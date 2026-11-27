@@ -83,7 +83,7 @@ export default function About() {
                   <CheckCircle2 aria-hidden className="size-5 text-success" /> Real
                 </h3>
                 <ul className="mt-3 space-y-1.5 text-sm text-ink-2">
-                  {['Campus weather from Open-Meteo', 'Campus coordinates and maps', 'Sign-in with emailed codes', 'Order chat and notifications', 'Online payments through Xendit', 'Reviews and every stored record'].map((x) => <li key={x}>{x}</li>)}
+                  {['Campus weather from Open-Meteo', 'Campus coordinates and maps', 'Sign-in with emailed codes', 'Order chat and notifications', 'Online payments through Xendit', 'Drone flight and live telemetry from the flight controller', 'Reviews and every stored record'].map((x) => <li key={x}>{x}</li>)}
                 </ul>
               </Reveal>
               <Reveal delay={0.06} className="rounded-2xl bg-surface p-5 shadow-sm">
@@ -91,7 +91,7 @@ export default function About() {
                   <FlaskConical aria-hidden className="size-5 text-warning" /> Simulated
                 </h3>
                 <ul className="mt-3 space-y-1.5 text-sm text-ink-2">
-                  {['Drone flight and telemetry', 'Simulated GCash and card payments', 'Refunds on cancelled orders'].map((x) => <li key={x}>{x}</li>)}
+                  {['Simulated GCash and card payments', 'Refunds on cancelled orders'].map((x) => <li key={x}>{x}</li>)}
                 </ul>
               </Reveal>
             </div>

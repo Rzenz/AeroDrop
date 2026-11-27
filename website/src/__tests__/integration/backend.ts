@@ -7,7 +7,21 @@
 // modules read and write the same store, so a change made in one module can
 // be checked in the next one, as a different signed-in user if needed.
 import { vi } from 'vitest'
-import type { Api, PlaceOrderInput, ProductInput, SimDelivery, TelemetryInput } from '@/data/api'
+import type { Api, PlaceOrderInput, ProductInput } from '@/data/api'
+
+/** A row the ground-station bridge writes with record_drone_telemetry. */
+export interface TelemetryInput {
+  deliveryId: string
+  latitude: number
+  longitude: number
+  altitude: number
+  speed: number
+  battery: number
+  signal: number
+  heading: number
+  event: 'standby' | 'in_flight' | 'returning_to_base'
+  progress: number | null
+}
 import type {
   AppNotification, CampusLocation, Delivery, Drone, NoFlyZone, Order, OrderMessage, Product, Profile, StatusLog, SupportMessage, SupportReport, Weather,
 } from '@/types'
@@ -99,11 +113,6 @@ const visibleOrders = (d: Db) => {
   return d.orders.filter((o) => v.role === 'admin' || (v.role === 'vendor' ? o.vendor_id === v.id : o.user_id === v.id))
 }
 const locName = (d: Db, id: string | null) => d.locations.find((l) => l.id === id)?.name ?? null
-// The row's own coordinates, as the live simDeliveries returns them
-const locCoords = (d: Db, id: string | null): [number, number] | null => {
-  const l = d.locations.find((x) => x.id === id)
-  return l ? [l.latitude, l.longitude] : null
-}
 
 const impl: Partial<Api> = {
   // ---------- Auth
@@ -126,7 +135,6 @@ const impl: Partial<Api> = {
   // ---------- Catalog
   async locations() { return db.current.locations },
   async weather() { return db.current.weather },
-  async hubCoords() { const h = db.current.locations.find((l) => l.location_code === 'BASE-HUB')!; return [h.latitude, h.longitude] },
   async deliveryZone() { return null },
   async vendors() {
     const d = db.current
@@ -326,32 +334,23 @@ const impl: Partial<Api> = {
   async saveZone(zone) { const d = db.current; if (zone.id) Object.assign(d.zones.find((z) => z.id === zone.id)!, zone); else d.zones.push({ ...zone, id: uid('zone') } as NoFlyZone) },
   async deleteZone(id) { const d = db.current; d.zones = d.zones.filter((z) => z.id !== id) },
 
-  // ---------- Drone flight
-  async simDeliveries() {
-    const d = db.current
-    const v = me(d)
-    return d.deliveries.filter((dl) => {
-      const o = d.orders.find((x) => x.id === dl.order_id)!
-      return v.role === 'admin' || (v.role === 'vendor' ? o.vendor_id === v.id : o.user_id === v.id)
-    }).map((dl): SimDelivery => {
-      const o = d.orders.find((x) => x.id === dl.order_id)!
-      return {
-        id: dl.id, order_id: dl.order_id, status: dl.status, progress: dl.progress, drone_id: dl.drone_id, trips_required: dl.trips_required, trips_completed: dl.trips_completed,
-        pickup_name: locName(d, dl.pickup_location_id), dropoff_name: locName(d, dl.dropoff_location_id),
-        pickup_coords: locCoords(d, dl.pickup_location_id), dropoff_coords: locCoords(d, dl.dropoff_location_id),
-        payload_kg: o.items.reduce((s, i) => s + i.weight_grams * i.quantity, 0) / 1000, delivered_at: dl.delivery_completed_at, created_at: dl.created_at,
-      }
-    })
-  },
-  async recordTelemetry(t) {
+  subscribeChanges() { return () => {} },
+}
+
+/**
+ * What the ground-station bridge (python_script/aio.py) does to the database
+ * while it flies a delivery, signed in as the admin: telemetry rows, then
+ * confirm_package_pickup after takeoff, complete_delivery_order after the
+ * drop and complete_drone_return after landing. The pages never call these.
+ */
+export const bridge = {
+  async recordTelemetry(t: TelemetryInput) {
     const d = db.current
     const dl = d.deliveries.find((x) => x.id === t.deliveryId)!
     d.telemetry.unshift({ ...t, recorded_at: now(), drone_id: dl.drone_id })
     if (t.progress != null) dl.progress = t.progress
   },
-  async setDroneBattery(id, battery) { db.current.drones.find((x) => x.id === id)!.battery_level = battery },
-  async setDroneStatus(id, status) { db.current.drones.find((x) => x.id === id)!.status = status },
-  async confirmPickup(deliveryId) {
+  async confirmPickup(deliveryId: string) {
     const d = db.current
     const dl = d.deliveries.find((x) => x.id === deliveryId)!
     const o = d.orders.find((x) => x.id === dl.order_id)!
@@ -361,22 +360,20 @@ const impl: Partial<Api> = {
     log(d, dl.id, 'in_transit', 'Package picked up. Drone is flying to the drop-off point.')
     notify(d, o.user_id!, 'Package Picked Up', 'The drone has picked up your order and is on its way.', 'package_picked_up', { order_id: o.id, delivery_id: dl.id })
   },
-  async completeDelivery(deliveryId) {
+  async completeDelivery(deliveryId: string) {
     const d = db.current
     const dl = d.deliveries.find((x) => x.id === deliveryId)!
     const o = d.orders.find((x) => x.id === dl.order_id)!
     Object.assign(dl, { status: 'delivered', progress: 1, trips_completed: dl.trips_required, delivery_completed_at: now() })
     o.order_status = 'delivered'
+    d.drones.find((x) => x.id === dl.drone_id)!.status = 'returning'
     log(d, dl.id, 'delivered', `Package delivered to ${locName(d, dl.dropoff_location_id)}.`)
     notify(d, o.user_id!, 'Order Delivered', `Your package has arrived at ${locName(d, dl.dropoff_location_id)}.`, 'order_delivered', { order_id: o.id, delivery_id: dl.id })
     notify(d, o.vendor_id!, 'Order Delivered', `The order for ${d.users.find((u) => u.id === o.user_id)?.full_name} was delivered.`, 'order_delivered', { order_id: o.id, delivery_id: dl.id })
   },
-  async arriveAtVendorForNextTrip() {},
-  async completeDroneReturn(droneId) { db.current.drones.find((x) => x.id === droneId)!.status = 'available' },
-  async claimSimLease() { return true },
-  async lastFinishedDeliveryForDrone() { return null },
-  async recoverStaleReturningDrone() { return false },
-  subscribeChanges() { return () => {} },
+  async completeDroneReturn(droneId: string) {
+    db.current.drones.find((x) => x.id === droneId)!.status = 'available'
+  },
 }
 
 /** The api object the pages import: the functions above as spies; anything else resolves to []. */

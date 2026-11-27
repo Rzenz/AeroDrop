@@ -1,11 +1,10 @@
 // Steps shared by the integration cases: open a page as a user, set up the
-// pre-condition through the same backend calls the pages make, and run the
-// drone flight module (lib/flight-sim.ts) until a delivery reaches a state.
+// pre-condition through the same backend calls the pages make, and play the
+// ground-station bridge's part (python_script/aio.py) until a delivery reaches
+// a state.
 import { fireEvent, screen } from '@testing-library/react'
-import { vi } from 'vitest'
-import { startFlightSimulator } from '@/lib/flight-sim'
 import { renderApp } from './app'
-import { backendApi as api, db, signInAs, type Db } from './backend'
+import { backendApi as api, bridge, db, signInAs, type Db } from './backend'
 
 export { api, db }
 
@@ -54,18 +53,31 @@ export async function dispatchedOrder() {
   return id
 }
 
-/** Runs the drone flight module, 3 s per tick, until [done] holds. */
-export async function fly(done: (d: Db) => boolean, maxTicks = 600) {
-  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'setTimeout', 'clearTimeout', 'Date'] })
-  const prev = db.current.session
-  db.current.session = 'admin'
-  const flight = startFlightSimulator(api, 'admin', () => {})
-  try {
-    for (let i = 0; i < maxTicks && !done(db.current); i++) await vi.advanceTimersByTimeAsync(3000)
-  } finally {
-    flight.stop()
-    db.current.session = prev
-    vi.useRealTimers()
+/**
+ * Flies the dispatched delivery of [orderId] the way the bridge does, one
+ * step at a time, until [done] holds: standby telemetry at the hub, takeoff
+ * (confirm_package_pickup), in-flight telemetry towards the drop-off, the drop
+ * (complete_delivery_order), the return leg, and landing (complete_drone_return).
+ */
+export async function fly(orderId: string, done: (d: Db) => boolean) {
+  const d = db.current
+  const dl = delivery(orderId)
+  const hub = d.locations.find((l) => l.location_code === 'BASE-HUB')!
+  const drop = d.locations.find((l) => l.id === dl.dropoff_location_id)!
+  const at = (f: number) => ({ latitude: hub.latitude + (drop.latitude - hub.latitude) * f, longitude: hub.longitude + (drop.longitude - hub.longitude) * f })
+  const point = (f: number, event: 'standby' | 'in_flight' | 'returning_to_base', progress: number | null) =>
+    bridge.recordTelemetry({ deliveryId: dl.id, ...at(f), altitude: event === 'standby' ? 0 : 20, speed: event === 'standby' ? 0 : 5, battery: 90, signal: 98, heading: 45, event, progress })
+  const steps: (() => Promise<void>)[] = [
+    () => point(0, 'standby', 0),
+    () => bridge.confirmPickup(dl.id),
+    ...[0.25, 0.5, 0.75, 1].map((f) => () => point(f, 'in_flight', f)),
+    () => bridge.completeDelivery(dl.id),
+    ...[0.5, 0].map((f) => () => point(f, 'returning_to_base', null)),
+    () => bridge.completeDroneReturn(dl.drone_id!),
+  ]
+  for (const step of steps) {
+    if (done(db.current)) return
+    await step()
   }
   if (!done(db.current)) throw new Error('The flight did not reach the expected state.')
 }

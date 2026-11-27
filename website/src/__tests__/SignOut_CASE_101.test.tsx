@@ -10,7 +10,7 @@ vi.mock('@/auth/auth', async () => {
 })
 vi.mock('@/data/api', async () => ({ ...(await import('@/data/auth-errors')), api: (await import('./helpers')).fakeApi({ subscribeChanges: vi.fn(() => () => {}) }) }))
 // The portal's background drone simulator is not part of this case.
-vi.mock('@/lib/flight-sim', () => ({ startFlightSimulator: () => ({ stop: () => {} }), markOrderReadyAndDispatch: vi.fn() }))
+vi.mock('@/lib/dispatch', () => ({ markOrderReadyAndDispatch: vi.fn() }))
 // The sidebar logo reads the app config, which needs the live Supabase keys; the test needs none of it.
 vi.mock('@/lib/config', () => ({ supabase: {}, PLAY_STORE_URL: null, isAdminEmail: () => false }))
 

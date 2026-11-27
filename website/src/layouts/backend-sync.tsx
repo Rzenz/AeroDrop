@@ -5,13 +5,11 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth, useMe } from '@/auth/auth'
 import { Button } from '@/components/ui/button'
 import { api } from '@/data/api'
-import { startFlightSimulator } from '@/lib/flight-sim'
 import { invalidateSoon } from '@/lib/store'
 import type { AccountStatus, Role } from '@/types'
 
 /**
  * The background work the app's shells and providers do while signed in:
- * - DeliveryNotifier's flight simulator (every 3s)
  * - the realtime channels on orders, deliveries, drones, weather, chat,
  *   notifications and telemetry
  * - UserShell's account-status check (every 10s, customers and vendors):
@@ -24,12 +22,9 @@ export function BackendSync({ role }: { role: Role }) {
   const [blocked, setBlocked] = useState<AccountStatus | null>(null)
 
   useEffect(() => {
-    const sim = startFlightSimulator(api, role, () => invalidateSoon())
-    const unsubscribe = api.subscribeChanges({ userId: me.id, role }, () => invalidateSoon())
-    return () => {
-      sim.stop()
-      unsubscribe()
-    }
+    // The drone's position arrives as drone_telemetry rows written by the
+    // ground-station bridge; nothing here moves a delivery.
+    return api.subscribeChanges({ userId: me.id, role }, () => invalidateSoon())
   }, [me.id, role])
 
   useEffect(() => {

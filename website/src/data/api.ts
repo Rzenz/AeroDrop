@@ -1,7 +1,5 @@
-import type { Coords } from '@/lib/flight-calc'
 import type {
   AccountStatus,
-  DroneStatus,
   AppNotification,
   CampusLocation,
   Drone,
@@ -128,41 +126,6 @@ export interface Review {
   comment: string | null
   reviewer_name: string | null
   created_at: string
-}
-
-/** A delivery as the flight simulator sees it (DeliveryNotifier._mapToDeliveryModel). */
-export interface SimDelivery {
-  id: string
-  order_id: string
-  status: 'pending' | 'assigning' | 'in_transit' | 'delivered' | 'cancelled' | 'failed'
-  /** Progress of the current leg: leg 1 while assigning, leg 2 while in transit. */
-  progress: number
-  drone_id: string | null
-  trips_required: number
-  trips_completed: number
-  pickup_name: string | null
-  dropoff_name: string | null
-  /** The pickup row's own coordinates, when the delivery has one. */
-  pickup_coords: [number, number] | null
-  /** Where the drop-off is: the customer's pin, else the drop-off row's own coordinates. */
-  dropoff_coords: [number, number] | null
-  payload_kg: number
-  delivered_at: string | null
-  created_at: string
-}
-
-export interface TelemetryInput {
-  deliveryId: string
-  latitude: number
-  longitude: number
-  altitude: number
-  speed: number
-  battery: number
-  signal: number
-  heading: number
-  event: 'standby' | 'traveling_to_pickup' | 'in_flight' | 'returning_to_base'
-  /** null on the return leg, so the server doesn't record it as delivery progress. */
-  progress: number | null
 }
 
 export interface ReviewDraft {
@@ -308,21 +271,6 @@ export interface Api {
   zones(): Promise<NoFlyZone[]>
   saveZone(zone: Omit<NoFlyZone, 'id'> & { id?: string }): Promise<void>
   deleteZone(id: string): Promise<void>
-
-  // Flight simulator (DeliveryNotifier._startSimulation). Same RPCs and writes
-  // as the app, so a website tab can fly the drone when no phone is open.
-  simDeliveries(): Promise<SimDelivery[]>
-  hubCoords(): Promise<Coords>
-  recordTelemetry(t: TelemetryInput): Promise<void>
-  setDroneBattery(droneId: string, battery: number): Promise<void>
-  setDroneStatus(droneId: string, status: DroneStatus): Promise<void>
-  confirmPickup(deliveryId: string): Promise<void>
-  completeDelivery(deliveryId: string): Promise<void>
-  arriveAtVendorForNextTrip(deliveryId: string): Promise<void>
-  completeDroneReturn(droneId: string): Promise<void>
-  claimSimLease(droneId: string): Promise<boolean>
-  lastFinishedDeliveryForDrone(droneId: string): Promise<string | null>
-  recoverStaleReturningDrone(droneId: string): Promise<boolean>
 
   /** Realtime: calls back when rows this user can see change (live mode). */
   subscribeChanges(scope: ChangeScope, cb: () => void): () => void

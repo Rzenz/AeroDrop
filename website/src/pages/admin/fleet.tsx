@@ -14,7 +14,7 @@ import type { Drone } from '@/types'
 
 // Same controls as the app's Drone Fleet screen: the fleet is the single
 // registered drone (DRN-001), and the admin's one action is Recharge.
-// Flight states are set by the dispatcher and the flight simulator.
+// Flight states are set by the dispatcher and the ground-station bridge.
 
 export default function Fleet() {
   const drones = useQuery(() => api.drones(), [], 5000)

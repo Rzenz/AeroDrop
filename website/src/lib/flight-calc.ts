@@ -55,14 +55,18 @@ export function formatEta(secs: number) {
   return `${Math.ceil(secs / 60)} mins`
 }
 
-// PROVISIONAL (migration 43): the hub, Maritime and the test drop-off were
-// placed by hand on the map, good to about +/-5 m. campus_locations in the
+// The hub, as migration 47 moved it. Marked on the app's own pin picker and
+// read back by fitting four known markers (scales agreeing to 0.4%, all four
+// within 0.5 m), so it is good to about a metre RELATIVE to the other campus
+// points, but still inherits the absolute error of the original map
+// estimates. Maritime below is still migration 43's copy, placed by hand on
+// the map, good to about +/-5 m. campus_locations in the
 // database is the source of truth; the hub is read from it (hubCoords) and
 // this is only the fallback.
-export const DEFAULT_HUB: Coords = [10.3261338, 123.9546208]
+export const DEFAULT_HUB: Coords = [10.3253829, 123.9537052]
 
-/** The test drop-off (migration 43). Provisional, as above. */
-const TEST_DROP: Coords = [10.3253252, 123.953722]
+/** The test drop-off, as migration 47 moved it; same accuracy as the hub above. */
+const TEST_DROP: Coords = [10.3256272, 123.9539688]
 
 /**
  * DeliveryNotifier._coordinatesForLocation: the simulator places buildings by

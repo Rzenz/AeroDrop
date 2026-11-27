@@ -78,16 +78,16 @@ final campusLocationsProvider = FutureProvider<List<CampusLocation>>((
         id: 'offline-test-drop',
         name: 'Test Drop-off Point',
         locationCode: 'TEST-DROP',
-        latitude: 10.3253252,
-        longitude: 123.9537220,
+        latitude: 10.3256272,
+        longitude: 123.9539688,
         isActive: true,
       ),
       CampusLocation(
         id: 'd637fc1f-64af-4911-9edb-b80ee587bb1e',
         name: 'Campus Base Hub',
         locationCode: 'BASE-HUB',
-        latitude: 10.3261338,
-        longitude: 123.9546208,
+        latitude: 10.3253829,
+        longitude: 123.9537052,
         isActive: true,
       ),
     ];
@@ -120,9 +120,13 @@ final dropoffLocationsProvider = FutureProvider<List<CampusLocation>>((
 
 /// Resolves the campus drone hub from the database. When no BASE-HUB row is
 /// found, falls back to the real hub row: id
-/// d637fc1f-64af-4911-9edb-b80ee587bb1e, at the position migration 43 moved
+/// d637fc1f-64af-4911-9edb-b80ee587bb1e, at the position migration 47 moved
 /// it to, so anything keyed by id, like campus_distance_km, still resolves to
-/// the hub. Provisional, about +/-15 m; the database is the source of truth.
+/// the hub. That position was marked on the app's own pin picker and read back
+/// by fitting four known markers (scales agreeing to 0.4%, all four within
+/// 0.5 m), so it is good to about a metre RELATIVE to the other campus points,
+/// but still inherits the absolute error of the original map estimates. The
+/// database is the source of truth.
 final baseHubLocationProvider = FutureProvider<CampusLocation>((ref) async {
   final allLocations = await ref.watch(campusLocationsProvider.future);
   return allLocations.firstWhere(
@@ -134,8 +138,8 @@ final baseHubLocationProvider = FutureProvider<CampusLocation>((ref) async {
       id: 'd637fc1f-64af-4911-9edb-b80ee587bb1e',
       name: 'Campus Drone Hub',
       locationCode: 'BASE-HUB',
-      latitude: 10.3261338,
-      longitude: 123.9546208,
+      latitude: 10.3253829,
+      longitude: 123.9537052,
       isActive: true,
     ),
   );

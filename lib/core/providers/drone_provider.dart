@@ -144,7 +144,7 @@ class DroneNotifier extends StateNotifier<List<DroneModel>> {
       if (!mounted) return;
 
       // The hub, until telemetry exists; BASE-HUB in the database is the source of truth.
-      String coords = '10.3261338,123.9546208';
+      String coords = '10.3253829,123.9537052';
       if (telemetryRes != null) {
         coords = '${telemetryRes['latitude']},${telemetryRes['longitude']}';
       }

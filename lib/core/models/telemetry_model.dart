@@ -38,8 +38,8 @@ class TelemetryModel {
       droneId: map['drone_id']?.toString(),
       droneCode: map['drone_code']?.toString() ?? 'DRN-001',
       // Hub position when a row has none; BASE-HUB in the database is the source of truth.
-      latitude: (map['latitude'] as num?)?.toDouble() ?? 10.3261338,
-      longitude: (map['longitude'] as num?)?.toDouble() ?? 123.9546208,
+      latitude: (map['latitude'] as num?)?.toDouble() ?? 10.3253829,
+      longitude: (map['longitude'] as num?)?.toDouble() ?? 123.9537052,
       altitude: (map['altitude'] as num?)?.toDouble(),
       speed: (map['speed'] as num?)?.toDouble(),
       batteryLevel: (map['battery_level'] as num?)?.toDouble(),

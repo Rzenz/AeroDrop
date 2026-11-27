@@ -55,7 +55,7 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
   LatLng? _lastFollowedLatLng;
 
   // Until _loadBaseHubLocation() reads BASE-HUB; the database is the source of truth.
-  (double, double) _baseHubCoords = (10.3261338, 123.9546208);
+  (double, double) _baseHubCoords = (10.3253829, 123.9537052);
 
   /// The campus_locations rows, read in build from campusLocationsProvider.
   /// Every name and coordinate the radar draws comes from here.
@@ -248,7 +248,7 @@ class _SharedDroneRadarState extends ConsumerState<SharedDroneRadar>
     // campus_locations (positions as of migration 43).
     // Before the building names: none of them should claim the test point.
     if (query.contains('test drop') || query.contains('test-drop')) {
-      return (10.3253252, 123.9537220);
+      return (10.3256272, 123.9539688);
     }
     if (query.contains('annex 2') ||
         query.contains('annex2') ||

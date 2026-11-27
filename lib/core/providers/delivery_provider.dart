@@ -16,7 +16,7 @@ import 'weather_provider.dart';
 class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
   final Ref ref;
   // Until _loadBaseHubLocation() reads BASE-HUB; the database is the source of truth.
-  (double, double) _baseHubCoords = (10.3261338, 123.9546208);
+  (double, double) _baseHubCoords = (10.3253829, 123.9537052);
   RealtimeChannel? _deliveriesSubscription;
   RealtimeChannel? _ordersSubscription;
   RealtimeChannel? _telemetrySubscription;
@@ -283,9 +283,9 @@ class DeliveryNotifier extends StateNotifier<List<DeliveryModel>> {
       'basic ed': (10.325133, 123.953853),
       'maritime building': (10.3261650, 123.9543871),
       'maritime': (10.3261650, 123.9543871),
-      'test drop-off point': (10.3253252, 123.9537220),
-      'test drop-off': (10.3253252, 123.9537220),
-      'test-drop': (10.3253252, 123.9537220),
+      'test drop-off point': (10.3256272, 123.9539688),
+      'test drop-off': (10.3256272, 123.9539688),
+      'test-drop': (10.3256272, 123.9539688),
       'base hub': _baseHubCoords,
       'base-hub': _baseHubCoords,
     };
